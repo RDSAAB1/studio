@@ -1,0 +1,48 @@
+export type Customer = {
+  id: string;
+  srNo: string;
+  date: string;
+  term: string;
+  dueDate: string;
+  name: string;
+  so: string;
+  address: string;
+  contact: string;
+  vehicleNo: string;
+  variety: string;
+  grossWeight: number;
+  teirWeight: number;
+  weight: number;
+  kartaPercentage: number;
+  kartaWeight: number;
+  kartaAmount: number;
+  netWeight: number;
+  rate: number;
+  labouryRate: number;
+  labouryAmount: number;
+  kanta: number;
+  amount: number;
+  netAmount: number;
+  barcode: string;
+  receiptType: string;
+  paymentType: string;
+  customerId: string;
+};
+
+export type Payment = {
+    paymentId: string;
+    date: string;
+    amount: number;
+    cdAmount: number;
+    type: string;
+    receiptType: string;
+    notes: string;
+}
+
+export type CustomerSummary = {
+    name: string;
+    contact: string;
+    totalOutstanding: number;
+    paymentHistory: Payment[];
+    outstandingEntryIds: string[];
+}

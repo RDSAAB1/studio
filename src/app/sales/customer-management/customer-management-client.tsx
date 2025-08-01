@@ -1,0 +1,486 @@
+"use client";
+
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { getSuggestedNames } from "@/lib/actions";
+import { useDebounce } from "@/hooks/use-debounce";
+import { initialCustomers, appOptionsData } from "@/lib/data";
+import type { Customer } from "@/lib/definitions";
+import { formatSrNo, toTitleCase } from "@/lib/utils";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AddressBook,
+  ArrowDown,
+  AtSign,
+  Calendar,
+  Car,
+  ChevronsUpDown,
+  Contact,
+  Hash,
+  Leaf,
+  Pen,
+  Percent,
+  Phone,
+  PlusCircle,
+  Save,
+  Trash,
+  User,
+  Weight,
+} from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+
+
+const formSchema = z.object({
+    srNo: z.string(),
+    date: z.date(),
+    term: z.coerce.number().min(0),
+    name: z.string().min(1, "Name is required."),
+    so: z.string(),
+    address: z.string(),
+    contact: z.string().min(1, "Contact is required."),
+    vehicleNo: z.string(),
+    variety: z.string().min(1, "Variety is required."),
+    grossWeight: z.coerce.number().min(0),
+    teirWeight: z.coerce.number().min(0),
+    rate: z.coerce.number().min(0),
+    kartaPercentage: z.coerce.number().min(0),
+    labouryRate: z.coerce.number().min(0),
+    kanta: z.coerce.number().min(0),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+// Helper to get a fresh form state
+const getInitialFormState = (customers: Customer[]): Customer => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+
+  return {
+    id: "", srNo: formatSrNo(nextSrNum), date: today.toISOString().split("T")[0], term: '0', dueDate: today.toISOString().split("T")[0], 
+    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
+    weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+    labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, barcode: '',
+    receiptType: 'Cash', paymentType: 'Full', customerId: ''
+  };
+};
+
+export default function CustomerManagementClient() {
+  const { toast } = useToast();
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(initialCustomers));
+  const [isEditing, setIsEditing] = useState(false);
+  const [appOptions, setAppOptions] = useState(appOptionsData);
+
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
+  const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
+  const debouncedName = useDebounce(currentCustomer.name, 300);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      date: new Date(),
+      term: 0,
+      name: "",
+      contact: "",
+      variety: "",
+      grossWeight: 0,
+      teirWeight: 0,
+      rate: 0,
+      kartaPercentage: 0,
+      labouryRate: 0,
+      kanta: 0,
+    },
+  });
+
+  const performCalculations = useCallback(() => {
+    const values = form.getValues();
+    const date = values.date;
+    const termDays = values.term || 0;
+    const newDueDate = new Date(date);
+    newDueDate.setDate(newDueDate.getDate() + termDays);
+
+    const grossWeight = values.grossWeight || 0;
+    const teirWeight = values.teirWeight || 0;
+    const weight = grossWeight - teirWeight;
+
+    const kartaPercentage = values.kartaPercentage || 0;
+    const rate = values.rate || 0;
+
+    const kartaWeight = weight * (kartaPercentage / 100);
+    const kartaAmount = kartaWeight * rate;
+    const netWeight = weight - kartaWeight;
+    const amount = netWeight * rate;
+
+    const labouryRate = values.labouryRate || 0;
+    const labouryAmount = weight * labouryRate;
+    const kanta = values.kanta || 0;
+    const netAmount = amount - labouryAmount - kanta;
+
+    setCurrentCustomer(prev => ({
+      ...prev,
+      dueDate: newDueDate.toISOString().split("T")[0],
+      weight: parseFloat(weight.toFixed(2)),
+      kartaWeight: parseFloat(kartaWeight.toFixed(2)),
+      kartaAmount: parseFloat(kartaAmount.toFixed(2)),
+      netWeight: parseFloat(netWeight.toFixed(2)),
+      amount: parseFloat(amount.toFixed(2)),
+      labouryAmount: parseFloat(labouryAmount.toFixed(2)),
+      netAmount: parseFloat(netAmount.toFixed(2)),
+    }));
+  }, [form]);
+
+  useEffect(() => {
+    const subscription = form.watch((value, { name, type }) => {
+        if (type === 'change') {
+            setCurrentCustomer(prev => ({...prev, ...value, date: value.date?.toISOString().split("T")[0] || ""}));
+            performCalculations();
+        }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, performCalculations]);
+
+  useEffect(() => {
+    if (debouncedName.length > 2) {
+      setIsSuggestionLoading(true);
+      const existingNames = customers.map(c => c.name);
+      getSuggestedNames(debouncedName, existingNames)
+        .then(setNameSuggestions)
+        .finally(() => setIsSuggestionLoading(false));
+    } else {
+      setNameSuggestions([]);
+    }
+  }, [debouncedName, customers]);
+
+
+  const handleNew = () => {
+    setIsEditing(false);
+    const newState = getInitialFormState(customers);
+    setCurrentCustomer(newState);
+    form.reset({
+      ...newState,
+      term: 0,
+      date: new Date(newState.date),
+      grossWeight: 0,
+      teirWeight: 0,
+      rate: 0,
+      kartaPercentage: 0,
+      labouryRate: 0,
+      kanta: 0,
+    });
+  };
+
+  const handleEdit = (id: string) => {
+    const customerToEdit = customers.find(c => c.id === id);
+    if (customerToEdit) {
+      setIsEditing(true);
+      setCurrentCustomer(customerToEdit);
+      form.reset({
+        ...customerToEdit,
+        date: new Date(customerToEdit.date),
+        term: Number(customerToEdit.term),
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    setCustomers(prev => prev.filter(c => c.id !== id));
+    toast({ title: "Success", description: "Entry deleted successfully." });
+    if (currentCustomer.id === id) {
+      handleNew();
+    }
+  };
+
+  const onSubmit = (values: FormValues) => {
+    const completeEntry: Customer = {
+      ...currentCustomer,
+      ...values,
+      date: values.date.toISOString().split("T")[0],
+      term: String(values.term),
+      name: toTitleCase(values.name),
+      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+    };
+
+    if (isEditing) {
+      setCustomers(prev => prev.map(c => c.id === completeEntry.id ? completeEntry : c));
+      toast({ title: "Success", description: "Entry updated successfully." });
+    } else {
+      const newEntry = { ...completeEntry, id: Date.now().toString() };
+      setCustomers(prev => [newEntry, ...prev]);
+      toast({ title: "Success", description: "New entry saved successfully." });
+    }
+    handleNew();
+  };
+
+  const summaryFields = useMemo(() => [
+    { label: "Due Date", value: currentCustomer.dueDate },
+    { label: "Weight", value: currentCustomer.weight },
+    { label: "Karta Weight", value: currentCustomer.kartaWeight },
+    { label: "Karta Amount", value: currentCustomer.kartaAmount },
+    { label: "Net Weight", value: currentCustomer.netWeight },
+    { label: "Laboury Amount", value: currentCustomer.labouryAmount },
+    { label: "Amount", value: currentCustomer.amount },
+    { label: "Net Amount", value: currentCustomer.netAmount, isBold: true },
+  ], [currentCustomer]);
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">{isEditing ? `Editing Entry: ${currentCustomer.srNo}` : "Add New Entry"}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <div className="space-y-6">
+              
+              {/* Basic Info */}
+              <Card className="bg-card/50">
+                  <CardHeader><CardTitle className="text-lg font-headline">Basic Information</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="srNo">Sr No.</Label>
+                        <Input id="srNo" value={currentCustomer.srNo} readOnly className="font-code" />
+                    </div>
+                    
+                    <Controller name="date" control={form.control} render={({ field }) => (
+                         <div className="space-y-2">
+                            <Label>Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <CalendarComponent
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    initialFocus
+                                />
+                                </PopoverContent>
+                            </Popover>
+                         </div>
+                    )} />
+
+                    <Controller name="term" control={form.control} render={({ field }) => (
+                         <div className="space-y-2">
+                            <Label htmlFor="term">Term (Days)</Label>
+                            <Input id="term" type="number" {...field} />
+                         </div>
+                    )} />
+                  </CardContent>
+              </Card>
+
+              {/* Customer Details */}
+              <Card className="bg-card/50">
+                  <CardHeader><CardTitle className="text-lg font-headline">Customer Details</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Controller name="name" control={form.control} render={({ field }) => (
+                        <div className="space-y-2 relative">
+                            <Label htmlFor="name">Name</Label>
+                            <Input id="name" {...field} placeholder="e.g. John Doe" />
+                            {nameSuggestions.length > 0 && (
+                                <div className="absolute z-10 w-full bg-popover border rounded-md shadow-lg mt-1">
+                                    {nameSuggestions.map((s, i) => (
+                                        <div key={i} className="p-2 hover:bg-accent cursor-pointer"
+                                            onClick={() => {
+                                                field.onChange(s);
+                                                setNameSuggestions([]);
+                                            }}>
+                                            {s}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+                        </div>
+                    )} />
+                    <Controller name="so" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="so">S/O</Label>
+                            <Input id="so" {...field} />
+                        </div>
+                    )} />
+                     <Controller name="contact" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="contact">Contact</Label>
+                            <Input id="contact" {...field} />
+                            {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
+                        </div>
+                    )} />
+                    <Controller name="address" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="address">Address</Label>
+                            <Input id="address" {...field} />
+                        </div>
+                    )} />
+                     <Controller name="vehicleNo" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="vehicleNo">Vehicle No.</Label>
+                            <Input id="vehicleNo" {...field} />
+                        </div>
+                    )} />
+                  </CardContent>
+              </Card>
+
+              {/* Transaction Details */}
+              <Card className="bg-card/50">
+                  <CardHeader><CardTitle className="text-lg font-headline">Transaction Details</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Controller name="variety" control={form.control} render={({ field }) => (
+                         <div className="space-y-2">
+                            <Label>Variety</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between">
+                                  {field.value ? toTitleCase(appOptions.varieties.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select variety..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[200px] p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search variety..." />
+                                  <CommandList>
+                                    <CommandEmpty>No variety found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {appOptions.varieties.map((variety) => (
+                                        <CommandItem key={variety} value={variety} onSelect={() => field.onChange(variety)}>
+                                          {toTitleCase(variety)}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                         </div>
+                    )} />
+                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
+                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
+                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
+                    <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
+                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
+                    <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
+                  </CardContent>
+              </Card>
+
+              {/* Summary */}
+              <Card>
+                <CardHeader><CardTitle className="text-lg font-headline">Calculated Summary</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {summaryFields.map(item => (
+                    <div key={item.label} className="space-y-1">
+                      <p className="text-sm text-muted-foreground">{item.label}</p>
+                      <p className={cn("text-lg font-semibold", item.isBold && "text-primary font-bold text-xl")}>{item.value}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+            </div>
+            <div className="flex justify-start space-x-4">
+              <Button type="submit">
+                {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+              </Button>
+              <Button type="button" variant="outline" onClick={handleNew}>
+                <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+      
+      {/* Customer Table */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="font-headline">Transaction Records</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sr No</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Net Amount</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customers.map(customer => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-code">{customer.srNo}</TableCell>
+                    <TableCell>{toTitleCase(customer.name)}</TableCell>
+                    <TableCell>{customer.date}</TableCell>
+                    <TableCell>{customer.netAmount.toFixed(2)}</TableCell>
+                    <TableCell>{customer.dueDate}</TableCell>
+                    <TableCell className="space-x-2">
+                       <Button variant="ghost" size="icon" onClick={() => handleEdit(customer.id)}>
+                            <Pen className="h-4 w-4" />
+                       </Button>
+                       <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon">
+                                <Trash className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(customer.id)}>Continue</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
