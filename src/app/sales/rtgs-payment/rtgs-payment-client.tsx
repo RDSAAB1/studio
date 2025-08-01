@@ -108,37 +108,39 @@ export default function RtgspaymentClient() {
     defaultValues: initialFormState,
   });
 
-  const generateSrNo = useCallback(() => {
-    const lastSrNo = allRecords.reduce((max, record) => {
-      const srNumMatch = record.srNo?.match(/^R(\d+)$/);
-      if (srNumMatch) {
-        const currentNum = parseInt(srNumMatch[1], 10);
-        return Math.max(max, currentNum);
-      }
-      return max;
-    }, 0);
-    const newSrNo = `R${String(lastSrNo + 1).padStart(5, "0")}`;
-    form.setValue("srNo", newSrNo);
-  }, [allRecords, form]);
+  const generateSrNo = useCallback((records: any[]) => {
+      const lastSrNo = records.reduce((max, record) => {
+        const srNumMatch = record.srNo?.match(/^R(\d+)$/);
+        if (srNumMatch) {
+          const currentNum = parseInt(srNumMatch[1], 10);
+          return Math.max(max, currentNum);
+        }
+        return max;
+      }, 0);
+      return `R${String(lastSrNo + 1).padStart(5, "0")}`;
+  }, []);
+
 
   useEffect(() => {
     setIsClient(true);
     const savedRecords = localStorage.getItem("rtgs_records");
     if (savedRecords) {
-      setAllRecords(JSON.parse(savedRecords));
+      const parsedRecords = JSON.parse(savedRecords);
+      setAllRecords(parsedRecords);
+      if (editingRecordIndex === null) {
+          form.setValue("srNo", generateSrNo(parsedRecords));
+      }
     } else {
-        generateSrNo();
+        form.setValue("srNo", generateSrNo([]));
     }
-  }, [generateSrNo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isClient) {
         localStorage.setItem("rtgs_records", JSON.stringify(allRecords));
     }
-     if (editingRecordIndex === null) {
-        generateSrNo();
-    }
-  }, [allRecords, editingRecordIndex, generateSrNo, isClient]);
+  }, [allRecords, isClient]);
 
   const onSubmit = (values: FormValues) => {
     let message = "";
@@ -153,13 +155,12 @@ export default function RtgspaymentClient() {
       message = "Record saved successfully!";
     }
     toast({ title: "Success", description: message });
-    form.reset(initialFormState);
+    handleNew(allRecords);
   };
   
-  const handleNew = () => {
-    form.reset(initialFormState);
+  const handleNew = (records: any[]) => {
+    form.reset({...initialFormState, srNo: generateSrNo(records) });
     setEditingRecordIndex(null);
-    generateSrNo();
   }
 
   const handleEdit = (index: number) => {
@@ -170,10 +171,11 @@ export default function RtgspaymentClient() {
   };
 
   const handleDelete = (index: number) => {
-    setAllRecords((prev) => prev.filter((_, i) => i !== index));
+    const updatedRecords = allRecords.filter((_, i) => i !== index);
+    setAllRecords(updatedRecords);
     toast({ title: "Success", description: "Record deleted successfully." });
     if(editingRecordIndex === index){
-        handleNew();
+        handleNew(updatedRecords);
     }
   };
 
@@ -189,11 +191,9 @@ export default function RtgspaymentClient() {
     const rateSteps = [1, 5, 10, 50, 100];
 
     for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
-        // Condition: Quantal (10 kg) - check if quantity is a multiple of 0.10
         if (Math.round(q * 100) % 10 !== 0) continue;
 
         for (let step of rateSteps) {
-            // Condition: Round Figure Rates
             let startRateForStep = Math.ceil(calcMinRate / step) * step;
             let endRateForStep = Math.floor(calcMaxRate / step) * step;
 
@@ -202,17 +202,13 @@ export default function RtgspaymentClient() {
                 if (currentRate < calcMinRate || currentRate > calcMaxRate || currentRate <= 0) continue;
 
                 let calculatedAmount = q * currentRate;
-                // Condition: Rounding of Calculated Amount to nearest 5
                 let finalAmount = Math.round(calculatedAmount / 5) * 5;
 
-                // Condition: No Exceeding Target Amount
                 if (finalAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - finalAmount).toFixed(2));
 
-                // Condition: Remaining Amount >= 0
                 if (amountRemaining >= 0) {
-                    // Condition: No Repeating Remaining Amounts
                     if (!generatedUniqueRemainingAmounts.has(amountRemaining)) {
                         rawOptions.push({
                             quantity: q,
@@ -302,7 +298,7 @@ export default function RtgspaymentClient() {
                 <Label htmlFor="srNo">SR No.</Label>
                 <Input id="srNo" {...form.register("srNo")} />
                 {form.formState.errors.srNo && <p className="text-sm text-destructive">{form.formState.errors.srNo.message}</p>}
-                <Button type="button" onClick={generateSrNo} className="mt-2">Generate SR No.</Button>
+                <Button type="button" onClick={() => form.setValue('srNo', generateSrNo(allRecords))} className="mt-2">Generate SR No.</Button>
               </div>
               <div className="space-y-2"><Label htmlFor="date">Payment Date</Label><Input type="date" id="date" {...form.register("date")} /></div>
               <div className="space-y-2"><Label htmlFor="grNo">6R No.</Label><Input id="grNo" {...form.register("grNo")} /></div>
@@ -333,7 +329,7 @@ export default function RtgspaymentClient() {
           <Button type="submit">
             {editingRecordIndex !== null ? <><Pen /> Update Record</> : <><Save /> Save Record</>}
           </Button>
-          <Button type="button" variant="outline" onClick={handleNew}>
+          <Button type="button" variant="outline" onClick={() => handleNew(allRecords)}>
             <PlusCircle /> New / Clear
           </Button>
         </div>
@@ -436,12 +432,5 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
-
-
-    
-
-    
-
-    
 
     
