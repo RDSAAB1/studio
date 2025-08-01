@@ -59,6 +59,13 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+type PaymentOption = {
+  quantity: number;
+  rate: number;
+  calculatedAmount: number;
+  amountRemaining: number;
+};
+
 const initialFormState: FormValues = {
   name: "",
   fatherName: "",
@@ -88,6 +95,12 @@ export default function RtgspaymentClient() {
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
+
+  const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
+  const [isPaymentOptionsModalOpen, setIsPaymentOptionsModalOpen] = useState(false);
+  const [calcTargetAmount, setCalcTargetAmount] = useState(50000);
+  const [calcMinRate, setCalcMinRate] = useState(2300);
+  const [calcMaxRate, setCalcMaxRate] = useState(2400);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -162,6 +175,81 @@ export default function RtgspaymentClient() {
         handleNew();
     }
   };
+
+  const handleGeneratePaymentOptions = () => {
+    if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate <= 0 || calcMaxRate <= 0 || calcMinRate > calcMaxRate) {
+        toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please enter valid numbers for payment calculation.' });
+        return;
+    }
+
+    const rawOptions: PaymentOption[] = [];
+    const generatedUniqueRemainingAmounts = new Set();
+    const remainingTolerance = 15;
+    const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / calcMinRate) + 50);
+    const rateSteps = [1, 5, 10, 50, 100];
+
+    for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
+        if (Math.round(q * 100) % 10 !== 0) continue;
+
+        for (let step of rateSteps) {
+            let startRateForStep = Math.ceil(calcMinRate / step) * step;
+            let endRateForStep = Math.floor(calcMaxRate / step) * step;
+
+            for (let currentRate = startRateForStep; currentRate <= endRateForStep; currentRate += step) {
+                currentRate = parseFloat(currentRate.toFixed(2));
+                if (currentRate < calcMinRate || currentRate > calcMaxRate || currentRate <= 0) continue;
+
+                let calculatedAmount = q * currentRate;
+                let finalAmount = Math.round(calculatedAmount / 5) * 5;
+
+                if (finalAmount > calcTargetAmount + 0.01) continue;
+
+                const amountRemaining = parseFloat((calcTargetAmount - finalAmount).toFixed(2));
+
+                if (amountRemaining >= 0 && amountRemaining <= remainingTolerance) {
+                    let isRemainingUnique = true;
+                    for (let existingRemaining of generatedUniqueRemainingAmounts) {
+                        if (Math.abs(existingRemaining - amountRemaining) < 0.01) {
+                            isRemainingUnique = false;
+                            break;
+                        }
+                    }
+
+                    if (isRemainingUnique) {
+                        rawOptions.push({
+                            quantity: q,
+                            rate: currentRate,
+                            calculatedAmount: finalAmount,
+                            amountRemaining: amountRemaining
+                        });
+                        generatedUniqueRemainingAmounts.add(amountRemaining);
+                    }
+                }
+            }
+        }
+    }
+
+    const sortedOptions = rawOptions.sort((a, b) => {
+        const diffA = Math.abs(a.amountRemaining);
+        const diffB = Math.abs(b.amountRemaining);
+        if (diffA !== diffB) return diffA - diffB;
+        if (a.quantity !== b.quantity) return a.quantity - b.quantity;
+        return a.rate - b.rate;
+    });
+    
+    setPaymentOptions(sortedOptions);
+    setIsPaymentOptionsModalOpen(true);
+    toast({ title: 'Success', description: `Generated ${sortedOptions.length} payment options.` });
+  }
+
+  const selectPaymentAmount = (option: PaymentOption) => {
+    form.setValue('amount', option.calculatedAmount);
+    form.setValue('rate', option.rate);
+    form.setValue('weight', option.quantity);
+    setIsPaymentOptionsModalOpen(false);
+    toast({ title: 'Selected', description: `Amount ${option.calculatedAmount} selected.` });
+  }
+
 
   if (!isClient) {
     return null; 
@@ -243,6 +331,68 @@ export default function RtgspaymentClient() {
           </Button>
         </div>
       </form>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Calculation</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <Label htmlFor="calcTargetAmount">Target Amount to Pay</Label>
+                    <Input type="number" id="calcTargetAmount" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(parseFloat(e.target.value))} />
+                </div>
+                <div>
+                    <Label htmlFor="calcMinRate">Min 6R Rate</Label>
+                    <Input type="number" id="calcMinRate" value={calcMinRate} onChange={(e) => setCalcMinRate(parseFloat(e.target.value))} />
+                </div>
+                <div>
+                    <Label htmlFor="calcMaxRate">Max 6R Rate</Label>
+                    <Input type="number" id="calcMaxRate" value={calcMaxRate} onChange={(e) => setCalcMaxRate(parseFloat(e.target.value))} />
+                </div>
+           </div>
+           <Button onClick={handleGeneratePaymentOptions}>Generate Payment Options</Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isPaymentOptionsModalOpen} onOpenChange={setIsPaymentOptionsModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Generated Payment Options</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>6R Rate</TableHead>
+                  <TableHead>Calculated Amount</TableHead>
+                  <TableHead>Amount Remaining</TableHead>
+                  <TableHead>Select</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paymentOptions.length > 0 ? paymentOptions.map((option, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{option.quantity}</TableCell>
+                      <TableCell>{option.rate}</TableCell>
+                      <TableCell>{option.calculatedAmount}</TableCell>
+                      <TableCell>{option.amountRemaining}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => selectPaymentAmount(option)}>Select</Button>
+                      </TableCell>
+                    </TableRow>
+                )) : (
+                    <TableRow>
+                        <TableCell colSpan={5} className="text-center">No options generated.</TableCell>
+                    </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       <Card>
         <CardHeader><CardTitle>Saved Records</CardTitle></CardHeader>
