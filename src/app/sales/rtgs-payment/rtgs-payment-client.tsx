@@ -235,12 +235,15 @@ export default function RtgspaymentClient() {
         return a.rate - b.rate;
     });
     
-    setPaymentOptions(sortedOptions);
+    const limitedOptions = sortedOptions.slice(0, 50);
+    
+    setPaymentOptions(limitedOptions);
     setIsPaymentOptionsModalOpen(true);
     
-    // Condition: Informational message about number of options
-    let message = `Generated ${sortedOptions.length} payment options.`;
-    if (sortedOptions.length < 20) {
+    let message = `Generated ${limitedOptions.length} payment options.`;
+    if (rawOptions.length > 50) {
+        message += ` Displaying top 50 results.`;
+    } else if (rawOptions.length < 20) {
         message += " Fewer than 20 options were found due to strict generation criteria.";
     }
     toast({ title: 'Success', description: message });
@@ -434,6 +437,8 @@ export default function RtgspaymentClient() {
   );
 }
 
+
+    
 
     
 
