@@ -132,13 +132,13 @@ export default function RtgspaymentClient() {
   }, [generateSrNo]);
 
   useEffect(() => {
-    if (allRecords.length > 0) {
-      localStorage.setItem("rtgs_records", JSON.stringify(allRecords));
+    if (isClient) {
+        localStorage.setItem("rtgs_records", JSON.stringify(allRecords));
     }
      if (editingRecordIndex === null) {
         generateSrNo();
     }
-  }, [allRecords, editingRecordIndex, generateSrNo]);
+  }, [allRecords, editingRecordIndex, generateSrNo, isClient]);
 
   const onSubmit = (values: FormValues) => {
     let message = "";
@@ -435,5 +435,7 @@ export default function RtgspaymentClient() {
   );
 }
 
+
+    
 
     
