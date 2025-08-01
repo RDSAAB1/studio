@@ -158,7 +158,8 @@ export default function RtgspaymentClient() {
           form.setValue("srNo", generateSrNo(parsedRecords));
       }
     }
-  }, [editingRecordIndex, form, generateSrNo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isClient) {
@@ -298,6 +299,9 @@ export default function RtgspaymentClient() {
 
     if (firstEntry) {
       form.setValue('amount', totalAmount);
+      // Also set the target amount for calculation
+      setCalcTargetAmount(totalAmount);
+
       form.setValue('grNo', firstEntry.grNo);
       form.setValue('grDate', firstEntry.grDate?.split('T')[0]);
       form.setValue('parchiNo', firstEntry.parchiNo);
@@ -306,7 +310,7 @@ export default function RtgspaymentClient() {
       form.setValue('weight', firstEntry.weight);
     }
     document.getElementById('close-outstanding-modal')?.click();
-    toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} outstanding entries. Total: ${totalAmount.toFixed(2)}` });
+    toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} outstanding entries. Total: ${totalAmount.toFixed(2)}. Target amount set.` });
   };
 
 
@@ -621,5 +625,3 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
-
-    
