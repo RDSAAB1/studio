@@ -107,6 +107,11 @@ export default function CustomerManagementClient() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
 
+  const [varietyPopoverOpen, setVarietyPopoverOpen] = useState(false);
+  const [receiptTypePopoverOpen, setReceiptTypePopoverOpen] = useState(false);
+  const [paymentTypePopoverOpen, setPaymentTypePopoverOpen] = useState(false);
+
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -322,6 +327,7 @@ export default function CustomerManagementClient() {
         setAppOptions({...appOptions, varieties: newVarieties});
         form.setValue('variety', toTitleCase(varietySearch));
         setVarietySearch("");
+        setVarietyPopoverOpen(false);
         toast({ title: "Success", description: `"${toTitleCase(varietySearch)}" added to varieties.` });
     }
   }
@@ -467,7 +473,7 @@ export default function CustomerManagementClient() {
                      <Controller name="receiptType" control={form.control} render={({ field }) => (
                          <div className="space-y-2">
                             <Label>Receipt Type</Label>
-                            <Popover>
+                            <Popover open={receiptTypePopoverOpen} onOpenChange={setReceiptTypePopoverOpen}>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" className="w-full justify-between">
                                   {field.value ? toTitleCase(appOptions.receiptTypes.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select..."}
@@ -481,6 +487,7 @@ export default function CustomerManagementClient() {
                                       {appOptions.receiptTypes.map((type) => (
                                         <CommandItem key={type} value={type} onSelect={(currentValue) => {
                                           form.setValue("receiptType", currentValue === field.value ? "" : currentValue);
+                                          setReceiptTypePopoverOpen(false);
                                         }}>
                                           {toTitleCase(type)}
                                         </CommandItem>
@@ -495,7 +502,7 @@ export default function CustomerManagementClient() {
                     <Controller name="paymentType" control={form.control} render={({ field }) => (
                          <div className="space-y-2">
                             <Label>Payment Type</Label>
-                            <Popover>
+                            <Popover open={paymentTypePopoverOpen} onOpenChange={setPaymentTypePopoverOpen}>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" className="w-full justify-between">
                                   {field.value ? toTitleCase(appOptions.paymentTypes.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select..."}
@@ -509,6 +516,7 @@ export default function CustomerManagementClient() {
                                       {appOptions.paymentTypes.map((type) => (
                                         <CommandItem key={type} value={type} onSelect={(currentValue) => {
                                           form.setValue("paymentType", currentValue === field.value ? "" : currentValue);
+                                          setPaymentTypePopoverOpen(false);
                                         }}>
                                           {toTitleCase(type)}
                                         </CommandItem>
@@ -572,7 +580,7 @@ export default function CustomerManagementClient() {
                          <div className="space-y-2">
                             <Label>Variety</Label>
                             <div className="flex gap-2">
-                            <Popover>
+                            <Popover open={varietyPopoverOpen} onOpenChange={setVarietyPopoverOpen}>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" className="w-full justify-between">
                                   {field.value ? toTitleCase(appOptions.varieties.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select variety..."}
@@ -598,6 +606,7 @@ export default function CustomerManagementClient() {
                                             value={variety} 
                                             onSelect={(currentValue) => {
                                                 form.setValue("variety", currentValue === field.value ? "" : toTitleCase(currentValue));
+                                                setVarietyPopoverOpen(false);
                                             }}
                                             className="flex justify-between items-center group"
                                         >
@@ -772,3 +781,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
