@@ -297,89 +297,9 @@ export default function CustomerManagementClient() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="space-y-6">
               
-              {/* Basic Customer Information */}
-              <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Basic Customer Information</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <Controller name="contact" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="contact">Contact</Label>
-                            <Input id="contact" {...field} />
-                            {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
-                        </div>
-                    )} />
-                     <Controller name="name" control={form.control} render={({ field }) => (
-                        <div className="space-y-2 relative">
-                            <Label htmlFor="name">Name</Label>
-                            <Input id="name" {...field} placeholder="e.g. John Doe" />
-                            {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
-                        </div>
-                    )} />
-                    <Controller name="so" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="so">S/O</Label>
-                            <Input id="so" {...field} />
-                        </div>
-                    )} />
-                    <Controller name="address" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="address">Address</Label>
-                            <Input id="address" {...field} />
-                        </div>
-                    )} />
-                     <Controller name="vehicleNo" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="vehicleNo">Vehicle No.</Label>
-                            <Input id="vehicleNo" {...field} />
-                        </div>
-                    )} />
-                  </CardContent>
-              </Card>
-
-              {/* Weight, Quantity & Financial Details */}
-              <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Weight, Quantity & Financial Details</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
-                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
-                     <Controller name="variety" control={form.control} render={({ field }) => (
-                         <div className="space-y-2">
-                            <Label>Variety</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" className="w-full justify-between">
-                                  {field.value ? toTitleCase(appOptions.varieties.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select variety..."}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[200px] p-0">
-                                <Command>
-                                  <CommandInput placeholder="Search variety..." />
-                                  <CommandList>
-                                    <CommandEmpty>No variety found.</CommandEmpty>
-                                    <CommandGroup>
-                                      {appOptions.varieties.map((variety) => (
-                                        <CommandItem key={variety} value={variety} onSelect={() => field.onChange(variety)}>
-                                          {toTitleCase(variety)}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                         </div>
-                    )} />
-                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
-                    <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
-                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
-                    <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
-                  </CardContent>
-              </Card>
-
               {/* Other Transaction Details */}
               <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Other Transaction Details</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-lg font-headline">Transaction Details</CardTitle></CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                      <div className="space-y-2">
                         <Label htmlFor="srNo">Sr No.</Label>
@@ -474,6 +394,87 @@ export default function CustomerManagementClient() {
                     )} />
                   </CardContent>
               </Card>
+
+              {/* Basic Customer Information */}
+              <Card className="bg-card/50">
+                  <CardHeader><CardTitle className="text-lg font-headline">Customer Information</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Controller name="contact" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="contact">Contact</Label>
+                            <Input id="contact" {...field} />
+                            {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
+                        </div>
+                    )} />
+                     <Controller name="name" control={form.control} render={({ field }) => (
+                        <div className="space-y-2 relative">
+                            <Label htmlFor="name">Name</Label>
+                            <Input id="name" {...field} placeholder="e.g. John Doe" />
+                            {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+                        </div>
+                    )} />
+                    <Controller name="so" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="so">S/O</Label>
+                            <Input id="so" {...field} />
+                        </div>
+                    )} />
+                    <Controller name="address" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="address">Address</Label>
+                            <Input id="address" {...field} />
+                        </div>
+                    )} />
+                     <Controller name="vehicleNo" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="vehicleNo">Vehicle No.</Label>
+                            <Input id="vehicleNo" {...field} />
+                        </div>
+                    )} />
+                  </CardContent>
+              </Card>
+
+              {/* Weight, Quantity & Financial Details */}
+              <Card className="bg-card/50">
+                  <CardHeader><CardTitle className="text-lg font-headline">Financial Details</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
+                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
+                     <Controller name="variety" control={form.control} render={({ field }) => (
+                         <div className="space-y-2">
+                            <Label>Variety</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between">
+                                  {field.value ? toTitleCase(appOptions.varieties.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select variety..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[200px] p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search variety..." />
+                                  <CommandList>
+                                    <CommandEmpty>No variety found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {appOptions.varieties.map((variety) => (
+                                        <CommandItem key={variety} value={variety} onSelect={() => field.onChange(variety)}>
+                                          {toTitleCase(variety)}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                         </div>
+                    )} />
+                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
+                    <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
+                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
+                    <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
+                  </CardContent>
+              </Card>
+
               
               {/* Summary */}
               <Card>
@@ -561,3 +562,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
