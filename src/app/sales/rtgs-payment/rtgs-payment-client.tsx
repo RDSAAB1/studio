@@ -185,7 +185,6 @@ export default function RtgspaymentClient() {
 
     const rawOptions: PaymentOption[] = [];
     const generatedUniqueRemainingAmounts = new Set<number>();
-    const remainingTolerance = 15;
     const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / calcMinRate) + 50);
     const rateSteps = [1, 5, 10, 50, 100];
 
@@ -211,8 +210,8 @@ export default function RtgspaymentClient() {
 
                 const amountRemaining = parseFloat((calcTargetAmount - finalAmount).toFixed(2));
 
-                // Condition: Remaining Amount Tolerance (0 to 15)
-                if (amountRemaining >= 0 && amountRemaining <= remainingTolerance) {
+                // Condition: Remaining Amount >= 0
+                if (amountRemaining >= 0) {
                     // Condition: No Repeating Remaining Amounts
                     if (!generatedUniqueRemainingAmounts.has(amountRemaining)) {
                         rawOptions.push({
@@ -435,6 +434,8 @@ export default function RtgspaymentClient() {
   );
 }
 
+
+    
 
     
 
