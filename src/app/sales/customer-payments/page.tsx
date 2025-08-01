@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -222,6 +223,10 @@ export default function CustomerPaymentsPage() {
                           <Label htmlFor="cd-amount">Cash Discount (CD) Amount</Label>
                           <Input id="cd-amount" type="number" value={cdAmount} onChange={e => setCdAmount(parseFloat(e.target.value) || 0)} />
                       </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="cd-toggle" onCheckedChange={(checked) => setCdAmount(checked ? (totalOutstandingForSelected * 0.02) : 0)} />
+                    <Label htmlFor="cd-toggle">Apply 2% CD</Label>
                   </div>
                   <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>Process Payment</Button>
               </CardContent>

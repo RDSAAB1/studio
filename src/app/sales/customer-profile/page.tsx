@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { initialCustomers } from "@/lib/data";
-import type { Customer, CustomerSummary } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase } from "@/lib/utils";
 
 import {
@@ -36,14 +37,35 @@ export default function CustomerProfilePage() {
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
-    initialCustomers.forEach(entry => { // Using initialCustomers to simulate a stable data source
+    const tempPaymentHistory = new Map<string, Payment[]>();
+
+    // First, let's process payments from somewhere, for now, we'll imagine they are tied to a customerId
+    // In a real app, you'd fetch payments. For now, we simulate some.
+    initialCustomers.forEach((c, index) => {
+        if(!tempPaymentHistory.has(c.customerId)) {
+            tempPaymentHistory.set(c.customerId, []);
+        }
+        if(index % 2 === 0 && c.netAmount > 5000) {
+             tempPaymentHistory.get(c.customerId)?.push({
+                 paymentId: `P0000${index + 1}`,
+                 date: '2025-07-28',
+                 amount: c.netAmount / 2,
+                 cdAmount: 0,
+                 type: 'Partial',
+                 receiptType: 'Online',
+                 notes: `Simulated partial payment for SR ${c.srNo}`
+             })
+        }
+    })
+
+    initialCustomers.forEach(entry => {
       const key = entry.customerId;
       if (!newSummary.has(key)) {
         newSummary.set(key, {
           name: entry.name,
           contact: entry.contact,
           totalOutstanding: 0,
-          paymentHistory: [], // In a real app, this would be fetched
+          paymentHistory: tempPaymentHistory.get(key) || [], 
           outstandingEntryIds: [],
         });
       }
@@ -53,15 +75,17 @@ export default function CustomerProfilePage() {
         data.outstandingEntryIds.push(entry.id);
       }
     });
+
     setCustomerSummary(newSummary);
     if (!selectedCustomerKey && newSummary.size > 0) {
       setSelectedCustomerKey(Array.from(newSummary.keys())[0]);
     }
-  }, [selectedCustomerKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Remove selectedCustomerKey from dependencies to avoid re-running on select
 
   useEffect(() => {
     updateCustomerSummary();
-  }, []);
+  }, [updateCustomerSummary]);
 
   const selectedCustomerData = selectedCustomerKey ? customerSummary.get(selectedCustomerKey) : null;
 
@@ -113,6 +137,40 @@ export default function CustomerProfilePage() {
                   <p className="text-2xl font-bold">
                     {selectedCustomerData.outstandingEntryIds.length}
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedCustomerData.paymentHistory.length > 0 ? (
+                        selectedCustomerData.paymentHistory.map(p => (
+                          <TableRow key={p.paymentId}>
+                            <TableCell>{p.paymentId}</TableCell>
+                            <TableCell>{p.date}</TableCell>
+                            <TableCell>{p.amount.toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-muted-foreground">No payment history</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>

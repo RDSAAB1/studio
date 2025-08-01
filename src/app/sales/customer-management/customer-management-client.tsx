@@ -86,10 +86,14 @@ export default function CustomerManagementClient() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      srNo: currentCustomer.srNo,
       date: new Date(),
       term: 0,
       name: "",
+      so: "",
+      address: "",
       contact: "",
+      vehicleNo: "",
       variety: "",
       grossWeight: 0,
       teirWeight: 0,
@@ -158,14 +162,17 @@ export default function CustomerManagementClient() {
     const newState = getInitialFormState(customers);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    // Set date part of state, ensuring it's a string
     newState.date = today.toISOString().split("T")[0];
     newState.dueDate = today.toISOString().split("T")[0];
 
     setCurrentCustomer(newState);
+
     form.reset({
       ...newState,
       term: 0,
-      date: today,
+      date: today, // form expects Date object
       grossWeight: 0,
       teirWeight: 0,
       rate: 0,
@@ -252,7 +259,7 @@ export default function CustomerManagementClient() {
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-2">
                         <Label htmlFor="srNo">Sr No.</Label>
-                        <Input id="srNo" value={currentCustomer.srNo} readOnly className="font-code" />
+                        <Input id="srNo" {...form.register('srNo')} readOnly className="font-code" />
                     </div>
                     
                     <Controller name="date" control={form.control} render={({ field }) => (
