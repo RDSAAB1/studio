@@ -34,6 +34,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -553,7 +554,7 @@ export default function CustomerManagementClient() {
                                             onSelect={(currentValue) => {
                                                 form.setValue("variety", currentValue === field.value ? "" : toTitleCase(currentValue));
                                             }}
-                                            className="flex justify-between items-center"
+                                            className="flex justify-between items-center group"
                                         >
                                           <span>{toTitleCase(variety)}</span>
                                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100">
