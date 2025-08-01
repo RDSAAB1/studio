@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -62,13 +63,11 @@ type FormValues = z.infer<typeof formSchema>;
 
 // Helper to get a fresh form state
 const getInitialFormState = (customers: Customer[]): Customer => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+  const staticDate = '2025-01-01'; // Static date to avoid hydration mismatch
 
   return {
-    id: "", srNo: formatSrNo(nextSrNum), date: today.toISOString().split("T")[0], term: '0', dueDate: today.toISOString().split("T")[0], 
+    id: "", srNo: formatSrNo(nextSrNum), date: staticDate, term: '0', dueDate: staticDate, 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, barcode: '',
@@ -82,6 +81,7 @@ export default function CustomerManagementClient() {
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(initialCustomers));
   const [isEditing, setIsEditing] = useState(false);
   const [appOptions, setAppOptions] = useState(appOptionsData);
+  const [isClient, setIsClient] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -136,6 +136,12 @@ export default function CustomerManagementClient() {
       netAmount: parseFloat(netAmount.toFixed(2)),
     }));
   }, [form]);
+  
+  useEffect(() => {
+    setIsClient(true);
+    handleNew();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const subscription = form.watch((value, { name, type }) => {
@@ -150,11 +156,16 @@ export default function CustomerManagementClient() {
   const handleNew = () => {
     setIsEditing(false);
     const newState = getInitialFormState(customers);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    newState.date = today.toISOString().split("T")[0];
+    newState.dueDate = today.toISOString().split("T")[0];
+
     setCurrentCustomer(newState);
     form.reset({
       ...newState,
       term: 0,
-      date: new Date(newState.date),
+      date: today,
       grossWeight: 0,
       teirWeight: 0,
       rate: 0,
@@ -217,6 +228,10 @@ export default function CustomerManagementClient() {
     { label: "Amount", value: currentCustomer.amount },
     { label: "Net Amount", value: currentCustomer.netAmount, isBold: true },
   ], [currentCustomer]);
+
+  if (!isClient) {
+    return null; // or a loading skeleton
+  }
 
   return (
     <>
@@ -361,7 +376,7 @@ export default function CustomerManagementClient() {
                   {summaryFields.map(item => (
                     <div key={item.label} className="space-y-1">
                       <p className="text-sm text-muted-foreground">{item.label}</p>
-                      <p className={cn("text-lg font-semibold", item.isBold && "text-primary font-bold text-xl")}>{item.value}</p>
+                      <p className={cn("text-lg font-semibold", item.isBold && "text-primary font-bold text-xl")}>{String(item.value)}</p>
                     </div>
                   ))}
                 </CardContent>
@@ -440,3 +455,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
