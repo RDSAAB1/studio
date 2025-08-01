@@ -45,6 +45,7 @@ import {
   Trash,
   Plus,
   Pencil,
+  Info
 } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -80,6 +81,7 @@ type FormValues = z.infer<typeof formSchema>;
 const getInitialFormState = (customers: Customer[]): Customer => {
   const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
   const staticDate = new Date();
+  staticDate.setHours(0,0,0,0);
 
   return {
     id: "", srNo: formatSrNo(nextSrNum), date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
@@ -102,6 +104,8 @@ export default function CustomerManagementClient() {
   const [editingOption, setEditingOption] = useState<{ type: 'varieties', value: string } | null>(null);
   const [newOptionValue, setNewOptionValue] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -265,6 +269,11 @@ export default function CustomerManagementClient() {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
+      const activeElement = document.activeElement as HTMLElement;
+      // Prevent form submission if the active element is a button inside a popover (like calendar)
+      if (activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]')) {
+        return;
+      }
       const form = e.currentTarget;
       const formElements = Array.from(form.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
       const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
@@ -346,6 +355,11 @@ export default function CustomerManagementClient() {
     setEditingOption(null);
     setNewOptionValue("");
   }
+  
+  const handleShowDetails = (customer: Customer) => {
+    setDetailsCustomer(customer);
+    setIsDetailsModalOpen(true);
+  }
 
 
   const summaryFields = useMemo(() => {
@@ -361,6 +375,37 @@ export default function CustomerManagementClient() {
         { label: "Net Amount", value: currentCustomer.netAmount, isBold: true },
       ]
     }, [currentCustomer]);
+    
+    const customerDetailsFields = (customer: Customer | null) => {
+      if (!customer) return [];
+      return [
+        { label: "SR No.", value: customer.srNo },
+        { label: "Date", value: format(new Date(customer.date), "PPP") },
+        { label: "Term", value: `${customer.term} days` },
+        { label: "Due Date", value: format(new Date(customer.dueDate), "PPP") },
+        { label: "Name", value: toTitleCase(customer.name) },
+        { label: "S/O", value: toTitleCase(customer.so) },
+        { label: "Address", value: customer.address },
+        { label: "Contact", value: customer.contact },
+        { label: "Vehicle No.", value: customer.vehicleNo },
+        { label: "Variety", value: toTitleCase(customer.variety) },
+        { label: "Gross Weight", value: customer.grossWeight },
+        { label: "Teir Weight", value: customer.teirWeight },
+        { label: "Weight", value: customer.weight },
+        { label: "Karta %", value: customer.kartaPercentage },
+        { label: "Karta Weight", value: customer.kartaWeight },
+        { label: "Karta Amount", value: customer.kartaAmount },
+        { label: "Net Weight", value: customer.netWeight },
+        { label: "Rate", value: customer.rate },
+        { label: "Laboury Rate", value: customer.labouryRate },
+        { label: "Laboury Amount", value: customer.labouryAmount },
+        { label: "Kanta", value: customer.kanta },
+        { label: "Amount", value: customer.amount },
+        { label: "Net Amount", value: customer.netAmount },
+        { label: "Receipt Type", value: customer.receiptType },
+        { label: "Payment Type", value: customer.paymentType },
+      ];
+    };
 
   if (!isClient) {
     return null; // or a loading skeleton
@@ -672,6 +717,9 @@ export default function CustomerManagementClient() {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
+                 <Button variant="ghost" size="icon" onClick={() => handleShowDetails(customer)}>
+                      <Info className="h-4 w-4" />
+                 </Button>
                  <Button variant="ghost" size="icon" onClick={() => handleEdit(customer.id)}>
                       <Pen className="h-4 w-4" />
                  </Button>
@@ -699,6 +747,31 @@ export default function CustomerManagementClient() {
           ))}
         </div>
       </div>
+
+       {/* Details Dialog */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Transaction Details for {detailsCustomer?.srNo}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto p-4">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+              {customerDetailsFields(detailsCustomer).map(field => (
+                <div key={field.label}>
+                  <p className="text-sm font-medium text-muted-foreground">{field.label}</p>
+                  <p className="font-semibold">{String(field.value)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsDetailsModalOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
+
+    
