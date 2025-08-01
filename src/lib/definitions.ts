@@ -65,3 +65,9 @@ export type CustomerSummary = {
     paymentHistory: Payment[];
     outstandingEntryIds: string[];
 }
+
+export type AppOptions = {
+    varieties: string[];
+    receiptTypes: string[];
+    paymentTypes: string[];
+}
