@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getSuggestedNames } from "@/lib/actions";
-import { useDebounce } from "@/hooks/use-debounce";
 import { initialCustomers, appOptionsData } from "@/lib/data";
 import type { Customer } from "@/lib/definitions";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
@@ -30,23 +28,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  AddressBook,
-  ArrowDown,
-  AtSign,
-  Calendar,
-  Car,
   ChevronsUpDown,
-  Contact,
-  Hash,
-  Leaf,
   Pen,
-  Percent,
-  Phone,
   PlusCircle,
   Save,
   Trash,
-  User,
-  Weight,
 } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -96,10 +82,6 @@ export default function CustomerManagementClient() {
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(initialCustomers));
   const [isEditing, setIsEditing] = useState(false);
   const [appOptions, setAppOptions] = useState(appOptionsData);
-
-  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
-  const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
-  const debouncedName = useDebounce(currentCustomer.name, 300);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -164,19 +146,6 @@ export default function CustomerManagementClient() {
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
-
-  useEffect(() => {
-    if (debouncedName.length > 2) {
-      setIsSuggestionLoading(true);
-      const existingNames = customers.map(c => c.name);
-      getSuggestedNames(debouncedName, existingNames)
-        .then(setNameSuggestions)
-        .finally(() => setIsSuggestionLoading(false));
-    } else {
-      setNameSuggestions([]);
-    }
-  }, [debouncedName, customers]);
-
 
   const handleNew = () => {
     setIsEditing(false);
@@ -313,19 +282,6 @@ export default function CustomerManagementClient() {
                         <div className="space-y-2 relative">
                             <Label htmlFor="name">Name</Label>
                             <Input id="name" {...field} placeholder="e.g. John Doe" />
-                            {nameSuggestions.length > 0 && (
-                                <div className="absolute z-10 w-full bg-popover border rounded-md shadow-lg mt-1">
-                                    {nameSuggestions.map((s, i) => (
-                                        <div key={i} className="p-2 hover:bg-accent cursor-pointer"
-                                            onClick={() => {
-                                                field.onChange(s);
-                                                setNameSuggestions([]);
-                                            }}>
-                                            {s}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                             {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
                         </div>
                     )} />
