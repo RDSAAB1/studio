@@ -427,7 +427,6 @@ export default function CustomerManagementClient() {
           <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-8">
             <div className="space-y-6">
               
-              {/* Other Transaction Details */}
               <Card className="bg-card/50">
                   <CardHeader><CardTitle className="text-lg font-headline">Transaction Details</CardTitle></CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -480,13 +479,13 @@ export default function CustomerManagementClient() {
                                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-[200px] p-0">
+                              <PopoverContent className="w-full p-0">
                                 <Command>
                                   <CommandList>
                                     <CommandGroup>
                                       {appOptions.receiptTypes.map((type) => (
                                         <CommandItem key={type} value={type} onSelect={(currentValue) => {
-                                          form.setValue("receiptType", currentValue === field.value ? "" : currentValue);
+                                          form.setValue("receiptType", currentValue === field.value ? "" : toTitleCase(currentValue));
                                           setReceiptTypePopoverOpen(false);
                                         }}>
                                           {toTitleCase(type)}
@@ -509,13 +508,13 @@ export default function CustomerManagementClient() {
                                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-[200px] p-0">
+                              <PopoverContent className="w-full p-0">
                                 <Command>
                                   <CommandList>
                                     <CommandGroup>
                                       {appOptions.paymentTypes.map((type) => (
                                         <CommandItem key={type} value={type} onSelect={(currentValue) => {
-                                          form.setValue("paymentType", currentValue === field.value ? "" : currentValue);
+                                          form.setValue("paymentType", currentValue === field.value ? "" : toTitleCase(currentValue));
                                           setPaymentTypePopoverOpen(false);
                                         }}>
                                           {toTitleCase(type)}
@@ -531,7 +530,6 @@ export default function CustomerManagementClient() {
                   </CardContent>
               </Card>
 
-              {/* Basic Customer Information */}
               <Card className="bg-card/50">
                   <CardHeader><CardTitle className="text-lg font-headline">Customer Information</CardTitle></CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -570,7 +568,6 @@ export default function CustomerManagementClient() {
                   </CardContent>
               </Card>
 
-              {/* Weight, Quantity & Financial Details */}
               <Card className="bg-card/50">
                   <CardHeader><CardTitle className="text-lg font-headline">Financial Details</CardTitle></CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -587,7 +584,7 @@ export default function CustomerManagementClient() {
                                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-[250px] p-0">
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                                 <Command>
                                   <CommandInput 
                                     placeholder="Search or add variety..." 
@@ -597,7 +594,7 @@ export default function CustomerManagementClient() {
                                   <CommandList>
                                     <CommandEmpty>
                                         No variety found.
-                                        {varietySearch && <Button className="w-full mt-2" onClick={() => handleAddOption('varieties')}>Add "{varietySearch}"</Button>}
+                                        {varietySearch && <Button className="w-full mt-2" onClick={() => handleAddOption('varieties')}>Add "{toTitleCase(varietySearch)}"</Button>}
                                     </CommandEmpty>
                                     <CommandGroup>
                                       {appOptions.varieties.filter(v => v.toLowerCase().includes(varietySearch.toLowerCase())).map((variety) => (
@@ -612,12 +609,12 @@ export default function CustomerManagementClient() {
                                         >
                                           <span>{toTitleCase(variety)}</span>
                                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditingOption({ type: 'varieties', value: variety }); }}>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setEditingOption({ type: 'varieties', value: variety }); }}>
                                                 <Pencil className="h-3 w-3" />
                                             </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); }}>
                                                         <Trash className="h-3 w-3 text-destructive" />
                                                     </Button>
                                                 </AlertDialogTrigger>
@@ -654,7 +651,6 @@ export default function CustomerManagementClient() {
               </Card>
 
               
-              {/* Summary */}
               <Card>
                 <CardHeader><CardTitle className="text-lg font-headline">Calculated Summary</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -768,6 +764,7 @@ export default function CustomerManagementClient() {
               {customerDetailsFields(detailsCustomer).map(field => (
                 <div key={field.label}>
                   <p className="text-sm font-medium text-muted-foreground">{field.label}</p>
+
                   <p className="font-semibold">{String(field.value)}</p>
                 </div>
               ))}
@@ -781,8 +778,3 @@ export default function CustomerManagementClient() {
     </>
   );
 }
-
-    
-    
-
-    
