@@ -612,12 +612,12 @@ export default function CustomerManagementClient() {
                                         >
                                           <span>{toTitleCase(variety)}</span>
                                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption({ type: 'varieties', value: variety }); }}>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditingOption({ type: 'varieties', value: variety }); }}>
                                                 <Pencil className="h-3 w-3" />
                                             </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                                                         <Trash className="h-3 w-3 text-destructive" />
                                                     </Button>
                                                 </AlertDialogTrigger>
@@ -783,4 +783,6 @@ export default function CustomerManagementClient() {
 }
 
     
+    
+
     
