@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -183,15 +184,17 @@ export default function RtgspaymentClient() {
     }
 
     const rawOptions: PaymentOption[] = [];
-    const generatedUniqueRemainingAmounts = new Set();
+    const generatedUniqueRemainingAmounts = new Set<number>();
     const remainingTolerance = 15;
     const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / calcMinRate) + 50);
     const rateSteps = [1, 5, 10, 50, 100];
 
     for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
+        // Condition: Quantal (10 kg) - check if quantity is a multiple of 0.10
         if (Math.round(q * 100) % 10 !== 0) continue;
 
         for (let step of rateSteps) {
+            // Condition: Round Figure Rates
             let startRateForStep = Math.ceil(calcMinRate / step) * step;
             let endRateForStep = Math.floor(calcMaxRate / step) * step;
 
@@ -200,22 +203,18 @@ export default function RtgspaymentClient() {
                 if (currentRate < calcMinRate || currentRate > calcMaxRate || currentRate <= 0) continue;
 
                 let calculatedAmount = q * currentRate;
+                // Condition: Rounding of Calculated Amount to nearest 5
                 let finalAmount = Math.round(calculatedAmount / 5) * 5;
 
-                if (finalAmount > calcTargetAmount + 0.01) continue;
+                // Condition: No Exceeding Target Amount
+                if (finalAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - finalAmount).toFixed(2));
 
+                // Condition: Remaining Amount Tolerance (0 to 15)
                 if (amountRemaining >= 0 && amountRemaining <= remainingTolerance) {
-                    let isRemainingUnique = true;
-                    for (let existingRemaining of generatedUniqueRemainingAmounts) {
-                        if (Math.abs(existingRemaining - amountRemaining) < 0.01) {
-                            isRemainingUnique = false;
-                            break;
-                        }
-                    }
-
-                    if (isRemainingUnique) {
+                    // Condition: No Repeating Remaining Amounts
+                    if (!generatedUniqueRemainingAmounts.has(amountRemaining)) {
                         rawOptions.push({
                             quantity: q,
                             rate: currentRate,
@@ -239,7 +238,13 @@ export default function RtgspaymentClient() {
     
     setPaymentOptions(sortedOptions);
     setIsPaymentOptionsModalOpen(true);
-    toast({ title: 'Success', description: `Generated ${sortedOptions.length} payment options.` });
+    
+    // Condition: Informational message about number of options
+    let message = `Generated ${sortedOptions.length} payment options.`;
+    if (sortedOptions.length < 20) {
+        message += " Fewer than 20 options were found due to strict generation criteria.";
+    }
+    toast({ title: 'Success', description: message });
   }
 
   const selectPaymentAmount = (option: PaymentOption) => {
@@ -360,7 +365,7 @@ export default function RtgspaymentClient() {
           <DialogHeader>
             <DialogTitle>Generated Payment Options</DialogTitle>
           </DialogHeader>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[60vh]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -374,7 +379,7 @@ export default function RtgspaymentClient() {
               <TableBody>
                 {paymentOptions.length > 0 ? paymentOptions.map((option, index) => (
                     <TableRow key={index}>
-                      <TableCell>{option.quantity}</TableCell>
+                      <TableCell>{option.quantity.toFixed(2)}</TableCell>
                       <TableCell>{option.rate}</TableCell>
                       <TableCell>{option.calculatedAmount}</TableCell>
                       <TableCell>{option.amountRemaining}</TableCell>
@@ -429,3 +434,6 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
+
+
+    
