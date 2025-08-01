@@ -38,6 +38,7 @@ const menuItems = [
       { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports" },
       { id: "Sub1-6", name: "Customer Payments", href: "/sales/customer-payments" },
       { id: "Sub1-7", name: "Customer Profile", href: "/sales/customer-profile" },
+      { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment" },
     ],
   },
   {

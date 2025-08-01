@@ -29,6 +29,22 @@ export type Customer = {
   paymentType: string;
   customerId: string;
   searchValue?: string;
+  
+  // Fields from RTGS form
+  fatherName?: string;
+  parchiName?: string;
+  parchiAddress?: string;
+  acNo?: string;
+  ifscCode?: string;
+  bank?: string;
+  branch?: string;
+  grNo?: string;
+  grDate?: string;
+  parchiNo?: string;
+  parchiDate?: string;
+  checkNo?: string;
+  utrNo?: string;
+  rtgsAmount?: number;
 };
 
 export type Payment = {
