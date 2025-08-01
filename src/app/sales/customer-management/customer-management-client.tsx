@@ -57,6 +57,8 @@ const formSchema = z.object({
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
+    receiptType: z.string(),
+    paymentType: z.string()
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -71,7 +73,7 @@ const getInitialFormState = (customers: Customer[]): Customer => {
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: ''
+    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
   };
 };
 
@@ -101,11 +103,13 @@ export default function CustomerManagementClient() {
       kartaPercentage: 0,
       labouryRate: 0,
       kanta: 0,
+      receiptType: "Cash",
+      paymentType: "Full"
     },
   });
 
-  const performCalculations = useCallback(() => {
-    const values = form.getValues();
+  const performCalculations = useCallback((data: Partial<FormValues>) => {
+    const values = {...form.getValues(), ...data};
     const date = values.date;
     const termDays = values.term || 0;
     const newDueDate = new Date(date);
@@ -130,6 +134,9 @@ export default function CustomerManagementClient() {
 
     setCurrentCustomer(prev => ({
       ...prev,
+      ...values,
+      date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
+      term: String(values.term),
       dueDate: newDueDate.toISOString().split("T")[0],
       weight: parseFloat(weight.toFixed(2)),
       kartaWeight: parseFloat(kartaWeight.toFixed(2)),
@@ -148,14 +155,49 @@ export default function CustomerManagementClient() {
   }, []);
 
   useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-        if (type === 'change') {
-            setCurrentCustomer(prev => ({...prev, ...value, date: value.date?.toISOString().split("T")[0] || ""}));
-            performCalculations();
-        }
+    const subscription = form.watch((value) => {
+        performCalculations(value as Partial<FormValues>);
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
+
+
+  const resetFormToState = (customerState: Customer) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let formDate;
+    try {
+        formDate = customerState.date ? new Date(customerState.date) : today;
+        if (isNaN(formDate.getTime())) formDate = today;
+    } catch {
+        formDate = today;
+    }
+    
+    const formValues: FormValues = {
+      srNo: customerState.srNo,
+      date: formDate,
+      term: Number(customerState.term) || 0,
+      name: customerState.name,
+      so: customerState.so,
+      address: customerState.address,
+      contact: customerState.contact,
+      vehicleNo: customerState.vehicleNo,
+      variety: customerState.variety,
+      grossWeight: customerState.grossWeight || 0,
+      teirWeight: customerState.teirWeight || 0,
+      rate: customerState.rate || 0,
+      kartaPercentage: customerState.kartaPercentage || 0,
+      labouryRate: customerState.labouryRate || 0,
+      kanta: customerState.kanta || 0,
+      receiptType: customerState.receiptType || 'Cash',
+      paymentType: customerState.paymentType || 'Full'
+    };
+    
+    setCurrentCustomer(customerState);
+    form.reset(formValues);
+    performCalculations(formValues);
+  }
 
   const handleNew = () => {
     setIsEditing(false);
@@ -163,38 +205,40 @@ export default function CustomerManagementClient() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Set date part of state, ensuring it's a string
     newState.date = today.toISOString().split("T")[0];
     newState.dueDate = today.toISOString().split("T")[0];
-
-    setCurrentCustomer(newState);
-
-    form.reset({
-      ...newState,
-      term: 0,
-      date: today, // form expects Date object
-      grossWeight: 0,
-      teirWeight: 0,
-      rate: 0,
-      kartaPercentage: 0,
-      labouryRate: 0,
-      kanta: 0,
-    });
+    
+    resetFormToState(newState);
   };
 
   const handleEdit = (id: string) => {
     const customerToEdit = customers.find(c => c.id === id);
     if (customerToEdit) {
       setIsEditing(true);
-      setCurrentCustomer(customerToEdit);
-      form.reset({
-        ...customerToEdit,
-        date: new Date(customerToEdit.date),
-        term: Number(customerToEdit.term),
-      });
+      resetFormToState(customerToEdit);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  const handleSrNoBlur = (srNoValue: string) => {
+    let formattedSrNo = srNoValue.trim();
+    if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
+        formattedSrNo = formatSrNo(parseInt(formattedSrNo));
+        form.setValue('srNo', formattedSrNo);
+    }
+    
+    const foundCustomer = customers.find(c => c.srNo === formattedSrNo);
+    if (foundCustomer) {
+        setIsEditing(true);
+        resetFormToState(foundCustomer);
+    } else {
+        setIsEditing(false);
+        // Keep the typed SR no, but reset the rest of the form
+        const currentState = {...getInitialFormState(customers), srNo: formattedSrNo};
+        resetFormToState(currentState);
+    }
+  }
+
 
   const handleDelete = (id: string) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
@@ -253,13 +297,93 @@ export default function CustomerManagementClient() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="space-y-6">
               
-              {/* Basic Info */}
+              {/* Basic Customer Information */}
               <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Basic Information</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-lg font-headline">Basic Customer Information</CardTitle></CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
+                    <Controller name="contact" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="contact">Contact</Label>
+                            <Input id="contact" {...field} />
+                            {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
+                        </div>
+                    )} />
+                     <Controller name="name" control={form.control} render={({ field }) => (
+                        <div className="space-y-2 relative">
+                            <Label htmlFor="name">Name</Label>
+                            <Input id="name" {...field} placeholder="e.g. John Doe" />
+                            {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+                        </div>
+                    )} />
+                    <Controller name="so" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="so">S/O</Label>
+                            <Input id="so" {...field} />
+                        </div>
+                    )} />
+                    <Controller name="address" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="address">Address</Label>
+                            <Input id="address" {...field} />
+                        </div>
+                    )} />
+                     <Controller name="vehicleNo" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="vehicleNo">Vehicle No.</Label>
+                            <Input id="vehicleNo" {...field} />
+                        </div>
+                    )} />
+                  </CardContent>
+              </Card>
+
+              {/* Weight, Quantity & Financial Details */}
+              <Card className="bg-card/50">
+                  <CardHeader><CardTitle className="text-lg font-headline">Weight, Quantity & Financial Details</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
+                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
+                     <Controller name="variety" control={form.control} render={({ field }) => (
+                         <div className="space-y-2">
+                            <Label>Variety</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between">
+                                  {field.value ? toTitleCase(appOptions.varieties.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select variety..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[200px] p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search variety..." />
+                                  <CommandList>
+                                    <CommandEmpty>No variety found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {appOptions.varieties.map((variety) => (
+                                        <CommandItem key={variety} value={variety} onSelect={() => field.onChange(variety)}>
+                                          {toTitleCase(variety)}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                         </div>
+                    )} />
+                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
+                    <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
+                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
+                    <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
+                  </CardContent>
+              </Card>
+
+              {/* Other Transaction Details */}
+              <Card className="bg-card/50">
+                  <CardHeader><CardTitle className="text-lg font-headline">Other Transaction Details</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                     <div className="space-y-2">
                         <Label htmlFor="srNo">Sr No.</Label>
-                        <Input id="srNo" {...form.register('srNo')} readOnly className="font-code" />
+                        <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code" />
                     </div>
                     
                     <Controller name="date" control={form.control} render={({ field }) => (
@@ -296,71 +420,23 @@ export default function CustomerManagementClient() {
                             <Input id="term" type="number" {...field} />
                          </div>
                     )} />
-                  </CardContent>
-              </Card>
-
-              {/* Customer Details */}
-              <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Customer Details</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <Controller name="name" control={form.control} render={({ field }) => (
-                        <div className="space-y-2 relative">
-                            <Label htmlFor="name">Name</Label>
-                            <Input id="name" {...field} placeholder="e.g. John Doe" />
-                            {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
-                        </div>
-                    )} />
-                    <Controller name="so" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="so">S/O</Label>
-                            <Input id="so" {...field} />
-                        </div>
-                    )} />
-                     <Controller name="contact" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="contact">Contact</Label>
-                            <Input id="contact" {...field} />
-                            {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
-                        </div>
-                    )} />
-                    <Controller name="address" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="address">Address</Label>
-                            <Input id="address" {...field} />
-                        </div>
-                    )} />
-                     <Controller name="vehicleNo" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="vehicleNo">Vehicle No.</Label>
-                            <Input id="vehicleNo" {...field} />
-                        </div>
-                    )} />
-                  </CardContent>
-              </Card>
-
-              {/* Transaction Details */}
-              <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Transaction Details</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <Controller name="variety" control={form.control} render={({ field }) => (
+                     <Controller name="receiptType" control={form.control} render={({ field }) => (
                          <div className="space-y-2">
-                            <Label>Variety</Label>
+                            <Label>Receipt Type</Label>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" className="w-full justify-between">
-                                  {field.value ? toTitleCase(appOptions.varieties.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select variety..."}
+                                  {field.value ? toTitleCase(appOptions.receiptTypes.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select..."}
                                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-[200px] p-0">
                                 <Command>
-                                  <CommandInput placeholder="Search variety..." />
                                   <CommandList>
-                                    <CommandEmpty>No variety found.</CommandEmpty>
                                     <CommandGroup>
-                                      {appOptions.varieties.map((variety) => (
-                                        <CommandItem key={variety} value={variety} onSelect={() => field.onChange(variety)}>
-                                          {toTitleCase(variety)}
+                                      {appOptions.receiptTypes.map((type) => (
+                                        <CommandItem key={type} value={type} onSelect={() => field.onChange(type)}>
+                                          {toTitleCase(type)}
                                         </CommandItem>
                                       ))}
                                     </CommandGroup>
@@ -370,15 +446,35 @@ export default function CustomerManagementClient() {
                             </Popover>
                          </div>
                     )} />
-                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
-                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
-                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
-                    <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
-                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
-                    <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
+                    <Controller name="paymentType" control={form.control} render={({ field }) => (
+                         <div className="space-y-2">
+                            <Label>Payment Type</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between">
+                                  {field.value ? toTitleCase(appOptions.paymentTypes.find(v => v.toLowerCase() === field.value.toLowerCase()) || field.value) : "Select..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[200px] p-0">
+                                <Command>
+                                  <CommandList>
+                                    <CommandGroup>
+                                      {appOptions.paymentTypes.map((type) => (
+                                        <CommandItem key={type} value={type} onSelect={() => field.onChange(type)}>
+                                          {toTitleCase(type)}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                         </div>
+                    )} />
                   </CardContent>
               </Card>
-
+              
               {/* Summary */}
               <Card>
                 <CardHeader><CardTitle className="text-lg font-headline">Calculated Summary</CardTitle></CardHeader>
@@ -465,3 +561,4 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+

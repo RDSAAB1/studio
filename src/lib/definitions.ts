@@ -1,3 +1,4 @@
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -22,11 +23,12 @@ export type Customer = {
   labouryAmount: number;
   kanta: number;
   amount: number;
-  netAmount: number;
+  netAmount: number | string;
   barcode: string;
   receiptType: string;
   paymentType: string;
   customerId: string;
+  searchValue?: string;
 };
 
 export type Payment = {

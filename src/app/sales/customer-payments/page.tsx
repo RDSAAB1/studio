@@ -40,14 +40,21 @@ export default function CustomerPaymentsPage() {
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
+  
   const [paymentAmount, setPaymentAmount] = useState(0);
-  const [cdAmount, setCdAmount] = useState(0);
+  const [paymentType, setPaymentType] = useState('Full');
+  const [cdEnabled, setCdEnabled] = useState(false);
+  const [cdPercent, setCdPercent] = useState(2);
+  const [cdAt, setCdAt] = useState('unpaid_amount');
+  const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
+
   const [paymentIdCounter, setPaymentIdCounter] = useState(0);
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
     customers.forEach(entry => {
-      const key = entry.customerId;
+      if (!entry.name || !entry.contact) return;
+      const key = `${entry.name.toLowerCase()}|${entry.contact.toLowerCase()}`;
       if (!newSummary.has(key)) {
         newSummary.set(key, {
           name: entry.name,
@@ -58,8 +65,8 @@ export default function CustomerPaymentsPage() {
         });
       }
       const data = newSummary.get(key)!;
-      if (entry.netAmount > 0) {
-        data.totalOutstanding += entry.netAmount;
+      if (parseFloat(String(entry.netAmount)) > 0) {
+        data.totalOutstanding += parseFloat(String(entry.netAmount));
         data.outstandingEntryIds.push(entry.id);
       }
     });
@@ -68,12 +75,15 @@ export default function CustomerPaymentsPage() {
 
   useEffect(() => {
     updateCustomerSummary();
+     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customers]);
 
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
+    setPaymentType('Full');
+    setCdEnabled(false);
   };
   
   const handleEntrySelect = (entryId: string) => {
@@ -91,21 +101,68 @@ export default function CustomerPaymentsPage() {
   }, [customers, selectedEntryIds]);
   
   const totalOutstandingForSelected = useMemo(() => {
-    return selectedEntries.reduce((acc, entry) => acc + entry.netAmount, 0);
+    return selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0);
   }, [selectedEntries]);
+  
+  const autoSetCDToggle = useCallback(() => {
+    if (selectedEntries.length === 0) {
+        setCdEnabled(false);
+        return;
+    }
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const allDueInFuture = selectedEntries.every(e => new Date(e.dueDate) > today);
+
+    setCdEnabled(allDueInFuture);
+  }, [selectedEntries]);
+
+  useEffect(() => {
+    if(paymentType === 'Full') {
+        setPaymentAmount(totalOutstandingForSelected);
+    }
+  }, [paymentType, totalOutstandingForSelected]);
+
+  useEffect(() => {
+    autoSetCDToggle();
+  }, [selectedEntryIds, autoSetCDToggle]);
+  
+  useEffect(() => {
+    if(!cdEnabled) {
+        setCalculatedCdAmount(0);
+        return;
+    }
+    let base = 0;
+    const amount = paymentAmount || 0;
+    const outstanding = totalOutstandingForSelected;
+
+    if (cdAt === 'paid_amount' || cdAt === 'payment_amount') {
+        base = amount;
+    } else if (cdAt === 'unpaid_amount') {
+        base = outstanding;
+    } else if (cdAt === 'full_amount') {
+        base = amount + outstanding;
+    }
+    setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
+  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt]);
+
 
   const processPayment = () => {
     if (selectedEntryIds.size === 0 || paymentAmount <= 0) {
       toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries and enter a valid payment amount." });
       return;
     }
-    let remainingPayment = paymentAmount + cdAmount;
+     if (paymentType === 'Partial' && paymentAmount > totalOutstandingForSelected) {
+      toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
+      return;
+    }
+
+    let remainingPayment = paymentAmount + calculatedCdAmount;
     const updatedCustomers = [...customers];
 
     selectedEntries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // FIFO
       .forEach(entry => {
         const entryInArray = updatedCustomers.find(c => c.id === entry.id)!;
-        const outstanding = entryInArray.netAmount;
+        const outstanding = parseFloat(String(entryInArray.netAmount));
         if (remainingPayment >= outstanding) {
           entryInArray.netAmount = 0;
           remainingPayment -= outstanding;
@@ -119,8 +176,8 @@ export default function CustomerPaymentsPage() {
         paymentId: formatPaymentId(paymentIdCounter + 1),
         date: new Date().toISOString().split("T")[0],
         amount: paymentAmount,
-        cdAmount: cdAmount,
-        type: paymentAmount >= totalOutstandingForSelected ? 'Full' : 'Partial',
+        cdAmount: calculatedCdAmount,
+        type: paymentType,
         receiptType: 'Online',
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
     };
@@ -132,12 +189,12 @@ export default function CustomerPaymentsPage() {
     setCustomers(updatedCustomers);
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
-    setCdAmount(0);
+    setCdEnabled(false);
     toast({ title: "Success", description: "Payment processed successfully." });
   };
   
-  const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && c.netAmount > 0) : [];
-  const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && c.netAmount === 0) : [];
+  const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && parseFloat(String(c.netAmount)) > 0) : [];
+  const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && parseFloat(String(c.netAmount)) === 0) : [];
   const paymentHistory = selectedCustomerKey ? customerSummary.get(selectedCustomerKey)?.paymentHistory || [] : [];
 
   return (
@@ -198,7 +255,7 @@ export default function CustomerPaymentsPage() {
                         <TableCell>{entry.srNo}</TableCell>
                         <TableCell>{entry.date}</TableCell>
                         <TableCell>{entry.dueDate}</TableCell>
-                        <TableCell className="text-right">{entry.netAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
@@ -209,24 +266,52 @@ export default function CustomerPaymentsPage() {
 
           <Card>
               <CardHeader><CardTitle>Payment Processing</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                   <div className="p-4 border rounded-lg bg-card/30">
                       <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
                       <p className="text-2xl font-bold text-primary">{totalOutstandingForSelected.toFixed(2)}</p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Payment Type</Label>
+                        <Select value={paymentType} onValueChange={setPaymentType}>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Full">Full</SelectItem>
+                                <SelectItem value="Partial">Partial</SelectItem>
+                            </SelectContent>
+                        </Select>
+                      </div>
                       <div className="space-y-2">
                           <Label htmlFor="payment-amount">Payment Amount</Label>
-                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} />
+                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} />
                       </div>
-                      <div className="space-y-2">
-                          <Label htmlFor="cd-amount">Cash Discount (CD) Amount</Label>
-                          <Input id="cd-amount" type="number" value={cdAmount} onChange={e => setCdAmount(parseFloat(e.target.value) || 0)} />
+                      <div className="flex items-center space-x-2 pt-6">
+                        <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
+                        <Label htmlFor="cd-toggle">Apply CD</Label>
                       </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="cd-toggle" onCheckedChange={(checked) => setCdAmount(checked ? (totalOutstandingForSelected * 0.02) : 0)} />
-                    <Label htmlFor="cd-toggle">Apply 2% CD</Label>
+                      {cdEnabled && <>
+                        <div className="space-y-2">
+                            <Label htmlFor="cd-percent">CD %</Label>
+                            <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>CD At</Label>
+                             <Select value={cdAt} onValueChange={setCdAt}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="paid_amount">CD on Paid Amount</SelectItem>
+                                    <SelectItem value="unpaid_amount">CD on Unpaid Amount (Selected)</SelectItem>
+                                    <SelectItem value="payment_amount">CD on Payment Amount (Manual)</SelectItem>
+                                    <SelectItem value="full_amount">CD on Full Amount (Selected)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Calculated CD Amount</Label>
+                            <Input value={calculatedCdAmount.toFixed(2)} readOnly className="font-bold text-primary" />
+                        </div>
+                      </>}
                   </div>
                   <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>Process Payment</Button>
               </CardContent>
@@ -243,7 +328,7 @@ export default function CustomerPaymentsPage() {
                         <TableRow key={entry.id}>
                         <TableCell>{entry.srNo}</TableCell>
                         <TableCell>{entry.date}</TableCell>
-                        <TableCell>{entry.amount.toFixed(2)}</TableCell>
+                        <TableCell>{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
@@ -278,3 +363,4 @@ export default function CustomerPaymentsPage() {
     </div>
   );
 }
+

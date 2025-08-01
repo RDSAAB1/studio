@@ -39,17 +39,18 @@ export default function CustomerProfilePage() {
     const newSummary = new Map<string, CustomerSummary>();
     const tempPaymentHistory = new Map<string, Payment[]>();
 
-    // First, let's process payments from somewhere, for now, we'll imagine they are tied to a customerId
     // In a real app, you'd fetch payments. For now, we simulate some.
-    initialCustomers.forEach((c, index) => {
+     customers.forEach((c, index) => {
+        if(!c.customerId) return;
         if(!tempPaymentHistory.has(c.customerId)) {
             tempPaymentHistory.set(c.customerId, []);
         }
-        if(index % 2 === 0 && c.netAmount > 5000) {
+         // Simulate some payments for demo
+        if(index % 2 === 0 && parseFloat(String(c.netAmount)) > 5000) {
              tempPaymentHistory.get(c.customerId)?.push({
                  paymentId: `P0000${index + 1}`,
                  date: '2025-07-28',
-                 amount: c.netAmount / 2,
+                 amount: parseFloat(String(c.netAmount)) / 2,
                  cdAmount: 0,
                  type: 'Partial',
                  receiptType: 'Online',
@@ -58,7 +59,8 @@ export default function CustomerProfilePage() {
         }
     })
 
-    initialCustomers.forEach(entry => {
+    customers.forEach(entry => {
+      if(!entry.customerId) return;
       const key = entry.customerId;
       if (!newSummary.has(key)) {
         newSummary.set(key, {
@@ -70,8 +72,8 @@ export default function CustomerProfilePage() {
         });
       }
       const data = newSummary.get(key)!;
-      if (entry.netAmount > 0) {
-        data.totalOutstanding += entry.netAmount;
+      if (parseFloat(String(entry.netAmount)) > 0) {
+        data.totalOutstanding += parseFloat(String(entry.netAmount));
         data.outstandingEntryIds.push(entry.id);
       }
     });
@@ -81,7 +83,7 @@ export default function CustomerProfilePage() {
       setSelectedCustomerKey(Array.from(newSummary.keys())[0]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Remove selectedCustomerKey from dependencies to avoid re-running on select
+  }, [customers]); 
 
   useEffect(() => {
     updateCustomerSummary();
@@ -102,7 +104,7 @@ export default function CustomerProfilePage() {
           <CardDescription>Choose a customer to view their detailed information.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Select onValueChange={setSelectedCustomerKey} value={selectedCustomerKey || undefined}>
+          <Select onValueChange={setSelectedCustomerKey} value={selectedCustomerKey || ""}>
             <SelectTrigger className="w-full md:w-1/2">
               <SelectValue placeholder="Select a customer..." />
             </SelectTrigger>
@@ -152,7 +154,8 @@ export default function CustomerProfilePage() {
                       <TableRow>
                         <TableHead>ID</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Amount</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">CD</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -161,12 +164,13 @@ export default function CustomerProfilePage() {
                           <TableRow key={p.paymentId}>
                             <TableCell>{p.paymentId}</TableCell>
                             <TableCell>{p.date}</TableCell>
-                            <TableCell>{p.amount.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{p.amount.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{p.cdAmount.toFixed(2)}</TableCell>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={3} className="text-center text-muted-foreground">No payment history</TableCell>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground">No payment history</TableCell>
                         </TableRow>
                       )}
                     </TableBody>
@@ -189,7 +193,7 @@ export default function CustomerProfilePage() {
                         <TableRow>
                         <TableHead>SR No</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Amount</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Status</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -200,10 +204,10 @@ export default function CustomerProfilePage() {
                             <TableRow key={entry.id}>
                             <TableCell>{entry.srNo}</TableCell>
                             <TableCell>{entry.date}</TableCell>
-                            <TableCell>{entry.amount.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
                             <TableCell>
-                                <Badge variant={entry.netAmount === 0 ? "secondary" : "destructive"}>
-                                {entry.netAmount === 0 ? "Paid" : "Outstanding"}
+                                <Badge variant={parseFloat(String(entry.netAmount)) === 0 ? "secondary" : "destructive"}>
+                                {parseFloat(String(entry.netAmount)) === 0 ? "Paid" : "Outstanding"}
                                 </Badge>
                             </TableCell>
                             </TableRow>
