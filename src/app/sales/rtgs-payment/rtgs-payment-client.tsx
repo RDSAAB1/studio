@@ -39,6 +39,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -120,6 +122,12 @@ export default function RtgspaymentClient() {
   const [calcMaxRate, setCalcMaxRate] = useState(2400);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
+  // CD State
+  const [cdEnabled, setCdEnabled] = useState(false);
+  const [cdPercent, setCdPercent] = useState(2);
+  const [cdAt, setCdAt] = useState('unpaid_amount');
+  const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialFormState,
@@ -137,35 +145,61 @@ export default function RtgspaymentClient() {
       return `R${String(lastSrNo + 1).padStart(5, "0")}`;
   }, []);
 
+  const totalOutstandingForSelected = useMemo(() => {
+    return outstandingEntries
+      .filter(entry => selectedOutstandingIds.has(entry.id))
+      .reduce((acc, entry) => acc + Number(entry.netAmount), 0);
+  }, [outstandingEntries, selectedOutstandingIds]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsClient(true);
-      const savedRecords = localStorage.getItem("rtgs_records");
-      let parsedRecords: any[] = [];
-      if (savedRecords) {
-        try {
-          parsedRecords = JSON.parse(savedRecords);
-          if (Array.isArray(parsedRecords)) {
-            setAllRecords(parsedRecords);
-          } else {
-            setAllRecords([]);
-          }
-        } catch (error) {
-          setAllRecords([]);
+      try {
+        const savedRecords = localStorage.getItem("rtgs_records");
+        const parsedRecords = savedRecords ? JSON.parse(savedRecords) : [];
+        if (Array.isArray(parsedRecords)) {
+          setAllRecords(parsedRecords);
+           if (editingRecordIndex === null) {
+              form.setValue("srNo", generateSrNo(parsedRecords));
+           }
         }
-      }
-      if (editingRecordIndex === null) {
-          form.setValue("srNo", generateSrNo(parsedRecords));
+      } catch (error) {
+        setAllRecords([]);
+         if (editingRecordIndex === null) {
+            form.setValue("srNo", generateSrNo([]));
+         }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   useEffect(() => {
     if (isClient) {
         localStorage.setItem("rtgs_records", JSON.stringify(allRecords));
     }
   }, [allRecords, isClient]);
+
+  // CD Calculation Effect
+  useEffect(() => {
+    if (!cdEnabled) {
+      setCalculatedCdAmount(0);
+      return;
+    }
+    let base = 0;
+    const amount = form.getValues('amount') || 0;
+    const outstanding = totalOutstandingForSelected;
+
+    if (cdAt === 'paid_amount' || cdAt === 'payment_amount') {
+      base = amount;
+    } else if (cdAt === 'unpaid_amount') {
+      base = outstanding;
+    } else if (cdAt === 'full_amount') {
+      base = outstanding; // For RTGS, it's usually on the outstanding amount
+    }
+    setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
+  }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected]);
+
 
   const handleCustomerSelect = (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
@@ -195,15 +229,20 @@ export default function RtgspaymentClient() {
   }
 
   const onSubmit = (values: FormValues) => {
+    const finalValues = {
+        ...values,
+        amount: values.amount + calculatedCdAmount,
+    }
+
     let message = "";
     if (editingRecordIndex !== null) {
       const updatedRecords = [...allRecords];
-      updatedRecords[editingRecordIndex] = values;
+      updatedRecords[editingRecordIndex] = finalValues;
       setAllRecords(updatedRecords);
       setEditingRecordIndex(null);
       message = "Record updated successfully!";
     } else {
-      setAllRecords((prev) => [...prev, values]);
+      setAllRecords((prev) => [...prev, finalValues]);
       message = "Record saved successfully!";
     }
     toast({ title: "Success", description: message });
@@ -216,6 +255,7 @@ export default function RtgspaymentClient() {
     setSelectedCustomer(null);
     setOutstandingEntries([]);
     setSelectedOutstandingIds(new Set());
+    setCdEnabled(false);
   }
 
   const handleEdit = (index: number) => {
@@ -235,20 +275,21 @@ export default function RtgspaymentClient() {
   };
 
   const handleGeneratePaymentOptions = () => {
-    if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate <= 0 || calcMaxRate <= 0 || calcMinRate > calcMaxRate) {
+    if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate > calcMaxRate) {
         toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please enter valid numbers for payment calculation.' });
         return;
     }
 
     const rawOptions: PaymentOption[] = [];
     const generatedUniqueRemainingAmounts = new Set<number>();
-    const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / calcMinRate) + 50);
+    const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
     const rateSteps = [5, 10]; 
 
     for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
         if (Math.round(q * 100) % 10 !== 0) continue; 
 
         for (let step of rateSteps) {
+            if (step <= 0) continue;
             let startRateForStep = Math.ceil(calcMinRate / step) * step;
             let endRateForStep = Math.floor(calcMaxRate / step) * step;
 
@@ -262,25 +303,22 @@ export default function RtgspaymentClient() {
 
                 const amountRemaining = parseFloat((calcTargetAmount - finalAmount).toFixed(2));
 
-                if (amountRemaining >= 0) {
-                    if (!generatedUniqueRemainingAmounts.has(amountRemaining)) {
-                        rawOptions.push({
-                            quantity: q,
-                            rate: currentRate,
-                            calculatedAmount: finalAmount,
-                            amountRemaining: amountRemaining
-                        });
-                        generatedUniqueRemainingAmounts.add(amountRemaining);
-                    }
+                 if (!generatedUniqueRemainingAmounts.has(amountRemaining)) {
+                    rawOptions.push({
+                        quantity: q,
+                        rate: currentRate,
+                        calculatedAmount: finalAmount,
+                        amountRemaining: amountRemaining
+                    });
+                    generatedUniqueRemainingAmounts.add(amountRemaining);
                 }
             }
         }
     }
-
+    
     const sortedOptions = rawOptions.sort((a, b) => a.amountRemaining - b.amountRemaining);
-    
     const limitedOptions = sortedOptions.slice(0, 50);
-    
+
     setPaymentOptions(limitedOptions);
     setIsPaymentOptionsModalOpen(true);
     setSortConfig(null);
@@ -299,17 +337,18 @@ export default function RtgspaymentClient() {
 
     if (firstEntry) {
       form.setValue('amount', totalAmount);
-      // Also set the target amount for calculation
       setCalcTargetAmount(totalAmount);
 
-      form.setValue('grNo', firstEntry.grNo);
-      form.setValue('grDate', firstEntry.grDate?.split('T')[0]);
-      form.setValue('parchiNo', firstEntry.parchiNo);
-      form.setValue('parchiDate', firstEntry.parchiDate?.split('T')[0]);
-      form.setValue('rate', firstEntry.rate);
-      form.setValue('weight', firstEntry.weight);
+      form.setValue('grNo', firstEntry.grNo || '');
+      form.setValue('grDate', firstEntry.grDate?.split('T')[0] || new Date().toISOString().split("T")[0]);
+      form.setValue('parchiNo', firstEntry.parchiNo || '');
+      form.setValue('parchiDate', firstEntry.parchiDate?.split('T')[0] || '');
+      form.setValue('rate', firstEntry.rate || 0);
+      form.setValue('weight', firstEntry.weight || 0);
     }
-    document.getElementById('close-outstanding-modal')?.click();
+    // Close the modal by targeting its trigger if possible or managing state
+    const closeTrigger = document.getElementById('close-outstanding-modal');
+    if (closeTrigger) closeTrigger.click();
     toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} outstanding entries. Total: ${totalAmount.toFixed(2)}. Target amount set.` });
   };
 
@@ -424,7 +463,7 @@ export default function RtgspaymentClient() {
                   </div>
                    <DialogFooter>
                     <p className="mr-auto text-sm text-muted-foreground">
-                      Selected: {selectedOutstandingIds.size} | Total: {outstandingEntries.filter(e => selectedOutstandingIds.has(e.id)).reduce((acc, e) => acc + Number(e.netAmount), 0).toFixed(2)}
+                      Selected: {selectedOutstandingIds.size} | Total: {totalOutstandingForSelected.toFixed(2)}
                     </p>
                     <Button id="close-outstanding-modal" variant="ghost">Cancel</Button>
                     <Button onClick={handlePaySelectedOutstanding} disabled={selectedOutstandingIds.size === 0}>
@@ -498,6 +537,34 @@ export default function RtgspaymentClient() {
               <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" {...form.register("utrNo")} /></div>
               <div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input type="number" id="rate" {...form.register("rate")} /></div>
               <div className="space-y-2"><Label htmlFor="weight">Weight</Label><Input type="number" id="weight" {...form.register("weight")} /></div>
+              
+              {/* CD Fields */}
+              <div className="flex items-center space-x-2 pt-6 md:col-span-2">
+                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
+                <Label htmlFor="cd-toggle">Apply CD</Label>
+              </div>
+              {cdEnabled && <>
+                <div className="space-y-2">
+                    <Label htmlFor="cd-percent">CD %</Label>
+                    <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
+                </div>
+                <div className="space-y-2">
+                    <Label>CD At</Label>
+                      <Select value={cdAt} onValueChange={setCdAt}>
+                        <SelectTrigger><SelectValue/></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="paid_amount">CD on Paid Amount</SelectItem>
+                            <SelectItem value="unpaid_amount">CD on Unpaid Amount (Selected)</SelectItem>
+                            <SelectItem value="payment_amount">CD on Payment Amount (Manual)</SelectItem>
+                            <SelectItem value="full_amount">CD on Full Amount (Selected)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                    <Label>Calculated CD Amount</Label>
+                    <Input value={calculatedCdAmount.toFixed(2)} readOnly className="font-bold text-primary" />
+                </div>
+              </>}
             </CardContent>
           </Card>
         </div>
