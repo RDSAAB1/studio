@@ -66,7 +66,7 @@ type FormValues = z.infer<typeof formSchema>;
 // Helper to get a fresh form state
 const getInitialFormState = (customers: Customer[]): Customer => {
   const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-  const staticDate = '2025-01-01'; // Static date to avoid hydration mismatch
+  const staticDate = new Date().toISOString().split('T')[0];
 
   return {
     id: "", srNo: formatSrNo(nextSrNum), date: staticDate, term: '0', dueDate: staticDate, 
