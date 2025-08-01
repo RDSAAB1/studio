@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { initialCustomers } from "@/lib/data"; // Using initialCustomers for farmer data simulation
+import { initialCustomers } from "@/lib/data";
 import type { Customer } from "@/lib/definitions";
 import { toTitleCase } from "@/lib/utils";
 
@@ -14,15 +14,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Pen, Save, PlusCircle, Trash, Settings, X, Check, ArrowUpDown } from "lucide-react";
+import { Pen, Save, PlusCircle, Trash, ArrowUpDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -32,7 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -99,6 +102,7 @@ const initialFormState: FormValues = {
 
 export default function RtgspaymentClient() {
   const { toast } = useToast();
+  const [customers] = useState<Customer[]>(initialCustomers);
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
@@ -109,7 +113,6 @@ export default function RtgspaymentClient() {
   const [calcMinRate, setCalcMinRate] = useState(2300);
   const [calcMaxRate, setCalcMaxRate] = useState(2400);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -127,7 +130,6 @@ export default function RtgspaymentClient() {
       }, 0);
       return `R${String(lastSrNo + 1).padStart(5, "0")}`;
   }, []);
-
 
   useEffect(() => {
     setIsClient(true);
@@ -156,6 +158,27 @@ export default function RtgspaymentClient() {
         localStorage.setItem("rtgs_records", JSON.stringify(allRecords));
     }
   }, [allRecords, isClient]);
+
+  const handleCustomerSelect = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    if(customer) {
+      form.reset({
+        ...initialFormState,
+        srNo: generateSrNo(allRecords),
+        name: customer.name,
+        fatherName: customer.so,
+        mobileNo: customer.contact,
+        address: customer.address,
+        acNo: customer.acNo,
+        ifscCode: customer.ifscCode,
+        bank: customer.bank,
+        branch: customer.branch,
+        parchiName: customer.parchiName,
+        parchiAddress: customer.parchiAddress,
+      });
+      setEditingRecordIndex(null);
+    }
+  }
 
   const onSubmit = (values: FormValues) => {
     let message = "";
@@ -203,10 +226,10 @@ export default function RtgspaymentClient() {
     const rawOptions: PaymentOption[] = [];
     const generatedUniqueRemainingAmounts = new Set<number>();
     const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / calcMinRate) + 50);
-    const rateSteps = [5, 10]; // Refined rate steps as per new request
+    const rateSteps = [5, 10]; 
 
     for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
-        if (Math.round(q * 100) % 10 !== 0) continue; // Quintal condition (10kg increments)
+        if (Math.round(q * 100) % 10 !== 0) continue; 
 
         for (let step of rateSteps) {
             let startRateForStep = Math.ceil(calcMinRate / step) * step;
@@ -216,7 +239,7 @@ export default function RtgspaymentClient() {
                 if (currentRate < calcMinRate || currentRate > calcMaxRate || currentRate <= 0) continue;
 
                 let calculatedAmount = q * currentRate;
-                let finalAmount = Math.round(calculatedAmount / 5) * 5; // Round to nearest 5
+                let finalAmount = Math.round(calculatedAmount / 5) * 5; 
 
                 if (finalAmount > calcTargetAmount) continue;
 
@@ -290,6 +313,26 @@ export default function RtgspaymentClient() {
 
   return (
     <div className="space-y-8">
+       <Card>
+        <CardHeader>
+          <CardTitle>Select Customer</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select onValueChange={handleCustomerSelect}>
+            <SelectTrigger className="w-full md:w-1/2">
+              <SelectValue placeholder="Select a customer to pre-fill details" />
+            </SelectTrigger>
+            <SelectContent>
+              {customers.map((customer) => (
+                <SelectItem key={customer.id} value={customer.id}>
+                  {toTitleCase(customer.name)} ({customer.contact})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+      
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Customer Details */}
@@ -478,3 +521,5 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
+
+    
