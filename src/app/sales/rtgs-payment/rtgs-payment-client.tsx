@@ -20,6 +20,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -36,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -106,6 +109,9 @@ export default function RtgspaymentClient() {
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [outstandingEntries, setOutstandingEntries] = useState<Customer[]>([]);
+  const [selectedOutstandingIds, setSelectedOutstandingIds] = useState<Set<string>>(new Set());
 
   const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [isPaymentOptionsModalOpen, setIsPaymentOptionsModalOpen] = useState(false);
@@ -132,24 +138,25 @@ export default function RtgspaymentClient() {
   }, []);
 
   useEffect(() => {
-    setIsClient(true);
-    const savedRecords = localStorage.getItem("rtgs_records");
-    let parsedRecords: any[] = [];
-    if (savedRecords) {
-      try {
-        parsedRecords = JSON.parse(savedRecords);
-        if (Array.isArray(parsedRecords)) {
-          setAllRecords(parsedRecords);
-        } else {
+    if (typeof window !== 'undefined') {
+      setIsClient(true);
+      const savedRecords = localStorage.getItem("rtgs_records");
+      let parsedRecords: any[] = [];
+      if (savedRecords) {
+        try {
+          parsedRecords = JSON.parse(savedRecords);
+          if (Array.isArray(parsedRecords)) {
+            setAllRecords(parsedRecords);
+          } else {
+            setAllRecords([]);
+          }
+        } catch (error) {
           setAllRecords([]);
         }
-      } catch (error) {
-        setAllRecords([]);
       }
-    }
-    
-    if (editingRecordIndex === null) {
-        form.setValue("srNo", generateSrNo(parsedRecords));
+      if (editingRecordIndex === null) {
+          form.setValue("srNo", generateSrNo(parsedRecords));
+      }
     }
   }, [editingRecordIndex, form, generateSrNo]);
 
@@ -162,6 +169,7 @@ export default function RtgspaymentClient() {
   const handleCustomerSelect = (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
     if(customer) {
+      setSelectedCustomer(customer);
       form.reset({
         ...initialFormState,
         srNo: generateSrNo(allRecords),
@@ -177,6 +185,11 @@ export default function RtgspaymentClient() {
         parchiAddress: customer.parchiAddress,
       });
       setEditingRecordIndex(null);
+      const customerOutstanding = customers.filter(c => c.customerId === customer.customerId && Number(c.netAmount) > 0);
+      setOutstandingEntries(customerOutstanding);
+    } else {
+      setSelectedCustomer(null);
+      setOutstandingEntries([]);
     }
   }
 
@@ -199,6 +212,9 @@ export default function RtgspaymentClient() {
   const handleNew = (records: any[]) => {
     form.reset({...initialFormState, srNo: generateSrNo(records) });
     setEditingRecordIndex(null);
+    setSelectedCustomer(null);
+    setOutstandingEntries([]);
+    setSelectedOutstandingIds(new Set());
   }
 
   const handleEdit = (index: number) => {
@@ -274,6 +290,25 @@ export default function RtgspaymentClient() {
     }
     toast({ title: 'Success', description: message });
   }
+  
+  const handlePaySelectedOutstanding = () => {
+    const selectedEntries = outstandingEntries.filter(e => selectedOutstandingIds.has(e.id));
+    const totalAmount = selectedEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
+    const firstEntry = selectedEntries[0];
+
+    if (firstEntry) {
+      form.setValue('amount', totalAmount);
+      form.setValue('grNo', firstEntry.grNo);
+      form.setValue('grDate', firstEntry.grDate?.split('T')[0]);
+      form.setValue('parchiNo', firstEntry.parchiNo);
+      form.setValue('parchiDate', firstEntry.parchiDate?.split('T')[0]);
+      form.setValue('rate', firstEntry.rate);
+      form.setValue('weight', firstEntry.weight);
+    }
+    document.getElementById('close-outstanding-modal')?.click();
+    toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} outstanding entries. Total: ${totalAmount.toFixed(2)}` });
+  };
+
 
   const selectPaymentAmount = (option: PaymentOption) => {
     form.setValue('amount', option.calculatedAmount);
@@ -317,19 +352,84 @@ export default function RtgspaymentClient() {
         <CardHeader>
           <CardTitle>Select Customer</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Select onValueChange={handleCustomerSelect}>
-            <SelectTrigger className="w-full md:w-1/2">
-              <SelectValue placeholder="Select a customer to pre-fill details" />
-            </SelectTrigger>
-            <SelectContent>
-              {customers.map((customer) => (
-                <SelectItem key={customer.id} value={customer.id}>
-                  {toTitleCase(customer.name)} ({customer.contact})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <CardContent className="flex items-end gap-4">
+          <div className="flex-grow">
+            <Select onValueChange={handleCustomerSelect} value={selectedCustomer?.id || ''}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a customer to pre-fill details" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {toTitleCase(customer.name)} ({customer.contact})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedCustomer && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline">View Outstanding ({outstandingEntries.length})</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl">
+                  <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(selectedCustomer.name)}</DialogTitle></DialogHeader>
+                  <div className="max-h-[60vh] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead><Checkbox
+                            checked={selectedOutstandingIds.size > 0 && selectedOutstandingIds.size === outstandingEntries.length}
+                            onCheckedChange={(checked) => {
+                              const newSet = new Set<string>();
+                              if (checked) {
+                                outstandingEntries.forEach(e => newSet.add(e.id));
+                              }
+                              setSelectedOutstandingIds(newSet);
+                            }}
+                           /></TableHead>
+                          <TableHead>SR No</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Net Amount</TableHead>
+                          <TableHead>Variety</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {outstandingEntries.map(entry => (
+                          <TableRow key={entry.id}>
+                            <TableCell><Checkbox 
+                              checked={selectedOutstandingIds.has(entry.id)}
+                              onCheckedChange={() => {
+                                const newSet = new Set(selectedOutstandingIds);
+                                if (newSet.has(entry.id)) {
+                                  newSet.delete(entry.id);
+                                } else {
+                                  newSet.add(entry.id);
+                                }
+                                setSelectedOutstandingIds(newSet);
+                              }}
+                            /></TableCell>
+                            <TableCell>{entry.srNo}</TableCell>
+                            <TableCell>{entry.date}</TableCell>
+                            <TableCell>{Number(entry.netAmount).toFixed(2)}</TableCell>
+                            <TableCell>{entry.variety}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                   <DialogFooter>
+                    <p className="mr-auto text-sm text-muted-foreground">
+                      Selected: {selectedOutstandingIds.size} | Total: {outstandingEntries.filter(e => selectedOutstandingIds.has(e.id)).reduce((acc, e) => acc + Number(e.netAmount), 0).toFixed(2)}
+                    </p>
+                    <Button id="close-outstanding-modal" variant="ghost">Cancel</Button>
+                    <Button onClick={handlePaySelectedOutstanding} disabled={selectedOutstandingIds.size === 0}>
+                      Pay Selected
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+          )}
         </CardContent>
       </Card>
       
@@ -521,5 +621,7 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
+
+    
 
     
