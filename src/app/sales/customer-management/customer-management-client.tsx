@@ -218,16 +218,19 @@ export default function CustomerManagementClient() {
     handleNew();
   };
 
-  const summaryFields = useMemo(() => [
-    { label: "Due Date", value: currentCustomer.dueDate },
-    { label: "Weight", value: currentCustomer.weight },
-    { label: "Karta Weight", value: currentCustomer.kartaWeight },
-    { label: "Karta Amount", value: currentCustomer.kartaAmount },
-    { label: "Net Weight", value: currentCustomer.netWeight },
-    { label: "Laboury Amount", value: currentCustomer.labouryAmount },
-    { label: "Amount", value: currentCustomer.amount },
-    { label: "Net Amount", value: currentCustomer.netAmount, isBold: true },
-  ], [currentCustomer]);
+  const summaryFields = useMemo(() => {
+      const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
+      return [
+        { label: "Due Date", value: dueDate },
+        { label: "Weight", value: currentCustomer.weight },
+        { label: "Karta Weight", value: currentCustomer.kartaWeight },
+        { label: "Karta Amount", value: currentCustomer.kartaAmount },
+        { label: "Net Weight", value: currentCustomer.netWeight },
+        { label: "Laboury Amount", value: currentCustomer.labouryAmount },
+        { label: "Amount", value: currentCustomer.amount },
+        { label: "Net Amount", value: currentCustomer.netAmount, isBold: true },
+      ]
+    }, [currentCustomer]);
 
   if (!isClient) {
     return null; // or a loading skeleton
@@ -418,9 +421,9 @@ export default function CustomerManagementClient() {
                   <TableRow key={customer.id}>
                     <TableCell className="font-code">{customer.srNo}</TableCell>
                     <TableCell>{toTitleCase(customer.name)}</TableCell>
-                    <TableCell>{customer.date}</TableCell>
+                    <TableCell>{customer.date ? format(new Date(customer.date), "PPP") : '-'}</TableCell>
                     <TableCell>{customer.netAmount.toFixed(2)}</TableCell>
-                    <TableCell>{customer.dueDate}</TableCell>
+                    <TableCell>{customer.dueDate ? format(new Date(customer.dueDate), "PPP") : '-'}</TableCell>
                     <TableCell className="space-x-2">
                        <Button variant="ghost" size="icon" onClick={() => handleEdit(customer.id)}>
                             <Pen className="h-4 w-4" />
@@ -455,5 +458,3 @@ export default function CustomerManagementClient() {
     </>
   );
 }
-
-    
