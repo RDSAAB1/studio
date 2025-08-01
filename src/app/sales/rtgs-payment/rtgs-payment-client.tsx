@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Pen, Save, PlusCircle, Trash, Settings, X, Check } from "lucide-react";
+import { Pen, Save, PlusCircle, Trash, Settings, X, Check, ArrowUpDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +67,12 @@ type PaymentOption = {
   amountRemaining: number;
 };
 
+type SortConfig = {
+    key: keyof PaymentOption;
+    direction: 'ascending' | 'descending';
+};
+
+
 const initialFormState: FormValues = {
   name: "",
   fatherName: "",
@@ -102,6 +108,8 @@ export default function RtgspaymentClient() {
   const [calcTargetAmount, setCalcTargetAmount] = useState(50000);
   const [calcMinRate, setCalcMinRate] = useState(2300);
   const [calcMaxRate, setCalcMaxRate] = useState(2400);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -124,17 +132,24 @@ export default function RtgspaymentClient() {
   useEffect(() => {
     setIsClient(true);
     const savedRecords = localStorage.getItem("rtgs_records");
+    let parsedRecords: any[] = [];
     if (savedRecords) {
-      const parsedRecords = JSON.parse(savedRecords);
-      setAllRecords(parsedRecords);
-      if (editingRecordIndex === null) {
-          form.setValue("srNo", generateSrNo(parsedRecords));
+      try {
+        parsedRecords = JSON.parse(savedRecords);
+        if (Array.isArray(parsedRecords)) {
+          setAllRecords(parsedRecords);
+        } else {
+          setAllRecords([]);
+        }
+      } catch (error) {
+        setAllRecords([]);
       }
-    } else {
-        form.setValue("srNo", generateSrNo([]));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    
+    if (editingRecordIndex === null) {
+        form.setValue("srNo", generateSrNo(parsedRecords));
+    }
+  }, [editingRecordIndex, form, generateSrNo]);
 
   useEffect(() => {
     if (isClient) {
@@ -188,21 +203,20 @@ export default function RtgspaymentClient() {
     const rawOptions: PaymentOption[] = [];
     const generatedUniqueRemainingAmounts = new Set<number>();
     const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / calcMinRate) + 50);
-    const rateSteps = [1, 5, 10, 50, 100];
+    const rateSteps = [5, 10]; // Refined rate steps as per new request
 
     for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
-        if (Math.round(q * 100) % 10 !== 0) continue;
+        if (Math.round(q * 100) % 10 !== 0) continue; // Quintal condition (10kg increments)
 
         for (let step of rateSteps) {
             let startRateForStep = Math.ceil(calcMinRate / step) * step;
             let endRateForStep = Math.floor(calcMaxRate / step) * step;
 
             for (let currentRate = startRateForStep; currentRate <= endRateForStep; currentRate += step) {
-                currentRate = parseFloat(currentRate.toFixed(2));
                 if (currentRate < calcMinRate || currentRate > calcMaxRate || currentRate <= 0) continue;
 
                 let calculatedAmount = q * currentRate;
-                let finalAmount = Math.round(calculatedAmount / 5) * 5;
+                let finalAmount = Math.round(calculatedAmount / 5) * 5; // Round to nearest 5
 
                 if (finalAmount > calcTargetAmount) continue;
 
@@ -223,24 +237,17 @@ export default function RtgspaymentClient() {
         }
     }
 
-    const sortedOptions = rawOptions.sort((a, b) => {
-        const diffA = Math.abs(a.amountRemaining);
-        const diffB = Math.abs(b.amountRemaining);
-        if (diffA !== diffB) return diffA - diffB;
-        if (a.quantity !== b.quantity) return a.quantity - b.quantity;
-        return a.rate - b.rate;
-    });
+    const sortedOptions = rawOptions.sort((a, b) => a.amountRemaining - b.amountRemaining);
     
     const limitedOptions = sortedOptions.slice(0, 50);
     
     setPaymentOptions(limitedOptions);
     setIsPaymentOptionsModalOpen(true);
+    setSortConfig(null);
     
     let message = `Generated ${limitedOptions.length} payment options.`;
-    if (rawOptions.length > 50) {
+     if (rawOptions.length > 50) {
         message += ` Displaying top 50 results.`;
-    } else if (rawOptions.length < 20) {
-        message += " Fewer than 20 options were found due to strict generation criteria.";
     }
     toast({ title: 'Success', description: message });
   }
@@ -253,6 +260,29 @@ export default function RtgspaymentClient() {
     toast({ title: 'Selected', description: `Amount ${option.calculatedAmount} selected.` });
   }
 
+  const requestSort = (key: keyof PaymentOption) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedPaymentOptions = useMemo(() => {
+    let sortableItems = [...paymentOptions];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [paymentOptions, sortConfig]);
 
   if (!isClient) {
     return null; 
@@ -359,7 +389,7 @@ export default function RtgspaymentClient() {
       </Card>
 
       <Dialog open={isPaymentOptionsModalOpen} onOpenChange={setIsPaymentOptionsModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Generated Payment Options</DialogTitle>
           </DialogHeader>
@@ -367,15 +397,31 @@ export default function RtgspaymentClient() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>6R Rate</TableHead>
-                  <TableHead>Calculated Amount</TableHead>
-                  <TableHead>Amount Remaining</TableHead>
+                  <TableHead>
+                     <Button variant="ghost" onClick={() => requestSort('quantity')}>
+                        Quantity <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button variant="ghost" onClick={() => requestSort('rate')}>
+                        6R Rate <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button variant="ghost" onClick={() => requestSort('calculatedAmount')}>
+                        Calculated Amount <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button variant="ghost" onClick={() => requestSort('amountRemaining')}>
+                        Amount Remaining <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead>Select</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paymentOptions.length > 0 ? paymentOptions.map((option, index) => (
+                {sortedPaymentOptions.length > 0 ? sortedPaymentOptions.map((option, index) => (
                     <TableRow key={index}>
                       <TableCell>{option.quantity.toFixed(2)}</TableCell>
                       <TableCell>{option.rate}</TableCell>
@@ -432,5 +478,3 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
-
-    
