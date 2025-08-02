@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,15 +37,11 @@ import { Badge } from "@/components/ui/badge";
 
 import { useToast } from "@/hooks/use-toast";
 import {
-  ChevronsUpDown,
   Pen,
   PlusCircle,
   Save,
   Trash,
-  Plus,
-  Pencil,
   Info,
-  Check
 } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -65,15 +60,15 @@ const formSchema = z.object({
       .length(10, "Contact number must be exactly 10 digits.")
       .regex(/^\d+$/, "Contact number must only contain digits."),
     vehicleNo: z.string(),
-    variety: z.string().min(1, "Variety is required."),
+    variety: z.string().min(1, "Variety is required.").transform(val => toTitleCase(val)),
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
     rate: z.coerce.number().min(0),
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
-    receiptType: z.string(),
-    paymentType: z.string()
+    receiptType: z.string().transform(val => toTitleCase(val)),
+    paymentType: z.string().transform(val => toTitleCase(val))
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -98,20 +93,9 @@ export default function CustomerManagementClient() {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(initialCustomers));
   const [isEditing, setIsEditing] = useState(false);
-  const [appOptions, setAppOptions] = useState(appOptionsData);
   const [isClient, setIsClient] = useState(false);
-
-  const [varietySearch, setVarietySearch] = useState("");
-  const [editingOption, setEditingOption] = useState<{ type: 'varieties', value: string } | null>(null);
-  const [newOptionValue, setNewOptionValue] = useState("");
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
-
-  const [varietyPopoverOpen, setVarietyPopoverOpen] = useState(false);
-  const [receiptTypePopoverOpen, setReceiptTypePopoverOpen] = useState(false);
-  const [paymentTypePopoverOpen, setPaymentTypePopoverOpen] = useState(false);
-
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -188,14 +172,6 @@ export default function CustomerManagementClient() {
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
-
-  useEffect(() => {
-    if (editingOption) {
-      setNewOptionValue(editingOption.value);
-      setIsEditModalOpen(true);
-    }
-  }, [editingOption]);
-
 
   const resetFormToState = (customerState: Customer) => {
     const today = new Date();
@@ -306,8 +282,6 @@ export default function CustomerManagementClient() {
       ...values,
       date: values.date.toISOString().split("T")[0],
       term: String(values.term),
-      name: toTitleCase(values.name),
-      so: toTitleCase(values.so),
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
@@ -321,47 +295,6 @@ export default function CustomerManagementClient() {
     }
     handleNew();
   };
-
-  const handleAddVariety = () => {
-    if(varietySearch && !appOptions.varieties.find(v => v.toLowerCase() === varietySearch.toLowerCase())) {
-        const newVarieties = [...appOptions.varieties, toTitleCase(varietySearch)];
-        setAppOptions({...appOptions, varieties: newVarieties});
-        form.setValue('variety', toTitleCase(varietySearch));
-        setVarietySearch("");
-        setVarietyPopoverOpen(false);
-        toast({ title: "Success", description: `"${toTitleCase(varietySearch)}" added to varieties.` });
-    }
-  }
-
-  const handleDeleteOption = (type: 'varieties', value: string) => {
-    let updatedList;
-    if (type === 'varieties') {
-      updatedList = appOptions.varieties.filter(v => v !== value);
-      setAppOptions({...appOptions, varieties: updatedList});
-      if(form.getValues('variety') === value) form.setValue('variety', '');
-    }
-    toast({ title: "Success", description: `"${value}" deleted.` });
-  }
-
-  const handleUpdateOption = () => {
-    if (editingOption && newOptionValue) {
-      const { type, value } = editingOption;
-      let updatedList;
-      if (type === 'varieties') {
-        updatedList = appOptions.varieties.map(v => v === value ? toTitleCase(newOptionValue) : v);
-        setAppOptions({...appOptions, varieties: updatedList});
-        if(form.getValues('variety') === value) form.setValue('variety', toTitleCase(newOptionValue));
-      }
-      toast({ title: "Success", description: `"${value}" updated to "${toTitleCase(newOptionValue)}".` });
-      closeEditModal();
-    }
-  }
-
-  const closeEditModal = () => {
-    setIsEditModalOpen(false);
-    setEditingOption(null);
-    setNewOptionValue("");
-  }
   
   const handleShowDetails = (customer: Customer) => {
     setDetailsCustomer(customer);
@@ -464,104 +397,18 @@ export default function CustomerManagementClient() {
                          </div>
                     )} />
 
-                    <Controller name="term" control={form.control} render={({ field }) => (
-                         <div className="space-y-2">
-                            <Label htmlFor="term">Term (Days)</Label>
-                            <Input id="term" type="number" {...field} />
-                         </div>
-                    )} />
-                     <Controller name="receiptType" control={form.control} render={({ field }) => (
-                         <div className="space-y-2">
-                            <Label>Receipt Type</Label>
-                             <Popover open={receiptTypePopoverOpen} onOpenChange={setReceiptTypePopoverOpen}>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={receiptTypePopoverOpen}
-                                    className="w-full justify-between"
-                                    >
-                                    {field.value
-                                        ? toTitleCase(appOptions.receiptTypes.find((type) => type.toLowerCase() === field.value.toLowerCase()) || "")
-                                        : "Select receipt type..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                    <CommandList>
-                                        <CommandGroup>
-                                        {appOptions.receiptTypes.map((type) => (
-                                            <CommandItem
-                                            key={type}
-                                            value={type}
-                                            onSelect={(currentValue) => {
-                                                form.setValue("receiptType", toTitleCase(currentValue));
-                                                setReceiptTypePopoverOpen(false);
-                                            }}
-                                            >
-                                            <Check
-                                                className={cn(
-                                                "mr-2 h-4 w-4",
-                                                field.value?.toLowerCase() === type.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            {toTitleCase(type)}
-                                            </CommandItem>
-                                        ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                         </div>
-                    )} />
-                    <Controller name="paymentType" control={form.control} render={({ field }) => (
-                         <div className="space-y-2">
-                            <Label>Payment Type</Label>
-                            <Popover open={paymentTypePopoverOpen} onOpenChange={setPaymentTypePopoverOpen}>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={paymentTypePopoverOpen}
-                                    className="w-full justify-between"
-                                    >
-                                    {field.value
-                                        ? toTitleCase(appOptions.paymentTypes.find((type) => type.toLowerCase() === field.value.toLowerCase()) || "")
-                                        : "Select payment type..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                    <CommandList>
-                                        <CommandGroup>
-                                        {appOptions.paymentTypes.map((type) => (
-                                            <CommandItem
-                                            key={type}
-                                            value={type}
-                                            onSelect={(currentValue) => {
-                                                form.setValue("paymentType", toTitleCase(currentValue));
-                                                setPaymentTypePopoverOpen(false);
-                                            }}
-                                            >
-                                            <Check
-                                                className={cn(
-                                                "mr-2 h-4 w-4",
-                                                field.value?.toLowerCase() === type.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            {toTitleCase(type)}
-                                            </CommandItem>
-                                        ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                         </div>
-                    )} />
+                    <div className="space-y-2">
+                      <Label htmlFor="term">Term (Days)</Label>
+                      <Input id="term" type="number" {...form.register('term')} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="receiptType">Receipt Type</Label>
+                      <Input id="receiptType" {...form.register('receiptType')} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="paymentType">Payment Type</Label>
+                      <Input id="paymentType" {...form.register('paymentType')} />
+                    </div>
                   </CardContent>
               </Card>
 
@@ -608,92 +455,11 @@ export default function CustomerManagementClient() {
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
                     <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
-                     <Controller name="variety" control={form.control} render={({ field }) => (
-                         <div className="space-y-2">
-                            <Label>Variety</Label>
-                            <div className="flex gap-2">
-                                <Popover open={varietyPopoverOpen} onOpenChange={setVarietyPopoverOpen}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        aria-expanded={varietyPopoverOpen}
-                                        className="w-full justify-between"
-                                        >
-                                        {field.value
-                                            ? toTitleCase(appOptions.varieties.find((variety) => variety.toLowerCase() === field.value.toLowerCase()) || "")
-                                            : "Select variety..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                        <Command>
-                                        <CommandInput
-                                            placeholder="Search variety..."
-                                            value={varietySearch}
-                                            onValueChange={setVarietySearch}
-                                        />
-                                        <CommandEmpty>
-                                            No variety found. 
-                                            {varietySearch && <Button className="w-full mt-2" onClick={handleAddVariety}>Add "{toTitleCase(varietySearch)}"</Button>}
-                                        </CommandEmpty>
-                                        <CommandList>
-                                            <CommandGroup>
-                                            {appOptions.varieties.filter(v => v.toLowerCase().includes(varietySearch.toLowerCase())).map((variety) => (
-                                                <CommandItem
-                                                    key={variety}
-                                                    value={variety}
-                                                    onSelect={(currentValue) => {
-                                                        form.setValue("variety", toTitleCase(currentValue));
-                                                        setVarietyPopoverOpen(false);
-                                                    }}
-                                                    className="group flex justify-between items-center"
-                                                >
-                                                    <div className="flex items-center">
-                                                        <Check
-                                                            className={cn(
-                                                            "mr-2 h-4 w-4",
-                                                            field.value?.toLowerCase() === variety.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                            )}
-                                                        />
-                                                        {toTitleCase(variety)}
-                                                    </div>
-                                                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6"
-                                                            onClick={(e) => { e.stopPropagation(); setEditingOption({ type: 'varieties', value: variety }); }}>
-                                                            <Pencil className="h-3 w-3" />
-                                                        </Button>
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => e.stopPropagation()}>
-                                                                    <Trash className="h-3 w-3 text-destructive" />
-                                                                </Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>This will permanently delete "{variety}".</AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleDeleteOption('varieties', variety)}>Delete</AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                    </div>
-                                                </CommandItem>
-                                            ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                                <Button type="button" size="icon" onClick={handleAddVariety} disabled={!varietySearch || appOptions.varieties.includes(varietySearch)}>
-                                    <Plus className="h-4 w-4"/>
-                                </Button>
-                            </div>
-                         </div>
-                    )} />
+                    <div className="space-y-2">
+                        <Label htmlFor="variety">Variety</Label>
+                        <Input id="variety" {...form.register('variety')} />
+                        {form.formState.errors.variety && <p className="text-sm text-destructive">{form.formState.errors.variety.message}</p>}
+                    </div>
                     <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
                     <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
                     <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
@@ -726,23 +492,6 @@ export default function CustomerManagementClient() {
           </form>
         </CardContent>
       </Card>
-
-      {/* Edit Option Dialog */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Option</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-                <Label htmlFor="editOptionInput">Value</Label>
-                <Input id="editOptionInput" value={newOptionValue} onChange={(e) => setNewOptionValue(e.target.value)} />
-            </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={closeEditModal}>Cancel</Button>
-                <Button onClick={handleUpdateOption}>Save Changes</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       {/* Customer Table */}
       <div className="mt-8">
@@ -829,5 +578,3 @@ export default function CustomerManagementClient() {
     </>
   );
 }
-
-    
