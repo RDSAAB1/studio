@@ -531,52 +531,52 @@ export default function CustomerManagementClient() {
                       control={form.control}
                       render={({ field }) => (
                         <div className="space-y-2">
-                          <Label>Variety</Label>
+                           <Label>Variety</Label>
                           <div className="flex items-center gap-2">
                             <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  aria-expanded={openVarietyCombobox}
-                                  className="w-full justify-between"
-                                >
-                                  {field.value
-                                    ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
-                                    : "Select variety..."}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                  <CommandInput placeholder="Search variety..." />
-                                  <CommandList>
-                                    <CommandEmpty>No variety found.</CommandEmpty>
-                                    <CommandGroup>
-                                      {varietyOptions.map((v) => (
-                                        <CommandItem
-                                          key={v}
-                                          value={v}
-                                          onSelect={(currentValue) => {
-                                            const titleCasedValue = toTitleCase(currentValue);
-                                            field.onChange(titleCasedValue);
-                                            setOpenVarietyCombobox(false);
-                                          }}
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
-                                            )}
-                                          />
-                                          {toTitleCase(v)}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openVarietyCombobox}
+                                    className="w-full justify-between"
+                                    >
+                                    {field.value
+                                        ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
+                                        : "Select variety..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command>
+                                    <CommandInput placeholder="Search variety..." />
+                                    <CommandList>
+                                        <CommandEmpty>No variety found.</CommandEmpty>
+                                        <CommandGroup>
+                                        {varietyOptions.map((v) => (
+                                            <CommandItem
+                                            key={v}
+                                            value={v}
+                                            onSelect={(currentValue) => {
+                                                const titleCasedValue = toTitleCase(currentValue);
+                                                field.onChange(titleCasedValue);
+                                                setOpenVarietyCombobox(false);
+                                            }}
+                                            >
+                                            <Check
+                                                className={cn(
+                                                "mr-2 h-4 w-4",
+                                                field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
+                                                )}
+                                            />
+                                            {toTitleCase(v)}
+                                            </CommandItem>
+                                        ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                                </Popover>
                             <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
                               <DialogTrigger asChild>
                                 <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
@@ -764,7 +764,3 @@ export default function CustomerManagementClient() {
     </>
   );
 }
-
-    
-
-    
