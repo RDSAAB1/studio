@@ -547,7 +547,7 @@ export default function CustomerManagementClient() {
                           name="variety"
                           control={form.control}
                           render={({ field }) => (
-                            <div className="space-y-1 col-span-2">
+                            <div className="space-y-1">
                               <Label className="text-xs">Variety</Label>
                               <div className="flex items-center gap-2">
                                 <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
@@ -790,5 +790,7 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
 
     
