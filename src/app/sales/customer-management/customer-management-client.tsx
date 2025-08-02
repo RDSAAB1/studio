@@ -41,7 +41,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-
+import { DynamicCombobox, type ComboboxOption } from "@/components/ui/dynamic-combobox";
 
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -68,7 +68,7 @@ const formSchema = z.object({
       .length(10, "Contact number must be exactly 10 digits.")
       .regex(/^\d+$/, "Contact number must only contain digits."),
     vehicleNo: z.string(),
-    variety: z.string().min(1, "Variety is required.").transform(val => toTitleCase(val)),
+    variety: z.string().min(1, "Variety is required."),
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
     rate: z.coerce.number().min(0),
@@ -104,6 +104,8 @@ export default function CustomerManagementClient() {
   
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+
+  const [varietyOptions, setVarietyOptions] = useState<ComboboxOption[]>(appOptionsData.varieties.map(v => ({ value: v, label: toTitleCase(v) })));
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -352,6 +354,22 @@ export default function CustomerManagementClient() {
     ];
   };
 
+  const handleAddVariety = (newVariety: string) => {
+    const newOption = { value: newVariety, label: toTitleCase(newVariety) };
+    if (!varietyOptions.some(o => o.value.toLowerCase() === newVariety.toLowerCase())) {
+        setVarietyOptions(prev => [...prev, newOption]);
+        toast({ title: 'Variety Added', description: `"${toTitleCase(newVariety)}" has been added to the list.` });
+    }
+  };
+
+  const handleDeleteVariety = (varietyToDelete: string) => {
+    setVarietyOptions(prev => prev.filter(o => o.value !== varietyToDelete));
+    if (form.getValues('variety') === varietyToDelete) {
+        form.setValue('variety', '');
+    }
+    toast({ title: 'Variety Removed', description: `"${toTitleCase(varietyToDelete)}" has been removed.` });
+  };
+
   if (!isClient) {
     return null; // or a loading skeleton
   }
@@ -491,13 +509,26 @@ export default function CustomerManagementClient() {
                     <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
                     <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
                     
-                    <Controller name="variety" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
+                    <Controller
+                        name="variety"
+                        control={form.control}
+                        render={({ field }) => (
+                          <div className="space-y-2">
                             <Label htmlFor="variety">Variety</Label>
-                            <Input id="variety" {...field} />
-                             {form.formState.errors.variety && <p className="text-sm text-destructive">{form.formState.errors.variety.message}</p>}
-                        </div>
-                    )} />
+                            <DynamicCombobox
+                                options={varietyOptions}
+                                value={field.value}
+                                onChange={field.onChange}
+                                onAdd={handleAddVariety}
+                                onDelete={handleDeleteVariety}
+                                placeholder="Select or add a variety..."
+                                searchPlaceholder="Search variety..."
+                                emptyPlaceholder="No variety found."
+                            />
+                            {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                          </div>
+                        )}
+                      />
 
                     <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
                     <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
@@ -615,5 +646,3 @@ export default function CustomerManagementClient() {
     </>
   );
 }
-
-    

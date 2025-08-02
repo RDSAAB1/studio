@@ -70,7 +70,7 @@ export function DynamicCombobox({
   const handleAdd = () => {
     if (onAdd && searchValue) {
       onAdd(searchValue);
-      onChange(searchValue);
+      onChange(searchValue); // Select the newly added value
       setSearchValue("");
       setOpen(false);
     }
@@ -107,19 +107,19 @@ export function DynamicCombobox({
           <CommandList>
             <CommandEmpty>
               {showAddOption ? (
-                <Button className="w-full" onClick={handleAdd}>
+                <Button variant="ghost" className="w-full justify-start" onClick={handleAdd}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Add "{searchValue}"
                 </Button>
               ) : (
-                emptyPlaceholder
+                <div className="py-6 text-center text-sm">{emptyPlaceholder}</div>
               )}
             </CommandEmpty>
             <CommandGroup>
               {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value}
-                  onSelect={handleSelect}
+                  value={option.label} // Use label for filtering in cmdk
+                  onSelect={() => handleSelect(option.value)}
                   className="flex justify-between items-center"
                 >
                   <div className="flex items-center">
@@ -137,8 +137,11 @@ export function DynamicCombobox({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
-                          onClick={(e) => e.stopPropagation()}
+                          className="h-6 w-6 opacity-50 hover:opacity-100"
+                           onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                           }}
                         >
                           <Trash className="h-4 w-4 text-destructive" />
                         </Button>
@@ -151,7 +154,7 @@ export function DynamicCombobox({
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={(e) => {
                               e.stopPropagation();
@@ -173,4 +176,3 @@ export function DynamicCombobox({
     </Popover>
   );
 }
-
