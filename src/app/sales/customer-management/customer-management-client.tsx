@@ -542,12 +542,12 @@ export default function CustomerManagementClient() {
                 {/* Financial Details */}
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
                     <h3 className="text-base font-headline mb-2">Financial Details</h3>
-                     <div className="grid grid-cols-5 gap-3 mb-3">
+                     <div className="grid grid-cols-[2fr,1fr,1fr] gap-3 mb-3">
                         <Controller
                           name="variety"
                           control={form.control}
                           render={({ field }) => (
-                            <div className="space-y-1 col-span-3">
+                            <div className="space-y-1 col-span-1">
                               <Label className="text-xs">Variety</Label>
                               <div className="flex items-center gap-2">
                                 <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
@@ -681,7 +681,7 @@ export default function CustomerManagementClient() {
                 {summaryFields.map(item => (
                   <div key={item.label}>
                     <p className="text-xs text-muted-foreground">{item.label}</p>
-                    <p className={cn("text-base font-semibold", item.isBold && "text-primary font-bold text-lg")}>{String(item.value)}</p>
+                    <p className={cn("text-sm font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
                   </div>
                 ))}
               </CardContent>
@@ -790,6 +790,8 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
 
     
 
