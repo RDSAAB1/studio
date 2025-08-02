@@ -421,80 +421,80 @@ export default function CustomerManagementClient() {
               
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
                     <h3 className="text-base font-headline mb-2">Transaction Details</h3>
+                     <Controller name="date" control={form.control} render={({ field }) => (
+                        <div className="space-y-1">
+                            <Label className="text-xs">Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                    "w-full justify-start text-left font-normal h-9 text-sm",
+                                    !field.value && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 z-[51]">
+                                <CalendarComponent
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={(date) => field.onChange(date || new Date())}
+                                    initialFocus
+                                />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    )} />
                     <div className="grid grid-cols-2 gap-3">
-                         <div className="space-y-1">
+                        <div className="space-y-1">
                             <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
                             <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm" />
                         </div>
-                        <Controller name="date" control={form.control} render={({ field }) => (
-                            <div className="space-y-1">
-                                <Label className="text-xs">Date</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                    <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                        "w-full justify-start text-left font-normal h-9 text-sm",
-                                        !field.value && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 z-[51]">
-                                    <CalendarComponent
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={(date) => field.onChange(date || new Date())}
-                                        initialFocus
-                                    />
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                        )} />
                         <div className="space-y-1">
-                          <Label htmlFor="term" className="text-xs">Term (Days)</Label>
-                          <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm" />
+                            <Label htmlFor="term" className="text-xs">Term (Days)</Label>
+                            <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm" />
                         </div>
-                         <Controller
+                        <Controller
                             name="receiptType"
                             control={form.control}
                             render={({ field }) => (
-                              <div className="space-y-1">
-                                <Label className="text-xs">Receipt Type</Label>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Select a receipt type" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {appOptionsData.receiptTypes.map(type => (
-                                        <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Receipt Type</Label>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger className="h-9 text-sm">
+                                        <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {appOptionsData.receiptTypes.map(type => (
+                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                    </Select>
+                                </div>
                             )}
-                          />
+                        />
                         <Controller
                             name="paymentType"
                             control={form.control}
                             render={({ field }) => (
-                              <div className="space-y-1 col-span-2">
-                                <Label className="text-xs">Payment Type</Label>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Select a payment type" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {appOptionsData.paymentTypes.map(type => (
-                                        <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Payment Type</Label>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger className="h-9 text-sm">
+                                        <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {appOptionsData.paymentTypes.map(type => (
+                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                    </Select>
+                                </div>
                             )}
-                          />
+                        />
                     </div>
                 </div>
 
@@ -538,12 +538,12 @@ export default function CustomerManagementClient() {
 
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50 md:col-span-2 lg:col-span-1">
                     <h3 className="text-base font-headline mb-2">Financial Details</h3>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                         <Controller
                           name="variety"
                           control={form.control}
                           render={({ field }) => (
-                            <div className="space-y-1 col-span-3">
+                            <div className="space-y-1 col-span-2">
                               <Label className="text-xs">Variety</Label>
                               <div className="flex items-center gap-2">
                                 <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
@@ -571,8 +571,7 @@ export default function CustomerManagementClient() {
                                                     key={v}
                                                     value={v}
                                                     onSelect={(currentValue) => {
-                                                        const titleCasedValue = toTitleCase(currentValue);
-                                                        form.setValue("variety", titleCasedValue)
+                                                        form.setValue("variety", toTitleCase(currentValue));
                                                         setOpenVarietyCombobox(false);
                                                     }}
                                                 >
@@ -662,10 +661,10 @@ export default function CustomerManagementClient() {
                         />
                         <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
-                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-2"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label><Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="labouryRate" className="text-xs">Laboury</Label><Input id="labouryRate" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-3"><Label htmlFor="kanta" className="text-xs">Kanta</Label><Input id="kanta" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-2"><Label htmlFor="kanta" className="text-xs">Kanta</Label><Input id="kanta" type="number" {...field} className="h-9 text-sm" /></div>)} />
                     </div>
                 </div>
             </div>
@@ -716,14 +715,14 @@ export default function CustomerManagementClient() {
                         </TableHeader>
                         <TableBody>
                             {customers.map(customer => (
-                                <TableRow key={customer.id}>
-                                    <TableCell className="font-mono px-3 py-2 text-sm">{customer.srNo}</TableCell>
-                                    <TableCell className="px-3 py-2 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
-                                    <TableCell className="px-3 py-2 text-sm">{toTitleCase(customer.name)}</TableCell>
-                                    <TableCell className="px-3 py-2 text-sm">{toTitleCase(customer.variety)}</TableCell>
-                                    <TableCell className="px-3 py-2 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-semibold px-3 py-2 text-sm">{Number(customer.netAmount).toFixed(2)}</TableCell>
-                                    <TableCell className="text-center px-3 py-2">
+                                <TableRow key={customer.id} className="h-12">
+                                    <TableCell className="font-mono px-3 py-1 text-sm">{customer.srNo}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-semibold px-3 py-1 text-sm">{Number(customer.netAmount).toFixed(2)}</TableCell>
+                                    <TableCell className="text-center px-3 py-1">
                                         <div className="flex justify-center items-center gap-0">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(customer)}>
                                                 <Info className="h-4 w-4" />
