@@ -74,13 +74,13 @@ const formSchema = z.object({
     srNo: z.string(),
     date: z.date(),
     term: z.coerce.number().min(0),
-    name: z.string().min(1, "Name is required.").transform(val => toTitleCase(val)),
-    so: z.string().transform(val => toTitleCase(val)),
-    address: z.string().transform(val => toTitleCase(val)),
+    name: z.string().min(1, "Name is required."),
+    so: z.string(),
+    address: z.string(),
     contact: z.string()
       .length(10, "Contact number must be exactly 10 digits.")
       .regex(/^\d+$/, "Contact number must only contain digits."),
-    vehicleNo: z.string().transform(val => toTitleCase(val)),
+    vehicleNo: z.string(),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
@@ -306,6 +306,11 @@ export default function CustomerManagementClient() {
     const completeEntry: Customer = {
       ...currentCustomer,
       ...values,
+      name: toTitleCase(values.name),
+      so: toTitleCase(values.so),
+      address: toTitleCase(values.address),
+      vehicleNo: toTitleCase(values.vehicleNo),
+      variety: toTitleCase(values.variety),
       date: values.date.toISOString().split("T")[0],
       term: String(values.term),
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
@@ -350,11 +355,10 @@ export default function CustomerManagementClient() {
   };
 
   const handleCapitalizeOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const fieldName = e.target.id as keyof FormValues;
-    const currentValue = e.target.value;
-    form.setValue(fieldName, toTitleCase(currentValue));
-  }
-
+    const field = e.target.name as keyof FormValues;
+    const value = e.target.value;
+    form.setValue(field, toTitleCase(value));
+  };
 
   const summaryFields = useMemo(() => {
       const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
@@ -409,28 +413,28 @@ export default function CustomerManagementClient() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">{isEditing ? `Editing Entry: ${currentCustomer.srNo}` : "Add New Entry"}</CardTitle>
+          <CardTitle className="font-headline text-xl">{isEditing ? `Editing Entry: ${currentCustomer.srNo}` : "Add New Entry"}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
               
-                <div className="space-y-4 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-lg font-headline mb-4">Transaction Details</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                         <div className="space-y-2">
-                            <Label htmlFor="srNo">Sr No.</Label>
-                            <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code" />
+                <div className="space-y-3 p-4 border rounded-lg bg-card/50">
+                    <h3 className="text-base font-headline mb-2">Transaction Details</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                         <div className="space-y-1">
+                            <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                            <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm" />
                         </div>
                         <Controller name="date" control={form.control} render={({ field }) => (
-                            <div className="space-y-2">
-                                <Label>Date</Label>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Date</Label>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                     <Button
                                         variant={"outline"}
                                         className={cn(
-                                        "w-full justify-start text-left font-normal",
+                                        "w-full justify-start text-left font-normal h-9 text-sm",
                                         !field.value && "text-muted-foreground"
                                         )}
                                     >
@@ -449,23 +453,23 @@ export default function CustomerManagementClient() {
                                 </Popover>
                             </div>
                         )} />
-                        <div className="space-y-2">
-                          <Label htmlFor="term">Term (Days)</Label>
-                          <Input id="term" type="number" {...form.register('term')} />
+                        <div className="space-y-1">
+                          <Label htmlFor="term" className="text-xs">Term (Days)</Label>
+                          <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm" />
                         </div>
                          <Controller
                             name="receiptType"
                             control={form.control}
                             render={({ field }) => (
-                              <div className="space-y-2">
-                                <Label>Receipt Type</Label>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Receipt Type</Label>
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                  <SelectTrigger>
+                                  <SelectTrigger className="h-9 text-sm">
                                     <SelectValue placeholder="Select a receipt type" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {appOptionsData.receiptTypes.map(type => (
-                                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                                        <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -476,15 +480,15 @@ export default function CustomerManagementClient() {
                             name="paymentType"
                             control={form.control}
                             render={({ field }) => (
-                              <div className="space-y-2">
-                                <Label>Payment Type</Label>
+                              <div className="space-y-1 col-span-2">
+                                <Label className="text-xs">Payment Type</Label>
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                  <SelectTrigger>
+                                  <SelectTrigger className="h-9 text-sm">
                                     <SelectValue placeholder="Select a payment type" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {appOptionsData.paymentTypes.map(type => (
-                                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                                        <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -494,56 +498,56 @@ export default function CustomerManagementClient() {
                     </div>
                 </div>
 
-                <div className="space-y-4 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-lg font-headline mb-4">Customer Information</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-3 p-4 border rounded-lg bg-card/50">
+                    <h3 className="text-base font-headline mb-2">Customer Information</h3>
+                    <div className="grid grid-cols-2 gap-3">
                          <Controller name="name" control={form.control} render={({ field }) => (
-                            <div className="space-y-2 relative sm:col-span-2">
-                                <Label htmlFor="name">Name</Label>
-                                <Input id="name" {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} />
-                                {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+                            <div className="space-y-1 relative col-span-2">
+                                <Label htmlFor="name" className="text-xs">Name</Label>
+                                <Input {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
+                                {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
                             </div>
                         )} />
                         <Controller name="so" control={form.control} render={({ field }) => (
-                            <div className="space-y-2">
-                                <Label htmlFor="so">S/O</Label>
-                                <Input id="so" {...field} onBlur={handleCapitalizeOnBlur} />
+                            <div className="space-y-1">
+                                <Label htmlFor="so" className="text-xs">S/O</Label>
+                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                             </div>
                         )} />
                         <Controller name="contact" control={form.control} render={({ field }) => (
-                            <div className="space-y-2">
-                                <Label htmlFor="contact">Contact</Label>
-                                <Input id="contact" {...field} />
-                                {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
+                            <div className="space-y-1">
+                                <Label htmlFor="contact" className="text-xs">Contact</Label>
+                                <Input {...field} className="h-9 text-sm" />
+                                {form.formState.errors.contact && <p className="text-xs text-destructive">{form.formState.errors.contact.message}</p>}
                             </div>
                         )} />
                         <Controller name="address" control={form.control} render={({ field }) => (
-                             <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="address">Address</Label>
-                                <Input id="address" {...field} onBlur={handleCapitalizeOnBlur}/>
+                             <div className="space-y-1 col-span-2">
+                                <Label htmlFor="address" className="text-xs">Address</Label>
+                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                             </div>
                         )} />
                          <Controller name="vehicleNo" control={form.control} render={({ field }) => (
-                            <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="vehicleNo">Vehicle No.</Label>
-                                <Input id="vehicleNo" {...field} onBlur={handleCapitalizeOnBlur} />
+                            <div className="space-y-1 col-span-2">
+                                <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
+                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                             </div>
                         )} />
                     </div>
                 </div>
 
-                <div className="space-y-4 p-4 border rounded-lg bg-card/50 lg:col-span-2">
-                    <h3 className="text-lg font-headline mb-4">Financial Details</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
-                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
+                <div className="space-y-3 p-4 border rounded-lg bg-card/50 md:col-span-2 lg:col-span-1">
+                    <h3 className="text-base font-headline mb-2">Financial Details</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
                         
                         <Controller
                           name="variety"
                           control={form.control}
                           render={({ field }) => (
-                            <div className="space-y-2">
-                              <Label>Variety</Label>
+                            <div className="space-y-1 col-span-3">
+                              <Label className="text-xs">Variety</Label>
                               <div className="flex items-center gap-2">
                                 <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
                                     <PopoverTrigger asChild>
@@ -551,7 +555,7 @@ export default function CustomerManagementClient() {
                                         variant="outline"
                                         role="combobox"
                                         aria-expanded={openVarietyCombobox}
-                                        className="w-full justify-between"
+                                        className="w-full justify-between h-9 text-sm font-normal"
                                         >
                                         {field.value
                                             ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
@@ -591,7 +595,7 @@ export default function CustomerManagementClient() {
                                 </Popover>
                                 <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
                                   <DialogTrigger asChild>
-                                    <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
+                                    <Button variant="outline" size="icon" className="h-9 w-9"><Settings className="h-4 w-4"/></Button>
                                   </DialogTrigger>
                                   <DialogContent>
                                     <DialogHeader>
@@ -655,36 +659,36 @@ export default function CustomerManagementClient() {
                                   </DialogContent>
                                 </Dialog>
                               </div>
-                              {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                              {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                             </div>
                           )}
                         />
 
-                        <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
-                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
-                        <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
-                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
+                        <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label><Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="labouryRate" className="text-xs">Laboury</Label><Input id="labouryRate" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-3"><Label htmlFor="kanta" className="text-xs">Kanta</Label><Input id="kanta" type="number" {...field} className="h-9 text-sm" /></div>)} />
                     </div>
                 </div>
             </div>
             
-            <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-lg font-headline">Calculated Summary</CardTitle></CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="lg:col-span-3">
+              <CardHeader className="p-4"><CardTitle className="text-base font-headline">Calculated Summary</CardTitle></CardHeader>
+              <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-2">
                 {summaryFields.map(item => (
-                  <div key={item.label} className="space-y-1">
-                    <p className="text-sm text-muted-foreground">{item.label}</p>
-                    <p className={cn("text-lg font-semibold", item.isBold && "text-primary font-bold text-xl")}>{String(item.value)}</p>
+                  <div key={item.label}>
+                    <p className="text-xs text-muted-foreground">{item.label}</p>
+                    <p className={cn("text-base font-semibold", item.isBold && "text-primary font-bold text-lg")}>{String(item.value)}</p>
                   </div>
                 ))}
               </CardContent>
             </Card>
 
-            <div className="flex justify-start space-x-4 pt-4">
-              <Button type="submit">
+            <div className="flex justify-start space-x-4 pt-4 col-span-3">
+              <Button type="submit" size="sm">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
               </Button>
-              <Button type="button" variant="outline" onClick={handleNew}>
+              <Button type="button" variant="outline" onClick={handleNew} size="sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
               </Button>
             </div>
@@ -693,45 +697,45 @@ export default function CustomerManagementClient() {
       </Card>
       
       {/* Customer Table */}
-      <div className="mt-8">
+      <div className="mt-6">
          <Card>
-            <CardHeader>
-                <CardTitle className="font-headline">Transaction Records</CardTitle>
+            <CardHeader className="p-4">
+                <CardTitle className="font-headline text-xl">Transaction Records</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
                  <div className="overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>SR No.</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Variety</TableHead>
-                                <TableHead>Net Weight</TableHead>
-                                <TableHead className="text-right">Net Amount</TableHead>
-                                <TableHead className="text-center">Actions</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">SR No.</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Date</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Name</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Variety</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Net Weight</TableHead>
+                                <TableHead className="text-right px-3 py-2 text-xs">Net Amount</TableHead>
+                                <TableHead className="text-center px-3 py-2 text-xs">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {customers.map(customer => (
                                 <TableRow key={customer.id}>
-                                    <TableCell className="font-mono">{customer.srNo}</TableCell>
-                                    <TableCell>{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
-                                    <TableCell>{toTitleCase(customer.name)}</TableCell>
-                                    <TableCell>{toTitleCase(customer.variety)}</TableCell>
-                                    <TableCell>{customer.netWeight.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-semibold">{Number(customer.netAmount).toFixed(2)}</TableCell>
-                                    <TableCell className="text-center">
-                                        <div className="flex justify-center items-center gap-1">
-                                            <Button variant="ghost" size="icon" onClick={() => handleShowDetails(customer)}>
+                                    <TableCell className="font-mono px-3 py-2 text-sm">{customer.srNo}</TableCell>
+                                    <TableCell className="px-3 py-2 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell className="px-3 py-2 text-sm">{toTitleCase(customer.name)}</TableCell>
+                                    <TableCell className="px-3 py-2 text-sm">{toTitleCase(customer.variety)}</TableCell>
+                                    <TableCell className="px-3 py-2 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-semibold px-3 py-2 text-sm">{Number(customer.netAmount).toFixed(2)}</TableCell>
+                                    <TableCell className="text-center px-3 py-2">
+                                        <div className="flex justify-center items-center gap-0">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(customer)}>
                                                 <Info className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(customer.id)}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(customer.id)}>
                                                 <Pen className="h-4 w-4" />
                                             </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7">
                                                     <Trash className="h-4 w-4 text-destructive" />
                                                 </Button>
                                                 </AlertDialogTrigger>
@@ -761,16 +765,16 @@ export default function CustomerManagementClient() {
 
        {/* Details Dialog */}
       <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Transaction Details for {detailsCustomer?.srNo}</DialogTitle>
+            <DialogTitle>Details for {detailsCustomer?.srNo}</DialogTitle>
           </DialogHeader>
-          <div className="max-h-[70vh] overflow-y-auto p-4">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          <div className="max-h-[70vh] overflow-y-auto p-1">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               {customerDetailsFields(detailsCustomer).map(field => (
                 <div key={field.label}>
-                  <p className="text-sm font-medium text-muted-foreground">{field.label}</p>
-                  <p className="font-semibold">{String(field.value)}</p>
+                  <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
+                  <p className="font-semibold text-sm">{String(field.value)}</p>
                 </div>
               ))}
             </div>
@@ -783,3 +787,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
