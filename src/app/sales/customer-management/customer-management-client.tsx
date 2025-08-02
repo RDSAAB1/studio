@@ -558,14 +558,15 @@ export default function CustomerManagementClient() {
                                                                 key={v}
                                                                 value={v}
                                                                 onSelect={(currentValue) => {
-                                                                    field.onChange(currentValue === field.value ? "" : currentValue);
+                                                                    const titleCasedValue = toTitleCase(currentValue);
+                                                                    field.onChange(titleCasedValue);
                                                                     setOpenVarietyCombobox(false);
                                                                 }}
                                                             >
                                                                 <Check
                                                                     className={cn(
                                                                         "mr-2 h-4 w-4",
-                                                                        field.value === v ? "opacity-100" : "opacity-0"
+                                                                        field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
                                                                     )}
                                                                 />
                                                                 {toTitleCase(v)}
@@ -764,3 +765,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
