@@ -42,7 +42,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { DynamicCombobox, type ComboboxOption } from "@/components/ui/dynamic-combobox";
 
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -355,26 +354,6 @@ export default function CustomerManagementClient() {
     ];
   };
 
-  const handleAddVariety = (newVariety: string) => {
-    const newOption = toTitleCase(newVariety);
-    if (!varietyOptions.some(o => o.toLowerCase() === newOption.toLowerCase())) {
-        setVarietyOptions(prev => [...prev, newOption]);
-        toast({ title: 'Variety Added', description: `"${newOption}" has been added to the list.` });
-    }
-  };
-
-  const handleDeleteVariety = (varietyToDelete: string) => {
-    setVarietyOptions(prev => prev.filter(o => o.toLowerCase() !== varietyToDelete.toLowerCase()));
-    if (form.getValues('variety').toLowerCase() === varietyToDelete.toLowerCase()) {
-        form.setValue('variety', '');
-    }
-    toast({ title: 'Variety Removed', description: `"${toTitleCase(varietyToDelete)}" has been removed.` });
-  };
-  
-  const varietyComboboxOptions = useMemo((): ComboboxOption[] => {
-    return varietyOptions.map(v => ({ value: v, label: v }));
-  }, [varietyOptions]);
-
   if (!isClient) {
     return null; // or a loading skeleton
   }
@@ -520,16 +499,16 @@ export default function CustomerManagementClient() {
                         render={({ field }) => (
                           <div className="space-y-2">
                             <Label>Variety</Label>
-                            <DynamicCombobox
-                                options={varietyComboboxOptions}
-                                value={field.value}
-                                onChange={field.onChange}
-                                onAdd={handleAddVariety}
-                                onDelete={handleDeleteVariety}
-                                placeholder="Select or add a variety..."
-                                searchPlaceholder="Search variety..."
-                                emptyPlaceholder="No variety found. Type to add."
-                            />
+                             <Select onValueChange={field.onChange} value={field.value}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a variety" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {varietyOptions.map(type => (
+                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                           </div>
                         )}
