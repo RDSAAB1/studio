@@ -501,7 +501,7 @@ export default function CustomerManagementClient() {
                 {/* Customer Information */}
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
                     <h3 className="text-base font-headline mb-2">Customer Information</h3>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 mb-3">
                          <Controller name="name" control={form.control} render={({ field }) => (
                             <div className="space-y-1 relative">
                                 <Label htmlFor="name" className="text-xs">Name</Label>
@@ -515,7 +515,9 @@ export default function CustomerManagementClient() {
                                 <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                             </div>
                         )} />
-                         <Controller name="contact" control={form.control} render={({ field }) => (
+                    </div>
+                     <div className="grid grid-cols-3 gap-3">
+                        <Controller name="contact" control={form.control} render={({ field }) => (
                             <div className="space-y-1">
                                 <Label htmlFor="contact" className="text-xs">Contact</Label>
                                 <Input {...field} className="h-9 text-sm" />
@@ -529,7 +531,7 @@ export default function CustomerManagementClient() {
                             </div>
                         )} />
                          <Controller name="vehicleNo" control={form.control} render={({ field }) => (
-                            <div className="space-y-1 col-span-2">
+                            <div className="space-y-1">
                                 <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                                 <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                             </div>
@@ -540,7 +542,7 @@ export default function CustomerManagementClient() {
                 {/* Financial Details */}
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
                     <h3 className="text-base font-headline mb-2">Financial Details</h3>
-                    <div className="grid grid-cols-4 gap-3">
+                     <div className="grid grid-cols-3 gap-3 mb-3">
                         <Controller
                           name="variety"
                           control={form.control}
@@ -663,10 +665,12 @@ export default function CustomerManagementClient() {
                         />
                         <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
-                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-2"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                     </div>
+                     <div className="grid grid-cols-4 gap-3">
+                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label><Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="labouryRate" className="text-xs">Laboury</Label><Input id="labouryRate" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-2"><Label htmlFor="kanta" className="text-xs">Kanta</Label><Input id="kanta" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kanta" className="text-xs">Kanta</Label><Input id="kanta" type="number" {...field} className="h-9 text-sm" /></div>)} />
                     </div>
                 </div>
             </div>
