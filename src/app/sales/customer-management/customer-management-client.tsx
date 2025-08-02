@@ -542,12 +542,12 @@ export default function CustomerManagementClient() {
                 {/* Financial Details */}
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
                     <h3 className="text-base font-headline mb-2">Financial Details</h3>
-                     <div className="grid grid-cols-3 gap-3 mb-3">
+                     <div className="grid grid-cols-5 gap-3 mb-3">
                         <Controller
                           name="variety"
                           control={form.control}
                           render={({ field }) => (
-                            <div className="space-y-1">
+                            <div className="space-y-1 col-span-3">
                               <Label className="text-xs">Variety</Label>
                               <div className="flex items-center gap-2">
                                 <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
@@ -663,8 +663,8 @@ export default function CustomerManagementClient() {
                             </div>
                           )}
                         />
-                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
+                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
                      </div>
                      <div className="grid grid-cols-4 gap-3">
                         <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
@@ -790,6 +790,8 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
 
     
 
