@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { toTitleCase } from "@/lib/utils";
 
 export type ComboboxOption = {
   value: string;
@@ -60,7 +61,7 @@ export function DynamicCombobox({
   className,
 }: DynamicComboboxProps) {
   const [open, setOpen] = React.useState(false);
-  const [searchValue, setSearchValue] = React.useState("");
+  const [inputValue, setInputValue] = React.useState("");
 
   const handleSelect = (currentValue: string) => {
     onChange(currentValue === value ? "" : currentValue);
@@ -68,21 +69,18 @@ export function DynamicCombobox({
   };
 
   const handleAdd = () => {
-    if (onAdd && searchValue) {
-      onAdd(searchValue);
-      onChange(searchValue); // Select the newly added value
-      setSearchValue("");
+    if (onAdd && inputValue) {
+      const formattedValue = toTitleCase(inputValue);
+      onAdd(formattedValue);
+      onChange(formattedValue);
+      setInputValue("");
       setOpen(false);
     }
   };
-  
-  const filteredOptions = options.filter(option => 
-    option.label.toLowerCase().includes(searchValue.toLowerCase())
-  );
 
-  const showAddOption = onAdd && searchValue && !options.some(opt => opt.label.toLowerCase() === searchValue.toLowerCase());
+  const selectedLabel = options.find((option) => option.value.toLowerCase() === value?.toLowerCase())?.label;
 
-  const selectedLabel = options.find((option) => option.value === value)?.label;
+  const showAddButton = onAdd && inputValue && !options.some(opt => opt.label.toLowerCase() === inputValue.toLowerCase());
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -93,7 +91,7 @@ export function DynamicCombobox({
           aria-expanded={open}
           className={cn("w-full justify-between", className)}
         >
-          {value ? selectedLabel : placeholder}
+          <span className="truncate">{value ? selectedLabel : placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -101,47 +99,49 @@ export function DynamicCombobox({
         <Command>
           <CommandInput 
             placeholder={searchPlaceholder}
-            value={searchValue}
-            onValueChange={setSearchValue}
+            value={inputValue}
+            onValueChange={setInputValue}
           />
           <CommandList>
             <CommandEmpty>
-              {showAddOption ? (
-                <Button variant="ghost" className="w-full justify-start" onClick={handleAdd}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add "{searchValue}"
-                </Button>
+              {showAddButton ? (
+                 <div className="p-1">
+                    <Button variant="ghost" className="w-full justify-start" onClick={handleAdd}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add "{inputValue}"
+                    </Button>
+                 </div>
               ) : (
                 <div className="py-6 text-center text-sm">{emptyPlaceholder}</div>
               )}
             </CommandEmpty>
             <CommandGroup>
-              {filteredOptions.map((option) => (
+              {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label} // Use label for filtering in cmdk
-                  onSelect={() => handleSelect(option.value)}
-                  className="flex justify-between items-center"
+                  value={option.value}
+                  onSelect={handleSelect}
+                  className="group/item flex justify-between items-center"
                 >
                   <div className="flex items-center">
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        value === option.value ? "opacity-100" : "opacity-0"
+                        value?.toLowerCase() === option.value.toLowerCase() ? "opacity-100" : "opacity-0"
                       )}
                     />
                     {option.label}
                   </div>
                   {onDelete && (
-                    <AlertDialog>
+                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button
+                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 opacity-50 hover:opacity-100"
-                           onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                           }}
+                          className="h-6 w-6 opacity-0 group-hover/item:opacity-100"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
                         >
                           <Trash className="h-4 w-4 text-destructive" />
                         </Button>

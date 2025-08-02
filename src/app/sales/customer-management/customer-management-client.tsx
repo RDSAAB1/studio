@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -105,7 +106,7 @@ export default function CustomerManagementClient() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
 
-  const [varietyOptions, setVarietyOptions] = useState<ComboboxOption[]>(appOptionsData.varieties.map(v => ({ value: v, label: toTitleCase(v) })));
+  const [varietyOptions, setVarietyOptions] = useState<string[]>(appOptionsData.varieties);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -355,20 +356,24 @@ export default function CustomerManagementClient() {
   };
 
   const handleAddVariety = (newVariety: string) => {
-    const newOption = { value: newVariety, label: toTitleCase(newVariety) };
-    if (!varietyOptions.some(o => o.value.toLowerCase() === newVariety.toLowerCase())) {
+    const newOption = toTitleCase(newVariety);
+    if (!varietyOptions.some(o => o.toLowerCase() === newOption.toLowerCase())) {
         setVarietyOptions(prev => [...prev, newOption]);
-        toast({ title: 'Variety Added', description: `"${toTitleCase(newVariety)}" has been added to the list.` });
+        toast({ title: 'Variety Added', description: `"${newOption}" has been added to the list.` });
     }
   };
 
   const handleDeleteVariety = (varietyToDelete: string) => {
-    setVarietyOptions(prev => prev.filter(o => o.value !== varietyToDelete));
-    if (form.getValues('variety') === varietyToDelete) {
+    setVarietyOptions(prev => prev.filter(o => o.toLowerCase() !== varietyToDelete.toLowerCase()));
+    if (form.getValues('variety').toLowerCase() === varietyToDelete.toLowerCase()) {
         form.setValue('variety', '');
     }
     toast({ title: 'Variety Removed', description: `"${toTitleCase(varietyToDelete)}" has been removed.` });
   };
+  
+  const varietyComboboxOptions = useMemo((): ComboboxOption[] => {
+    return varietyOptions.map(v => ({ value: v, label: v }));
+  }, [varietyOptions]);
 
   if (!isClient) {
     return null; // or a loading skeleton
@@ -514,16 +519,16 @@ export default function CustomerManagementClient() {
                         control={form.control}
                         render={({ field }) => (
                           <div className="space-y-2">
-                            <Label htmlFor="variety">Variety</Label>
+                            <Label>Variety</Label>
                             <DynamicCombobox
-                                options={varietyOptions}
+                                options={varietyComboboxOptions}
                                 value={field.value}
                                 onChange={field.onChange}
                                 onAdd={handleAddVariety}
                                 onDelete={handleDeleteVariety}
                                 placeholder="Select or add a variety..."
                                 searchPlaceholder="Search variety..."
-                                emptyPlaceholder="No variety found."
+                                emptyPlaceholder="No variety found. Type to add."
                             />
                             {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                           </div>
