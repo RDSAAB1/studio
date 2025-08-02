@@ -143,7 +143,7 @@ export default function CustomerManagementClient() {
   const performCalculations = useCallback((data: Partial<FormValues>) => {
     const values = {...form.getValues(), ...data};
     const date = values.date;
-    const termDays = values.term || 0;
+    const termDays = Number(values.term) || 0;
     const newDueDate = new Date(date);
     newDueDate.setDate(newDueDate.getDate() + termDays);
 
@@ -335,7 +335,7 @@ export default function CustomerManagementClient() {
   
   const handleSaveEditedVariety = () => {
     if (editingVariety) {
-      setVarietyOptions(prev => prev.map(v => v === editingVariety.old ? editingVariety.new : v).sort());
+      setVarietyOptions(prev => prev.map(v => v === editingVariety.old ? toTitleCase(editingVariety.new) : v).sort());
       setEditingVariety(null);
       toast({ title: "Variety Updated" });
     }
@@ -531,7 +531,7 @@ export default function CustomerManagementClient() {
                       control={form.control}
                       render={({ field }) => (
                         <div className="space-y-2">
-                           <Label>Variety</Label>
+                          <Label>Variety</Label>
                           <div className="flex items-center gap-2">
                             <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
                                 <PopoverTrigger asChild>
@@ -555,13 +555,13 @@ export default function CustomerManagementClient() {
                                         <CommandGroup>
                                         {varietyOptions.map((v) => (
                                             <CommandItem
-                                            key={v}
-                                            value={v}
-                                            onSelect={(currentValue) => {
-                                                const titleCasedValue = toTitleCase(currentValue);
-                                                field.onChange(titleCasedValue);
-                                                setOpenVarietyCombobox(false);
-                                            }}
+                                                key={v}
+                                                value={v}
+                                                onSelect={(currentValue) => {
+                                                    const titleCasedValue = toTitleCase(currentValue);
+                                                    field.onChange(titleCasedValue);
+                                                    setOpenVarietyCombobox(false);
+                                                }}
                                             >
                                             <Check
                                                 className={cn(
@@ -576,7 +576,7 @@ export default function CustomerManagementClient() {
                                     </CommandList>
                                     </Command>
                                 </PopoverContent>
-                                </Popover>
+                            </Popover>
                             <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
                               <DialogTrigger asChild>
                                 <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
