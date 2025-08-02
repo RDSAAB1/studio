@@ -417,92 +417,93 @@ export default function CustomerManagementClient() {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-              
-                <div className="space-y-3 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-base font-headline mb-2">Transaction Details</h3>
-                     <Controller name="date" control={form.control} render={({ field }) => (
-                        <div className="space-y-1">
-                            <Label className="text-xs">Date</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                    "w-full justify-start text-left font-normal h-9 text-sm",
-                                    !field.value && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 z-[51]">
-                                <CalendarComponent
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={(date) => field.onChange(date || new Date())}
-                                    initialFocus
-                                />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    )} />
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
-                            <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="term" className="text-xs">Term (Days)</Label>
-                            <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm" />
-                        </div>
-                        <Controller
-                            name="receiptType"
-                            control={form.control}
-                            render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Receipt Type</Label>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="h-9 text-sm">
-                                        <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {appOptionsData.receiptTypes.map(type => (
-                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                        />
-                        <Controller
-                            name="paymentType"
-                            control={form.control}
-                            render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Payment Type</Label>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="h-9 text-sm">
-                                        <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {appOptionsData.paymentTypes.map(type => (
-                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                        />
-                    </div>
-                </div>
+             {/* Transaction Details */}
+            <div className="p-4 border rounded-lg bg-card/50">
+              <h3 className="text-base font-headline mb-2">Transaction Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                  <Controller name="date" control={form.control} render={({ field }) => (
+                      <div className="space-y-1">
+                          <Label className="text-xs">Date</Label>
+                          <Popover>
+                              <PopoverTrigger asChild>
+                              <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                  "w-full justify-start text-left font-normal h-9 text-sm",
+                                  !field.value && "text-muted-foreground"
+                                  )}
+                              >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                              </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 z-[51]">
+                              <CalendarComponent
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={(date) => field.onChange(date || new Date())}
+                                  initialFocus
+                              />
+                              </PopoverContent>
+                          </Popover>
+                      </div>
+                  )} />
+                  <div className="space-y-1">
+                      <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                      <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="term" className="text-xs">Term (Days)</Label>
+                      <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm" />
+                  </div>
+                  <Controller
+                      name="receiptType"
+                      control={form.control}
+                      render={({ field }) => (
+                          <div className="space-y-1">
+                              <Label className="text-xs">Receipt Type</Label>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                              <SelectTrigger className="h-9 text-sm">
+                                  <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  {appOptionsData.receiptTypes.map(type => (
+                                      <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                              </Select>
+                          </div>
+                      )}
+                  />
+                  <Controller
+                      name="paymentType"
+                      control={form.control}
+                      render={({ field }) => (
+                          <div className="space-y-1">
+                              <Label className="text-xs">Payment Type</Label>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                              <SelectTrigger className="h-9 text-sm">
+                                  <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  {appOptionsData.paymentTypes.map(type => (
+                                      <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                              </Select>
+                          </div>
+                      )}
+                  />
+              </div>
+            </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+                {/* Customer Information */}
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
                     <h3 className="text-base font-headline mb-2">Customer Information</h3>
                     <div className="grid grid-cols-2 gap-3">
                          <Controller name="name" control={form.control} render={({ field }) => (
-                            <div className="space-y-1 relative col-span-2">
+                            <div className="space-y-1 relative">
                                 <Label htmlFor="name" className="text-xs">Name</Label>
                                 <Input {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                                 {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
@@ -514,7 +515,7 @@ export default function CustomerManagementClient() {
                                 <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                             </div>
                         )} />
-                        <Controller name="contact" control={form.control} render={({ field }) => (
+                         <Controller name="contact" control={form.control} render={({ field }) => (
                             <div className="space-y-1">
                                 <Label htmlFor="contact" className="text-xs">Contact</Label>
                                 <Input {...field} className="h-9 text-sm" />
@@ -522,7 +523,7 @@ export default function CustomerManagementClient() {
                             </div>
                         )} />
                         <Controller name="address" control={form.control} render={({ field }) => (
-                             <div className="space-y-1 col-span-2">
+                             <div className="space-y-1">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
                             </div>
@@ -535,10 +536,11 @@ export default function CustomerManagementClient() {
                         )} />
                     </div>
                 </div>
-
-                <div className="space-y-3 p-4 border rounded-lg bg-card/50 md:col-span-2 lg:col-span-1">
+                
+                {/* Financial Details */}
+                <div className="space-y-3 p-4 border rounded-lg bg-card/50">
                     <h3 className="text-base font-headline mb-2">Financial Details</h3>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-4 gap-3">
                         <Controller
                           name="variety"
                           control={form.control}
@@ -669,7 +671,7 @@ export default function CustomerManagementClient() {
                 </div>
             </div>
             
-            <Card className="lg:col-span-3">
+            <Card>
               <CardHeader className="p-4"><CardTitle className="text-base font-headline">Calculated Summary</CardTitle></CardHeader>
               <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-2">
                 {summaryFields.map(item => (
@@ -681,7 +683,7 @@ export default function CustomerManagementClient() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-start space-x-4 pt-4 col-span-3">
+            <div className="flex justify-start space-x-4 pt-4">
               <Button type="submit" size="sm">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
               </Button>
