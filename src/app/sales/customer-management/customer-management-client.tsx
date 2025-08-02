@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -40,6 +39,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
@@ -50,6 +50,8 @@ import {
   Save,
   Trash,
   Info,
+  Settings,
+  Plus,
 } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -106,6 +108,10 @@ export default function CustomerManagementClient() {
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
 
   const [varietyOptions, setVarietyOptions] = useState<string[]>(appOptionsData.varieties);
+  const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
+  const [newVariety, setNewVariety] = useState("");
+  const [editingVariety, setEditingVariety] = useState<{ old: string; new: string } | null>(null);
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -309,6 +315,29 @@ export default function CustomerManagementClient() {
     setIsDetailsModalOpen(true);
   }
 
+  const handleAddVariety = () => {
+    if (newVariety && !varietyOptions.find(opt => opt.toLowerCase() === newVariety.toLowerCase())) {
+        const titleCasedVariety = toTitleCase(newVariety);
+        setVarietyOptions(prev => [...prev, titleCasedVariety]);
+        setNewVariety("");
+        toast({ title: "Variety Added", description: `"${titleCasedVariety}" has been added.` });
+    }
+  };
+
+  const handleDeleteVariety = (varietyToDelete: string) => {
+    setVarietyOptions(prev => prev.filter(v => v !== varietyToDelete));
+    toast({ title: "Variety Deleted", description: `"${varietyToDelete}" has been removed.` });
+  };
+  
+  const handleSaveEditedVariety = () => {
+    if (editingVariety) {
+      setVarietyOptions(prev => prev.map(v => v === editingVariety.old ? editingVariety.new : v));
+      setEditingVariety(null);
+      toast({ title: "Variety Updated" });
+    }
+  };
+
+
   const summaryFields = useMemo(() => {
       const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
       return [
@@ -499,16 +528,82 @@ export default function CustomerManagementClient() {
                         render={({ field }) => (
                           <div className="space-y-2">
                             <Label>Variety</Label>
-                             <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a variety" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {varietyOptions.map(type => (
-                                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                             <div className="flex items-center gap-2">
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a variety" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {varietyOptions.map(type => (
+                                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                                </Select>
+                                <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Manage Varieties</DialogTitle>
+                                            <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    placeholder="Add new variety"
+                                                    value={newVariety}
+                                                    onChange={(e) => setNewVariety(e.target.value)}
+                                                />
+                                                <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
+                                            </div>
+                                            <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
+                                                {varietyOptions.map(v => (
+                                                <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                                                     {editingVariety?.old === v ? (
+                                                        <Input
+                                                            value={editingVariety.new}
+                                                            onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        <span className="flex-grow">{v}</span>
+                                                    )}
+                                                    <div className="flex gap-1">
+                                                        {editingVariety?.old === v ? (
+                                                            <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
+                                                        ) : (
+                                                            <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
+                                                        )}
+
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    This will permanently delete the variety "{v}".
+                                                                </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                             {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                           </div>
                         )}
@@ -630,3 +725,6 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+
+    
