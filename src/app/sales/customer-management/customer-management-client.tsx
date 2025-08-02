@@ -442,7 +442,7 @@ export default function CustomerManagementClient() {
                                         {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                                     </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 z-50">
+                                    <PopoverContent className="w-auto p-0 z-[51]">
                                     <CalendarComponent
                                         mode="single"
                                         selected={field.value}
@@ -539,9 +539,6 @@ export default function CustomerManagementClient() {
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50 md:col-span-2 lg:col-span-1">
                     <h3 className="text-base font-headline mb-2">Financial Details</h3>
                     <div className="grid grid-cols-3 gap-3">
-                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
-                        
                         <Controller
                           name="variety"
                           control={form.control}
@@ -563,7 +560,7 @@ export default function CustomerManagementClient() {
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-50">
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[51]">
                                         <Command>
                                         <CommandInput placeholder="Search variety..." />
                                         <CommandList>
@@ -663,9 +660,10 @@ export default function CustomerManagementClient() {
                             </div>
                           )}
                         />
-
-                        <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label><Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
                         <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
+                        <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label><Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="labouryRate" className="text-xs">Laboury</Label><Input id="labouryRate" type="number" {...field} className="h-9 text-sm" /></div>)} />
                         <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-3"><Label htmlFor="kanta" className="text-xs">Kanta</Label><Input id="kanta" type="number" {...field} className="h-9 text-sm" /></div>)} />
                     </div>
