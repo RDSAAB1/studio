@@ -416,7 +416,7 @@ export default function CustomerManagementClient() {
           <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
              {/* Transaction Details */}
             <div className="p-4 border rounded-lg bg-card/50">
-              <h3 className="text-base font-headline mb-2 text-destructive">Transaction Details</h3>
+              <h3 className="text-base font-headline mb-2 text-primary">Transaction Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                   <Controller name="date" control={form.control} render={({ field }) => (
                       <div className="space-y-1">
@@ -497,7 +497,7 @@ export default function CustomerManagementClient() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
                 {/* Customer Information */}
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-base font-headline mb-2 text-destructive">Customer Information</h3>
+                    <h3 className="text-base font-headline mb-2 text-primary">Customer Information</h3>
                     <div className="grid grid-cols-2 gap-3 mb-3">
                          <Controller name="name" control={form.control} render={({ field }) => (
                             <div className="space-y-1 relative">
@@ -538,7 +538,7 @@ export default function CustomerManagementClient() {
                 
                 {/* Financial Details */}
                 <div className="space-y-3 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-base font-headline mb-2 text-destructive">Financial Details</h3>
+                    <h3 className="text-base font-headline mb-2 text-primary">Financial Details</h3>
                      <div className="grid grid-cols-[2fr,1fr,1fr] gap-3 mb-3">
                         <Controller
                           name="variety"
@@ -673,7 +673,7 @@ export default function CustomerManagementClient() {
             </div>
             
             <Card>
-              <CardHeader className="p-4"><CardTitle className="text-base font-headline text-destructive">Calculated Summary</CardTitle></CardHeader>
+              <CardHeader className="p-4"><CardTitle className="text-base font-headline text-primary">Calculated Summary</CardTitle></CardHeader>
               <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-2">
                 {summaryFields.map(item => (
                   <div key={item.label}>
@@ -685,7 +685,7 @@ export default function CustomerManagementClient() {
             </Card>
 
             <div className="flex justify-start space-x-4 pt-4">
-              <Button type="submit" size="sm" variant="destructive">
+              <Button type="submit" size="sm">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
               </Button>
               <Button type="button" variant="outline" onClick={handleNew} size="sm">
