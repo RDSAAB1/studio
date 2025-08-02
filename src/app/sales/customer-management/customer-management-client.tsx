@@ -15,6 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -67,8 +74,8 @@ const formSchema = z.object({
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
-    receiptType: z.string().transform(val => toTitleCase(val)),
-    paymentType: z.string().transform(val => toTitleCase(val))
+    receiptType: z.string().min(1, "Receipt type is required"),
+    paymentType: z.string().min(1, "Payment type is required")
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -401,14 +408,44 @@ export default function CustomerManagementClient() {
                       <Label htmlFor="term">Term (Days)</Label>
                       <Input id="term" type="number" {...form.register('term')} />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="receiptType">Receipt Type</Label>
-                      <Input id="receiptType" {...form.register('receiptType')} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="paymentType">Payment Type</Label>
-                      <Input id="paymentType" {...form.register('paymentType')} />
-                    </div>
+                     <Controller
+                        name="receiptType"
+                        control={form.control}
+                        render={({ field }) => (
+                          <div className="space-y-2">
+                            <Label>Receipt Type</Label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a receipt type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {appOptionsData.receiptTypes.map(type => (
+                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      />
+                    <Controller
+                        name="paymentType"
+                        control={form.control}
+                        render={({ field }) => (
+                          <div className="space-y-2">
+                            <Label>Payment Type</Label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a payment type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {appOptionsData.paymentTypes.map(type => (
+                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      />
                   </CardContent>
               </Card>
 
@@ -578,3 +615,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
