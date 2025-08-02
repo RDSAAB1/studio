@@ -527,127 +527,126 @@ export default function CustomerManagementClient() {
                     <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
                     
                     <Controller
-                        name="variety"
-                        control={form.control}
-                        render={({ field }) => (
-                            <div className="space-y-2">
-                                <Label>Variety</Label>
-                                <div className="flex items-center gap-2">
-                                    <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={openVarietyCombobox}
-                                                className="w-full justify-between"
-                                            >
-                                                {field.value
-                                                    ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
-                                                    : "Select variety..."}
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                            <Command>
-                                                <CommandInput placeholder="Search variety..." />
-                                                <CommandList>
-                                                    <CommandEmpty>No variety found.</CommandEmpty>
-                                                    <CommandGroup>
-                                                        {varietyOptions.map((v) => (
-                                                            <CommandItem
-                                                                key={v}
-                                                                value={v}
-                                                                onSelect={(currentValue) => {
-                                                                    const titleCasedValue = toTitleCase(currentValue);
-                                                                    field.onChange(titleCasedValue);
-                                                                    setOpenVarietyCombobox(false);
-                                                                }}
-                                                            >
-                                                                <Check
-                                                                    className={cn(
-                                                                        "mr-2 h-4 w-4",
-                                                                        field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                                    )}
-                                                                />
-                                                                {toTitleCase(v)}
-                                                            </CommandItem>
-                                                        ))}
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
-                                    <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
-                                        <DialogTrigger asChild>
-                                            <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>Manage Varieties</DialogTitle>
-                                                <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
-                                            </DialogHeader>
-                                            <div className="space-y-4">
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        placeholder="Add new variety"
-                                                        value={newVariety}
-                                                        onChange={(e) => setNewVariety(e.target.value)}
-                                                    />
-                                                    <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
-                                                </div>
-                                                <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
-                                                    {varietyOptions.map(v => (
-                                                    <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                                                         {editingVariety?.old === v ? (
-                                                            <Input
-                                                                value={editingVariety.new}
-                                                                onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
-                                                                autoFocus
-                                                                onBlur={handleSaveEditedVariety}
-                                                                onKeyDown={(e) => e.key === 'Enter' && handleSaveEditedVariety()}
-                                                            />
-                                                        ) : (
-                                                            <span className="flex-grow">{toTitleCase(v)}</span>
-                                                        )}
-                                                        <div className="flex gap-1">
-                                                            {editingVariety?.old === v ? (
-                                                                <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
-                                                            ) : (
-                                                                <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
-                                                            )}
-
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>
-                                                                        This will permanently delete the variety "{toTitleCase(v)}".
-                                                                    </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </div>
-                                                    </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
+                      name="variety"
+                      control={form.control}
+                      render={({ field }) => (
+                        <div className="space-y-2">
+                          <Label>Variety</Label>
+                          <div className="flex items-center gap-2">
+                            <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openVarietyCombobox}
+                                  className="w-full justify-between"
+                                >
+                                  {field.value
+                                    ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
+                                    : "Select variety..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search variety..." />
+                                  <CommandList>
+                                    <CommandEmpty>No variety found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {varietyOptions.map((v) => (
+                                        <CommandItem
+                                          key={v}
+                                          value={v}
+                                          onSelect={(currentValue) => {
+                                            const titleCasedValue = toTitleCase(currentValue);
+                                            field.onChange(titleCasedValue);
+                                            setOpenVarietyCombobox(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {toTitleCase(v)}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Manage Varieties</DialogTitle>
+                                  <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Add new variety"
+                                      value={newVariety}
+                                      onChange={(e) => setNewVariety(e.target.value)}
+                                    />
+                                    <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
+                                  </div>
+                                  <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
+                                    {varietyOptions.map(v => (
+                                      <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                                        {editingVariety?.old === v ? (
+                                          <Input
+                                            value={editingVariety.new}
+                                            onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
+                                            autoFocus
+                                            onBlur={handleSaveEditedVariety}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEditedVariety()}
+                                          />
+                                        ) : (
+                                          <span className="flex-grow">{toTitleCase(v)}</span>
+                                        )}
+                                        <div className="flex gap-1">
+                                          {editingVariety?.old === v ? (
+                                            <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
+                                          ) : (
+                                            <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
+                                          )}
+                                          <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                              <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                  This will permanently delete the variety "{toTitleCase(v)}".
+                                                </AlertDialogDescription>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
+                                              </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                          </AlertDialog>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                                {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
-                            </div>
-                        )}
-                      />
+                                <DialogFooter>
+                                  <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                          {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                        </div>
+                      )}
+                    />
 
                     <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
                     <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
@@ -765,5 +764,7 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
 
     
