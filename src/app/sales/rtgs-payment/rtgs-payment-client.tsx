@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { DynamicCombobox, type ComboboxOption } from "@/components/ui/dynamic-combobox";
 
 
 const formSchema = z.object({
@@ -80,7 +81,6 @@ type SortConfig = {
     direction: 'ascending' | 'descending';
 };
 
-
 const initialFormState: FormValues = {
   name: "",
   fatherName: "",
@@ -107,11 +107,12 @@ const initialFormState: FormValues = {
 
 export default function RtgspaymentClient() {
   const { toast } = useToast();
-  const [customers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
   const [outstandingEntries, setOutstandingEntries] = useState<Customer[]>([]);
   const [selectedOutstandingIds, setSelectedOutstandingIds] = useState<Set<string>>(new Set());
 
@@ -163,11 +164,18 @@ export default function RtgspaymentClient() {
               form.setValue("srNo", generateSrNo(parsedRecords));
            }
         }
+        
+        const savedCustomers = localStorage.getItem("customers_data");
+        if (savedCustomers) {
+            setCustomers(JSON.parse(savedCustomers));
+        }
+
       } catch (error) {
+        console.error("Failed to load data from localStorage", error);
         setAllRecords([]);
-         if (editingRecordIndex === null) {
+        if (editingRecordIndex === null) {
             form.setValue("srNo", generateSrNo([]));
-         }
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,8 +185,9 @@ export default function RtgspaymentClient() {
   useEffect(() => {
     if (isClient) {
         localStorage.setItem("rtgs_records", JSON.stringify(allRecords));
+        localStorage.setItem("customers_data", JSON.stringify(customers));
     }
-  }, [allRecords, isClient]);
+  }, [allRecords, customers, isClient]);
 
   // CD Calculation Effect
   useEffect(() => {
@@ -202,9 +211,9 @@ export default function RtgspaymentClient() {
 
 
   const handleCustomerSelect = (customerId: string) => {
+    setSelectedCustomerId(customerId);
     const customer = customers.find(c => c.id === customerId);
     if(customer) {
-      setSelectedCustomer(customer);
       form.reset({
         ...initialFormState,
         srNo: generateSrNo(allRecords),
@@ -223,7 +232,6 @@ export default function RtgspaymentClient() {
       const customerOutstanding = customers.filter(c => c.customerId === customer.customerId && Number(c.netAmount) > 0);
       setOutstandingEntries(customerOutstanding);
     } else {
-      setSelectedCustomer(null);
       setOutstandingEntries([]);
     }
   }
@@ -252,11 +260,25 @@ export default function RtgspaymentClient() {
   const handleNew = (records: any[]) => {
     form.reset({...initialFormState, srNo: generateSrNo(records) });
     setEditingRecordIndex(null);
-    setSelectedCustomer(null);
+    setSelectedCustomerId(undefined);
     setOutstandingEntries([]);
     setSelectedOutstandingIds(new Set());
     setCdEnabled(false);
   }
+  
+  const handleAddNewCustomer = (customerName: string) => {
+    const newCustomer: Customer = {
+        id: Date.now().toString(),
+        name: toTitleCase(customerName),
+        contact: '',
+        srNo: '', date: '', term: '', dueDate: '', so: '', address: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0, weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0, labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, barcode: '', receiptType: '', paymentType: '',
+        customerId: `${toTitleCase(customerName).toLowerCase()}|`
+    };
+    setCustomers(prev => [...prev, newCustomer]);
+    handleCustomerSelect(newCustomer.id);
+    toast({ title: "Customer Added", description: `Added "${customerName}". Please fill in other details.` });
+  };
+
 
   const handleEdit = (index: number) => {
     const record = allRecords[index];
@@ -346,7 +368,6 @@ export default function RtgspaymentClient() {
       form.setValue('rate', firstEntry.rate || 0);
       form.setValue('weight', firstEntry.weight || 0);
     }
-    // Close the modal by targeting its trigger if possible or managing state
     const closeTrigger = document.getElementById('close-outstanding-modal');
     if (closeTrigger) closeTrigger.click();
     toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} outstanding entries. Total: ${totalAmount.toFixed(2)}. Target amount set.` });
@@ -384,6 +405,13 @@ export default function RtgspaymentClient() {
     }
     return sortableItems;
   }, [paymentOptions, sortConfig]);
+  
+  const customerComboboxOptions = useMemo(() => {
+    return customers.map(c => ({
+        value: c.id,
+        label: `${toTitleCase(c.name)} (${c.contact || 'No Contact'})`
+    }));
+  }, [customers]);
 
   if (!isClient) {
     return null; 
@@ -397,26 +425,23 @@ export default function RtgspaymentClient() {
         </CardHeader>
         <CardContent className="flex items-end gap-4">
           <div className="flex-grow">
-            <Select onValueChange={handleCustomerSelect} value={selectedCustomer?.id || ''}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a customer to pre-fill details" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {toTitleCase(customer.name)} ({customer.contact})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DynamicCombobox
+                options={customerComboboxOptions}
+                value={selectedCustomerId}
+                onChange={handleCustomerSelect}
+                onAdd={handleAddNewCustomer}
+                placeholder="Select or add a customer..."
+                searchPlaceholder="Search customer..."
+                emptyPlaceholder="No customer found."
+            />
           </div>
-          {selectedCustomer && (
+          {selectedCustomerId && (
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline">View Outstanding ({outstandingEntries.length})</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl">
-                  <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(selectedCustomer.name)}</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(customers.find(c=>c.id === selectedCustomerId)?.name || '')}</DialogTitle></DialogHeader>
                   <div className="max-h-[60vh] overflow-y-auto">
                     <Table>
                       <TableHeader>
@@ -656,7 +681,6 @@ export default function RtgspaymentClient() {
         </DialogContent>
       </Dialog>
 
-
       <Card>
         <CardHeader><CardTitle>Saved Records</CardTitle></CardHeader>
         <CardContent>
@@ -692,3 +716,4 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
+

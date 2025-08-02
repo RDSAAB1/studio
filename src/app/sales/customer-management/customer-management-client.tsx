@@ -40,8 +40,9 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { DynamicCombobox, type ComboboxOption } from "@/components/ui/dynamic-combobox";
+
 
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -50,8 +51,6 @@ import {
   Save,
   Trash,
   Info,
-  Check,
-  ChevronsUpDown,
 } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -104,13 +103,11 @@ export default function CustomerManagementClient() {
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   
-  const [varietyOptions, setVarietyOptions] = useState(appOptionsData.varieties);
+  const [varietyOptions, setVarietyOptions] = useState<ComboboxOption[]>(
+    appOptionsData.varieties.map(v => ({ value: v, label: toTitleCase(v) }))
+  );
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
-
-  const [editOption, setEditOption] = useState<{ type: 'variety'; value: string } | null>(null);
-  const [editValue, setEditValue] = useState('');
-
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -316,40 +313,16 @@ export default function CustomerManagementClient() {
 
   const handleAddVariety = (variety: string) => {
     const newVariety = toTitleCase(variety);
-    if (newVariety && !varietyOptions.includes(newVariety)) {
-        setVarietyOptions(prev => [...prev, newVariety]);
-        form.setValue('variety', newVariety);
+    const newOption = { value: newVariety, label: newVariety };
+    if (newVariety && !varietyOptions.some(o => o.value.toLowerCase() === newVariety.toLowerCase())) {
+        setVarietyOptions(prev => [...prev, newOption]);
         toast({ title: 'Variety Added', description: `${newVariety} has been added to the list.` });
     }
   };
-  
-  const handleEditOption = (type: 'variety', value: string) => {
-    setEditOption({ type, value });
-    setEditValue(value);
-  };
 
-  const handleUpdateOption = () => {
-    if (!editOption) return;
-    const updatedValue = toTitleCase(editValue);
-    if (!updatedValue) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Value cannot be empty.' });
-        return;
-    }
-    
-    if (editOption.type === 'variety') {
-        setVarietyOptions(prev => prev.map(v => v === editOption.value ? updatedValue : v));
-    }
-    
-    toast({ title: 'Success', description: `${editOption.value} updated to ${updatedValue}.` });
-    setEditOption(null);
-    setEditValue('');
-  };
-
-  const handleDeleteOption = (type: 'variety', value: string) => {
-      if (type === 'variety') {
-        setVarietyOptions(prev => prev.filter(v => v !== value));
-      }
-      toast({ title: 'Success', description: `${value} has been deleted.` });
+  const handleDeleteVariety = (variety: string) => {
+      setVarietyOptions(prev => prev.filter(v => v.value !== variety));
+      toast({ title: 'Success', description: `${variety} has been deleted.` });
   };
 
   const summaryFields = useMemo(() => {
@@ -539,103 +512,22 @@ export default function CustomerManagementClient() {
                     <Controller
                         name="variety"
                         control={form.control}
-                        render={({ field }) => {
-                          const [open, setOpen] = useState(false);
-                          const [searchValue, setSearchValue] = useState("");
-
-                          const handleSelect = (value: string) => {
-                              field.onChange(toTitleCase(value));
-                              setOpen(false);
-                              setSearchValue("");
-                          };
-
-                          const filteredOptions = varietyOptions.filter(option =>
-                            option.toLowerCase().includes(searchValue.toLowerCase())
-                          );
-
-                          const showAddOption = searchValue && !filteredOptions.some(opt => opt.toLowerCase() === searchValue.toLowerCase());
-
-                          return (
+                        render={({ field }) => (
                             <div className="space-y-2">
                                 <Label>Variety</Label>
-                                <Popover open={open} onOpenChange={setOpen}>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={open}
-                                    className="w-full justify-between"
-                                    >
-                                    {field.value
-                                        ? toTitleCase(field.value)
-                                        : "Select variety..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command shouldFilter={false}>
-                                        <CommandInput 
-                                            placeholder="Search or add variety..."
-                                            value={searchValue}
-                                            onValueChange={setSearchValue}
-                                        />
-                                        <CommandList>
-                                            <CommandEmpty>
-                                                {showAddOption ? (
-                                                    <Button className="w-full" onClick={() => {
-                                                        handleAddVariety(searchValue);
-                                                        handleSelect(searchValue);
-                                                    }}>
-                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add "{searchValue}"
-                                                    </Button>
-                                                ) : "No variety found."}
-                                            </CommandEmpty>
-                                            <CommandGroup>
-                                            {filteredOptions.map((option) => (
-                                                <CommandItem
-                                                    key={option}
-                                                    value={option}
-                                                    onSelect={() => handleSelect(option)}
-                                                    className="flex justify-between items-center"
-                                                >
-                                                <div className="flex items-center">
-                                                    <Check
-                                                        className={cn(
-                                                        "mr-2 h-4 w-4",
-                                                        field.value?.toLowerCase() === option.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                        )}
-                                                    />
-                                                    {option}
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleEditOption('variety', option); }}>
-                                                        <Pen className="h-4 w-4"/>
-                                                    </Button>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                          <Button variant="destructive" size="icon" className="h-6 w-6" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-                                                              <Trash className="h-4 w-4"/>
-                                                          </Button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete "{option}" from the list.</AlertDialogDescription></AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDeleteOption('variety', option)}>Delete</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </div>
-                                                </CommandItem>
-                                            ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                                </Popover>
+                                <DynamicCombobox
+                                    options={varietyOptions}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    onAdd={handleAddVariety}
+                                    onDelete={handleDeleteVariety}
+                                    placeholder="Select variety..."
+                                    searchPlaceholder="Search or add variety..."
+                                    emptyPlaceholder="No variety found."
+                                />
                                 {form.formState.errors.variety && <p className="text-sm text-destructive">{form.formState.errors.variety.message}</p>}
                             </div>
-                        )}}
+                        )}
                     />
 
                     <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
@@ -644,7 +536,6 @@ export default function CustomerManagementClient() {
                     <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
                   </CardContent>
               </Card>
-
               
               <Card>
                 <CardHeader><CardTitle className="text-lg font-headline">Calculated Summary</CardTitle></CardHeader>
@@ -751,23 +642,6 @@ export default function CustomerManagementClient() {
             <Button onClick={() => setIsDetailsModalOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-
-      {/* Edit Option Dialog */}
-      <Dialog open={!!editOption} onOpenChange={(open) => !open && setEditOption(null)}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>Edit {editOption?.type}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                  <Label htmlFor="edit-value">Value</Label>
-                  <Input id="edit-value" value={editValue} onChange={(e) => setEditValue(e.target.value)} />
-              </div>
-              <DialogFooter>
-                  <Button variant="ghost" onClick={() => setEditOption(null)}>Cancel</Button>
-                  <Button onClick={handleUpdateOption}>Update</Button>
-              </DialogFooter>
-          </DialogContent>
       </Dialog>
     </>
   );
