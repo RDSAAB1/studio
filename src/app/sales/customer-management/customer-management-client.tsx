@@ -41,7 +41,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { DynamicCombobox, type ComboboxOption } from "@/components/ui/dynamic-combobox";
 
 
 import { useToast } from "@/hooks/use-toast";
@@ -103,9 +102,6 @@ export default function CustomerManagementClient() {
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   
-  const [varietyOptions, setVarietyOptions] = useState<ComboboxOption[]>(
-    appOptionsData.varieties.map(v => ({ value: v, label: toTitleCase(v) }))
-  );
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
 
@@ -311,20 +307,6 @@ export default function CustomerManagementClient() {
     setIsDetailsModalOpen(true);
   }
 
-  const handleAddVariety = (variety: string) => {
-    const newVariety = toTitleCase(variety);
-    const newOption = { value: newVariety, label: newVariety };
-    if (newVariety && !varietyOptions.some(o => o.value.toLowerCase() === newVariety.toLowerCase())) {
-        setVarietyOptions(prev => [...prev, newOption]);
-        toast({ title: 'Variety Added', description: `${newVariety} has been added to the list.` });
-    }
-  };
-
-  const handleDeleteVariety = (variety: string) => {
-      setVarietyOptions(prev => prev.filter(v => v.value !== variety));
-      toast({ title: 'Success', description: `${variety} has been deleted.` });
-  };
-
   const summaryFields = useMemo(() => {
       const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
       return [
@@ -509,26 +491,13 @@ export default function CustomerManagementClient() {
                     <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
                     <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
                     
-                    <Controller
-                        name="variety"
-                        control={form.control}
-                        render={({ field }) => (
-                            <div className="space-y-2">
-                                <Label>Variety</Label>
-                                <DynamicCombobox
-                                    options={varietyOptions}
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    onAdd={handleAddVariety}
-                                    onDelete={handleDeleteVariety}
-                                    placeholder="Select variety..."
-                                    searchPlaceholder="Search or add variety..."
-                                    emptyPlaceholder="No variety found."
-                                />
-                                {form.formState.errors.variety && <p className="text-sm text-destructive">{form.formState.errors.variety.message}</p>}
-                            </div>
-                        )}
-                    />
+                    <Controller name="variety" control={form.control} render={({ field }) => (
+                        <div className="space-y-2">
+                            <Label htmlFor="variety">Variety</Label>
+                            <Input id="variety" {...field} />
+                             {form.formState.errors.variety && <p className="text-sm text-destructive">{form.formState.errors.variety.message}</p>}
+                        </div>
+                    )} />
 
                     <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
                     <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
@@ -646,3 +615,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
