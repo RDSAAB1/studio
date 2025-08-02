@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -322,7 +322,7 @@ export default function CustomerManagementClient() {
   const handleAddVariety = () => {
     if (newVariety && !varietyOptions.find(opt => opt.toLowerCase() === newVariety.toLowerCase())) {
         const titleCasedVariety = toTitleCase(newVariety);
-        setVarietyOptions(prev => [...prev, titleCasedVariety]);
+        setVarietyOptions(prev => [...prev, titleCasedVariety].sort());
         setNewVariety("");
         toast({ title: "Variety Added", description: `"${titleCasedVariety}" has been added.` });
     }
@@ -335,7 +335,7 @@ export default function CustomerManagementClient() {
   
   const handleSaveEditedVariety = () => {
     if (editingVariety) {
-      setVarietyOptions(prev => prev.map(v => v === editingVariety.old ? editingVariety.new : v));
+      setVarietyOptions(prev => prev.map(v => v === editingVariety.old ? editingVariety.new : v).sort());
       setEditingVariety(null);
       toast({ title: "Variety Updated" });
     }
@@ -542,7 +542,7 @@ export default function CustomerManagementClient() {
                                                 className="w-full justify-between"
                                             >
                                                 {field.value
-                                                    ? varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase())
+                                                    ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
                                                     : "Select variety..."}
                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                             </Button>
@@ -550,27 +550,29 @@ export default function CustomerManagementClient() {
                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                                             <Command>
                                                 <CommandInput placeholder="Search variety..." />
-                                                <CommandEmpty>No variety found.</CommandEmpty>
-                                                <CommandGroup>
-                                                    {varietyOptions.map((v) => (
-                                                        <CommandItem
-                                                            key={v}
-                                                            value={v}
-                                                            onSelect={(currentValue) => {
-                                                                field.onChange(currentValue.toLowerCase() === field.value.toLowerCase() ? "" : currentValue);
-                                                                setOpenVarietyCombobox(false);
-                                                            }}
-                                                        >
-                                                            <Check
-                                                                className={cn(
-                                                                    "mr-2 h-4 w-4",
-                                                                    field.value.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                                )}
-                                                            />
-                                                            {v}
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
+                                                <CommandList>
+                                                    <CommandEmpty>No variety found.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {varietyOptions.map((v) => (
+                                                            <CommandItem
+                                                                key={v}
+                                                                value={v}
+                                                                onSelect={(currentValue) => {
+                                                                    field.onChange(currentValue === field.value ? "" : currentValue);
+                                                                    setOpenVarietyCombobox(false);
+                                                                }}
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        field.value === v ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                {toTitleCase(v)}
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
                                             </Command>
                                         </PopoverContent>
                                     </Popover>
@@ -600,9 +602,11 @@ export default function CustomerManagementClient() {
                                                                 value={editingVariety.new}
                                                                 onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
                                                                 autoFocus
+                                                                onBlur={handleSaveEditedVariety}
+                                                                onKeyDown={(e) => e.key === 'Enter' && handleSaveEditedVariety()}
                                                             />
                                                         ) : (
-                                                            <span className="flex-grow">{v}</span>
+                                                            <span className="flex-grow">{toTitleCase(v)}</span>
                                                         )}
                                                         <div className="flex gap-1">
                                                             {editingVariety?.old === v ? (
@@ -619,7 +623,7 @@ export default function CustomerManagementClient() {
                                                                     <AlertDialogHeader>
                                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                                     <AlertDialogDescription>
-                                                                        This will permanently delete the variety "{v}".
+                                                                        This will permanently delete the variety "{toTitleCase(v)}".
                                                                     </AlertDialogDescription>
                                                                     </AlertDialogHeader>
                                                                     <AlertDialogFooter>
