@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -52,6 +53,8 @@ import {
   Info,
   Settings,
   Plus,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -111,6 +114,7 @@ export default function CustomerManagementClient() {
   const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
   const [newVariety, setNewVariety] = useState("");
   const [editingVariety, setEditingVariety] = useState<{ old: string; new: string } | null>(null);
+  const [openVarietyCombobox, setOpenVarietyCombobox] = useState(false);
 
 
   const form = useForm<FormValues>({
@@ -526,86 +530,117 @@ export default function CustomerManagementClient() {
                         name="variety"
                         control={form.control}
                         render={({ field }) => (
-                          <div className="space-y-2">
-                            <Label>Variety</Label>
-                             <div className="flex items-center gap-2">
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a variety" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {varietyOptions.map(type => (
-                                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
-                                <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Manage Varieties</DialogTitle>
-                                            <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4">
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    placeholder="Add new variety"
-                                                    value={newVariety}
-                                                    onChange={(e) => setNewVariety(e.target.value)}
-                                                />
-                                                <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
-                                            </div>
-                                            <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
-                                                {varietyOptions.map(v => (
-                                                <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                                                     {editingVariety?.old === v ? (
-                                                        <Input
-                                                            value={editingVariety.new}
-                                                            onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
-                                                            autoFocus
-                                                        />
-                                                    ) : (
-                                                        <span className="flex-grow">{v}</span>
-                                                    )}
-                                                    <div className="flex gap-1">
-                                                        {editingVariety?.old === v ? (
-                                                            <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
-                                                        ) : (
-                                                            <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
-                                                        )}
-
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    This will permanently delete the variety "{v}".
-                                                                </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                    </div>
+                            <div className="space-y-2">
+                                <Label>Variety</Label>
+                                <div className="flex items-center gap-2">
+                                    <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={openVarietyCombobox}
+                                                className="w-full justify-between"
+                                            >
+                                                {field.value
+                                                    ? varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase())
+                                                    : "Select variety..."}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                            <Command>
+                                                <CommandInput placeholder="Search variety..." />
+                                                <CommandEmpty>No variety found.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {varietyOptions.map((v) => (
+                                                        <CommandItem
+                                                            key={v}
+                                                            value={v}
+                                                            onSelect={(currentValue) => {
+                                                                field.onChange(currentValue.toLowerCase() === field.value.toLowerCase() ? "" : currentValue);
+                                                                setOpenVarietyCombobox(false);
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    field.value.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                            {v}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
+                                    <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Manage Varieties</DialogTitle>
+                                                <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4">
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        placeholder="Add new variety"
+                                                        value={newVariety}
+                                                        onChange={(e) => setNewVariety(e.target.value)}
+                                                    />
+                                                    <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
                                                 </div>
-                                                ))}
+                                                <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
+                                                    {varietyOptions.map(v => (
+                                                    <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                                                         {editingVariety?.old === v ? (
+                                                            <Input
+                                                                value={editingVariety.new}
+                                                                onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <span className="flex-grow">{v}</span>
+                                                        )}
+                                                        <div className="flex gap-1">
+                                                            {editingVariety?.old === v ? (
+                                                                <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
+                                                            ) : (
+                                                                <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
+                                                            )}
+
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        This will permanently delete the variety "{v}".
+                                                                    </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </div>
+                                                    </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
+                                            <DialogFooter>
+                                                <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                                {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                             </div>
-                            {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
-                          </div>
                         )}
                       />
 
@@ -725,6 +760,3 @@ export default function CustomerManagementClient() {
     </>
   );
 }
-
-
-    
