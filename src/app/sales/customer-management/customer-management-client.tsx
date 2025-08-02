@@ -40,6 +40,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +50,8 @@ import {
   Save,
   Trash,
   Info,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Calendar as CalendarIcon } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -80,7 +83,6 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Helper to get a fresh form state
 const getInitialFormState = (customers: Customer[]): Customer => {
   const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
   const staticDate = new Date();
@@ -101,8 +103,14 @@ export default function CustomerManagementClient() {
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(initialCustomers));
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  
+  const [varietyOptions, setVarietyOptions] = useState(appOptionsData.varieties);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+
+  const [editOption, setEditOption] = useState<{ type: 'variety'; value: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -259,8 +267,7 @@ export default function CustomerManagementClient() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       const activeElement = document.activeElement as HTMLElement;
-      // Prevent form submission if the active element is a button inside a popover (like calendar)
-      if (activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]')) {
+      if (activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
         return;
       }
       const form = e.currentTarget;
@@ -273,7 +280,6 @@ export default function CustomerManagementClient() {
       }
     }
   };
-
 
   const handleDelete = (id: string) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
@@ -308,6 +314,43 @@ export default function CustomerManagementClient() {
     setIsDetailsModalOpen(true);
   }
 
+  const handleAddVariety = (variety: string) => {
+    const newVariety = toTitleCase(variety);
+    if (newVariety && !varietyOptions.includes(newVariety)) {
+        setVarietyOptions(prev => [...prev, newVariety]);
+        form.setValue('variety', newVariety);
+        toast({ title: 'Variety Added', description: `${newVariety} has been added to the list.` });
+    }
+  };
+  
+  const handleEditOption = (type: 'variety', value: string) => {
+    setEditOption({ type, value });
+    setEditValue(value);
+  };
+
+  const handleUpdateOption = () => {
+    if (!editOption) return;
+    const updatedValue = toTitleCase(editValue);
+    if (!updatedValue) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Value cannot be empty.' });
+        return;
+    }
+    
+    if (editOption.type === 'variety') {
+        setVarietyOptions(prev => prev.map(v => v === editOption.value ? updatedValue : v));
+    }
+    
+    toast({ title: 'Success', description: `${editOption.value} updated to ${updatedValue}.` });
+    setEditOption(null);
+    setEditValue('');
+  };
+
+  const handleDeleteOption = (type: 'variety', value: string) => {
+      if (type === 'variety') {
+        setVarietyOptions(prev => prev.filter(v => v !== value));
+      }
+      toast({ title: 'Success', description: `${value} has been deleted.` });
+  };
 
   const summaryFields = useMemo(() => {
       const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
@@ -323,36 +366,36 @@ export default function CustomerManagementClient() {
       ]
     }, [currentCustomer]);
     
-    const customerDetailsFields = (customer: Customer | null) => {
-      if (!customer) return [];
-      return [
-        { label: "SR No.", value: customer.srNo },
-        { label: "Date", value: format(new Date(customer.date), "PPP") },
-        { label: "Term", value: `${customer.term} days` },
-        { label: "Due Date", value: format(new Date(customer.dueDate), "PPP") },
-        { label: "Name", value: toTitleCase(customer.name) },
-        { label: "S/O", value: toTitleCase(customer.so) },
-        { label: "Address", value: customer.address },
-        { label: "Contact", value: customer.contact },
-        { label: "Vehicle No.", value: customer.vehicleNo },
-        { label: "Variety", value: toTitleCase(customer.variety) },
-        { label: "Gross Weight", value: customer.grossWeight },
-        { label: "Teir Weight", value: customer.teirWeight },
-        { label: "Weight", value: customer.weight },
-        { label: "Karta %", value: customer.kartaPercentage },
-        { label: "Karta Weight", value: customer.kartaWeight },
-        { label: "Karta Amount", value: customer.kartaAmount },
-        { label: "Net Weight", value: customer.netWeight },
-        { label: "Rate", value: customer.rate },
-        { label: "Laboury Rate", value: customer.labouryRate },
-        { label: "Laboury Amount", value: customer.labouryAmount },
-        { label: "Kanta", value: customer.kanta },
-        { label: "Amount", value: customer.amount },
-        { label: "Net Amount", value: customer.netAmount },
-        { label: "Receipt Type", value: customer.receiptType },
-        { label: "Payment Type", value: customer.paymentType },
-      ];
-    };
+  const customerDetailsFields = (customer: Customer | null) => {
+    if (!customer) return [];
+    return [
+      { label: "SR No.", value: customer.srNo },
+      { label: "Date", value: format(new Date(customer.date), "PPP") },
+      { label: "Term", value: `${customer.term} days` },
+      { label: "Due Date", value: format(new Date(customer.dueDate), "PPP") },
+      { label: "Name", value: toTitleCase(customer.name) },
+      { label: "S/O", value: toTitleCase(customer.so) },
+      { label: "Address", value: customer.address },
+      { label: "Contact", value: customer.contact },
+      { label: "Vehicle No.", value: customer.vehicleNo },
+      { label: "Variety", value: toTitleCase(customer.variety) },
+      { label: "Gross Weight", value: customer.grossWeight },
+      { label: "Teir Weight", value: customer.teirWeight },
+      { label: "Weight", value: customer.weight },
+      { label: "Karta %", value: customer.kartaPercentage },
+      { label: "Karta Weight", value: customer.kartaWeight },
+      { label: "Karta Amount", value: customer.kartaAmount },
+      { label: "Net Weight", value: customer.netWeight },
+      { label: "Rate", value: customer.rate },
+      { label: "Laboury Rate", value: customer.labouryRate },
+      { label: "Laboury Amount", value: customer.labouryAmount },
+      { label: "Kanta", value: customer.kanta },
+      { label: "Amount", value: customer.amount },
+      { label: "Net Amount", value: customer.netAmount },
+      { label: "Receipt Type", value: customer.receiptType },
+      { label: "Payment Type", value: customer.paymentType },
+    ];
+  };
 
   if (!isClient) {
     return null; // or a loading skeleton
@@ -414,7 +457,7 @@ export default function CustomerManagementClient() {
                         render={({ field }) => (
                           <div className="space-y-2">
                             <Label>Receipt Type</Label>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a receipt type" />
                               </SelectTrigger>
@@ -433,7 +476,7 @@ export default function CustomerManagementClient() {
                         render={({ field }) => (
                           <div className="space-y-2">
                             <Label>Payment Type</Label>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a payment type" />
                               </SelectTrigger>
@@ -492,11 +535,109 @@ export default function CustomerManagementClient() {
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
                     <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
-                    <div className="space-y-2">
-                        <Label htmlFor="variety">Variety</Label>
-                        <Input id="variety" {...form.register('variety')} />
-                        {form.formState.errors.variety && <p className="text-sm text-destructive">{form.formState.errors.variety.message}</p>}
-                    </div>
+                    
+                    <Controller
+                        name="variety"
+                        control={form.control}
+                        render={({ field }) => {
+                          const [open, setOpen] = useState(false);
+                          const [searchValue, setSearchValue] = useState("");
+
+                          const handleSelect = (value: string) => {
+                              field.onChange(toTitleCase(value));
+                              setOpen(false);
+                              setSearchValue("");
+                          };
+
+                          const filteredOptions = varietyOptions.filter(option =>
+                            option.toLowerCase().includes(searchValue.toLowerCase())
+                          );
+
+                          const showAddOption = searchValue && !filteredOptions.some(opt => opt.toLowerCase() === searchValue.toLowerCase());
+
+                          return (
+                            <div className="space-y-2">
+                                <Label>Variety</Label>
+                                <Popover open={open} onOpenChange={setOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={open}
+                                    className="w-full justify-between"
+                                    >
+                                    {field.value
+                                        ? toTitleCase(field.value)
+                                        : "Select variety..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command shouldFilter={false}>
+                                        <CommandInput 
+                                            placeholder="Search or add variety..."
+                                            value={searchValue}
+                                            onValueChange={setSearchValue}
+                                        />
+                                        <CommandList>
+                                            <CommandEmpty>
+                                                {showAddOption ? (
+                                                    <Button className="w-full" onClick={() => {
+                                                        handleAddVariety(searchValue);
+                                                        handleSelect(searchValue);
+                                                    }}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add "{searchValue}"
+                                                    </Button>
+                                                ) : "No variety found."}
+                                            </CommandEmpty>
+                                            <CommandGroup>
+                                            {filteredOptions.map((option) => (
+                                                <CommandItem
+                                                    key={option}
+                                                    value={option}
+                                                    onSelect={() => handleSelect(option)}
+                                                    className="flex justify-between items-center"
+                                                >
+                                                <div className="flex items-center">
+                                                    <Check
+                                                        className={cn(
+                                                        "mr-2 h-4 w-4",
+                                                        field.value?.toLowerCase() === option.toLowerCase() ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                    {option}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleEditOption('variety', option); }}>
+                                                        <Pen className="h-4 w-4"/>
+                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                          <Button variant="destructive" size="icon" className="h-6 w-6" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                                                              <Trash className="h-4 w-4"/>
+                                                          </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete "{option}" from the list.</AlertDialogDescription></AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDeleteOption('variety', option)}>Delete</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
+                                                </CommandItem>
+                                            ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                                </Popover>
+                                {form.formState.errors.variety && <p className="text-sm text-destructive">{form.formState.errors.variety.message}</p>}
+                            </div>
+                        )}}
+                    />
+
                     <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
                     <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
                     <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
@@ -601,7 +742,6 @@ export default function CustomerManagementClient() {
               {customerDetailsFields(detailsCustomer).map(field => (
                 <div key={field.label}>
                   <p className="text-sm font-medium text-muted-foreground">{field.label}</p>
-
                   <p className="font-semibold">{String(field.value)}</p>
                 </div>
               ))}
@@ -612,8 +752,23 @@ export default function CustomerManagementClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Option Dialog */}
+      <Dialog open={!!editOption} onOpenChange={(open) => !open && setEditOption(null)}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Edit {editOption?.type}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                  <Label htmlFor="edit-value">Value</Label>
+                  <Input id="edit-value" value={editValue} onChange={(e) => setEditValue(e.target.value)} />
+              </div>
+              <DialogFooter>
+                  <Button variant="ghost" onClick={() => setEditOption(null)}>Cancel</Button>
+                  <Button onClick={handleUpdateOption}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </>
   );
 }
-
-    
