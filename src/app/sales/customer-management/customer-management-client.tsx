@@ -16,6 +16,14 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -68,11 +76,11 @@ const formSchema = z.object({
     term: z.coerce.number().min(0),
     name: z.string().min(1, "Name is required.").transform(val => toTitleCase(val)),
     so: z.string().transform(val => toTitleCase(val)),
-    address: z.string(),
+    address: z.string().transform(val => toTitleCase(val)),
     contact: z.string()
       .length(10, "Contact number must be exactly 10 digits.")
       .regex(/^\d+$/, "Contact number must only contain digits."),
-    vehicleNo: z.string(),
+    vehicleNo: z.string().transform(val => toTitleCase(val)),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
@@ -341,6 +349,12 @@ export default function CustomerManagementClient() {
     }
   };
 
+  const handleCapitalizeOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const fieldName = e.target.id as keyof FormValues;
+    const currentValue = e.target.value;
+    form.setValue(fieldName, toTitleCase(currentValue));
+  }
+
 
   const summaryFields = useMemo(() => {
       const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
@@ -398,277 +412,275 @@ export default function CustomerManagementClient() {
           <CardTitle className="font-headline">{isEditing ? `Editing Entry: ${currentCustomer.srNo}` : "Add New Entry"}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-8">
-            <div className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
               
-              <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Transaction Details</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                     <div className="space-y-2">
-                        <Label htmlFor="srNo">Sr No.</Label>
-                        <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code" />
-                    </div>
-                    
-                    <Controller name="date" control={form.control} render={({ field }) => (
+                <div className="space-y-4 p-4 border rounded-lg bg-card/50">
+                    <h3 className="text-lg font-headline mb-4">Transaction Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                          <div className="space-y-2">
-                            <Label>Date</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <CalendarComponent
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={(date) => field.onChange(date || new Date())}
-                                    initialFocus
-                                />
-                                </PopoverContent>
-                            </Popover>
-                         </div>
-                    )} />
-
-                    <div className="space-y-2">
-                      <Label htmlFor="term">Term (Days)</Label>
-                      <Input id="term" type="number" {...form.register('term')} />
-                    </div>
-                     <Controller
-                        name="receiptType"
-                        control={form.control}
-                        render={({ field }) => (
-                          <div className="space-y-2">
-                            <Label>Receipt Type</Label>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a receipt type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {appOptionsData.receiptTypes.map(type => (
-                                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                      />
-                    <Controller
-                        name="paymentType"
-                        control={form.control}
-                        render={({ field }) => (
-                          <div className="space-y-2">
-                            <Label>Payment Type</Label>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a payment type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {appOptionsData.paymentTypes.map(type => (
-                                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                      />
-                  </CardContent>
-              </Card>
-
-              <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Customer Information</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                     <Controller name="name" control={form.control} render={({ field }) => (
-                        <div className="space-y-2 relative">
-                            <Label htmlFor="name">Name</Label>
-                            <Input id="name" {...field} placeholder="e.g. John Doe" />
-                            {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+                            <Label htmlFor="srNo">Sr No.</Label>
+                            <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code" />
                         </div>
-                    )} />
-                    <Controller name="so" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="so">S/O</Label>
-                            <Input id="so" {...field} />
-                        </div>
-                    )} />
-                    <Controller name="address" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="address">Address</Label>
-                            <Input id="address" {...field} />
-                        </div>
-                    )} />
-                    <Controller name="contact" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="contact">Contact</Label>
-                            <Input id="contact" {...field} />
-                            {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
-                        </div>
-                    )} />
-                     <Controller name="vehicleNo" control={form.control} render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="vehicleNo">Vehicle No.</Label>
-                            <Input id="vehicleNo" {...field} />
-                        </div>
-                    )} />
-                  </CardContent>
-              </Card>
-
-              <Card className="bg-card/50">
-                  <CardHeader><CardTitle className="text-lg font-headline">Financial Details</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
-                    <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
-                    
-                    <Controller
-                      name="variety"
-                      control={form.control}
-                      render={({ field }) => (
-                        <div className="space-y-2">
-                          <Label>Variety</Label>
-                          <div className="flex items-center gap-2">
-                            <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
-                                <PopoverTrigger asChild>
+                        <Controller name="date" control={form.control} render={({ field }) => (
+                            <div className="space-y-2">
+                                <Label>Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
                                     <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={openVarietyCombobox}
-                                    className="w-full justify-between"
-                                    >
-                                    {field.value
-                                        ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
-                                        : "Select variety..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                    <CommandInput placeholder="Search variety..." />
-                                    <CommandList>
-                                        <CommandEmpty>No variety found.</CommandEmpty>
-                                        <CommandGroup>
-                                        {varietyOptions.map((v) => (
-                                            <CommandItem
-                                                key={v}
-                                                value={v}
-                                                onSelect={(currentValue) => {
-                                                    const titleCasedValue = toTitleCase(currentValue);
-                                                    field.onChange(titleCasedValue);
-                                                    setOpenVarietyCombobox(false);
-                                                }}
-                                            >
-                                            <Check
-                                                className={cn(
-                                                "mr-2 h-4 w-4",
-                                                field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            {toTitleCase(v)}
-                                            </CommandItem>
-                                        ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                            <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Manage Varieties</DialogTitle>
-                                  <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                  <div className="flex gap-2">
-                                    <Input
-                                      placeholder="Add new variety"
-                                      value={newVariety}
-                                      onChange={(e) => setNewVariety(e.target.value)}
-                                    />
-                                    <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
-                                  </div>
-                                  <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
-                                    {varietyOptions.map(v => (
-                                      <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                                        {editingVariety?.old === v ? (
-                                          <Input
-                                            value={editingVariety.new}
-                                            onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
-                                            autoFocus
-                                            onBlur={handleSaveEditedVariety}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEditedVariety()}
-                                          />
-                                        ) : (
-                                          <span className="flex-grow">{toTitleCase(v)}</span>
+                                        variant={"outline"}
+                                        className={cn(
+                                        "w-full justify-start text-left font-normal",
+                                        !field.value && "text-muted-foreground"
                                         )}
-                                        <div className="flex gap-1">
-                                          {editingVariety?.old === v ? (
-                                            <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
-                                          ) : (
-                                            <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
-                                          )}
-                                          <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                              <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                              <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                  This will permanently delete the variety "{toTitleCase(v)}".
-                                                </AlertDialogDescription>
-                                              </AlertDialogHeader>
-                                              <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
-                                              </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                          </AlertDialog>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                <DialogFooter>
-                                  <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          </div>
-                          {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 z-50">
+                                    <CalendarComponent
+                                        mode="single"
+                                        selected={field.value}
+                                        onSelect={(date) => field.onChange(date || new Date())}
+                                        initialFocus
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        )} />
+                        <div className="space-y-2">
+                          <Label htmlFor="term">Term (Days)</Label>
+                          <Input id="term" type="number" {...form.register('term')} />
                         </div>
-                      )}
-                    />
-
-                    <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
-                    <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
-                    <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury Rate</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
-                    <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
-                  </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader><CardTitle className="text-lg font-headline">Calculated Summary</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {summaryFields.map(item => (
-                    <div key={item.label} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">{item.label}</p>
-                      <p className={cn("text-lg font-semibold", item.isBold && "text-primary font-bold text-xl")}>{String(item.value)}</p>
+                         <Controller
+                            name="receiptType"
+                            control={form.control}
+                            render={({ field }) => (
+                              <div className="space-y-2">
+                                <Label>Receipt Type</Label>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a receipt type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {appOptionsData.receiptTypes.map(type => (
+                                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          />
+                        <Controller
+                            name="paymentType"
+                            control={form.control}
+                            render={({ field }) => (
+                              <div className="space-y-2">
+                                <Label>Payment Type</Label>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a payment type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {appOptionsData.paymentTypes.map(type => (
+                                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          />
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
+                </div>
 
+                <div className="space-y-4 p-4 border rounded-lg bg-card/50">
+                    <h3 className="text-lg font-headline mb-4">Customer Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                         <Controller name="name" control={form.control} render={({ field }) => (
+                            <div className="space-y-2 relative sm:col-span-2">
+                                <Label htmlFor="name">Name</Label>
+                                <Input id="name" {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} />
+                                {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+                            </div>
+                        )} />
+                        <Controller name="so" control={form.control} render={({ field }) => (
+                            <div className="space-y-2">
+                                <Label htmlFor="so">S/O</Label>
+                                <Input id="so" {...field} onBlur={handleCapitalizeOnBlur} />
+                            </div>
+                        )} />
+                        <Controller name="contact" control={form.control} render={({ field }) => (
+                            <div className="space-y-2">
+                                <Label htmlFor="contact">Contact</Label>
+                                <Input id="contact" {...field} />
+                                {form.formState.errors.contact && <p className="text-sm text-destructive">{form.formState.errors.contact.message}</p>}
+                            </div>
+                        )} />
+                        <Controller name="address" control={form.control} render={({ field }) => (
+                             <div className="space-y-2 sm:col-span-2">
+                                <Label htmlFor="address">Address</Label>
+                                <Input id="address" {...field} onBlur={handleCapitalizeOnBlur}/>
+                            </div>
+                        )} />
+                         <Controller name="vehicleNo" control={form.control} render={({ field }) => (
+                            <div className="space-y-2 sm:col-span-2">
+                                <Label htmlFor="vehicleNo">Vehicle No.</Label>
+                                <Input id="vehicleNo" {...field} onBlur={handleCapitalizeOnBlur} />
+                            </div>
+                        )} />
+                    </div>
+                </div>
+
+                <div className="space-y-4 p-4 border rounded-lg bg-card/50 lg:col-span-2">
+                    <h3 className="text-lg font-headline mb-4">Financial Details</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="grossWeight">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} /></div>)} />
+                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="teirWeight">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} /></div>)} />
+                        
+                        <Controller
+                          name="variety"
+                          control={form.control}
+                          render={({ field }) => (
+                            <div className="space-y-2">
+                              <Label>Variety</Label>
+                              <div className="flex items-center gap-2">
+                                <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={openVarietyCombobox}
+                                        className="w-full justify-between"
+                                        >
+                                        {field.value
+                                            ? toTitleCase(varietyOptions.find((v) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
+                                            : "Select variety..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-50">
+                                        <Command>
+                                        <CommandInput placeholder="Search variety..." />
+                                        <CommandList>
+                                            <CommandEmpty>No variety found.</CommandEmpty>
+                                            <CommandGroup>
+                                            {varietyOptions.map((v) => (
+                                                <CommandItem
+                                                    key={v}
+                                                    value={v}
+                                                    onSelect={(currentValue) => {
+                                                        const titleCasedValue = toTitleCase(currentValue);
+                                                        form.setValue("variety", titleCasedValue)
+                                                        setOpenVarietyCombobox(false);
+                                                    }}
+                                                >
+                                                <Check
+                                                    className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                />
+                                                {toTitleCase(v)}
+                                                </CommandItem>
+                                            ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                                <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
+                                  <DialogTrigger asChild>
+                                    <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Manage Varieties</DialogTitle>
+                                      <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <div className="flex gap-2">
+                                        <Input
+                                          placeholder="Add new variety"
+                                          value={newVariety}
+                                          onChange={(e) => setNewVariety(e.target.value)}
+                                        />
+                                        <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
+                                      </div>
+                                      <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
+                                        {varietyOptions.map(v => (
+                                          <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                                            {editingVariety?.old === v ? (
+                                              <Input
+                                                value={editingVariety.new}
+                                                onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
+                                                autoFocus
+                                                onBlur={handleSaveEditedVariety}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSaveEditedVariety()}
+                                              />
+                                            ) : (
+                                              <span className="flex-grow">{toTitleCase(v)}</span>
+                                            )}
+                                            <div className="flex gap-1">
+                                              {editingVariety?.old === v ? (
+                                                <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
+                                              ) : (
+                                                <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
+                                              )}
+                                              <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                  <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                  <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                      This will permanently delete the variety "{toTitleCase(v)}".
+                                                    </AlertDialogDescription>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                              </AlertDialog>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <DialogFooter>
+                                      <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
+                              {form.formState.errors.variety && <p className="text-sm text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                            </div>
+                          )}
+                        />
+
+                        <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kartaPercentage">Karta %</Label><Input id="kartaPercentage" type="number" {...field} /></div>)} />
+                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input id="rate" type="number" {...field} /></div>)} />
+                        <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="labouryRate">Laboury</Label><Input id="labouryRate" type="number" {...field} /></div>)} />
+                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-2"><Label htmlFor="kanta">Kanta</Label><Input id="kanta" type="number" {...field} /></div>)} />
+                    </div>
+                </div>
             </div>
-            <div className="flex justify-start space-x-4">
+            
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle className="text-lg font-headline">Calculated Summary</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {summaryFields.map(item => (
+                  <div key={item.label} className="space-y-1">
+                    <p className="text-sm text-muted-foreground">{item.label}</p>
+                    <p className={cn("text-lg font-semibold", item.isBold && "text-primary font-bold text-xl")}>{String(item.value)}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-start space-x-4 pt-4">
               <Button type="submit">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
               </Button>
@@ -682,62 +694,69 @@ export default function CustomerManagementClient() {
       
       {/* Customer Table */}
       <div className="mt-8">
-        <CardHeader>
-          <CardTitle className="font-headline">Transaction Records</CardTitle>
-        </CardHeader>
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {customers.map(customer => (
-            <Card key={customer.id} className="flex flex-col">
-              <CardHeader>
-                <CardTitle className="flex justify-between items-start">
-                    <span>{toTitleCase(customer.name)}</span>
-                    <Badge variant={customer.paymentType === 'Full' ? 'secondary' : 'default'}>{customer.paymentType}</Badge>
-                </CardTitle>
-                <CardDescription>SR No: <span className="font-mono">{customer.srNo}</span></CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 flex-grow">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div><strong className="text-muted-foreground">Date:</strong> {customer.date ? format(new Date(customer.date), "PPP") : '-'}</div>
-                  <div><strong className="text-muted-foreground">Due:</strong> {customer.dueDate ? format(new Date(customer.dueDate), "PPP") : '-'}</div>
-                  <div><strong className="text-muted-foreground">Contact:</strong> {customer.contact}</div>
-                  <div><strong className="text-muted-foreground">Variety:</strong> {toTitleCase(customer.variety)}</div>
-                  <div><strong className="text-muted-foreground">Vehicle:</strong> {customer.vehicleNo || 'N/A'}</div>
-                  <div><strong className="text-muted-foreground">S/O:</strong> {toTitleCase(customer.so)}</div>
+         <Card>
+            <CardHeader>
+                <CardTitle className="font-headline">Transaction Records</CardTitle>
+            </CardHeader>
+            <CardContent>
+                 <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>SR No.</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Variety</TableHead>
+                                <TableHead>Net Weight</TableHead>
+                                <TableHead className="text-right">Net Amount</TableHead>
+                                <TableHead className="text-center">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {customers.map(customer => (
+                                <TableRow key={customer.id}>
+                                    <TableCell className="font-mono">{customer.srNo}</TableCell>
+                                    <TableCell>{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell>{toTitleCase(customer.name)}</TableCell>
+                                    <TableCell>{toTitleCase(customer.variety)}</TableCell>
+                                    <TableCell>{customer.netWeight.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{Number(customer.netAmount).toFixed(2)}</TableCell>
+                                    <TableCell className="text-center">
+                                        <div className="flex justify-center items-center gap-1">
+                                            <Button variant="ghost" size="icon" onClick={() => handleShowDetails(customer)}>
+                                                <Info className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(customer.id)}>
+                                                <Pen className="h-4 w-4" />
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon">
+                                                    <Trash className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDelete(customer.id)}>Continue</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </div>
-                <div className="border-t pt-4 mt-4">
-                    <p className="text-lg font-bold text-right text-primary">Net Amount: {Number(customer.netAmount).toFixed(2)}</p>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-end gap-2">
-                 <Button variant="ghost" size="icon" onClick={() => handleShowDetails(customer)}>
-                      <Info className="h-4 w-4" />
-                 </Button>
-                 <Button variant="ghost" size="icon" onClick={() => handleEdit(customer.id)}>
-                      <Pen className="h-4 w-4" />
-                 </Button>
-                 <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="icon">
-                          <Trash className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(customer.id)}>Continue</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+            </CardContent>
+         </Card>
       </div>
 
        {/* Details Dialog */}
