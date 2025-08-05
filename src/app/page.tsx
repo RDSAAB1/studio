@@ -8,7 +8,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/sales/customer-management');
+    router.replace('/sales/supplier-entry');
   }, [router]);
 
   // Render nothing or a loading spinner while redirecting

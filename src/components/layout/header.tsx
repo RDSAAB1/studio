@@ -24,7 +24,7 @@ import {
   HeartHandshake, Briefcase, Users, Package, Megaphone, LayoutDashboard, FilePlus, 
   Book, PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database, 
   Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Volume2, Mail, 
-  LineChart, ClipboardCheck, Users2 
+  LineChart, ClipboardCheck, Users2, UserPlus 
 } from "lucide-react";
 
 const menuItems = [
@@ -34,13 +34,15 @@ const menuItems = [
     icon: <HeartHandshake className="h-5 w-5" />,
     subMenus: [
       { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview", icon: <LayoutDashboard className="h-4 w-4" /> },
-      { id: "Sub1-2", name: "Supplier Entry", href: "/sales/customer-management", icon: <FilePlus className="h-4 w-4" /> },
-      { id: "Sub1-10", name: "Customer Entry", href: "/sales/customer-entry", icon: <FilePlus className="h-4 w-4" /> },
+      { id: "Sub1-2", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <FilePlus className="h-4 w-4" /> },
+      { id: "Sub1-10", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-4 w-4" /> },
       { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <Book className="h-4 w-4" /> },
       { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-4 w-4" /> },
       { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-4 w-4" /> },
-      { id: "Sub1-6", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-4 w-4" /> },
-      { id: "Sub1-7", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-4 w-4" /> },
+      { id: "Sub1-6", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-4 w-4" /> },
+      { id: "Sub1-7", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-4 w-4" /> },
+      { id: "Sub1-11", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-4 w-4" /> },
+      { id: "Sub1-12", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-4 w-4" /> },
       { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-4 w-4" /> },
     ],
   },
