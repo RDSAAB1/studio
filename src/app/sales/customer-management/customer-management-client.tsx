@@ -740,11 +740,11 @@ export default function CustomerManagementClient() {
                                         <p className="font-medium text-sm mb-2">Financial Calculation</p>
                                          <Table>
                                             <TableBody>
-                                                <TableRow><TableCell className="text-muted-foreground p-2">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-2">- {detailsCustomer.kartaWeight.toFixed(2)} kg</TableCell></TableRow>
                                                 <TableRow><TableCell className="text-muted-foreground p-2">Net Weight</TableCell><TableCell className="text-right font-semibold p-2">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
                                                 <TableRow><TableCell className="text-muted-foreground p-2">Rate</TableCell><TableCell className="text-right font-semibold p-2">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
                                                 <TableRow className="bg-muted/50"><TableCell className="font-bold p-2">Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                                <TableRow><TableCell className="text-muted-foreground p-2">Deductions</TableCell><TableCell className="text-right font-semibold p-2">- ₹ {(detailsCustomer.labouryAmount + detailsCustomer.kanta).toFixed(2)}</TableCell></TableRow>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Laboury Amount</TableCell><TableCell className="text-right font-semibold p-2">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Kanta</TableCell><TableCell className="text-right font-semibold p-2">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
                                             </TableBody>
                                         </Table>
                                     </div>
@@ -768,5 +768,3 @@ export default function CustomerManagementClient() {
     </>
   );
 }
-
-    
