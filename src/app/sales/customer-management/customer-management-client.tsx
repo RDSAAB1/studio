@@ -680,7 +680,7 @@ export default function CustomerManagementClient() {
             <>
             <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
                 <div>
-                    <DialogTitle className="text-base font-semibold">Details</DialogTitle>
+                    <DialogTitle className="text-base font-semibold">Details for SR No: {detailsCustomer.srNo}</DialogTitle>
                 </div>
                 <div className="flex items-center gap-2">
                     <DropdownMenu>
@@ -729,7 +729,7 @@ export default function CustomerManagementClient() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card>
-                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0 space-y-3">
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                   <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
@@ -811,7 +811,7 @@ export default function CustomerManagementClient() {
                                         <TableRow><TableCell className="p-2">Rate</TableCell><TableCell className="text-right p-2 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
                                         <TableRow className="border-t border-dashed"><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="text-right p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2 text-destructive">Laboury</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2 text-destructive">Laboury (@{detailsCustomer.labouryRate.toFixed(2)})</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2 text-destructive">Kanta</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
                                         <TableRow className="bg-primary/5"><TableCell className="p-2 font-extrabold text-primary">Net Payable Amount</TableCell><TableCell className="text-right p-2 text-xl font-extrabold text-primary">₹{Number(detailsCustomer.netAmount).toFixed(2)}</TableCell></TableRow>
                                     </TableBody>
@@ -856,7 +856,7 @@ export default function CustomerManagementClient() {
                          <Separator />
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
                              <DetailItem icon={<Percent size={14} />} label={`Karta (${detailsCustomer.kartaPercentage}%)`} value={`- ₹ ${detailsCustomer.kartaAmount.toFixed(2)}`} className="text-destructive" />
-                             <DetailItem icon={<Milestone size={14} />} label="Laboury" value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} className="text-destructive" />
+                             <DetailItem icon={<Milestone size={14} />} label={`Laboury (@${detailsCustomer.labouryRate.toFixed(2)})`} value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} className="text-destructive" />
                              <DetailItem icon={<Landmark size={14} />} label="Kanta" value={`- ₹ ${detailsCustomer.kanta.toFixed(2)}`} className="text-destructive" />
                          </div>
                         <Card className="border-primary/50 bg-primary/5 text-center mt-4">
@@ -872,13 +872,19 @@ export default function CustomerManagementClient() {
                 {/* Layout 4: Step-by-Step */}
                 {activeLayout === 'step-by-step' && (
                   <div className="flex flex-col md:flex-row items-start justify-center gap-4">
-                      <div className="flex-1 w-full">
+                      <div className="flex-1 w-full space-y-4">
                           <Card>
-                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><User size={16}/>Customer & Transaction</CardTitle></CardHeader>
+                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><User size={16}/>Customer Details</CardTitle></CardHeader>
                               <CardContent className="p-4 pt-0 space-y-2">
                                   <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
                                   <DetailItem icon={<UserSquare size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                                   <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
+                                  <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} />
+                              </CardContent>
+                          </Card>
+                          <Card>
+                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><FileText size={16}/>Transaction Details</CardTitle></CardHeader>
+                              <CardContent className="p-4 pt-0 space-y-2">
                                   <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
                                   <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                                   <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
@@ -918,7 +924,7 @@ export default function CustomerManagementClient() {
                                           <TableRow><TableCell className="p-1">Rate</TableCell><TableCell className="text-right p-1 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
                                           <TableRow className="border-t border-dashed"><TableCell className="p-1 font-bold">Total</TableCell><TableCell className="text-right p-1 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
                                           <TableRow><TableCell className="p-1 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
-                                          <TableRow><TableCell className="p-1 text-destructive">Laboury</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                          <TableRow><TableCell className="p-1 text-destructive">Laboury (@{detailsCustomer.labouryRate.toFixed(2)})</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
                                           <TableRow><TableCell className="p-1 text-destructive">Kanta</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
                                           <TableRow className="bg-primary/5"><TableCell className="p-2 font-extrabold text-primary">Net Payable</TableCell><TableCell className="text-right p-2 text-xl font-extrabold text-primary">₹{Number(detailsCustomer.netAmount).toFixed(2)}</TableCell></TableRow>
                                       </TableBody>
