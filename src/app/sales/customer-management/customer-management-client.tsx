@@ -680,10 +680,7 @@ export default function CustomerManagementClient() {
             <>
             <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
                 <div>
-                    <DialogTitle className="text-base font-semibold">Transaction Report</DialogTitle>
-                    <DialogDescription className="text-xs">
-                        SR No: {detailsCustomer.srNo}
-                    </DialogDescription>
+                    <DialogTitle className="text-base font-semibold">Details</DialogTitle>
                 </div>
                 <div className="flex items-center gap-2">
                     <DropdownMenu>
@@ -780,8 +777,8 @@ export default function CustomerManagementClient() {
                  {activeLayout === 'compact' && (
                     <div className="space-y-4">
                         <Card>
-                            <CardHeader className="p-4"><CardTitle className="text-base">Customer Details</CardTitle></CardHeader>
-                            <CardContent className="p-4 pt-0 space-y-3">
+                            <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Customer</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                                 <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                                 <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
                                 <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
@@ -789,8 +786,8 @@ export default function CustomerManagementClient() {
                             </CardContent>
                         </Card>
                         <Card>
-                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction Details</CardTitle></CardHeader>
-                            <CardContent className="p-4 pt-0 space-y-3">
+                            <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Transaction</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                                 <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
                                 <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                 <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
@@ -799,16 +796,16 @@ export default function CustomerManagementClient() {
                             </CardContent>
                         </Card>
                         <Card>
-                             <CardHeader className="p-4"><CardTitle className="text-base">Financials</CardTitle></CardHeader>
-                             <CardContent className="p-4 pt-0">
+                             <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Financials</CardTitle></CardHeader>
+                             <CardContent className="p-4 pt-2">
                                 <Table className="text-sm">
                                     <TableBody>
                                         <TableRow><TableCell className="p-2">Gross Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2">Teir Weight</TableCell><TableCell className="text-right p-2 font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow className="border-t border-dashed"><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2">Net Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2">Rate</TableCell><TableCell className="text-right p-2 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="text-right p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow className="border-t border-dashed"><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="text-right p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2 text-destructive">Laboury</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
                                         <TableRow><TableCell className="p-2 text-destructive">Kanta</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
@@ -821,40 +818,49 @@ export default function CustomerManagementClient() {
                 )}
                 {/* Layout 3: Grid */}
                 {activeLayout === 'grid' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
-                        <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
-                        <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
-                        <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                        <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="md:col-span-2" />
-                        <Separator className="md:col-span-2" />
-                        <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                        <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                        <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
-                        <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
-                        <Separator className="md:col-span-2" />
-                        <div className="md:col-span-2">
+                     <div className="space-y-4">
+                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+                            <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                            <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                             <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
+                            <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                            <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
+                            <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                            <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                            <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
+                            <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="md:col-span-3" />
+                         </div>
+                         <Separator />
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
                              <Table className="text-sm">
                                 <TableBody>
-                                    <TableRow><TableCell className="p-2">Gross Weight</TableCell><TableCell className="p-2">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell><TableCell className="p-2">Net Weight</TableCell><TableCell className="p-2">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                    <TableRow><TableCell className="p-2">Teir Weight</TableCell><TableCell className="p-2">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell><TableCell className="p-2">Rate</TableCell><TableCell className="p-2">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                    <TableRow><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                    <TableRow><TableCell className="p-2 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="p-2 text-destructive" colSpan={3}>- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
-                                    <TableRow><TableCell className="p-2 text-destructive">Laboury</TableCell><TableCell className="p-2 text-destructive" colSpan={3}>- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
-                                    <TableRow><TableCell className="p-2 text-destructive">Kanta</TableCell><TableCell className="p-2 text-destructive" colSpan={3}>- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2">Gross Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2">Teir Weight</TableCell><TableCell className="text-right p-2 font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow className="border-t border-dashed bg-muted/30"><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
                                 </TableBody>
                             </Table>
-                        </div>
-                        <div className="md:col-span-2">
-                            <Card className="border-primary/50 bg-primary/5 text-center">
-                                <CardContent className="p-3">
-                                    <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
-                                    <p className="text-3xl font-bold text-primary font-mono">
-                                        ₹{Number(detailsCustomer.netAmount).toFixed(2)}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </div>
+                             <Table className="text-sm">
+                                <TableBody>
+                                    <TableRow><TableCell className="p-2">Net Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2">Rate</TableCell><TableCell className="text-right p-2 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow className="border-t border-dashed bg-muted/30"><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="text-right p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                </TableBody>
+                            </Table>
+                         </div>
+                         <Separator />
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
+                             <DetailItem icon={<Percent size={14} />} label={`Karta (${detailsCustomer.kartaPercentage}%)`} value={`- ₹ ${detailsCustomer.kartaAmount.toFixed(2)}`} className="text-destructive" />
+                             <DetailItem icon={<Milestone size={14} />} label="Laboury" value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} className="text-destructive" />
+                             <DetailItem icon={<Landmark size={14} />} label="Kanta" value={`- ₹ ${detailsCustomer.kanta.toFixed(2)}`} className="text-destructive" />
+                         </div>
+                        <Card className="border-primary/50 bg-primary/5 text-center mt-4">
+                            <CardContent className="p-3">
+                                <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
+                                <p className="text-3xl font-bold text-primary font-mono">
+                                    ₹{Number(detailsCustomer.netAmount).toFixed(2)}
+                                </p>
+                            </CardContent>
+                        </Card>
                      </div>
                 )}
                 {/* Layout 4: Step-by-Step */}
@@ -869,6 +875,8 @@ export default function CustomerManagementClient() {
                                   <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
                                   <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                   <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                                  <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                                  <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
                               </CardContent>
                           </Card>
                       </div>
@@ -900,7 +908,10 @@ export default function CustomerManagementClient() {
                                       <TableBody>
                                           <TableRow><TableCell className="p-1">Net Weight</TableCell><TableCell className="text-right p-1 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
                                           <TableRow><TableCell className="p-1">Rate</TableCell><TableCell className="text-right p-1 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                          <TableRow><TableCell className="p-1 text-destructive">Deductions</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {(detailsCustomer.kartaAmount + detailsCustomer.labouryAmount + detailsCustomer.kanta).toFixed(2)}</TableCell></TableRow>
+                                          <TableRow className="border-t border-dashed"><TableCell className="p-1 font-bold">Total</TableCell><TableCell className="text-right p-1 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                          <TableRow><TableCell className="p-1 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
+                                          <TableRow><TableCell className="p-1 text-destructive">Laboury</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                          <TableRow><TableCell className="p-1 text-destructive">Kanta</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
                                           <TableRow className="bg-primary/5"><TableCell className="p-2 font-extrabold text-primary">Net Payable</TableCell><TableCell className="text-right p-2 text-xl font-extrabold text-primary">₹{Number(detailsCustomer.netAmount).toFixed(2)}</TableCell></TableRow>
                                       </TableBody>
                                   </Table>
