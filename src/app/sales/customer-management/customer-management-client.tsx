@@ -27,7 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -109,11 +109,13 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
     };
     
     return (
-        <Card>
-            <CardContent className="p-6 space-y-6">
-                 {/* Basic Info Section */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <Controller name="date" control={form.control} render={({ field }) => (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><InfoIcon className="h-5 w-5"/>Basic Info</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                     <Controller name="date" control={form.control} render={({ field }) => (
                         <div className="space-y-1">
                             <Label className="text-xs">Date</Label>
                             <Popover>
@@ -140,7 +142,7 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             </Popover>
                         </div>
                     )} />
-                        <div className="space-y-1">
+                    <div className="space-y-1">
                         <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
                         <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
                             <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm pl-10" />
@@ -190,12 +192,14 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             </div>
                         )}
                     />
-                </div>
-                
-                <Separator />
+                </CardContent>
+            </Card>
 
-                {/* Customer Details Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><UserCog className="h-5 w-5" />Customer Details</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                         <Label htmlFor="name" className="text-xs">Name</Label>
                         <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
@@ -230,13 +234,15 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             )} />
                         </InputWithIcon>
                     </div>
-                </div>
+                </CardContent>
+            </Card>
 
-                <Separator />
-
-                 {/* Transaction Details Section */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="space-y-1">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><PackageSearch className="h-5 w-5" />Transaction & Weight</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                     <div className="space-y-1">
                         <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                         <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
                             <Controller name="vehicleNo" control={form.control} render={({ field }) => (
@@ -366,24 +372,26 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                         </div>
                         )}
                     />
-                        <div className="space-y-1">
+                    <div className="space-y-1">
                         <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
                             <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} className="h-9 text-sm pl-10" />)} />
                         </InputWithIcon>
-                        </div>
+                    </div>
                     <div className="space-y-1">
                         <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
                             <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} className="h-9 text-sm pl-10"/>)} />
                         </InputWithIcon>
                     </div>
-                </div>
-                
-                <Separator />
-                
-                {/* Financial Details Section */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><CircleDollarSign className="h-5 w-5" />Financial Details</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-1">
                         <Label htmlFor="rate" className="text-xs">Rate</Label>
                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
@@ -408,9 +416,9 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} className="h-9 text-sm pl-10" />)} />
                         </InputWithIcon>
                     </div>
-                </div>
-            </CardContent>
-        </Card>
+                </CardContent>
+            </Card>
+        </div>
     );
 });
 
