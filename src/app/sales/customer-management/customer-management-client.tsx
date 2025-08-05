@@ -23,7 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -450,9 +450,9 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
 });
 
 
-const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) => (
-    <div className="flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
-        <div className="text-muted-foreground mt-1">{icon}</div>
+const DetailItem = ({ icon, label, value, className }: { icon: React.ReactNode, label: string, value: any, className?: string }) => (
+    <div className={cn("flex items-start gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted/50", className)}>
+        <div className="text-primary mt-1">{icon}</div>
         <div>
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="font-semibold text-sm">{String(value)}</p>
@@ -460,13 +460,12 @@ const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: stri
     </div>
 );
 
-const FinancialDetailItem = ({ label, value }: { label: string, value: any }) => (
-    <div className="flex justify-between items-center py-2 px-2 rounded-lg transition-colors hover:bg-muted/50">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="font-semibold text-sm">{String(value)}</p>
+const FinancialDetailItem = ({ label, value, isSubtle = false }: { label: string, value: any, isSubtle?: boolean }) => (
+    <div className="flex justify-between items-center py-1.5 px-2.5 rounded-lg transition-colors hover:bg-muted/50">
+        <p className={cn("text-sm", isSubtle ? "text-muted-foreground" : "text-foreground")}>{label}</p>
+        <p className={cn("font-semibold text-sm", isSubtle ? "text-muted-foreground" : "text-foreground")}>{String(value)}</p>
     </div>
 );
-
 
 export default function CustomerManagementClient() {
   const { toast } = useToast();
@@ -645,43 +644,10 @@ export default function CustomerManagementClient() {
     const value = e.target.value;
     form.setValue(field, toTitleCase(value));
   };
-    
-  const customerDetailsFields = (customer: Customer | null) => {
-    if (!customer) return { personal: [], transaction: [], financial: [] };
-    return {
-        personal: [
-            { label: "Name", value: toTitleCase(customer.name), icon: <User className="size-4" /> },
-            { label: "S/O", value: toTitleCase(customer.so), icon: <User className="size-4" /> },
-            { label: "Contact", value: customer.contact, icon: <Phone className="size-4" /> },
-            { label: "Address", value: customer.address, icon: <Home className="size-4" /> },
-        ],
-        transaction: [
-            { label: "SR No.", value: customer.srNo, icon: <Hash className="size-4" /> },
-            { label: "Date", value: format(new Date(customer.date), "PPP"), icon: <CalendarIcon className="size-4" /> },
-            { label: "Term", value: `${customer.term} days`, icon: <CalendarIcon className="size-4" /> },
-            { label: "Due Date", value: format(new Date(customer.dueDate), "PPP"), icon: <CalendarIcon className="size-4" /> },
-            { label: "Vehicle No.", value: customer.vehicleNo, icon: <Truck className="size-4" /> },
-            { label: "Variety", value: toTitleCase(customer.variety), icon: <Wheat className="size-4" /> },
-            { label: "Receipt Type", value: customer.receiptType, icon: <FileText className="size-4" /> },
-            { label: "Payment Type", value: customer.paymentType, icon: <Landmark className="size-4" /> },
-        ],
-        financial: [
-            { label: "Gross Wt", value: customer.grossWeight }, { label: "Teir Wt", value: customer.teirWeight },
-            { label: "Weight", value: customer.weight }, { label: "Rate", value: customer.rate },
-            { label: "Karta %", value: customer.kartaPercentage }, { label: "Karta Wt", value: customer.kartaWeight },
-            { label: "Net Wt", value: customer.netWeight }, { label: "Amount", value: customer.amount },
-            { label: "Karta Amt", value: customer.kartaAmount }, { label: "Laboury Rate", value: customer.labouryRate },
-            { label: "Laboury Amt", value: customer.labouryAmount }, { label: "Kanta", value: customer.kanta },
-        ]
-    }
-  };
-
 
   if (!isClient) {
     return null;
   }
-
-  const { personal, transaction, financial } = customerDetailsFields(detailsCustomer);
 
   return (
     <>
@@ -715,52 +681,85 @@ export default function CustomerManagementClient() {
       <CustomerTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
       
        <Sheet open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
-        <SheetContent className="w-full sm:max-w-4xl overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-4xl overflow-y-auto p-0">
             {detailsCustomer && (
-                <>
-                <SheetHeader>
-                    <SheetTitle className="text-2xl font-headline">
-                        Profile: {toTitleCase(detailsCustomer.name)}
-                    </SheetTitle>
-                    <SheetDescription>
-                        Contact: {detailsCustomer.contact} | SR No: {detailsCustomer.srNo}
-                    </SheetDescription>
-                </SheetHeader>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
-                    <div className="space-y-6">
-                        <Card>
-                            <CardHeader><CardTitle className="text-lg font-headline text-primary">Personal & Transaction</CardTitle></CardHeader>
-                            <CardContent className="space-y-2 divide-y">
-                                <div className="grid grid-cols-2 gap-2 pt-2">
-                                    {personal.map(item => <DetailItem key={item.label} {...item} />)}
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 pt-2">
-                                    {transaction.map(item => <DetailItem key={item.label} {...item} />)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                <div className="flex flex-col h-full">
+                    <SheetHeader className="p-6 border-b">
+                        <SheetTitle className="text-2xl font-headline">
+                            Transaction Profile
+                        </SheetTitle>
+                        <SheetDescription>
+                            SR No: {detailsCustomer.srNo}
+                        </SheetDescription>
+                    </SheetHeader>
+                    <div className="flex-grow p-6 space-y-6 bg-muted/20">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Column 1: Customer Info */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg font-headline flex items-center gap-2">
+                                        <User className="text-primary"/> Customer Info
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-1 text-sm">
+                                    <DetailItem icon={<User className="size-4" />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                                    <DetailItem icon={<Building className="size-4" />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                                    <DetailItem icon={<Phone className="size-4" />} label="Contact" value={detailsCustomer.contact} />
+                                    <DetailItem icon={<Home className="size-4" />} label="Address" value={toTitleCase(detailsCustomer.address)} />
+                                </CardContent>
+                            </Card>
 
-                    <div className="space-y-6">
-                        <Card>
-                            <CardHeader><CardTitle className="text-lg font-headline text-primary">Financial Summary</CardTitle></CardHeader>
-                            <CardContent className="divide-y">
-                                {financial.map(item => (
-                                    <FinancialDetailItem key={item.label} {...item} />
-                                ))}
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-primary/10 border-primary">
-                            <CardContent className="p-4 text-center">
-                                <p className="text-sm text-primary/80">Net Payable Amount</p>
+                            {/* Column 2: Transaction Info */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg font-headline flex items-center gap-2">
+                                        <Milestone className="text-primary"/> Transaction Info
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-1 text-sm">
+                                     <DetailItem icon={<CalendarIcon className="size-4" />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                    <DetailItem icon={<CalendarIcon className="size-4" />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
+                                    <DetailItem icon={<Truck className="size-4" />} label="Vehicle No." value={detailsCustomer.vehicleNo} />
+                                    <DetailItem icon={<Wheat className="size-4" />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                                    <DetailItem icon={<FileText className="size-4" />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                                    <DetailItem icon={<Landmark className="size-4" />} label="Payment Type" value={detailsCustomer.paymentType} />
+                                </CardContent>
+                            </Card>
+
+                            {/* Column 3: Financial Breakdown */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg font-headline flex items-center gap-2">
+                                        <Calculator className="text-primary"/> Financial Breakdown
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-1.5 text-sm divide-y">
+                                    <FinancialDetailItem label="Gross Wt." value={`${detailsCustomer.grossWeight.toFixed(2)} kg`} />
+                                    <FinancialDetailItem label="Teir Wt." value={`${detailsCustomer.teirWeight.toFixed(2)} kg`} isSubtle />
+                                    <FinancialDetailItem label="Weight" value={`${detailsCustomer.weight.toFixed(2)} kg`} />
+                                    <FinancialDetailItem label="Rate" value={`₹ ${detailsCustomer.rate.toFixed(2)}`} />
+                                    <div className="pt-1.5">
+                                        <FinancialDetailItem label="Karta" value={`${detailsCustomer.kartaPercentage}% (-${detailsCustomer.kartaWeight.toFixed(2)} kg)`} isSubtle />
+                                        <FinancialDetailItem label="Net Weight" value={`${detailsCustomer.netWeight.toFixed(2)} kg`} />
+                                        <FinancialDetailItem label="Amount" value={`₹ ${detailsCustomer.amount.toFixed(2)}`} />
+                                    </div>
+                                    <div className="pt-1.5">
+                                        <FinancialDetailItem label="Laboury" value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} isSubtle/>
+                                        <FinancialDetailItem label="Kanta" value={`- ₹ ${detailsCustomer.kanta.toFixed(2)}`} isSubtle />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                         <Card className="bg-primary/10 border-primary">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <p className="text-lg font-bold text-primary">Net Payable Amount</p>
                                 <p className="text-3xl font-bold text-primary">
-                                    {Number(detailsCustomer.netAmount).toFixed(2)}
+                                    ₹{Number(detailsCustomer.netAmount).toFixed(2)}
                                 </p>
                             </CardContent>
                         </Card>
                     </div>
                 </div>
-                </>
             )}
         </SheetContent>
        </Sheet>
