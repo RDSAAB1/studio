@@ -10,8 +10,13 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PageMeta } from "@/app/types";
 import { HeartHandshake, Briefcase, Users, Package, Megaphone } from "lucide-react";
@@ -94,30 +99,37 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
             </span>
         </div>
         <NavigationMenu>
-          <NavigationMenuList>
-            {menuItems.map((item) => (
-              <NavigationMenuItem key={item.id}>
-                <NavigationMenuTrigger>
-                  <div className="flex items-center gap-2">
-                    {item.icon}
-                    <span>{item.name}</span>
-                  </div>
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
-                    {item.subMenus.map((subItem) => (
-                      <ListItem
-                        key={subItem.id}
-                        href={subItem.href}
-                        title={subItem.name}
-                        active={pathname === subItem.href}
-                      />
-                    ))}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-            ))}
-          </NavigationMenuList>
+          <TooltipProvider>
+            <NavigationMenuList>
+              {menuItems.map((item) => (
+                <NavigationMenuItem key={item.id}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <NavigationMenuTrigger className="px-2">
+                        {item.icon}
+                        <span className="sr-only">{item.name}</span>
+                      </NavigationMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{item.name}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
+                      {item.subMenus.map((subItem) => (
+                        <ListItem
+                          key={subItem.id}
+                          href={subItem.href}
+                          title={subItem.name}
+                          active={pathname === subItem.href}
+                        />
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              ))}
+            </NavigationMenuList>
+          </TooltipProvider>
         </NavigationMenu>
       </div>
     </header>
@@ -151,5 +163,3 @@ const ListItem = React.forwardRef<
   );
 });
 ListItem.displayName = "ListItem";
-
-    
