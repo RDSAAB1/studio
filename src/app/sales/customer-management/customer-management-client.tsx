@@ -779,6 +779,7 @@ export default function CustomerManagementClient() {
                         <Card>
                             <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Customer</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                                <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
                                 <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                                 <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
                                 <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
@@ -789,6 +790,7 @@ export default function CustomerManagementClient() {
                             <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Transaction</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                                 <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                                 <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                 <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
                                 <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
@@ -820,10 +822,12 @@ export default function CustomerManagementClient() {
                 {activeLayout === 'grid' && (
                      <div className="space-y-4">
                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+                            <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
                             <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                             <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
                              <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
                             <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                            <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                             <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                             <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
                             <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
@@ -870,9 +874,11 @@ export default function CustomerManagementClient() {
                           <Card>
                               <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><User size={16}/>Customer & Transaction</CardTitle></CardHeader>
                               <CardContent className="p-4 pt-0 space-y-2">
+                                  <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
                                   <DetailItem icon={<UserSquare size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                                   <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
                                   <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                  <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                                   <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                   <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
                                   <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
