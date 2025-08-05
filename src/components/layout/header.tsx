@@ -31,10 +31,11 @@ const menuItems = [
   {
     id: "Main1",
     name: "Sales & CRM",
-    icon: <HeartHandshake className="h-12 w-12" />,
+    icon: <HeartHandshake className="h-5 w-5" />,
     subMenus: [
       { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview", icon: <LayoutDashboard className="h-4 w-4" /> },
       { id: "Sub1-2", name: "Supplier Entry", href: "/sales/customer-management", icon: <FilePlus className="h-4 w-4" /> },
+      { id: "Sub1-10", name: "Customer Entry", href: "/sales/customer-entry", icon: <FilePlus className="h-4 w-4" /> },
       { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <Book className="h-4 w-4" /> },
       { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-4 w-4" /> },
       { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-4 w-4" /> },
@@ -46,7 +47,7 @@ const menuItems = [
   {
     id: "Main2",
     name: "HR & Payroll",
-    icon: <Users className="h-12 w-12" />,
+    icon: <Users className="h-5 w-5" />,
     subMenus: [
       { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database className="h-4 w-4" /> },
       { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator className="h-4 w-4" /> },
@@ -56,7 +57,7 @@ const menuItems = [
   {
     id: "Main3",
     name: "Inventory",
-    icon: <Package className="h-12 w-12" />,
+    icon: <Package className="h-5 w-5" />,
     subMenus: [
       { id: "Sub3-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: <Boxes className="h-4 w-4" /> },
       { id: "Sub3-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: <Building2 className="h-4 w-4" /> },
@@ -66,7 +67,7 @@ const menuItems = [
   {
     id: "Main4",
     name: "Marketing",
-    icon: <Megaphone className="h-12 w-12" />,
+    icon: <Megaphone className="h-5 w-5" />,
     subMenus: [
       { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Volume2 className="h-4 w-4" /> },
       { id: "Sub4-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: <Mail className="h-4 w-4" /> },
@@ -76,7 +77,7 @@ const menuItems = [
   {
     id: "Main5",
     name: "Project Management",
-    icon: <Briefcase className="h-12 w-12" />,
+    icon: <Briefcase className="h-5 w-5" />,
     subMenus: [
       { id: "Sub5-1", name: "Project Dashboard", href: "/projects/dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
       { id: "Sub5-2", name: "Task Management", href: "/projects/tasks", icon: <ClipboardCheck className="h-4 w-4" /> },
@@ -97,7 +98,7 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-20 max-w-screen-2xl items-center justify-between">
+      <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
         <div className="flex items-center space-x-2">
             <div className="text-primary">{displayIcon}</div>
             <span className="font-bold font-headline sm:inline-block">
@@ -111,7 +112,7 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
                 <NavigationMenuItem key={item.id} value={item.id}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <NavigationMenuTrigger className="px-2 h-16 w-16">
+                      <NavigationMenuTrigger className="px-2 h-10 w-10">
                         {item.icon}
                         <span className="sr-only">{item.name}</span>
                       </NavigationMenuTrigger>
