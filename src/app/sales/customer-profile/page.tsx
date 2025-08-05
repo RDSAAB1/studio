@@ -93,11 +93,6 @@ export default function CustomerProfilePage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold font-headline text-primary">Customer Profile</h1>
-        <p className="text-muted-foreground">View detailed profiles and payment history for each customer.</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Select Customer</CardTitle>

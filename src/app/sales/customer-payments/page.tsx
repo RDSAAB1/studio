@@ -200,11 +200,6 @@ export default function CustomerPaymentsPage() {
 
   return (
     <div className="space-y-8">
-       <div>
-        <h1 className="text-3xl font-bold font-headline text-primary">Customer Payments</h1>
-        <p className="text-muted-foreground">Process payments, apply discounts, and track payment history.</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Select Customer</CardTitle>
@@ -364,6 +359,3 @@ export default function CustomerPaymentsPage() {
     </div>
   );
 }
-
-
-    

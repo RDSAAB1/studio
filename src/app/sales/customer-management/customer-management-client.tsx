@@ -460,6 +460,13 @@ const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: stri
     </div>
 );
 
+const FinancialDetailItem = ({ label, value }: { label: string, value: any }) => (
+    <div className="flex justify-between items-center py-2 px-2 rounded-lg transition-colors hover:bg-muted/50">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="font-semibold text-sm">{String(value)}</p>
+    </div>
+);
+
 
 export default function CustomerManagementClient() {
   const { toast } = useToast();
@@ -640,31 +647,31 @@ export default function CustomerManagementClient() {
   };
     
   const customerDetailsFields = (customer: Customer | null) => {
-    if (!customer) return [];
+    if (!customer) return { personal: [], transaction: [], financial: [] };
     return {
         personal: [
             { label: "Name", value: toTitleCase(customer.name), icon: <User className="size-4" /> },
             { label: "S/O", value: toTitleCase(customer.so), icon: <User className="size-4" /> },
             { label: "Contact", value: customer.contact, icon: <Phone className="size-4" /> },
             { label: "Address", value: customer.address, icon: <Home className="size-4" /> },
-            { label: "Vehicle No.", value: customer.vehicleNo, icon: <Truck className="size-4" /> },
-            { label: "Variety", value: toTitleCase(customer.variety), icon: <Wheat className="size-4" /> },
         ],
         transaction: [
             { label: "SR No.", value: customer.srNo, icon: <Hash className="size-4" /> },
             { label: "Date", value: format(new Date(customer.date), "PPP"), icon: <CalendarIcon className="size-4" /> },
             { label: "Term", value: `${customer.term} days`, icon: <CalendarIcon className="size-4" /> },
             { label: "Due Date", value: format(new Date(customer.dueDate), "PPP"), icon: <CalendarIcon className="size-4" /> },
+            { label: "Vehicle No.", value: customer.vehicleNo, icon: <Truck className="size-4" /> },
+            { label: "Variety", value: toTitleCase(customer.variety), icon: <Wheat className="size-4" /> },
             { label: "Receipt Type", value: customer.receiptType, icon: <FileText className="size-4" /> },
             { label: "Payment Type", value: customer.paymentType, icon: <Landmark className="size-4" /> },
         ],
         financial: [
             { label: "Gross Wt", value: customer.grossWeight }, { label: "Teir Wt", value: customer.teirWeight },
-            { label: "Weight", value: customer.weight }, { label: "Karta %", value: customer.kartaPercentage },
-            { label: "Karta Wt", value: customer.kartaWeight }, { label: "Karta Amt", value: customer.kartaAmount },
-            { label: "Net Wt", value: customer.netWeight }, { label: "Rate", value: customer.rate },
-            { label: "Laboury Rate", value: customer.labouryRate }, { label: "Laboury Amt", value: customer.labouryAmount },
-            { label: "Kanta", value: customer.kanta }, { label: "Amount", value: customer.amount },
+            { label: "Weight", value: customer.weight }, { label: "Rate", value: customer.rate },
+            { label: "Karta %", value: customer.kartaPercentage }, { label: "Karta Wt", value: customer.kartaWeight },
+            { label: "Net Wt", value: customer.netWeight }, { label: "Amount", value: customer.amount },
+            { label: "Karta Amt", value: customer.kartaAmount }, { label: "Laboury Rate", value: customer.labouryRate },
+            { label: "Laboury Amt", value: customer.labouryAmount }, { label: "Kanta", value: customer.kanta },
         ]
     }
   };
@@ -708,7 +715,7 @@ export default function CustomerManagementClient() {
       <CustomerTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
       
        <Sheet open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
-        <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-4xl overflow-y-auto">
             {detailsCustomer && (
                 <>
                 <SheetHeader>
@@ -719,42 +726,38 @@ export default function CustomerManagementClient() {
                         Contact: {detailsCustomer.contact} | SR No: {detailsCustomer.srNo}
                     </SheetDescription>
                 </SheetHeader>
-                <div className="space-y-6 py-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
+                    <div className="space-y-6">
                         <Card>
                             <CardHeader><CardTitle className="text-lg font-headline text-primary">Personal & Transaction</CardTitle></CardHeader>
-                            <CardContent className="space-y-2">
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                            <CardContent className="space-y-2 divide-y">
+                                <div className="grid grid-cols-2 gap-2 pt-2">
                                     {personal.map(item => <DetailItem key={item.label} {...item} />)}
                                 </div>
-                                <hr className="my-4" />
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                <div className="grid grid-cols-2 gap-2 pt-2">
                                     {transaction.map(item => <DetailItem key={item.label} {...item} />)}
                                 </div>
                             </CardContent>
                         </Card>
+                    </div>
 
-                        <div className="space-y-6">
-                            <Card>
-                                <CardHeader><CardTitle className="text-lg font-headline text-primary">Financial Summary</CardTitle></CardHeader>
-                                <CardContent className="grid grid-cols-2 gap-x-6 gap-y-4">
-                                    {financial.map(item => (
-                                        <div key={item.label}>
-                                            <p className="text-xs text-muted-foreground">{item.label}</p>
-                                            <p className="font-semibold">{String(item.value)}</p>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                             <Card className="bg-primary/10 border-primary">
-                                <CardContent className="p-4 text-center">
-                                    <p className="text-sm text-primary/80">Net Payable Amount</p>
-                                    <p className="text-3xl font-bold text-primary">
-                                        {Number(detailsCustomer.netAmount).toFixed(2)}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </div>
+                    <div className="space-y-6">
+                        <Card>
+                            <CardHeader><CardTitle className="text-lg font-headline text-primary">Financial Summary</CardTitle></CardHeader>
+                            <CardContent className="divide-y">
+                                {financial.map(item => (
+                                    <FinancialDetailItem key={item.label} {...item} />
+                                ))}
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-primary/10 border-primary">
+                            <CardContent className="p-4 text-center">
+                                <p className="text-sm text-primary/80">Net Payable Amount</p>
+                                <p className="text-3xl font-bold text-primary">
+                                    {Number(detailsCustomer.netAmount).toFixed(2)}
+                                </p>
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
                 </>
