@@ -668,39 +668,39 @@ export default function CustomerManagementClient() {
         </form>
       </FormProvider>
       
-      <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
-        <CustomerTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
+      <CustomerTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
         
-        <DialogContent className="max-w-3xl p-0">
+      <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
+        <DialogContent className="max-w-4xl p-0">
             {detailsCustomer && (
-              <ScrollArea className="max-h-[80vh]">
+              <ScrollArea className="max-h-[90vh]">
                 <div className="p-4 sm:p-6 space-y-4">
-                    <Card className="p-4">
+                    <Card className="p-2 sm:p-4">
                       <CardHeader className="p-2 text-center">
                           <CardTitle className="text-xl font-bold font-headline text-primary">Transaction Report</CardTitle>
+                          <CardDescription>SR No: {detailsCustomer.srNo}</CardDescription>
                       </CardHeader>
                       <CardContent className="p-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 text-sm">
                             <DetailItem label="Name" value={toTitleCase(detailsCustomer.name)}/>
                             <DetailItem label="S/O" value={toTitleCase(detailsCustomer.so)}/>
                             <DetailItem label="Contact" value={detailsCustomer.contact}/>
-                            <DetailItem label="Address" value={toTitleCase(detailsCustomer.address)} className="md:col-span-3"/>
-                            <Separator className="md:col-span-3 my-1" />
-                            <DetailItem label="SR No." value={detailsCustomer.srNo}/>
                             <DetailItem label="Date" value={format(new Date(detailsCustomer.date), "PPP")}/>
-                            <DetailItem label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")}/>
+                            <DetailItem label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-2 md:col-span-4"/>
                         </div>
                       </CardContent>
                     </Card>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card>
-                            <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2">Transaction &amp; Weight</CardTitle></CardHeader>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0 space-y-3">
-                                <DetailItem label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                                <DetailItem label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                <DetailItem label="Receipt Type" value={detailsCustomer.receiptType} />
-                                <DetailItem label="Payment Type" value={detailsCustomer.paymentType} />
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                  <DetailItem label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
+                                  <DetailItem label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                                  <DetailItem label="Receipt Type" value={detailsCustomer.receiptType} />
+                                  <DetailItem label="Payment Type" value={detailsCustomer.paymentType} />
+                                </div>
                                 <Separator />
                                 <Table className="text-xs">
                                     <TableBody>
@@ -712,7 +712,7 @@ export default function CustomerManagementClient() {
                             </CardContent>
                         </Card>
                         <Card>
-                             <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2">Financial Calculation</CardTitle></CardHeader>
+                             <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
                              <CardContent className="p-4 pt-0">
                                 <Table className="text-xs">
                                     <TableBody>
