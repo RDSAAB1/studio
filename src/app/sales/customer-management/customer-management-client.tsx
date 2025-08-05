@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -698,50 +698,57 @@ export default function CustomerManagementClient() {
                         </SheetDescription>
                     </SheetHeader>
                     <div className="flex-grow p-6 overflow-y-auto space-y-6">
-                        <div className="flex items-center gap-6">
+                        <div className="flex flex-col lg:flex-row items-start gap-6">
                             {/* Step 1: Customer & Transaction */}
                             <HorizontalDetailSection title="Customer & Transaction" icon={<UserSquare className="text-primary size-5"/>}>
                                <div className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                      <DetailItem icon={<User className="size-4" />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                                      <DetailItem icon={<Building className="size-4" />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
                                      <DetailItem icon={<Phone className="size-4" />} label="Contact" value={detailsCustomer.contact} />
                                      <DetailItem icon={<Home className="size-4" />} label="Address" value={toTitleCase(detailsCustomer.address)} />
                                   </div>
                                    <Separator/>
-                                   <div className="grid grid-cols-2 gap-4">
+                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                      <DetailItem icon={<Truck className="size-4" />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                      <DetailItem icon={<Wheat className="size-4" />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                                     <DetailItem icon={<Receipt className="size-4" />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                                     <DetailItem icon={<Wallet className="size-4" />} label="Payment Type" value={detailsCustomer.paymentType} />
                                      <DetailItem icon={<CalendarIcon className="size-4" />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                                    </div>
                                </div>
                             </HorizontalDetailSection>
-                             <div className="flex items-center justify-center text-muted-foreground">
-                                <ChevronRight className="size-8" />
+                             <div className="flex items-center justify-center text-muted-foreground self-center px-4">
+                                <ChevronRight className="size-8 hidden lg:block" />
                             </div>
-                            {/* Step 2: Weight Calculation */}
-                            <HorizontalDetailSection title="Weight Calculation" icon={<Weight className="text-primary size-5"/>}>
-                                <Table>
-                                  <TableBody>
-                                    <TableRow><TableCell className="text-muted-foreground">Gross Weight</TableCell><TableCell className="text-right font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                    <TableRow><TableCell className="text-muted-foreground">Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                    <TableRow className="bg-muted/50"><TableCell className="font-bold">Final Weight</TableCell><TableCell className="text-right font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
-                                  </TableBody>
-                                </Table>
-                            </HorizontalDetailSection>
-                             <div className="flex items-center justify-center text-muted-foreground">
-                                <ChevronRight className="size-8" />
-                            </div>
-                            {/* Step 3: Financials */}
-                            <HorizontalDetailSection title="Financial Breakdown" icon={<Calculator className="text-primary size-5"/>}>
-                                 <Table>
-                                  <TableBody>
-                                     <TableRow><TableCell className="text-muted-foreground">Net Weight for Billing</TableCell><TableCell className="text-right font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                     <TableRow><TableCell className="text-muted-foreground">Rate</TableCell><TableCell className="text-right font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                     <TableRow><TableCell className="text-muted-foreground">Total Amount</TableCell><TableCell className="text-right font-semibold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                     <TableRow><TableCell className="text-muted-foreground">Deductions (Laboury + Kanta)</TableCell><TableCell className="text-right font-semibold">- ₹ {(detailsCustomer.labouryAmount + detailsCustomer.kanta).toFixed(2)}</TableCell></TableRow>
-                                  </TableBody>
-                                </Table>
+                            {/* Step 2: Weight & Financials */}
+                            <HorizontalDetailSection title="Weight & Financial Breakdown" icon={<Calculator className="text-primary size-5"/>}>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                    {/* Weight Calculation */}
+                                    <div>
+                                        <p className="font-medium text-sm mb-2">Weight Calculation</p>
+                                        <Table>
+                                            <TableBody>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Gross Weight</TableCell><TableCell className="text-right font-semibold p-2">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-2">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                                <TableRow className="bg-muted/50"><TableCell className="font-bold p-2">Final Weight</TableCell><TableCell className="text-right font-bold p-2">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                    {/* Financial Calculation */}
+                                    <div>
+                                        <p className="font-medium text-sm mb-2">Financial Calculation</p>
+                                         <Table>
+                                            <TableBody>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-2">- {detailsCustomer.kartaWeight.toFixed(2)} kg</TableCell></TableRow>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Net Weight</TableCell><TableCell className="text-right font-semibold p-2">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Rate</TableCell><TableCell className="text-right font-semibold p-2">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                                <TableRow className="bg-muted/50"><TableCell className="font-bold p-2">Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                                <TableRow><TableCell className="text-muted-foreground p-2">Deductions</TableCell><TableCell className="text-right font-semibold p-2">- ₹ {(detailsCustomer.labouryAmount + detailsCustomer.kanta).toFixed(2)}</TableCell></TableRow>
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
                             </HorizontalDetailSection>
                         </div>
                         {/* Final Amount */}
@@ -761,3 +768,5 @@ export default function CustomerManagementClient() {
     </>
   );
 }
+
+    
