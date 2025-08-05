@@ -678,8 +678,8 @@ export default function CustomerManagementClient() {
        <Sheet open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <SheetContent className="w-full sm:max-w-4xl p-0">
             {detailsCustomer && (
-                <div className="flex flex-col h-full bg-muted/20">
-                    <SheetHeader className="p-4 border-b bg-card">
+                <div className="flex flex-col h-full">
+                    <SheetHeader className="p-4 border-b bg-muted/50">
                         <SheetTitle className="text-xl font-headline flex items-center gap-3">
                             <FileText className="text-primary"/>
                             <span>Transaction Report: <span className="text-primary font-mono">{detailsCustomer.srNo}</span></span>
@@ -693,7 +693,7 @@ export default function CustomerManagementClient() {
                             {/* Left Column */}
                             <Card className="flex-1">
                                 <CardHeader>
-                                    <CardTitle className="text-base flex items-center gap-2"><UserSquare className="text-primary size-5"/> Customer & Transaction Details</CardTitle>
+                                    <CardTitle className="text-base flex items-center gap-2"><UserSquare className="text-primary size-5"/> Customer & Transaction</CardTitle>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 gap-x-6 gap-y-4">
                                      <DetailItem icon={<User className="size-4" />} label="Name" value={toTitleCase(detailsCustomer.name)} />
