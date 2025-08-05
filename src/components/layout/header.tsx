@@ -102,10 +102,10 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
           <TooltipProvider>
             <NavigationMenuList>
               {menuItems.map((item) => (
-                <NavigationMenuItem key={item.id}>
+                <NavigationMenuItem key={item.id} value={item.id}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <NavigationMenuTrigger className="px-2">
+                      <NavigationMenuTrigger className="px-2 h-9 w-9">
                         {item.icon}
                         <span className="sr-only">{item.name}</span>
                       </NavigationMenuTrigger>
