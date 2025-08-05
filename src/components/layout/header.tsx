@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -18,7 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { PageMeta } from "@/app/types";
+import type { PageMeta } from "@/app/types";
 import { HeartHandshake, Briefcase, Users, Package, Megaphone } from "lucide-react";
 
 const menuItems = [
@@ -115,7 +116,7 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
                     </TooltipContent>
                   </Tooltip>
                   <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
+                    <ul className="grid w-[250px] gap-3 p-4 md:w-[300px]">
                       {item.subMenus.map((subItem) => (
                         <ListItem
                           key={subItem.id}
