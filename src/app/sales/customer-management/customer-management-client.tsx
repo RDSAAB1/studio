@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight } from "lucide-react";
@@ -680,14 +681,26 @@ export default function CustomerManagementClient() {
                 </DialogDescription>
               </DialogHeader>
               <div className="p-4 sm:p-6 space-y-4">
-                  <Card className="p-2 sm:p-4">
-                    <CardContent className="p-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2 text-sm">
-                        <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)}/>
-                        <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)}/>
-                        <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact}/>
-                        <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")}/>
-                        <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-2 md:col-span-3"/>
-                    </CardContent>
+                  <Card>
+                      <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
+                          <div className="flex flex-col items-center justify-center space-y-2 p-4">
+                              <Avatar className="h-24 w-24 border-2 border-primary">
+                                  <AvatarImage src={`https://placehold.co/128x128.png`} alt={detailsCustomer.name} />
+                                  <AvatarFallback>{detailsCustomer.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="text-center">
+                                <p className="text-lg font-bold">{toTitleCase(detailsCustomer.name)}</p>
+                                <p className="text-sm text-muted-foreground">{detailsCustomer.contact}</p>
+                              </div>
+                          </div>
+                          <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" />
+                          <Separator orientation="horizontal" className="w-full md:hidden" />
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
+                              <DetailItem label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                              <DetailItem label="Transaction Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                              <DetailItem label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-2" />
+                          </div>
+                      </CardContent>
                   </Card>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
