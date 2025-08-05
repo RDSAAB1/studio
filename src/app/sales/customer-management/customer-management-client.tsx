@@ -18,7 +18,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -55,6 +56,7 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
 const getInitialFormState = (customers: Customer[]): Customer => {
   const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
@@ -465,6 +467,8 @@ export default function CustomerManagementClient() {
   const [isClient, setIsClient] = useState(false);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+  const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
+
 
   const [varietyOptions, setVarietyOptions] = useState<string[]>(appOptionsData.varieties);
   const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
@@ -673,83 +677,241 @@ export default function CustomerManagementClient() {
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
           {detailsCustomer && (
-            <ScrollArea className="max-h-[90vh]">
-              <DialogHeader className="p-4 pb-0 sm:p-6 sm:pb-0">
-                <DialogTitle className="text-base font-semibold">Transaction Report</DialogTitle>
-                <DialogDescription className="text-xs">
-                  SR No: {detailsCustomer.srNo}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="p-4 sm:p-6 space-y-4">
-                  <Card>
-                      <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
-                          <div className="flex flex-col items-center justify-center space-y-2 p-4">
-                              <Avatar className="h-24 w-24 border-2 border-primary">
-                                  <AvatarImage src={`https://placehold.co/128x128.png`} alt={detailsCustomer.name} />
-                                  <AvatarFallback>{detailsCustomer.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div className="text-center">
-                                <p className="text-lg font-bold">{toTitleCase(detailsCustomer.name)}</p>
-                                <p className="text-sm text-muted-foreground">{detailsCustomer.contact}</p>
-                              </div>
-                          </div>
-                          <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" />
-                          <Separator orientation="horizontal" className="w-full md:hidden" />
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
-                              <DetailItem label="S/O" value={toTitleCase(detailsCustomer.so)} />
-                              <DetailItem label="Transaction Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                              <DetailItem label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-2" />
-                          </div>
-                      </CardContent>
-                  </Card>
+            <>
+            <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
+                <div>
+                    <DialogTitle className="text-base font-semibold">Transaction Report</DialogTitle>
+                    <DialogDescription className="text-xs">
+                        SR No: {detailsCustomer.srNo}
+                    </DialogDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8">
+                                <Settings className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}>
+                                <DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="compact"><LayoutList className="mr-2 h-4 w-4" />Compact</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="grid"><LayoutGrid className="mr-2 h-4 w-4" />Grid</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="step-by-step"><StepForward className="mr-2 h-4 w-4" />Step-by-Step</DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DialogClose asChild>
+                         <Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button>
+                    </DialogClose>
+                </div>
+            </DialogHeader>
+            <ScrollArea className="max-h-[85vh]">
+              <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-6">
+                {/* Layout 1: Classic ID Card */}
+                {activeLayout === 'classic' && (
+                  <div className="space-y-4">
+                    <Card>
+                        <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
+                            <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full">
+                                <p className="text-xs text-muted-foreground">SR No.</p>
+                                <p className="text-2xl font-bold font-mono text-primary">{detailsCustomer.srNo}</p>
+                            </div>
+                            <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" />
+                            <Separator orientation="horizontal" className="w-full md:hidden" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
+                                <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                                <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
+                                <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                                <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-1 sm:col-span-2" />
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Card>
-                          <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight Details</CardTitle></CardHeader>
-                          <CardContent className="p-4 pt-0 space-y-3">
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-0 space-y-3">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                  <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
+                                  <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                                  <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                                  <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
+                                </div>
+                                <Separator />
+                                <Table className="text-xs">
+                                    <TableBody>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
+                             <CardContent className="p-4 pt-0">
+                                <Table className="text-xs">
+                                    <TableBody>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
+                                    </TableBody>
+                                </Table>
+                             </CardContent>
+                        </Card>
+                    </div>
+
+                    <Card className="border-primary/50 bg-primary/5 text-center">
+                         <CardContent className="p-3">
+                            <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
+                            <p className="text-3xl font-bold text-primary font-mono">
+                                ₹{Number(detailsCustomer.netAmount).toFixed(2)}
+                            </p>
+                         </CardContent>
+                    </Card>
+                  </div>
+                )}
+                 {/* Layout 2: Compact List */}
+                 {activeLayout === 'compact' && (
+                    <div className="space-y-4">
+                        <Card>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Customer Details</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-0 space-y-3">
+                                <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                                <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                                <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
+                                <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} />
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction Details</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-0 space-y-3">
+                                <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
                                 <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                 <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
                                 <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
                                 <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
-                              </div>
-                              <Separator />
-                              <Table className="text-xs">
-                                  <TableBody>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                      <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
-                                  </TableBody>
-                              </Table>
-                          </CardContent>
-                      </Card>
-                      <Card>
-                           <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
-                           <CardContent className="p-4 pt-0">
-                              <Table className="text-xs">
-                                  <TableBody>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
-                                  </TableBody>
-                              </Table>
-                           </CardContent>
-                      </Card>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader className="p-4"><CardTitle className="text-base">Financials</CardTitle></CardHeader>
+                             <CardContent className="p-4 pt-0">
+                                <Table className="text-sm">
+                                    <TableBody>
+                                        <TableRow><TableCell className="p-2">Gross Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2">Teir Weight</TableCell><TableCell className="text-right p-2 font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2">Net Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2">Rate</TableCell><TableCell className="text-right p-2 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="text-right p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2 text-destructive">Laboury</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="p-2 text-destructive">Kanta</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow className="bg-primary/5"><TableCell className="p-2 font-extrabold text-primary">Net Payable Amount</TableCell><TableCell className="text-right p-2 text-xl font-extrabold text-primary">₹{Number(detailsCustomer.netAmount).toFixed(2)}</TableCell></TableRow>
+                                    </TableBody>
+                                </Table>
+                             </CardContent>
+                        </Card>
+                    </div>
+                )}
+                {/* Layout 3: Grid */}
+                {activeLayout === 'grid' && (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                        <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                        <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
+                        <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                        <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="md:col-span-2" />
+                        <Separator className="md:col-span-2" />
+                        <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
+                        <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                        <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                        <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
+                        <Separator className="md:col-span-2" />
+                        <div className="md:col-span-2">
+                             <Table className="text-sm">
+                                <TableBody>
+                                    <TableRow><TableCell className="p-2">Gross Weight</TableCell><TableCell className="p-2">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell><TableCell className="p-2">Net Weight</TableCell><TableCell className="p-2">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2">Teir Weight</TableCell><TableCell className="p-2">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell><TableCell className="p-2">Rate</TableCell><TableCell className="p-2">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="p-2 text-destructive" colSpan={3}>- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2 text-destructive">Laboury</TableCell><TableCell className="p-2 text-destructive" colSpan={3}>- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="p-2 text-destructive">Kanta</TableCell><TableCell className="p-2 text-destructive" colSpan={3}>- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <div className="md:col-span-2">
+                            <Card className="border-primary/50 bg-primary/5 text-center">
+                                <CardContent className="p-3">
+                                    <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
+                                    <p className="text-3xl font-bold text-primary font-mono">
+                                        ₹{Number(detailsCustomer.netAmount).toFixed(2)}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </div>
+                     </div>
+                )}
+                {/* Layout 4: Step-by-Step */}
+                {activeLayout === 'step-by-step' && (
+                  <div className="flex flex-col md:flex-row items-start justify-center gap-4">
+                      <div className="flex-1 w-full">
+                          <Card>
+                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><User size={16}/>Customer & Transaction</CardTitle></CardHeader>
+                              <CardContent className="p-4 pt-0 space-y-2">
+                                  <DetailItem icon={<UserSquare size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                                  <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
+                                  <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                  <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
+                                  <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                              </CardContent>
+                          </Card>
+                      </div>
+                      <div className="self-center p-2 hidden md:block">
+                          <ArrowRight className="text-muted-foreground"/>
+                      </div>
+                       <div className="flex-1 w-full">
+                          <Card>
+                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><Scale size={16}/>Weight Calculation</CardTitle></CardHeader>
+                              <CardContent className="p-4 pt-0">
+                                  <Table className="text-xs">
+                                      <TableBody>
+                                          <TableRow><TableCell className="p-1">Gross Weight</TableCell><TableCell className="text-right p-1 font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                          <TableRow><TableCell className="p-1">Teir Weight</TableCell><TableCell className="text-right p-1 font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                          <TableRow className="bg-muted/50"><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                      </TableBody>
+                                  </Table>
+                              </CardContent>
+                          </Card>
+                      </div>
+                      <div className="self-center p-2 hidden md:block">
+                          <ArrowRight className="text-muted-foreground"/>
+                      </div>
+                       <div className="flex-1 w-full">
+                          <Card>
+                               <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/>Financial Breakdown</CardTitle></CardHeader>
+                               <CardContent className="p-4 pt-0">
+                                  <Table className="text-xs">
+                                      <TableBody>
+                                          <TableRow><TableCell className="p-1">Net Weight</TableCell><TableCell className="text-right p-1 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                          <TableRow><TableCell className="p-1">Rate</TableCell><TableCell className="text-right p-1 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                          <TableRow><TableCell className="p-1 text-destructive">Deductions</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {(detailsCustomer.kartaAmount + detailsCustomer.labouryAmount + detailsCustomer.kanta).toFixed(2)}</TableCell></TableRow>
+                                          <TableRow className="bg-primary/5"><TableCell className="p-2 font-extrabold text-primary">Net Payable</TableCell><TableCell className="text-right p-2 text-xl font-extrabold text-primary">₹{Number(detailsCustomer.netAmount).toFixed(2)}</TableCell></TableRow>
+                                      </TableBody>
+                                  </Table>
+                               </CardContent>
+                          </Card>
+                      </div>
                   </div>
-
-                  <Card className="border-primary/50 bg-primary/5 text-center">
-                       <CardContent className="p-3">
-                          <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
-                          <p className="text-3xl font-bold text-primary font-mono">
-                              ₹{Number(detailsCustomer.netAmount).toFixed(2)}
-                          </p>
-                       </CardContent>
-                  </Card>
+                )}
               </div>
             </ScrollArea>
+            </>
           )}
         </DialogContent>
       </Dialog>
