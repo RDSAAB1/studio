@@ -13,17 +13,8 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
-import {
-  Briefcase,
-  Building,
-  HeartHandshake,
-  LayoutGrid,
-  LineChart,
-  Megaphone,
-  Package,
-  Presentation,
-  Users,
-} from "lucide-react";
+import { PageMeta } from "@/app/types";
+import { HeartHandshake, Briefcase, Users, Package, Megaphone } from "lucide-react";
 
 const menuItems = [
   {
@@ -32,7 +23,7 @@ const menuItems = [
     icon: <HeartHandshake className="h-5 w-5" />,
     subMenus: [
       { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview" },
-      { id: "Sub1-2", name: "Customer Management", href: "/sales/customer-management" },
+      { id: "Sub1-2", name: "Supplier Entry", href: "/sales/customer-management" },
       { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog" },
       { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking" },
       { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports" },
@@ -83,18 +74,25 @@ const menuItems = [
   },
 ];
 
-export function Header() {
+
+export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
   const pathname = usePathname();
+
+  const currentPage = menuItems.flatMap(m => m.subMenus).find(s => s.href === pathname);
+  const currentMainMenu = menuItems.find(m => m.subMenus.some(s => s.href === pathname));
+
+  const displayTitle = currentPage?.name || pageMeta?.title || 'BizSuite';
+  const displayIcon = currentMainMenu?.icon || pageMeta?.icon;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-screen-2xl items-center">
-        <Link href="/" className="mr-6 flex items-center space-x-2">
-          <Building className="h-6 w-6" />
-          <span className="font-bold font-headline sm:inline-block">
-            BizSuite
-          </span>
-        </Link>
+      <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
+        <div className="flex items-center space-x-2">
+            <div className="text-primary">{displayIcon}</div>
+            <span className="font-bold font-headline sm:inline-block">
+                {displayTitle}
+            </span>
+        </div>
         <NavigationMenu>
           <NavigationMenuList>
             {menuItems.map((item) => (

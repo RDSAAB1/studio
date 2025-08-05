@@ -2,10 +2,19 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import MainLayout from '@/components/layout/main-layout';
+import type { PageMeta } from '@/app/types';
+import { HeartHandshake, Briefcase } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'BizSuite DataFlow',
   description: 'Data entry and management software',
+};
+
+// Default metadata for layout
+export const pageMeta: PageMeta = {
+  title: 'Dashboard',
+  icon: <HeartHandshake />,
+  description: 'Welcome to BizSuite DataFlow'
 };
 
 export default function RootLayout({
@@ -23,7 +32,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <MainLayout>{children}</MainLayout>
+        <MainLayout pageMeta={pageMeta}>{children}</MainLayout>
         <Toaster />
       </body>
     </html>
