@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -447,7 +447,7 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
 
 const DetailItem = ({ icon, label, value, className }: { icon: React.ReactNode, label: string, value: any, className?: string }) => (
     <div className={cn("flex items-start gap-3", className)}>
-        <div className="text-muted-foreground mt-1">{icon}</div>
+        <div className="text-muted-foreground mt-0.5">{icon}</div>
         <div>
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="font-semibold text-sm">{String(value)}</p>
@@ -455,11 +455,20 @@ const DetailItem = ({ icon, label, value, className }: { icon: React.ReactNode, 
     </div>
 );
 
-const FinancialDetailItem = ({ label, value, isSubtle = false, isBold = false, className = '' }: { label: string, value: any, isSubtle?: boolean, isBold?: boolean, className?: string }) => (
-    <tr className={cn(className)}>
-        <td className={cn("py-1.5 text-sm", isSubtle ? "text-muted-foreground" : "text-foreground")}>{label}</td>
-        <td className={cn("py-1.5 text-right font-semibold text-sm font-mono", isSubtle ? "text-muted-foreground" : "text-foreground", isBold && "font-bold text-base")}>{String(value)}</td>
-    </tr>
+const HorizontalDetailSection = ({ title, icon, children, className }: { title: string, icon: React.ReactNode, children: React.ReactNode, className?: string }) => (
+    <div className={cn("flex-1", className)}>
+        <Card className="h-full">
+            <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                    {icon}
+                    <span>{title}</span>
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                {children}
+            </CardContent>
+        </Card>
+    </div>
 );
 
 export default function CustomerManagementClient() {
@@ -676,7 +685,7 @@ export default function CustomerManagementClient() {
       <CustomerTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
       
        <Sheet open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
-        <SheetContent className="w-full sm:max-w-4xl p-0">
+        <SheetContent className="w-full sm:max-w-7xl p-0">
             {detailsCustomer && (
                 <div className="flex flex-col h-full">
                     <SheetHeader className="p-4 border-b bg-muted/50">
@@ -689,62 +698,59 @@ export default function CustomerManagementClient() {
                         </SheetDescription>
                     </SheetHeader>
                     <div className="flex-grow p-6 overflow-y-auto space-y-6">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Left Column */}
-                            <Card className="flex-1">
-                                <CardHeader>
-                                    <CardTitle className="text-base flex items-center gap-2"><UserSquare className="text-primary size-5"/> Customer & Transaction</CardTitle>
-                                </CardHeader>
-                                <CardContent className="grid grid-cols-2 gap-x-6 gap-y-4">
+                        <div className="flex items-center gap-6">
+                            {/* Step 1: Customer & Transaction */}
+                            <HorizontalDetailSection title="Customer & Transaction" icon={<UserSquare className="text-primary size-5"/>}>
+                               <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
                                      <DetailItem icon={<User className="size-4" />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                                      <DetailItem icon={<Building className="size-4" />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
                                      <DetailItem icon={<Phone className="size-4" />} label="Contact" value={detailsCustomer.contact} />
                                      <DetailItem icon={<Home className="size-4" />} label="Address" value={toTitleCase(detailsCustomer.address)} />
-                                     <Separator className="col-span-2 my-1"/>
-                                     <DetailItem icon={<Hash className="size-4" />} label="SR No." value={detailsCustomer.srNo} />
-                                     <DetailItem icon={<CalendarIcon className="size-4" />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                  </div>
+                                   <Separator/>
+                                   <div className="grid grid-cols-2 gap-4">
                                      <DetailItem icon={<Truck className="size-4" />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                      <DetailItem icon={<Wheat className="size-4" />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                </CardContent>
-                            </Card>
-                            {/* Right Column */}
-                             <Card className="flex-1">
-                                <CardHeader>
-                                    <CardTitle className="text-base flex items-center gap-2"><Calculator className="text-primary size-5"/> Financial Calculation</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <table className="w-full">
-                                        <tbody>
-                                            <FinancialDetailItem label="Gross Weight" value={`${detailsCustomer.grossWeight.toFixed(2)} kg`} />
-                                            <FinancialDetailItem label="Teir Weight (Less)" value={`- ${detailsCustomer.teirWeight.toFixed(2)} kg`} isSubtle />
-                                            <FinancialDetailItem label="Final Weight" value={`${detailsCustomer.weight.toFixed(2)} kg`} isBold className="border-t" />
-                                            <FinancialDetailItem label={`Karta (${detailsCustomer.kartaPercentage}%)`} value={`- ${detailsCustomer.kartaWeight.toFixed(2)} kg`} isSubtle className="border-t border-dashed" />
-                                            <FinancialDetailItem label="Net Weight for Billing" value={`${detailsCustomer.netWeight.toFixed(2)} kg`} isBold className="border-t"/>
-                                            <tr className="h-4"><td colSpan={2}></td></tr>
-                                            <FinancialDetailItem label="Rate" value={`@ ₹ ${detailsCustomer.rate.toFixed(2)} / kg`} isSubtle className="border-t border-dashed"/>
-                                            <FinancialDetailItem label="Total Amount" value={`₹ ${detailsCustomer.amount.toFixed(2)}`} isBold className="border-t"/>
-                                            <tr className="h-4"><td colSpan={2}></td></tr>
-                                            <FinancialDetailItem label="Laboury Charges" value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} isSubtle className="border-t border-dashed"/>
-                                            <FinancialDetailItem label="Kanta Charges" value={`- ₹ ${detailsCustomer.kanta.toFixed(2)}`} isSubtle />
-                                        </tbody>
-                                    </table>
-                                </CardContent>
-                            </Card>
+                                     <DetailItem icon={<CalendarIcon className="size-4" />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
+                                   </div>
+                               </div>
+                            </HorizontalDetailSection>
+                             <div className="flex items-center justify-center text-muted-foreground">
+                                <ChevronRight className="size-8" />
+                            </div>
+                            {/* Step 2: Weight Calculation */}
+                            <HorizontalDetailSection title="Weight Calculation" icon={<Weight className="text-primary size-5"/>}>
+                                <Table>
+                                  <TableBody>
+                                    <TableRow><TableCell className="text-muted-foreground">Gross Weight</TableCell><TableCell className="text-right font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground">Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow className="bg-muted/50"><TableCell className="font-bold">Final Weight</TableCell><TableCell className="text-right font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                  </TableBody>
+                                </Table>
+                            </HorizontalDetailSection>
+                             <div className="flex items-center justify-center text-muted-foreground">
+                                <ChevronRight className="size-8" />
+                            </div>
+                            {/* Step 3: Financials */}
+                            <HorizontalDetailSection title="Financial Breakdown" icon={<Calculator className="text-primary size-5"/>}>
+                                 <Table>
+                                  <TableBody>
+                                     <TableRow><TableCell className="text-muted-foreground">Net Weight for Billing</TableCell><TableCell className="text-right font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                     <TableRow><TableCell className="text-muted-foreground">Rate</TableCell><TableCell className="text-right font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                     <TableRow><TableCell className="text-muted-foreground">Total Amount</TableCell><TableCell className="text-right font-semibold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                     <TableRow><TableCell className="text-muted-foreground">Deductions (Laboury + Kanta)</TableCell><TableCell className="text-right font-semibold">- ₹ {(detailsCustomer.labouryAmount + detailsCustomer.kanta).toFixed(2)}</TableCell></TableRow>
+                                  </TableBody>
+                                </Table>
+                            </HorizontalDetailSection>
                         </div>
-                        {/* Footer Section */}
-                        <Card className="mt-6 bg-card/80 border-primary/50">
-                             <CardContent className="p-4 flex justify-between items-center">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Net Payable Amount</p>
-                                    <p className="text-3xl font-bold text-primary font-mono">
-                                        ₹{Number(detailsCustomer.netAmount).toFixed(2)}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <DetailItem icon={<FileText className="size-4" />} label="Receipt Type" value={detailsCustomer.receiptType} />
-                                    <DetailItem icon={<Landmark className="size-4" />} label="Payment Type" value={detailsCustomer.paymentType} />
-                                    <DetailItem icon={<CalendarIcon className="size-4" />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
-                                </div>
+                        {/* Final Amount */}
+                        <Card className="mt-6 border-primary/50 bg-primary/5 text-center">
+                             <CardContent className="p-4">
+                                <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
+                                <p className="text-4xl font-bold text-primary font-mono">
+                                    ₹{Number(detailsCustomer.netAmount).toFixed(2)}
+                                </p>
                              </CardContent>
                         </Card>
                     </div>
