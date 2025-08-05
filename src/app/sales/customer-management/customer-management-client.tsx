@@ -27,7 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -72,6 +72,15 @@ const getInitialFormState = (customers: Customer[]): Customer => {
   };
 };
 
+const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
+    <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            {icon}
+        </div>
+        {children}
+    </div>
+);
+
 const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, varietyOptions, setVarietyOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox }: any) {
     const { toast } = useToast();
     const [newVariety, setNewVariety] = useState("");
@@ -100,132 +109,151 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
     };
     
     return (
-        <div className="space-y-4">
-            <div className="p-4 border rounded-lg bg-card/50">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <Controller name="date" control={form.control} render={({ field }) => (
-                        <div className="space-y-1">
-                            <Label className="text-xs">Date</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                    "w-full justify-start text-left font-normal h-9 text-sm",
-                                    !field.value && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 z-[51]">
-                                <CalendarComponent
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={(date) => field.onChange(date || new Date())}
-                                    initialFocus
-                                />
-                                </PopoverContent>
-                            </Popover>
+        <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="basic"><ClipboardList className="mr-2 h-4 w-4"/>Basic Info</TabsTrigger>
+                <TabsTrigger value="customer"><User className="mr-2 h-4 w-4"/>Customer Details</TabsTrigger>
+                <TabsTrigger value="transaction"><Banknote className="mr-2 h-4 w-4"/>Transaction</TabsTrigger>
+            </TabsList>
+            <TabsContent value="basic" className="mt-4">
+                 <Card className="bg-card/50">
+                    <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+                         <Controller name="date" control={form.control} render={({ field }) => (
+                            <div className="space-y-1">
+                                <Label className="text-xs">Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                        "w-full justify-start text-left font-normal h-9 text-sm",
+                                        !field.value && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 z-[51]">
+                                    <CalendarComponent
+                                        mode="single"
+                                        selected={field.value}
+                                        onSelect={(date) => field.onChange(date || new Date())}
+                                        initialFocus
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        )} />
+                         <div className="space-y-1">
+                            <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                            <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm pl-10" />
+                            </InputWithIcon>
                         </div>
-                    )} />
-                    <div className="space-y-1">
-                        <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
-                        <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm" />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="term" className="text-xs">Term (Days)</Label>
-                        <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm" />
-                    </div>
-                    <Controller
-                        name="receiptType"
-                        control={form.control}
-                        render={({ field }) => (
-                            <div className="space-y-1">
-                                <Label className="text-xs">Receipt Type</Label>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Select" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {appOptionsData.receiptTypes.map(type => (
-                                        <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                    />
-                    <Controller
-                        name="paymentType"
-                        control={form.control}
-                        render={({ field }) => (
-                            <div className="space-y-1">
-                                <Label className="text-xs">Payment Type</Label>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Select" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {appOptionsData.paymentTypes.map(type => (
-                                        <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                    />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
-                <div className="space-y-3 p-4 border rounded-lg bg-card/50">
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                            <Controller name="name" control={form.control} render={({ field }) => (
-                            <div className="space-y-1 relative">
-                                <Label htmlFor="name" className="text-xs">Name</Label>
-                                <Input {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
-                                {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
-                            </div>
-                        )} />
-                        <Controller name="so" control={form.control} render={({ field }) => (
-                            <div className="space-y-1">
-                                <Label htmlFor="so" className="text-xs">S/O</Label>
-                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
-                            </div>
-                        )} />
-                    </div>
-                        <div className="grid grid-cols-3 gap-3">
-                        <Controller name="contact" control={form.control} render={({ field }) => (
-                            <div className="space-y-1">
-                                <Label htmlFor="contact" className="text-xs">Contact</Label>
-                                <Input {...field} className="h-9 text-sm" />
-                                {form.formState.errors.contact && <p className="text-xs text-destructive">{form.formState.errors.contact.message}</p>}
-                            </div>
-                        )} />
-                        <Controller name="address" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                <Label htmlFor="address" className="text-xs">Address</Label>
-                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
-                            </div>
-                        )} />
-                            <Controller name="vehicleNo" control={form.control} render={({ field }) => (
-                            <div className="space-y-1">
-                                <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
-                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm" />
-                            </div>
-                        )} />
-                    </div>
-                </div>
-                
-                <div className="space-y-3 p-4 border rounded-lg bg-card/50">
-                        <div className="grid grid-cols-[2fr,1fr,1fr] gap-3 mb-3">
+                        <div className="space-y-1">
+                            <Label htmlFor="term" className="text-xs">Term (Days)</Label>
+                             <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm pl-10" />
+                            </InputWithIcon>
+                        </div>
                         <Controller
+                            name="receiptType"
+                            control={form.control}
+                            render={({ field }) => (
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Receipt Type</Label>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger className="h-9 text-sm">
+                                        <div className="flex items-center gap-2"><Receipt className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select" /></div>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {appOptionsData.receiptTypes.map(type => (
+                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                        />
+                        <Controller
+                            name="paymentType"
+                            control={form.control}
+                            render={({ field }) => (
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Payment Type</Label>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger className="h-9 text-sm">
+                                        <div className="flex items-center gap-2"><Wallet className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select" /></div>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {appOptionsData.paymentTypes.map(type => (
+                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="customer" className="mt-4">
+                 <Card className="bg-card/50">
+                    <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <Label htmlFor="name" className="text-xs">Name</Label>
+                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="name" control={form.control} render={({ field }) => (
+                                    <Input {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )} />
+                            </InputWithIcon>
+                             {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="so" className="text-xs">S/O</Label>
+                             <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="so" control={form.control} render={({ field }) => (
+                                    <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="contact" className="text-xs">Contact</Label>
+                            <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="contact" control={form.control} render={({ field }) => (
+                                    <Input {...field} className="h-9 text-sm pl-10" />
+                                )} />
+                            </InputWithIcon>
+                             {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
+                        </div>
+                         <div className="space-y-1">
+                            <Label htmlFor="address" className="text-xs">Address</Label>
+                             <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="address" control={form.control} render={({ field }) => (
+                                        <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )} />
+                            </InputWithIcon>
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="transaction" className="mt-4">
+                 <Card className="bg-card/50">
+                    <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
+                            <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="vehicleNo" control={form.control} render={({ field }) => (
+                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )} />
+                            </InputWithIcon>
+                        </div>
+                         <Controller
                             name="variety"
                             control={form.control}
                             render={({ field }) => (
-                            <div className="space-y-1 col-span-1">
+                            <div className="space-y-1">
                                 <Label className="text-xs">Variety</Label>
                                 <div className="flex items-center gap-2">
                                 <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
@@ -236,9 +264,11 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                                         aria-expanded={openVarietyCombobox}
                                         className="w-full justify-between h-9 text-sm font-normal"
                                         >
+                                        <div className="flex items-center gap-2"><Wheat className="h-4 w-4 text-muted-foreground" />
                                         {field.value
                                             ? toTitleCase(varietyOptions.find((v: string) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
                                             : "Select variety..."}
+                                        </div>
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
@@ -341,18 +371,46 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             </div>
                             )}
                         />
-                        <Controller name="grossWeight" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-1"><Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label><Input id="grossWeight" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="teirWeight" control={form.control} render={({ field }) => (<div className="space-y-1 col-span-1"><Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label><Input id="teirWeight" type="number" {...field} className="h-9 text-sm"/></div>)} />
+                         <div className="space-y-1">
+                            <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
+                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                         </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
+                             <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} className="h-9 text-sm pl-10"/>)} />
+                            </InputWithIcon>
                         </div>
-                        <div className="grid grid-cols-4 gap-3">
-                        <Controller name="rate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="rate" className="text-xs">Rate</Label><Input id="rate" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label><Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="labouryRate" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="labouryRate" className="text-xs">Laboury</Label><Input id="labouryRate" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                        <Controller name="kanta" control={form.control} render={({ field }) => (<div className="space-y-1"><Label htmlFor="kanta" className="text-xs">Kanta</Label><Input id="kanta" type="number" {...field} className="h-9 text-sm" /></div>)} />
-                    </div>
-                </div>
-            </div>
-        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="rate" className="text-xs">Rate</Label>
+                             <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
+                             <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
+                             <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="kanta" className="text-xs">Kanta</Label>
+                             <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
     );
 });
 
@@ -872,27 +930,29 @@ export default function CustomerManagementClient() {
                 {/* Layout 4: Step-by-Step */}
                 {activeLayout === 'step-by-step' && (
                   <div className="flex flex-col md:flex-row items-start justify-center gap-4">
-                      <div className="flex-1 w-full space-y-4">
-                          <Card>
-                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><User size={16}/>Customer Details</CardTitle></CardHeader>
-                              <CardContent className="p-4 pt-0 space-y-2">
-                                  <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
-                                  <DetailItem icon={<UserSquare size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
-                                  <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
-                                  <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} />
-                              </CardContent>
-                          </Card>
-                          <Card>
-                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><FileText size={16}/>Transaction Details</CardTitle></CardHeader>
-                              <CardContent className="p-4 pt-0 space-y-2">
-                                  <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                                  <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
-                                  <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                                  <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                  <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
-                                  <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
-                              </CardContent>
-                          </Card>
+                      <div className="flex flex-col md:flex-row gap-4 flex-1 w-full">
+                        <div className="flex-1 space-y-4">
+                            <Card>
+                                <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><User size={16}/>Customer Details</CardTitle></CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-2">
+                                    <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
+                                    <DetailItem icon={<UserSquare size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                                    <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
+                                    <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} />
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><FileText size={16}/>Transaction Details</CardTitle></CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-2">
+                                    <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                    <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
+                                    <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
+                                    <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                                    <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                                    <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
+                                </CardContent>
+                            </Card>
+                        </div>
                       </div>
                       <div className="self-center p-2 hidden md:block">
                           <ArrowRight className="text-muted-foreground"/>
