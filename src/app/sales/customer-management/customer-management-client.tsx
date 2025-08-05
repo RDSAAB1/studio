@@ -682,11 +682,11 @@ export default function CustomerManagementClient() {
               <div className="p-4 sm:p-6 space-y-4">
                   <Card className="p-2 sm:p-4">
                     <CardContent className="p-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2 text-sm">
-                        <DetailItem label="Name" value={toTitleCase(detailsCustomer.name)}/>
-                        <DetailItem label="S/O" value={toTitleCase(detailsCustomer.so)}/>
-                        <DetailItem label="Contact" value={detailsCustomer.contact}/>
-                        <DetailItem label="Date" value={format(new Date(detailsCustomer.date), "PPP")}/>
-                        <DetailItem label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-2 md:col-span-3"/>
+                        <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)}/>
+                        <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)}/>
+                        <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact}/>
+                        <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")}/>
+                        <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-2 md:col-span-3"/>
                     </CardContent>
                   </Card>
 
@@ -695,17 +695,17 @@ export default function CustomerManagementClient() {
                           <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight Details</CardTitle></CardHeader>
                           <CardContent className="p-4 pt-0 space-y-3">
                               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                <DetailItem label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                                <DetailItem label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                <DetailItem label="Receipt Type" value={detailsCustomer.receiptType} />
-                                <DetailItem label="Payment Type" value={detailsCustomer.paymentType} />
+                                <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
+                                <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
+                                <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                                <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
                               </div>
                               <Separator />
                               <Table className="text-xs">
                                   <TableBody>
-                                      <TableRow><TableCell className="text-muted-foreground p-1">Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1">Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                      <TableRow className="bg-muted/50"><TableCell className="font-bold p-2">Final Weight</TableCell><TableCell className="text-right font-bold p-2">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                      <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
                                   </TableBody>
                               </Table>
                           </CardContent>
@@ -715,12 +715,12 @@ export default function CustomerManagementClient() {
                            <CardContent className="p-4 pt-0">
                               <Table className="text-xs">
                                   <TableBody>
-                                      <TableRow><TableCell className="text-muted-foreground p-1">Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1">Rate</TableCell><TableCell className="text-right font-semibold p-1">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow className="bg-muted/50"><TableCell className="font-bold p-2">Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive">Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
-                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive">Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
+                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                      <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
+                                      <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
+                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
+                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
+                                      <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
                                   </TableBody>
                               </Table>
                            </CardContent>
