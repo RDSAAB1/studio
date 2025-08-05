@@ -110,11 +110,7 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
     
     return (
         <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><FilePlus className="h-6 w-6" /> Supplier Entry</CardTitle>
-                <CardDescription>Fill in the details below to add or update a supplier entry.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6 space-y-6">
                  {/* Basic Info Section */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <Controller name="date" control={form.control} render={({ field }) => (
