@@ -27,6 +27,7 @@ import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Che
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -451,7 +452,7 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
 
 
 const DetailItem = ({ icon, label, value, className }: { icon: React.ReactNode, label: string, value: any, className?: string }) => (
-    <div className={cn("flex items-start gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted/50", className)}>
+    <div className={cn("flex items-start gap-3", className)}>
         <div className="text-primary mt-1">{icon}</div>
         <div>
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -460,10 +461,10 @@ const DetailItem = ({ icon, label, value, className }: { icon: React.ReactNode, 
     </div>
 );
 
-const FinancialDetailItem = ({ label, value, isSubtle = false }: { label: string, value: any, isSubtle?: boolean }) => (
-    <div className="flex justify-between items-center py-1.5 px-2.5 rounded-lg transition-colors hover:bg-muted/50">
+const FinancialDetailItem = ({ label, value, isSubtle = false, isBold = false, className = '' }: { label: string, value: any, isSubtle?: boolean, isBold?: boolean, className?: string }) => (
+    <div className={cn("flex justify-between items-center py-1.5", className)}>
         <p className={cn("text-sm", isSubtle ? "text-muted-foreground" : "text-foreground")}>{label}</p>
-        <p className={cn("font-semibold text-sm", isSubtle ? "text-muted-foreground" : "text-foreground")}>{String(value)}</p>
+        <p className={cn("font-semibold text-sm", isSubtle ? "text-muted-foreground" : "text-foreground", isBold && "font-bold text-base")}>{String(value)}</p>
     </div>
 );
 
@@ -681,76 +682,69 @@ export default function CustomerManagementClient() {
       <CustomerTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
       
        <Sheet open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
-        <SheetContent className="w-full sm:max-w-4xl overflow-y-auto p-0">
+        <SheetContent className="w-full sm:max-w-5xl overflow-y-auto p-0">
             {detailsCustomer && (
                 <div className="flex flex-col h-full">
-                    <SheetHeader className="p-6 border-b">
+                    <SheetHeader className="p-6 border-b bg-muted/30">
                         <SheetTitle className="text-2xl font-headline">
-                            Transaction Profile
+                            Transaction Profile: <span className="text-primary font-mono">{detailsCustomer.srNo}</span>
                         </SheetTitle>
                         <SheetDescription>
-                            SR No: {detailsCustomer.srNo}
+                           Detailed overview for {toTitleCase(detailsCustomer.name)}'s transaction on {format(new Date(detailsCustomer.date), "PPP")}
                         </SheetDescription>
                     </SheetHeader>
                     <div className="flex-grow p-6 space-y-6 bg-muted/20">
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Column 1: Customer Info */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg font-headline flex items-center gap-2">
-                                        <User className="text-primary"/> Customer Info
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-1 text-sm">
-                                    <DetailItem icon={<User className="size-4" />} label="Name" value={toTitleCase(detailsCustomer.name)} />
-                                    <DetailItem icon={<Building className="size-4" />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
-                                    <DetailItem icon={<Phone className="size-4" />} label="Contact" value={detailsCustomer.contact} />
-                                    <DetailItem icon={<Home className="size-4" />} label="Address" value={toTitleCase(detailsCustomer.address)} />
-                                </CardContent>
-                            </Card>
+                        <Card>
+                             <CardHeader>
+                                <CardTitle className="text-lg font-headline flex items-center gap-2">
+                                    <User className="text-primary"/> Customer & Transaction Details
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
+                                <DetailItem icon={<User className="size-4" />} label="Name" value={toTitleCase(detailsCustomer.name)} />
+                                <DetailItem icon={<Building className="size-4" />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                                <DetailItem icon={<Phone className="size-4" />} label="Contact" value={detailsCustomer.contact} />
+                                <DetailItem icon={<Home className="size-4" />} label="Address" value={toTitleCase(detailsCustomer.address)} />
+                                
+                                <DetailItem icon={<CalendarIcon className="size-4" />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
+                                <DetailItem icon={<CalendarIcon className="size-4" />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
+                                <DetailItem icon={<Truck className="size-4" />} label="Vehicle No." value={detailsCustomer.vehicleNo} />
+                                <DetailItem icon={<Wheat className="size-4" />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
 
-                            {/* Column 2: Transaction Info */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg font-headline flex items-center gap-2">
-                                        <Milestone className="text-primary"/> Transaction Info
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-1 text-sm">
-                                     <DetailItem icon={<CalendarIcon className="size-4" />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                                    <DetailItem icon={<CalendarIcon className="size-4" />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
-                                    <DetailItem icon={<Truck className="size-4" />} label="Vehicle No." value={detailsCustomer.vehicleNo} />
-                                    <DetailItem icon={<Wheat className="size-4" />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                    <DetailItem icon={<FileText className="size-4" />} label="Receipt Type" value={detailsCustomer.receiptType} />
-                                    <DetailItem icon={<Landmark className="size-4" />} label="Payment Type" value={detailsCustomer.paymentType} />
-                                </CardContent>
-                            </Card>
+                                <DetailItem icon={<FileText className="size-4" />} label="Receipt Type" value={detailsCustomer.receiptType} />
+                                <DetailItem icon={<Landmark className="size-4" />} label="Payment Type" value={detailsCustomer.paymentType} />
+                            </CardContent>
+                        </Card>
 
-                            {/* Column 3: Financial Breakdown */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg font-headline flex items-center gap-2">
-                                        <Calculator className="text-primary"/> Financial Breakdown
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-1.5 text-sm divide-y">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg font-headline flex items-center gap-2">
+                                    <Calculator className="text-primary"/> Financial Summary
+                                </CardTitle>
+                            </CardHeader>
+                             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
+                                <div className="space-y-2">
+                                    <h4 className="font-semibold flex items-center gap-2 text-sm"><Weight className="size-4 text-primary" />Weight Calculation</h4>
                                     <FinancialDetailItem label="Gross Wt." value={`${detailsCustomer.grossWeight.toFixed(2)} kg`} />
                                     <FinancialDetailItem label="Teir Wt." value={`${detailsCustomer.teirWeight.toFixed(2)} kg`} isSubtle />
-                                    <FinancialDetailItem label="Weight" value={`${detailsCustomer.weight.toFixed(2)} kg`} />
-                                    <FinancialDetailItem label="Rate" value={`₹ ${detailsCustomer.rate.toFixed(2)}`} />
-                                    <div className="pt-1.5">
-                                        <FinancialDetailItem label="Karta" value={`${detailsCustomer.kartaPercentage}% (-${detailsCustomer.kartaWeight.toFixed(2)} kg)`} isSubtle />
-                                        <FinancialDetailItem label="Net Weight" value={`${detailsCustomer.netWeight.toFixed(2)} kg`} />
-                                        <FinancialDetailItem label="Amount" value={`₹ ${detailsCustomer.amount.toFixed(2)}`} />
-                                    </div>
-                                    <div className="pt-1.5">
-                                        <FinancialDetailItem label="Laboury" value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} isSubtle/>
-                                        <FinancialDetailItem label="Kanta" value={`- ₹ ${detailsCustomer.kanta.toFixed(2)}`} isSubtle />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                         <Card className="bg-primary/10 border-primary">
+                                    <FinancialDetailItem label="Final Weight" value={`${detailsCustomer.weight.toFixed(2)} kg`} isBold />
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="font-semibold flex items-center gap-2 text-sm"><Percent className="size-4 text-primary" />Deductions</h4>
+                                     <FinancialDetailItem label="Karta" value={`${detailsCustomer.kartaPercentage}% (-${detailsCustomer.kartaWeight.toFixed(2)} kg)`} />
+                                     <FinancialDetailItem label="Net Weight" value={`${detailsCustomer.netWeight.toFixed(2)} kg`} isBold />
+                                </div>
+                                 <div className="space-y-2">
+                                    <h4 className="font-semibold flex items-center gap-2 text-sm"><Banknote className="size-4 text-primary" />Amount Calculation</h4>
+                                    <FinancialDetailItem label="Rate" value={`₹ ${detailsCustomer.rate.toFixed(2)} / kg`} />
+                                    <FinancialDetailItem label="Total Amount" value={`₹ ${detailsCustomer.amount.toFixed(2)}`} isBold />
+                                    <FinancialDetailItem label="Laboury" value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} isSubtle/>
+                                    <FinancialDetailItem label="Kanta" value={`- ₹ ${detailsCustomer.kanta.toFixed(2)}`} isSubtle />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        
+                         <Card className="bg-primary/10 border-primary shadow-lg">
                             <CardContent className="p-4 flex items-center justify-between">
                                 <p className="text-lg font-bold text-primary">Net Payable Amount</p>
                                 <p className="text-3xl font-bold text-primary">
