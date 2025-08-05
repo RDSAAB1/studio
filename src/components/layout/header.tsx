@@ -33,14 +33,14 @@ const menuItems = [
     name: "Sales & CRM",
     icon: <HeartHandshake className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview", icon: <LayoutDashboard /> },
-      { id: "Sub1-2", name: "Supplier Entry", href: "/sales/customer-management", icon: <FilePlus /> },
-      { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <Book /> },
-      { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck /> },
-      { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 /> },
-      { id: "Sub1-6", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet /> },
-      { id: "Sub1-7", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle /> },
-      { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote /> },
+      { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview", icon: <LayoutDashboard className="h-4 w-4" /> },
+      { id: "Sub1-2", name: "Supplier Entry", href: "/sales/customer-management", icon: <FilePlus className="h-4 w-4" /> },
+      { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <Book className="h-4 w-4" /> },
+      { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-4 w-4" /> },
+      { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-4 w-4" /> },
+      { id: "Sub1-6", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-4 w-4" /> },
+      { id: "Sub1-7", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-4 w-4" /> },
+      { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-4 w-4" /> },
     ],
   },
   {
@@ -48,9 +48,9 @@ const menuItems = [
     name: "HR & Payroll",
     icon: <Users className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database /> },
-      { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator /> },
-      { id: "Sub2-3", name: "Attendance Tracking", href: "/hr/attendance-tracking", icon: <CalendarCheck /> },
+      { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database className="h-4 w-4" /> },
+      { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator className="h-4 w-4" /> },
+      { id: "Sub2-3", name: "Attendance Tracking", href: "/hr/attendance-tracking", icon: <CalendarCheck className="h-4 w-4" /> },
     ],
   },
   {
@@ -58,9 +58,9 @@ const menuItems = [
     name: "Inventory",
     icon: <Package className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub3-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: <Boxes /> },
-      { id: "Sub3-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: <Building2 /> },
-      { id: "Sub3-3", name: "Purchase Orders", href: "/inventory/purchase-orders", icon: <ShoppingCart /> },
+      { id: "Sub3-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: <Boxes className="h-4 w-4" /> },
+      { id: "Sub3-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: <Building2 className="h-4 w-4" /> },
+      { id: "Sub3-3", name: "Purchase Orders", href: "/inventory/purchase-orders", icon: <ShoppingCart className="h-4 w-4" /> },
     ],
   },
   {
@@ -68,9 +68,9 @@ const menuItems = [
     name: "Marketing",
     icon: <Megaphone className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Volume2 /> },
-      { id: "Sub4-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: <Mail /> },
-      { id: "Sub4-3", name: "Analytics", href: "/marketing/analytics", icon: <LineChart /> },
+      { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Volume2 className="h-4 w-4" /> },
+      { id: "Sub4-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: <Mail className="h-4 w-4" /> },
+      { id: "Sub4-3", name: "Analytics", href: "/marketing/analytics", icon: <LineChart className="h-4 w-4" /> },
     ],
   },
   {
@@ -78,9 +78,9 @@ const menuItems = [
     name: "Project Management",
     icon: <Briefcase className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub5-1", name: "Project Dashboard", href: "/projects/dashboard", icon: <LayoutDashboard /> },
-      { id: "Sub5-2", name: "Task Management", href: "/projects/tasks", icon: <ClipboardCheck /> },
-      { id: "Sub5-3", name: "Team Collaboration", href: "/projects/collaboration", icon: <Users2 /> },
+      { id: "Sub5-1", name: "Project Dashboard", href: "/projects/dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+      { id: "Sub5-2", name: "Task Management", href: "/projects/tasks", icon: <ClipboardCheck className="h-4 w-4" /> },
+      { id: "Sub5-3", name: "Team Collaboration", href: "/projects/collaboration", icon: <Users2 className="h-4 w-4" /> },
     ],
   },
 ];
@@ -121,7 +121,7 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
                     </TooltipContent>
                   </Tooltip>
                   <NavigationMenuContent>
-                    <ul className="grid w-[250px] gap-3 p-4">
+                    <ul className="grid w-[250px] gap-2 p-4">
                       {item.subMenus.map((subItem) => (
                         <ListItem
                           key={subItem.id}
@@ -154,7 +154,7 @@ const ListItem = React.forwardRef<
           href={props.href || "#"}
           ref={ref}
           className={cn(
-            "flex items-center gap-3 select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+            "flex items-center gap-2 select-none space-y-1 rounded-md p-2 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
             active ? "bg-accent/50" : "",
             className
           )}
@@ -163,7 +163,7 @@ const ListItem = React.forwardRef<
           <div className="text-primary">{icon}</div>
           <div className="flex flex-col">
             <div className="text-sm font-medium leading-none">{title}</div>
-            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+            <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
               {children}
             </p>
           </div>
