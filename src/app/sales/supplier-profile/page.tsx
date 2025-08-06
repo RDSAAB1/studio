@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
@@ -50,11 +50,18 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-type TotalOverview = {
-    totalOutstanding: number;
-    totalPayments: number;
-    totalTransactions: number;
-}
+const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <div className="text-muted-foreground">{icon}</div>
+    </CardHeader>
+    <CardContent>
+      <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    </CardContent>
+  </Card>
+);
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -66,13 +73,12 @@ export default function SupplierProfilePage() {
 
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
-  const [totalOverview, setTotalOverview] = useState<TotalOverview>({ totalOutstanding: 0, totalPayments: 0, totalTransactions: 0 });
-
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
     const tempPaymentHistory = new Map<string, Payment[]>();
 
+     // Simulate some payment history for demonstration
      customers.forEach((c, index) => {
         if(!c.customerId) return;
         if(!tempPaymentHistory.has(c.customerId)) {
@@ -83,35 +89,28 @@ export default function SupplierProfilePage() {
                  paymentId: `P0000${index + 1}`,
                  date: '2025-07-28',
                  amount: parseFloat(String(c.netAmount)) / 2,
-                 cdAmount: 0,
+                 cdAmount: 50, // Simulated CD
                  type: 'Partial',
                  receiptType: 'Online',
                  notes: `Simulated partial payment for SR ${c.srNo}`
              })
         }
-    })
-
-    let overviewOutstanding = 0;
-    let overviewPayments = 0;
-
+    });
+    
+    // Create summaries for each customer
     customers.forEach(entry => {
       if(!entry.customerId) return;
       const key = entry.customerId;
       if (!newSummary.has(key)) {
         newSummary.set(key, {
-          name: entry.name,
-          so: entry.so,
-          contact: entry.contact,
-          address: entry.address,
-          acNo: entry.acNo,
-          ifscCode: entry.ifscCode,
-          bank: entry.bank,
-          branch: entry.branch,
-          totalOutstanding: 0,
-          totalAmount: 0,
-          totalPaid: 0,
+          name: entry.name, so: entry.so, contact: entry.contact, address: entry.address,
+          acNo: entry.acNo, ifscCode: entry.ifscCode, bank: entry.bank, branch: entry.branch,
+          totalOutstanding: 0, totalAmount: 0, totalPaid: 0, 
           paymentHistory: tempPaymentHistory.get(key) || [], 
           outstandingEntryIds: [],
+          totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
+          totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
+          totalOutstandingTransactions: 0, allTransactions: [], allPayments: []
         });
       }
       const data = newSummary.get(key)!;
@@ -120,33 +119,61 @@ export default function SupplierProfilePage() {
       
       data.totalAmount += totalAmount;
       if (netAmount > 0) {
-        data.totalOutstanding += netAmount;
         data.outstandingEntryIds.push(entry.id);
       }
-       data.totalPaid = data.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
-       data.totalOutstanding = data.totalAmount - data.totalPaid;
+    });
+
+    // Calculate totals for each customer
+    newSummary.forEach((summary) => {
+        const customerTransactions = customers.filter(c => c.customerId === summary.customerId);
+        summary.totalPaid = summary.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
+        summary.totalOutstanding = summary.totalAmount - summary.totalPaid;
+    });
+
+    // Create the Mill overview summary
+    const millSummary: CustomerSummary = {
+        name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
+        paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
+        totalOutstandingTransactions: 0, allTransactions: customers, allPayments: []
+    };
+    
+    let totalRate = 0;
+    let rateCount = 0;
+
+    customers.forEach(c => {
+        millSummary.totalGrossWeight += c.grossWeight;
+        millSummary.totalTeirWeight += c.teirWeight;
+        millSummary.totalNetWeight += c.netWeight;
+        millSummary.totalKartaAmount += c.kartaAmount;
+        millSummary.totalLabouryAmount += c.labouryAmount;
+        if(c.rate > 0) {
+            totalRate += c.rate;
+            rateCount++;
+        }
     });
 
     newSummary.forEach(summary => {
-        overviewOutstanding += summary.totalOutstanding;
-        overviewPayments += summary.totalPaid;
-    });
-
-    setTotalOverview({
-        totalOutstanding: overviewOutstanding,
-        totalPayments: overviewPayments,
-        totalTransactions: customers.length
+        millSummary.totalOutstanding += summary.totalOutstanding;
+        millSummary.totalPaid += summary.totalPaid;
+        summary.paymentHistory.forEach(p => millSummary.allPayments.push(p));
     });
     
+    millSummary.totalCdAmount = millSummary.allPayments.reduce((acc, p) => acc + p.cdAmount, 0);
+    millSummary.totalTransactions = customers.length;
+    millSummary.totalOutstandingTransactions = customers.filter(c => parseFloat(String(c.netAmount)) > 0).length;
+    millSummary.averageRate = rateCount > 0 ? totalRate / rateCount : 0;
+
+
     const finalSummary = new Map<string, CustomerSummary>();
-    finalSummary.set(MILL_OVERVIEW_KEY, { name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, paymentHistory: [], outstandingEntryIds: [], totalAmount: 0, totalPaid: 0 });
+    finalSummary.set(MILL_OVERVIEW_KEY, millSummary);
     newSummary.forEach((value, key) => {
       finalSummary.set(key, value);
     });
 
     setCustomerSummary(finalSummary);
-    if (!selectedCustomerKey && finalSummary.size > 0) {
-      setSelectedCustomerKey(Array.from(finalSummary.keys())[0]);
+    if (!selectedCustomerKey) {
+      setSelectedCustomerKey(MILL_OVERVIEW_KEY);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customers]); 
@@ -160,41 +187,24 @@ export default function SupplierProfilePage() {
   }
 
   const selectedCustomerData = selectedCustomerKey ? customerSummary.get(selectedCustomerKey) : null;
+  const isMillSelected = selectedCustomerKey === MILL_OVERVIEW_KEY;
 
   const pieChartData = useMemo(() => {
-    if (!selectedCustomerData) return [];
+    if (!selectedCustomerData || isMillSelected) return [];
     return [
       { name: 'Total Paid', value: selectedCustomerData.totalPaid },
       { name: 'Total Outstanding', value: selectedCustomerData.totalOutstanding },
     ];
-  }, [selectedCustomerData]);
+  }, [selectedCustomerData, isMillSelected]);
 
-  const PIE_CHART_COLORS = [
-    'hsl(var(--chart-2))',
-    'hsl(var(--destructive))',
-  ];
-
-  const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="text-muted-foreground">{icon}</div>
-      </CardHeader>
-      <CardContent>
-        <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
-      </CardContent>
-    </Card>
-  )
-
-  const isMillSelected = selectedCustomerKey === MILL_OVERVIEW_KEY;
+  const PIE_CHART_COLORS = ['hsl(var(--chart-2))', 'hsl(var(--destructive))'];
 
   return (
     <div className="space-y-6">
       <Card>
         <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-                <UserCircle className="h-5 w-5 text-primary" />
+                <Users className="h-5 w-5 text-primary" />
                 <h3 className="text-base font-semibold">Select Supplier</h3>
             </div>
             <div className="w-full sm:w-auto sm:min-w-64">
@@ -215,16 +225,85 @@ export default function SupplierProfilePage() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {isMillSelected ? (
+        {isMillSelected && selectedCustomerData ? (
              <div className="lg:col-span-12 space-y-6">
                 <Card>
-                    <CardHeader><CardTitle>Total Overview (All Suppliers)</CardTitle></CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        <StatCard title="Total Outstanding" value={`₹${totalOverview.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                        <StatCard title="Total Payments" value={`₹${totalOverview.totalPayments.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-                        <StatCard title="Total Transactions" value={totalOverview.totalTransactions.toString()} icon={<Briefcase />} />
+                    <CardHeader>
+                        <CardTitle>Mill Overview (All Suppliers)</CardTitle>
+                        <CardDescription>A complete financial and transactional overview of the entire business.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <StatCard title="Total Gross Weight" value={`${selectedCustomerData.totalGrossWeight.toFixed(2)} kg`} icon={<Box />} />
+                        <StatCard title="Total Teir Weight" value={`${selectedCustomerData.totalTeirWeight.toFixed(2)} kg`} icon={<Box />} />
+                        <StatCard title="Total Net Weight" value={`${selectedCustomerData.totalNetWeight.toFixed(2)} kg`} icon={<Weight />} />
+                        <StatCard title="Average Rate" value={`₹${selectedCustomerData.averageRate.toFixed(2)}`} icon={<Calculator />} />
+                        <StatCard title="Total Karta" value={`₹${selectedCustomerData.totalKartaAmount.toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
+                        <StatCard title="Total Laboury" value={`₹${selectedCustomerData.totalLabouryAmount.toFixed(2)}`} icon={<Users />} colorClass="text-destructive" />
+                        <StatCard title="Total CD" value={`₹${selectedCustomerData.totalCdAmount.toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
+                        <StatCard title="Total Transactions" value={`${selectedCustomerData.totalTransactions}`} icon={<Briefcase />} />
+                        <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+                        <StatCard title="Total Outstanding Entries" value={`${selectedCustomerData.totalOutstandingTransactions}`} icon={<FileText />} />
                     </CardContent>
                 </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader><CardTitle>All Transactions</CardTitle></CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-96">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>SR No</TableHead>
+                                            <TableHead>Supplier</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                            <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {selectedCustomerData.allTransactions.map(entry => (
+                                            <TableRow key={entry.id}>
+                                                <TableCell className="font-mono">{entry.srNo}</TableCell>
+                                                <TableCell>{toTitleCase(entry.name)}</TableCell>
+                                                <TableCell className="text-right font-semibold">₹{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={parseFloat(String(entry.netAmount)) === 0 ? "secondary" : "destructive"}>
+                                                        {parseFloat(String(entry.netAmount)) === 0 ? "Paid" : "Outstanding"}
+                                                    </Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-96">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Payment ID</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {selectedCustomerData.allPayments.map(payment => (
+                                            <TableRow key={payment.paymentId}>
+                                                <TableCell className="font-mono">{payment.paymentId}</TableCell>
+                                                <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
+                                                <TableCell className="text-right font-semibold">₹{payment.amount.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         ) : selectedCustomerData && (
             <>
@@ -610,3 +689,5 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
+
+    

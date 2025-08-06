@@ -72,6 +72,18 @@ export type CustomerSummary = {
     totalPaid: number;
     paymentHistory: Payment[];
     outstandingEntryIds: string[];
+    // New fields for Mill Overview
+    totalGrossWeight: number;
+    totalTeirWeight: number;
+    totalNetWeight: number;
+    totalKartaAmount: number;
+    totalLabouryAmount: number;
+    totalCdAmount: number;
+    averageRate: number;
+    totalTransactions: number;
+    totalOutstandingTransactions: number;
+    allTransactions: Customer[];
+    allPayments: Payment[];
 }
 
 export type AppOptions = {
@@ -79,3 +91,5 @@ export type AppOptions = {
     receiptTypes: string[];
     paymentTypes: string[];
 }
+
+    
