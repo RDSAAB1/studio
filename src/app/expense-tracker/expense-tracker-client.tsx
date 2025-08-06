@@ -5,8 +5,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { initialExpenses, expenseCategories } from "@/lib/data";
-import type { Expense } from "@/lib/definitions";
+import { initialTransactions, transactionCategories } from "@/lib/data";
+import type { Transaction } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -25,38 +25,38 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
-const expenseSchema = z.object({
+const transactionSchema = z.object({
   id: z.string().optional(),
   date: z.date(),
+  transactionType: z.enum(["Income", "Expense"]),
   category: z.string().min(1, "Category is required."),
   subCategory: z.string().min(1, "Sub-category is required."),
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
-  payee: z.string().min(1, "Payee is required."),
+  payee: z.string().min(1, "Payee/Payer is required."),
   paymentMethod: z.string().min(1, "Payment method is required."),
   status: z.string().min(1, "Status is required."),
   description: z.string().optional(),
   invoiceNumber: z.string().optional(),
   taxAmount: z.coerce.number().optional(),
-  expenseType: z.enum(["Personal", "Business"]),
+  expenseType: z.enum(["Personal", "Business"]).optional(),
   isRecurring: z.boolean(),
   mill: z.string().optional(),
-  expenseNature: z.enum(["Permanent", "Seasonal"]),
+  expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
 });
 
-type ExpenseFormValues = z.infer<typeof expenseSchema>;
+type TransactionFormValues = z.infer<typeof transactionSchema>;
 
-const getInitialFormState = (expenses: Expense[]): Expense => {
-  const nextId = expenses.length > 0 ? String(Math.max(...expenses.map(e => parseInt(e.id))) + 1) : "1";
+const getInitialFormState = (transactions: Transaction[]): Omit<Transaction, 'id' | 'date'> & { date: Date } => {
   const staticDate = new Date();
   staticDate.setHours(0, 0, 0, 0);
 
   return {
-    id: nextId,
-    date: staticDate.toISOString().split('T')[0],
+    date: staticDate,
+    transactionType: 'Expense',
     category: '',
     subCategory: '',
     amount: 0,
@@ -101,27 +101,31 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
   </Card>
 );
 
-export default function ExpenseTrackerClient() {
+export default function IncomeExpenseClient() {
   const { toast } = useToast();
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [isEditing, setIsEditing] = useState<string | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Expense, direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction, direction: 'ascending' | 'descending' } | null>(null);
   const [activeTab, setActiveTab] = useState("history");
 
-  const form = useForm<ExpenseFormValues>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: {
-      ...getInitialFormState(expenses),
-      date: new Date(),
-    },
+  const form = useForm<TransactionFormValues>({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: getInitialFormState(transactions),
   });
 
+  const selectedTransactionType = form.watch('transactionType');
   const selectedExpenseNature = form.watch('expenseNature');
   const selectedCategory = form.watch('category');
 
   const availableCategories = useMemo(() => {
-    return expenseCategories[selectedExpenseNature]?.categories || [];
-  }, [selectedExpenseNature]);
+    if (selectedTransactionType === 'Income') {
+        return transactionCategories.Income.categories || [];
+    }
+    if (selectedTransactionType === 'Expense' && selectedExpenseNature) {
+        return transactionCategories.Expense[selectedExpenseNature]?.categories || [];
+    }
+    return [];
+  }, [selectedTransactionType, selectedExpenseNature]);
 
   const availableSubCategories = useMemo(() => {
     const categoryObj = availableCategories.find(c => c.name === selectedCategory);
@@ -131,7 +135,7 @@ export default function ExpenseTrackerClient() {
   useEffect(() => {
     form.setValue('category', '');
     form.setValue('subCategory', '');
-  }, [selectedExpenseNature, form]);
+  }, [selectedTransactionType, selectedExpenseNature, form]);
 
   useEffect(() => {
     form.setValue('subCategory', '');
@@ -139,38 +143,31 @@ export default function ExpenseTrackerClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(null);
-    form.reset({
-      ...getInitialFormState(expenses),
-      date: new Date(),
-    });
+    form.reset(getInitialFormState(transactions));
     setActiveTab("form");
-  }, [expenses, form]);
-  
-  useEffect(() => {
-    // We don't want to reset the form on initial load this way anymore
-  }, []);
+  }, [transactions, form]);
 
-  const handleEdit = (expense: Expense) => {
-    setIsEditing(expense.id);
+  const handleEdit = (transaction: Transaction) => {
+    setIsEditing(transaction.id);
     form.reset({
-      ...expense,
-      date: new Date(expense.date),
-      taxAmount: expense.taxAmount || 0,
+      ...transaction,
+      date: new Date(transaction.date),
+      taxAmount: transaction.taxAmount || 0,
     });
     setActiveTab("form");
   };
 
   const handleDelete = (id: string) => {
-    setExpenses(prev => prev.filter(e => e.id !== id));
-    toast({ title: "Success", description: "Expense deleted successfully." });
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    toast({ title: "Success", description: "Transaction deleted successfully." });
     if (isEditing === id) {
       setIsEditing(null);
-      form.reset({ ...getInitialFormState(expenses), date: new Date() });
+      form.reset(getInitialFormState(transactions));
     }
   };
 
-  const onSubmit = (values: ExpenseFormValues) => {
-    const expenseData: Expense = {
+  const onSubmit = (values: TransactionFormValues) => {
+    const transactionData: Transaction = {
       ...values,
       date: format(values.date, "yyyy-MM-dd"),
       payee: toTitleCase(values.payee),
@@ -178,19 +175,19 @@ export default function ExpenseTrackerClient() {
     };
     
     if (isEditing) {
-      setExpenses(prev => prev.map(e => e.id === isEditing ? { ...expenseData, id: isEditing } : e));
-      toast({ title: "Success", description: "Expense updated successfully." });
+      setTransactions(prev => prev.map(t => t.id === isEditing ? { ...transactionData, id: isEditing } : t));
+      toast({ title: "Success", description: "Transaction updated successfully." });
     } else {
       const newId = String(Date.now());
-      setExpenses(prev => [{ ...expenseData, id: newId }, ...prev]);
-      toast({ title: "Success", description: "New expense saved successfully." });
+      setTransactions(prev => [{ ...transactionData, id: newId }, ...prev]);
+      toast({ title: "Success", description: "New transaction saved successfully." });
     }
     setIsEditing(null);
-    form.reset({ ...getInitialFormState(expenses), date: new Date() });
+    form.reset(getInitialFormState(transactions));
     setActiveTab("history");
   };
 
-  const requestSort = (key: keyof Expense) => {
+  const requestSort = (key: keyof Transaction) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
         direction = 'descending';
@@ -198,8 +195,8 @@ export default function ExpenseTrackerClient() {
     setSortConfig({ key, direction });
   };
 
-  const sortedExpenses = useMemo(() => {
-    let sortableItems = [...expenses];
+  const sortedTransactions = useMemo(() => {
+    let sortableItems = [...transactions];
     if (sortConfig !== null) {
         sortableItems.sort((a, b) => {
             const valA = a[sortConfig.key] || '';
@@ -214,37 +211,43 @@ export default function ExpenseTrackerClient() {
         });
     }
     return sortableItems;
-  }, [expenses, sortConfig]);
+  }, [transactions, sortConfig]);
   
-  const totalExpenses = useMemo(() => expenses.reduce((sum, e) => sum + e.amount, 0), [expenses]);
-  const totalTax = useMemo(() => expenses.reduce((sum, e) => sum + (e.taxAmount || 0), 0), [expenses]);
-  const totalTransactions = expenses.length;
-  const averageExpense = totalTransactions > 0 ? totalExpenses / totalTransactions : 0;
+  const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
+    const income = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
+    const expense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
+    return {
+      totalIncome: income,
+      totalExpense: expense,
+      netProfitLoss: income - expense,
+      totalTransactions: transactions.length,
+    };
+  }, [transactions]);
 
   return (
     <div className="space-y-6">
       <SectionCard>
           <CardHeader>
-              <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Expense Overview</CardTitle>
-              <CardDescription>A summary of your recorded expenses.</CardDescription>
+              <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Transactions Overview</CardTitle>
+              <CardDescription>A summary of your recorded income and expenses.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Total Expenses" value={`₹${totalExpenses.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-primary"/>
-              <StatCard title="Total Tax" value={`₹${totalTax.toFixed(2)}`} icon={<Landmark />} />
+              <StatCard title="Total Income" value={`₹${totalIncome.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-green-500"/>
+              <StatCard title="Total Expense" value={`₹${totalExpense.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-red-500"/>
+              <StatCard title="Net Profit/Loss" value={`₹${netProfitLoss.toFixed(2)}`} icon={<BarChart />} colorClass={netProfitLoss >= 0 ? "text-green-500" : "text-red-500"}/>
               <StatCard title="Total Transactions" value={String(totalTransactions)} icon={<Hash />} />
-              <StatCard title="Average Expense" value={`₹${averageExpense.toFixed(2)}`} icon={<BarChart />} />
           </CardContent>
       </SectionCard>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex justify-between items-center">
           <TabsList>
-            <TabsTrigger value="history"><List className="mr-2 h-4 w-4"/>Expense History</TabsTrigger>
-            <TabsTrigger value="form"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Expense' : 'Add New Expense'}</TabsTrigger>
+            <TabsTrigger value="history"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
+            <TabsTrigger value="form"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
           </TabsList>
           {activeTab === 'history' && (
              <Button onClick={handleNew} size="sm">
-                <PlusCircle className="mr-2 h-4 w-4" /> New Expense
+                <PlusCircle className="mr-2 h-4 w-4" /> New Transaction
               </Button>
           )}
         </div>
@@ -256,41 +259,27 @@ export default function ExpenseTrackerClient() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                       <TableHead>Sub-Category</TableHead>
-                      <TableHead>Mill</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Nature</TableHead>
                       <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                      <TableHead>Payee</TableHead>
-                      <TableHead>Tax</TableHead>
-                      <TableHead>Invoice #</TableHead>
-                      <TableHead>Recurring</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Payee/Payer</TableHead>
+                       <TableHead>Mill</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedExpenses.map((expense) => (
-                      <TableRow key={expense.id}>
-                        <TableCell>{format(new Date(expense.date), "dd-MMM-yy")}</TableCell>
-                        <TableCell>{expense.category}</TableCell>
-                        <TableCell>{expense.subCategory}</TableCell>
-                        <TableCell>{expense.mill}</TableCell>
-                        <TableCell><Badge variant={expense.expenseType === 'Business' ? 'default' : 'secondary'}>{expense.expenseType}</Badge></TableCell>
-                        <TableCell><Badge variant={expense.expenseNature === 'Permanent' ? 'outline' : 'secondary'}>{expense.expenseNature}</Badge></TableCell>
-                        <TableCell className="text-right font-medium">₹{expense.amount.toFixed(2)}</TableCell>
-                        <TableCell>{expense.payee}</TableCell>
-                        <TableCell className="text-right">₹{(expense.taxAmount || 0).toFixed(2)}</TableCell>
-                        <TableCell>{expense.invoiceNumber}</TableCell>
-                        <TableCell className="text-center">{expense.isRecurring ? <RefreshCw className="h-4 w-4 text-blue-500"/> : '-'}</TableCell>
-                        <TableCell>
-                          <span className={cn("px-2 py-1 text-xs rounded-full", expense.status === 'Paid' ? 'bg-green-500/10 text-green-500' : expense.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500')}>
-                            {expense.status}
-                          </span>
-                        </TableCell>
+                    {sortedTransactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
+                        <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
+                        <TableCell>{transaction.category}</TableCell>
+                        <TableCell>{transaction.subCategory}</TableCell>
+                        <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>₹{transaction.amount.toFixed(2)}</TableCell>
+                        <TableCell>{transaction.payee}</TableCell>
+                        <TableCell>{transaction.mill}</TableCell>
                         <TableCell className="text-center">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(expense)}><Pen className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
@@ -298,11 +287,11 @@ export default function ExpenseTrackerClient() {
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>This will permanently delete the expense entry for "{expense.payee}" of ₹{expense.amount}.</AlertDialogDescription>
+                                <AlertDialogDescription>This will permanently delete the transaction entry for "{transaction.payee}" of ₹{transaction.amount}.</AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(expense.id)}>Continue</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleDelete(transaction.id)}>Continue</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -320,6 +309,23 @@ export default function ExpenseTrackerClient() {
               <CardContent className="p-6">
                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      
+                      <Controller name="transactionType" control={form.control} render={({ field }) => (
+                          <div className="space-y-2">
+                              <Label className="text-xs">Transaction Type</Label>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="Income" id="type-income" />
+                                      <Label htmlFor="type-income" className="font-normal text-sm flex items-center gap-2">Income</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="Expense" id="type-expense" />
+                                      <Label htmlFor="type-expense" className="font-normal text-sm flex items-center gap-2">Expense</Label>
+                                  </div>
+                              </RadioGroup>
+                          </div>
+                      )} />
+                      
                       <Controller name="date" control={form.control} render={({ field }) => (
                           <div className="space-y-1">
                               <Label className="text-xs">Date</Label>
@@ -345,25 +351,27 @@ export default function ExpenseTrackerClient() {
                           {form.formState.errors.amount && <p className="text-xs text-destructive mt-1">{form.formState.errors.amount.message}</p>}
                       </div>
                        
-                        <Controller name="expenseNature" control={form.control} render={({ field }) => (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Expense Nature</Label>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger className="h-9 text-sm">
-                                    <div className="flex items-center gap-2"><Layers3 className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Nature" /></div>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Permanent">Permanent</SelectItem>
-                                    <SelectItem value="Seasonal">Seasonal</SelectItem>
-                                </SelectContent>
-                            </Select>
-                          </div>
-                        )} />
+                        {selectedTransactionType === 'Expense' && (
+                            <Controller name="expenseNature" control={form.control} render={({ field }) => (
+                              <div className="space-y-1">
+                                <Label className="text-xs">Expense Nature</Label>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger className="h-9 text-sm">
+                                        <div className="flex items-center gap-2"><Layers3 className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Nature" /></div>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Permanent">Permanent</SelectItem>
+                                        <SelectItem value="Seasonal">Seasonal</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                              </div>
+                            )} />
+                        )}
 
                         <Controller name="category" control={form.control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Category</Label>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedExpenseNature}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={availableCategories.length === 0}>
                                 <SelectTrigger className="h-9 text-sm">
                                     <div className="flex items-center gap-2"><Tag className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Category" /></div>
                                 </SelectTrigger>
@@ -391,7 +399,7 @@ export default function ExpenseTrackerClient() {
                         )} />
 
                       <div className="space-y-1">
-                          <Label htmlFor="payee" className="text-xs">Payee / Vendor</Label>
+                          <Label htmlFor="payee" className="text-xs">Payee / Payer</Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
                               <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-9 text-sm pl-10" />} />
                           </InputWithIcon>
@@ -439,21 +447,23 @@ export default function ExpenseTrackerClient() {
                           </InputWithIcon>
                       </div>
 
-                       <Controller name="expenseType" control={form.control} render={({ field }) => (
-                          <div className="space-y-2">
-                              <Label className="text-xs">Expense Type</Label>
-                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="Business" id="type-business" />
-                                      <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="Personal" id="type-personal" />
-                                      <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
-                                  </div>
-                              </RadioGroup>
-                          </div>
-                      )} />
+                       {selectedTransactionType === 'Expense' && (
+                            <Controller name="expenseType" control={form.control} render={({ field }) => (
+                              <div className="space-y-2">
+                                  <Label className="text-xs">Expense Type</Label>
+                                  <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                      <div className="flex items-center space-x-2">
+                                          <RadioGroupItem value="Business" id="type-business" />
+                                          <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                          <RadioGroupItem value="Personal" id="type-personal" />
+                                          <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
+                                      </div>
+                                  </RadioGroup>
+                              </div>
+                            )} />
+                       )}
 
                         <div className="space-y-1">
                           <Label htmlFor="mill" className="text-xs">Mill</Label>
@@ -466,7 +476,7 @@ export default function ExpenseTrackerClient() {
                        <Controller name="isRecurring" control={form.control} render={({ field }) => (
                           <div className="flex items-center space-x-2 pt-6">
                               <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
-                              <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Expense</Label>
+                              <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Transaction</Label>
                           </div>
                        )} />
 
@@ -477,12 +487,12 @@ export default function ExpenseTrackerClient() {
                     </div>
                     <div className="flex justify-start space-x-4 pt-4">
                       <Button type="submit" size="sm">
-                        {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update Expense</> : <><Save className="mr-2 h-4 w-4" /> Save Expense</>}
+                        {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update Transaction</> : <><Save className="mr-2 h-4 w-4" /> Save Transaction</>}
                       </Button>
                       {isEditing && (
                         <Button type="button" variant="outline" onClick={() => {
                           setIsEditing(null);
-                          form.reset({ ...getInitialFormState(expenses), date: new Date() });
+                          form.reset(getInitialFormState(transactions));
                         }} size="sm">
                           Cancel
                         </Button>

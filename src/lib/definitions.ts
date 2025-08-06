@@ -48,9 +48,10 @@ export type Customer = {
   rtgsAmount?: number;
 };
 
-export type Expense = {
+export type Transaction = {
     id: string;
     date: string;
+    transactionType: 'Income' | 'Expense';
     category: string;
     subCategory: string;
     amount: number;
@@ -60,7 +61,7 @@ export type Expense = {
     status: 'Paid' | 'Pending' | 'Cancelled';
     invoiceNumber?: string;
     taxAmount?: number;
-    expenseType: 'Personal' | 'Business';
+    expenseType?: 'Personal' | 'Business';
     isRecurring: boolean;
     mill?: string;
     expenseNature?: 'Permanent' | 'Seasonal';
