@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,18 +17,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 
-import { PiggyBank, Landmark, HandCoins, ArrowLeftRight, PlusCircle, MinusCircle, DollarSign, Wallet, Scale, ArrowDown, ArrowUp } from "lucide-react";
+import { PiggyBank, Landmark, HandCoins, ArrowLeftRight, PlusCircle, MinusCircle, DollarSign, Wallet, Scale, ArrowDown, ArrowUp, Save } from "lucide-react";
 import { format } from "date-fns";
 
-const fundTransactionSchema = z.object({
-  type: z.enum(["CapitalInflow", "BankWithdrawal", "BankDeposit"]),
-  source: z.string().optional(),
-  destination: z.string().optional(),
+const capitalInflowSchema = z.object({
+  source: z.enum(["OwnerCapital", "BankLoan", "ExternalLoan"]),
+  destination: z.enum(["BankAccount", "CashInHand"]),
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
   description: z.string().optional(),
 });
+type CapitalInflowValues = z.infer<typeof capitalInflowSchema>;
 
-type FundFormValues = z.infer<typeof fundTransactionSchema>;
+const withdrawalSchema = z.object({
+  amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
+  description: z.string().optional(),
+});
+type WithdrawalValues = z.infer<typeof withdrawalSchema>;
+
+const depositSchema = z.object({
+    amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
+    description: z.string().optional(),
+});
+type DepositValues = z.infer<typeof depositSchema>;
+
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm border-white/10">
@@ -43,6 +54,18 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
     </Card>
 );
 
+const TransactionFormCard = ({ title, description, children }: { title: string, description: string, children: React.ReactNode}) => (
+    <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {children}
+        </CardContent>
+    </Card>
+);
+
 
 export default function CashBankClient() {
     const { toast } = useToast();
@@ -50,27 +73,17 @@ export default function CashBankClient() {
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(initialFundTransactions);
     const [isClient, setIsClient] = useState(false);
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
+    useEffect(() => { setIsClient(true); }, []);
 
-    const form = useForm<FundFormValues>({
-        resolver: zodResolver(fundTransactionSchema),
-        defaultValues: {
-            type: "CapitalInflow",
-            amount: 0,
-            description: "",
-        },
-    });
-
-    const transactionType = form.watch('type');
+    const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(capitalInflowSchema), defaultValues: { amount: 0, description: "" } });
+    const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(withdrawalSchema), defaultValues: { amount: 0, description: "" } });
+    const depositForm = useForm<DepositValues>({ resolver: zodResolver(depositSchema), defaultValues: { amount: 0, description: "" } });
 
     const financialState = useMemo(() => {
         let bankBalance = 0;
         let cashInHand = 0;
         let totalLiabilities = 0;
         
-        // Process fund transactions
         fundTransactions.forEach(t => {
             if (t.type === 'CapitalInflow') {
                 if(t.destination === 'BankAccount') bankBalance += t.amount;
@@ -85,7 +98,6 @@ export default function CashBankClient() {
             }
         });
 
-        // Process income/expense transactions
         transactions.forEach(t => {
             if (t.transactionType === 'Income') {
                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
@@ -96,52 +108,35 @@ export default function CashBankClient() {
             }
         });
 
-        return {
-            bankBalance,
-            cashInHand,
-            totalAssets: bankBalance + cashInHand,
-            totalLiabilities,
-        }
-
+        return { bankBalance, cashInHand, totalAssets: bankBalance + cashInHand, totalLiabilities };
     }, [transactions, fundTransactions]);
 
-
-    const onSubmit = (values: FundFormValues) => {
-        let newTransaction: Omit<FundTransaction, 'id' | 'date'>;
-
-        switch(values.type) {
-            case 'CapitalInflow':
-                if(!values.source || !values.destination) {
-                    toast({variant: 'destructive', title: "Error", description: "Source and Destination are required for Capital Inflow."});
-                    return;
-                }
-                newTransaction = { type: 'CapitalInflow', source: values.source, destination: values.destination, amount: values.amount, description: values.description };
-                break;
-            case 'BankWithdrawal':
-                newTransaction = { type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: values.amount, description: values.description };
-                break;
-            case 'BankDeposit':
-                newTransaction = { type: 'BankDeposit', source: 'CashInHand', destination: 'BankAccount', amount: values.amount, description: values.description };
-                break;
-            default:
-                toast({variant: 'destructive', title: "Error", description: "Invalid transaction type."});
-                return;
-        }
-
+    const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         const fullTransaction: FundTransaction = {
-            ...newTransaction,
+            ...transaction,
             id: String(Date.now()),
             date: new Date().toISOString().split('T')[0],
         };
-
         setFundTransactions(prev => [fullTransaction, ...prev]);
         toast({title: "Success", description: "Transaction recorded successfully."});
-        form.reset({ type: "CapitalInflow", amount: 0, description: "" });
-    }
+    };
+    
+    const onCapitalInflowSubmit = (values: CapitalInflowValues) => {
+        handleAddFundTransaction({ type: 'CapitalInflow', source: values.source, destination: values.destination, amount: values.amount, description: values.description });
+        capitalInflowForm.reset();
+    };
 
-    if (!isClient) {
-        return null; // or a loading spinner
-    }
+    const onWithdrawalSubmit = (values: WithdrawalValues) => {
+        handleAddFundTransaction({ type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: values.amount, description: values.description });
+        withdrawalForm.reset();
+    };
+
+    const onDepositSubmit = (values: DepositValues) => {
+        handleAddFundTransaction({ type: 'BankDeposit', source: 'CashInHand', destination: 'BankAccount', amount: values.amount, description: values.description });
+        depositForm.reset();
+    };
+
+    if (!isClient) return null;
 
     return (
         <div className="space-y-6">
@@ -159,111 +154,117 @@ export default function CashBankClient() {
             </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Add New Fund Transaction</CardTitle>
-                        <CardDescription>Record capital inflow or internal fund transfers.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <Controller name="type" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label>Transaction Type</Label>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="CapitalInflow">Capital Inflow (Add Money)</SelectItem>
-                                            <SelectItem value="BankWithdrawal">Withdraw from Bank</SelectItem>
-                                            <SelectItem value="BankDeposit">Deposit to Bank</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )} />
-
-                            {transactionType === 'CapitalInflow' && (
-                                <>
-                                    <Controller name="source" control={form.control} render={({ field }) => (
-                                        <div className="space-y-1">
-                                            <Label>Source of Capital</Label>
-                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                <SelectTrigger><SelectValue placeholder="Select Source" /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="OwnerCapital">Owner's Capital</SelectItem>
-                                                    <SelectItem value="BankLoan">Bank Loan</SelectItem>
-                                                    <SelectItem value="ExternalLoan">External Loan</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    )} />
-                                     <Controller name="destination" control={form.control} render={({ field }) => (
-                                        <div className="space-y-1">
-                                            <Label>Deposit To</Label>
-                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                <SelectTrigger><SelectValue placeholder="Select Destination" /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="BankAccount">Bank Account</SelectItem>
-                                                    <SelectItem value="CashInHand">Cash in Hand</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    )} />
-                                </>
-                            )}
-                            
+                <TransactionFormCard title="Add Capital" description="Add funds from various sources into your business.">
+                    <form onSubmit={capitalInflowForm.handleSubmit(onCapitalInflowSubmit)} className="space-y-4">
+                        <Controller name="source" control={capitalInflowForm.control} render={({ field }) => (
                             <div className="space-y-1">
-                                <Label htmlFor="amount">Amount</Label>
-                                <Controller name="amount" control={form.control} render={({ field }) => <Input id="amount" type="number" {...field} />} />
-                                {form.formState.errors.amount && <p className="text-xs text-destructive mt-1">{form.formState.errors.amount.message}</p>}
+                                <Label>Source of Capital</Label>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger><SelectValue placeholder="Select Source" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="OwnerCapital">Owner's Capital</SelectItem>
+                                        <SelectItem value="BankLoan">Bank Loan</SelectItem>
+                                        <SelectItem value="ExternalLoan">External Loan</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-
-                             <div className="space-y-1">
-                                <Label htmlFor="description">Description</Label>
-                                <Controller name="description" control={form.control} render={({ field }) => <Textarea id="description" {...field} />} />
+                        )} />
+                        <Controller name="destination" control={capitalInflowForm.control} render={({ field }) => (
+                            <div className="space-y-1">
+                                <Label>Deposit To</Label>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger><SelectValue placeholder="Select Destination" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="BankAccount">Bank Account</SelectItem>
+                                        <SelectItem value="CashInHand">Cash in Hand</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-
-                            <Button type="submit">Record Transaction</Button>
-                        </form>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Fund Transaction History</CardTitle>
-                        <CardDescription>A log of all capital and internal fund movements.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto max-h-96">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
-                                        <TableHead>Description</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {fundTransactions.map(t => (
-                                        <TableRow key={t.id}>
-                                            <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
-                                                    {t.type === 'BankWithdrawal' && <MinusCircle className="h-4 w-4 text-red-500"/>}
-                                                    {t.type === 'BankDeposit' && <PlusCircle className="h-4 w-4 text-blue-500"/>}
-                                                    <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">{t.source} &rarr; {t.destination}</p>
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">₹{t.amount.toFixed(2)}</TableCell>
-                                            <TableCell>{t.description}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                        )} />
+                        <div className="space-y-1">
+                            <Label htmlFor="capital-amount">Amount</Label>
+                            <Input id="capital-amount" type="number" {...capitalInflowForm.register('amount')} />
+                            {capitalInflowForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{capitalInflowForm.formState.errors.amount.message}</p>}
                         </div>
-                    </CardContent>
-                </Card>
+                        <div className="space-y-1">
+                            <Label htmlFor="capital-description">Description</Label>
+                            <Textarea id="capital-description" {...capitalInflowForm.register('description')} />
+                        </div>
+                        <Button type="submit"><Save className="mr-2"/> Add Capital</Button>
+                    </form>
+                </TransactionFormCard>
+
+                <div className="space-y-6">
+                    <TransactionFormCard title="Withdraw from Bank" description="Move funds from your bank to cash in hand.">
+                        <form onSubmit={withdrawalForm.handleSubmit(onWithdrawalSubmit)} className="space-y-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="withdrawal-amount">Amount</Label>
+                                <Input id="withdrawal-amount" type="number" {...withdrawalForm.register('amount')} />
+                                {withdrawalForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{withdrawalForm.formState.errors.amount.message}</p>}
+                            </div>
+                             <div className="space-y-1">
+                                <Label htmlFor="withdrawal-description">Description</Label>
+                                <Textarea id="withdrawal-description" {...withdrawalForm.register('description')} />
+                            </div>
+                            <Button type="submit"><ArrowDown className="mr-2"/> Withdraw</Button>
+                        </form>
+                    </TransactionFormCard>
+
+                    <TransactionFormCard title="Deposit to Bank" description="Move cash from hand to your bank account.">
+                        <form onSubmit={depositForm.handleSubmit(onDepositSubmit)} className="space-y-4">
+                             <div className="space-y-1">
+                                <Label htmlFor="deposit-amount">Amount</Label>
+                                <Input id="deposit-amount" type="number" {...depositForm.register('amount')} />
+                                {depositForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{depositForm.formState.errors.amount.message}</p>}
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="deposit-description">Description</Label>
+                                <Textarea id="deposit-description" {...depositForm.register('description')} />
+                            </div>
+                            <Button type="submit"><ArrowUp className="mr-2"/> Deposit</Button>
+                        </form>
+                    </TransactionFormCard>
+                </div>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Fund Transaction History</CardTitle>
+                    <CardDescription>A log of all capital and internal fund movements.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto max-h-96">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead>Description</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {fundTransactions.map(t => (
+                                    <TableRow key={t.id}>
+                                        <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
+                                                {t.type === 'BankWithdrawal' && <MinusCircle className="h-4 w-4 text-red-500"/>}
+                                                {t.type === 'BankDeposit' && <PlusCircle className="h-4 w-4 text-blue-500"/>}
+                                                <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">{t.source && toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {t.destination && toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">₹{t.amount.toFixed(2)}</TableCell>
+                                        <TableCell>{t.description}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
