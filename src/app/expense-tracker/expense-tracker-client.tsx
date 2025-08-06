@@ -19,8 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -35,6 +38,8 @@ const expenseSchema = z.object({
   description: z.string().optional(),
   invoiceNumber: z.string().optional(),
   taxAmount: z.coerce.number().optional(),
+  expenseType: z.enum(["Personal", "Business"]),
+  isRecurring: z.boolean(),
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -55,6 +60,8 @@ const getInitialFormState = (expenses: Expense[]): Expense => {
     status: 'Paid',
     invoiceNumber: '',
     taxAmount: 0,
+    expenseType: 'Business',
+    isRecurring: false,
   };
 };
 
@@ -86,7 +93,10 @@ export default function ExpenseTrackerClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(null);
-    form.reset(getInitialFormState(expenses));
+    form.reset({
+      ...getInitialFormState(expenses),
+      date: new Date(),
+    });
   }, [expenses, form]);
   
   useEffect(() => {
@@ -250,6 +260,30 @@ export default function ExpenseTrackerClient() {
                 </div>
             </div>
 
+             <Controller name="expenseType" control={form.control} render={({ field }) => (
+                <div className="space-y-2">
+                    <Label className="text-xs">Expense Type</Label>
+                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Business" id="type-business" />
+                            <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Personal" id="type-personal" />
+                            <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
+                        </div>
+                    </RadioGroup>
+                </div>
+            )} />
+
+             <Controller name="isRecurring" control={form.control} render={({ field }) => (
+                <div className="flex items-center space-x-2 pt-2">
+                    <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
+                    <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Expense</Label>
+                </div>
+             )} />
+
+
             <div className="space-y-1">
                 <Label htmlFor="description" className="text-xs">Description</Label>
                 <Controller name="description" control={form.control} render={({ field }) => <Textarea id="description" {...field} className="text-sm" rows={3}/>} />
@@ -293,10 +327,10 @@ export default function ExpenseTrackerClient() {
                   <TableRow>
                     <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => requestSort('taxAmount')}>Tax <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                     <TableHead>Payee</TableHead>
+                    <TableHead>Recurring</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
@@ -306,10 +340,10 @@ export default function ExpenseTrackerClient() {
                     <TableRow key={expense.id}>
                       <TableCell>{format(new Date(expense.date), "dd-MMM-yy")}</TableCell>
                       <TableCell>{expense.category}</TableCell>
-                      <TableCell className="font-mono text-xs">{expense.invoiceNumber}</TableCell>
+                      <TableCell><Badge variant={expense.expenseType === 'Business' ? 'default' : 'secondary'}>{expense.expenseType}</Badge></TableCell>
                       <TableCell className="text-right font-medium">₹{expense.amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-medium">₹{(expense.taxAmount || 0).toFixed(2)}</TableCell>
                       <TableCell>{expense.payee}</TableCell>
+                      <TableCell className="text-center">{expense.isRecurring ? <RefreshCw className="h-4 w-4 text-blue-500"/> : '-'}</TableCell>
                       <TableCell>
                         <span className={cn("px-2 py-1 text-xs rounded-full", expense.status === 'Paid' ? 'bg-green-500/10 text-green-500' : expense.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500')}>
                           {expense.status}

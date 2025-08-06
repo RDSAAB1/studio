@@ -28,11 +28,11 @@ export const initialCustomers: Customer[] = [
 ];
 
 export const initialExpenses: Expense[] = [
-    { id: '1', date: '2025-07-20', category: 'Office Supplies', amount: 1500, payee: 'Staples Inc.', description: 'A4 paper and pens', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-001', taxAmount: 75 },
-    { id: '2', date: '2025-07-19', category: 'Utilities', amount: 4500, payee: 'Electricity Board', description: 'Monthly electricity bill', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-002', taxAmount: 225 },
-    { id: '3', date: '2025-07-18', category: 'Travel', amount: 850, payee: 'Ola Cabs', description: 'Client meeting travel', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-003', taxAmount: 42.5 },
-    { id: '4', date: '2025-07-18', category: 'Salaries', amount: 150000, payee: 'Staff Payroll', description: 'July 2025 Salaries', paymentMethod: 'Cheque', status: 'Pending', invoiceNumber: 'INV-004', taxAmount: 0 },
-    { id: '5', date: '2025-07-15', category: 'Maintenance', amount: 2500, payee: 'Local Hardware', description: 'Office repairs', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-005', taxAmount: 125 }
+    { id: '1', date: '2025-07-20', category: 'Office Supplies', amount: 1500, payee: 'Staples Inc.', description: 'A4 paper and pens', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-001', taxAmount: 75, expenseType: 'Business', isRecurring: false },
+    { id: '2', date: '2025-07-19', category: 'Utilities', amount: 4500, payee: 'Electricity Board', description: 'Monthly electricity bill', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-002', taxAmount: 225, expenseType: 'Business', isRecurring: true },
+    { id: '3', date: '2025-07-18', category: 'Travel', amount: 850, payee: 'Ola Cabs', description: 'Client meeting travel', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-003', taxAmount: 42.5, expenseType: 'Business', isRecurring: false },
+    { id: '4', date: '2025-07-18', category: 'Salaries', amount: 150000, payee: 'Staff Payroll', description: 'July 2025 Salaries', paymentMethod: 'Cheque', status: 'Pending', invoiceNumber: 'INV-004', taxAmount: 0, expenseType: 'Business', isRecurring: true },
+    { id: '5', date: '2025-07-15', category: 'Maintenance', amount: 2500, payee: 'Local Hardware', description: 'Office repairs', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-005', taxAmount: 125, expenseType: 'Business', isRecurring: false }
 ];
 
 export const appOptionsData = {

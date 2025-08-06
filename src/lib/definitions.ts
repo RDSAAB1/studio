@@ -59,6 +59,8 @@ export type Expense = {
     status: 'Paid' | 'Pending' | 'Cancelled';
     invoiceNumber?: string;
     taxAmount?: number;
+    expenseType: 'Personal' | 'Business';
+    isRecurring: boolean;
 };
 
 export type Payment = {
