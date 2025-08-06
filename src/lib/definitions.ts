@@ -61,7 +61,15 @@ export type Payment = {
 export type CustomerSummary = {
     name: string;
     contact: string;
+    so?: string;
+    address?: string;
+    acNo?: string;
+    ifscCode?: string;
+    bank?: string;
+    branch?: string;
     totalOutstanding: number;
+    totalAmount: number;
+    totalPaid: number;
     paymentHistory: Payment[];
     outstandingEntryIds: string[];
 }
