@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle } from "lucide-react";
 
 
 export default function SupplierProfilePage() {
@@ -128,23 +128,25 @@ export default function SupplierProfilePage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Select Supplier</CardTitle>
-          <CardDescription>Choose a supplier to view their detailed information.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Select onValueChange={setSelectedCustomerKey} value={selectedCustomerKey || ""}>
-            <SelectTrigger className="w-full md:w-1/2">
-              <SelectValue placeholder="Select a supplier..." />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from(customerSummary.entries()).map(([key, data]) => (
-                <SelectItem key={key} value={key}>
-                  {toTitleCase(data.name)} ({data.contact})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+                <UserCircle className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Select Supplier</h3>
+            </div>
+            <div className="w-full sm:w-auto sm:min-w-64">
+                <Select onValueChange={setSelectedCustomerKey} value={selectedCustomerKey || ""}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select a supplier..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from(customerSummary.entries()).map(([key, data]) => (
+                        <SelectItem key={key} value={key}>
+                          {toTitleCase(data.name)} ({data.contact})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                </Select>
+            </div>
         </CardContent>
       </Card>
 
@@ -279,3 +281,5 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
+
+    
