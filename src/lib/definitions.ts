@@ -52,6 +52,7 @@ export type Expense = {
     id: string;
     date: string;
     category: string;
+    subCategory: string;
     amount: number;
     payee: string;
     description?: string;
@@ -109,9 +110,3 @@ export type AppOptions = {
     receiptTypes: string[];
     paymentTypes: string[];
 }
-
-    
-
-    
-
-    

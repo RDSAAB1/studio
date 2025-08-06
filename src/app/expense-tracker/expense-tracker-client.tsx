@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { initialExpenses } from "@/lib/data";
+import { initialExpenses, expenseCategories } from "@/lib/data";
 import type { Expense } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -33,6 +33,7 @@ const expenseSchema = z.object({
   id: z.string().optional(),
   date: z.date(),
   category: z.string().min(1, "Category is required."),
+  subCategory: z.string().min(1, "Sub-category is required."),
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
   payee: z.string().min(1, "Payee is required."),
   paymentMethod: z.string().min(1, "Payment method is required."),
@@ -43,7 +44,7 @@ const expenseSchema = z.object({
   expenseType: z.enum(["Personal", "Business"]),
   isRecurring: z.boolean(),
   mill: z.string().optional(),
-  expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
+  expenseNature: z.enum(["Permanent", "Seasonal"]),
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -57,6 +58,7 @@ const getInitialFormState = (expenses: Expense[]): Expense => {
     id: nextId,
     date: staticDate.toISOString().split('T')[0],
     category: '',
+    subCategory: '',
     amount: 0,
     payee: '',
     description: '',
@@ -108,8 +110,32 @@ export default function ExpenseTrackerClient() {
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: getInitialFormState(expenses),
+    defaultValues: {
+      ...getInitialFormState(expenses),
+      date: new Date(),
+    },
   });
+
+  const selectedExpenseNature = form.watch('expenseNature');
+  const selectedCategory = form.watch('category');
+
+  const availableCategories = useMemo(() => {
+    return expenseCategories[selectedExpenseNature]?.categories || [];
+  }, [selectedExpenseNature]);
+
+  const availableSubCategories = useMemo(() => {
+    const categoryObj = availableCategories.find(c => c.name === selectedCategory);
+    return categoryObj?.subCategories || [];
+  }, [selectedCategory, availableCategories]);
+
+  useEffect(() => {
+    form.setValue('category', '');
+    form.setValue('subCategory', '');
+  }, [selectedExpenseNature, form]);
+
+  useEffect(() => {
+    form.setValue('subCategory', '');
+  }, [selectedCategory, form]);
 
   const handleNew = useCallback(() => {
     setIsEditing(null);
@@ -122,7 +148,6 @@ export default function ExpenseTrackerClient() {
   
   useEffect(() => {
     // We don't want to reset the form on initial load this way anymore
-    // handleNew();
   }, []);
 
   const handleEdit = (expense: Expense) => {
@@ -149,7 +174,6 @@ export default function ExpenseTrackerClient() {
       ...values,
       date: format(values.date, "yyyy-MM-dd"),
       payee: toTitleCase(values.payee),
-      category: toTitleCase(values.category),
       mill: toTitleCase(values.mill || ''),
     };
     
@@ -233,6 +257,7 @@ export default function ExpenseTrackerClient() {
                     <TableRow>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                      <TableHead>Sub-Category</TableHead>
                       <TableHead>Mill</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Nature</TableHead>
@@ -250,6 +275,7 @@ export default function ExpenseTrackerClient() {
                       <TableRow key={expense.id}>
                         <TableCell>{format(new Date(expense.date), "dd-MMM-yy")}</TableCell>
                         <TableCell>{expense.category}</TableCell>
+                        <TableCell>{expense.subCategory}</TableCell>
                         <TableCell>{expense.mill}</TableCell>
                         <TableCell><Badge variant={expense.expenseType === 'Business' ? 'default' : 'secondary'}>{expense.expenseType}</Badge></TableCell>
                         <TableCell><Badge variant={expense.expenseNature === 'Permanent' ? 'outline' : 'secondary'}>{expense.expenseNature}</Badge></TableCell>
@@ -318,15 +344,53 @@ export default function ExpenseTrackerClient() {
                           </InputWithIcon>
                           {form.formState.errors.amount && <p className="text-xs text-destructive mt-1">{form.formState.errors.amount.message}</p>}
                       </div>
-                       <div className="space-y-1">
-                          <Label htmlFor="category" className="text-xs">Category</Label>
-                          <InputWithIcon icon={<Tag className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="category" control={form.control} render={({ field }) => <Input id="category" {...field} className="h-9 text-sm pl-10" />} />
-                          </InputWithIcon>
-                          {form.formState.errors.category && <p className="text-xs text-destructive mt-1">{form.formState.errors.category.message}</p>}
-                      </div>
+                       
+                        <Controller name="expenseNature" control={form.control} render={({ field }) => (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Expense Nature</Label>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className="h-9 text-sm">
+                                    <div className="flex items-center gap-2"><Layers3 className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Nature" /></div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Permanent">Permanent</SelectItem>
+                                    <SelectItem value="Seasonal">Seasonal</SelectItem>
+                                </SelectContent>
+                            </Select>
+                          </div>
+                        )} />
 
-                      <div className="space-y-1 lg:col-span-3">
+                        <Controller name="category" control={form.control} render={({ field }) => (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Category</Label>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedExpenseNature}>
+                                <SelectTrigger className="h-9 text-sm">
+                                    <div className="flex items-center gap-2"><Tag className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Category" /></div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableCategories.map(cat => <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            {form.formState.errors.category && <p className="text-xs text-destructive mt-1">{form.formState.errors.category.message}</p>}
+                          </div>
+                        )} />
+
+                        <Controller name="subCategory" control={form.control} render={({ field }) => (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Sub-Category</Label>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCategory}>
+                                <SelectTrigger className="h-9 text-sm">
+                                    <div className="flex items-center gap-2"><FolderTree className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Sub-Category" /></div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableSubCategories.map(subCat => <SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            {form.formState.errors.subCategory && <p className="text-xs text-destructive mt-1">{form.formState.errors.subCategory.message}</p>}
+                          </div>
+                        )} />
+
+                      <div className="space-y-1">
                           <Label htmlFor="payee" className="text-xs">Payee / Vendor</Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
                               <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-9 text-sm pl-10" />} />
@@ -391,22 +455,6 @@ export default function ExpenseTrackerClient() {
                           </div>
                       )} />
 
-                        <Controller name="expenseNature" control={form.control} render={({ field }) => (
-                          <div className="space-y-2">
-                              <Label className="text-xs">Expense Nature</Label>
-                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="Permanent" id="nature-permanent" />
-                                      <Label htmlFor="nature-permanent" className="font-normal text-sm flex items-center gap-2"><Landmark className="h-4 w-4"/> Permanent</Label>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="Seasonal" id="nature-seasonal" />
-                                      <Label htmlFor="nature-seasonal" className="font-normal text-sm flex items-center gap-2"><SunMoon className="h-4 w-4"/> Seasonal</Label>
-                                  </div>
-                              </RadioGroup>
-                          </div>
-                        )} />
-
                         <div className="space-y-1">
                           <Label htmlFor="mill" className="text-xs">Mill</Label>
                           <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
@@ -448,5 +496,3 @@ export default function ExpenseTrackerClient() {
     </div>
   );
 }
-
-    
