@@ -31,7 +31,7 @@ const menuItems = [
   {
     id: "Main1",
     name: "Sales & CRM",
-    icon: <HeartHandshake className="h-5 w-5" />,
+    icon: <HeartHandshake className="h-6 w-6" />,
     subMenus: [
       { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview", icon: <LayoutDashboard className="h-4 w-4" /> },
       { id: "Sub1-2", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <FilePlus className="h-4 w-4" /> },
@@ -49,7 +49,7 @@ const menuItems = [
   {
     id: "Main2",
     name: "HR & Payroll",
-    icon: <Users className="h-5 w-5" />,
+    icon: <Users className="h-6 w-6" />,
     subMenus: [
       { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database className="h-4 w-4" /> },
       { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator className="h-4 w-4" /> },
@@ -59,7 +59,7 @@ const menuItems = [
   {
     id: "Main3",
     name: "Inventory",
-    icon: <Package className="h-5 w-5" />,
+    icon: <Package className="h-6 w-6" />,
     subMenus: [
       { id: "Sub3-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: <Boxes className="h-4 w-4" /> },
       { id: "Sub3-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: <Building2 className="h-4 w-4" /> },
@@ -69,7 +69,7 @@ const menuItems = [
   {
     id: "Main4",
     name: "Marketing",
-    icon: <Megaphone className="h-5 w-5" />,
+    icon: <Megaphone className="h-6 w-6" />,
     subMenus: [
       { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Volume2 className="h-4 w-4" /> },
       { id: "Sub4-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: <Mail className="h-4 w-4" /> },
@@ -79,7 +79,7 @@ const menuItems = [
   {
     id: "Main5",
     name: "Project Management",
-    icon: <Briefcase className="h-5 w-5" />,
+    icon: <Briefcase className="h-6 w-6" />,
     subMenus: [
       { id: "Sub5-1", name: "Project Dashboard", href: "/projects/dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
       { id: "Sub5-2", name: "Task Management", href: "/projects/tasks", icon: <ClipboardCheck className="h-4 w-4" /> },
