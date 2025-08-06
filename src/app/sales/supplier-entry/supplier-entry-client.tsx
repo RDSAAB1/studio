@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
@@ -86,7 +87,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, varietyOptions, setVarietyOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox }: any) {
+const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox }: any) {
     const { toast } = useToast();
     const [newVariety, setNewVariety] = useState("");
     const [editingVariety, setEditingVariety] = useState<{ old: string; new: string } | null>(null);
@@ -166,16 +167,22 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Payment Type</Label>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="h-9 text-sm">
-                                        <div className="flex items-center gap-2"><Wallet className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select" /></div>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {appOptionsData.paymentTypes.map(type => (
-                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
+                                    <DynamicCombobox
+                                        options={paymentTypeOptions.map((v: string) => ({value: v, label: v}))}
+                                        value={field.value}
+                                        onChange={(val) => form.setValue("paymentType", val)}
+                                        onAdd={(newVal) => {
+                                            const titleCased = toTitleCase(newVal);
+                                            if (!paymentTypeOptions.includes(titleCased)) {
+                                                setPaymentTypeOptions((prev: any) => [...prev, titleCased].sort());
+                                            }
+                                            form.setValue("paymentType", titleCased);
+                                        }}
+                                        placeholder="Select or add type..."
+                                        searchPlaceholder="Search type..."
+                                        emptyPlaceholder="No type found."
+                                    />
+                                    {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                                 </div>
                             )}
                         />
@@ -528,6 +535,7 @@ export default function SupplierEntryClient() {
 
 
   const [varietyOptions, setVarietyOptions] = useState<string[]>(appOptionsData.varieties);
+  const [paymentTypeOptions, setPaymentTypeOptions] = useState<string[]>(appOptionsData.paymentTypes);
   const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
   const [openVarietyCombobox, setOpenVarietyCombobox] = useState(false);
 
@@ -710,6 +718,8 @@ export default function SupplierEntryClient() {
                 handleCapitalizeOnBlur={handleCapitalizeOnBlur}
                 varietyOptions={varietyOptions}
                 setVarietyOptions={setVarietyOptions}
+                paymentTypeOptions={paymentTypeOptions}
+                setPaymentTypeOptions={setPaymentTypeOptions}
                 isManageVarietiesOpen={isManageVarietiesOpen}
                 setIsManageVarietiesOpen={setIsManageVarietiesOpen}
                 openVarietyCombobox={openVarietyCombobox}

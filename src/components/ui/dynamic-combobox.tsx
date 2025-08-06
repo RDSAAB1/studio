@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -18,6 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { toTitleCase } from "@/lib/utils";
 
 export type ComboboxOption = {
   value: string;
@@ -46,14 +48,21 @@ export function DynamicCombobox({
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState("");
 
-  const selectedOption = options.find((option) => option.value === value);
+  const selectedOption = options.find(
+    (option) => option.value.toLowerCase() === value?.toLowerCase()
+  );
 
   const handleAddNew = () => {
     if (onAdd && inputValue) {
       onAdd(inputValue);
+      setInputValue("");
       setOpen(false);
     }
   };
+
+  const filteredOptions = options.filter(option => 
+    option.label.toLowerCase().includes(inputValue.toLowerCase())
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -62,53 +71,53 @@ export function DynamicCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between h-9 text-sm font-normal"
         >
-          {selectedOption ? selectedOption.label : placeholder}
+          {selectedOption ? toTitleCase(selectedOption.label) : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command shouldFilter={false}>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[51]">
+        <Command>
           <CommandInput
             placeholder={searchPlaceholder}
             value={inputValue}
             onValueChange={setInputValue}
           />
           <CommandList>
-            <CommandEmpty>
-                {onAdd ? (
-                    <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={handleAddNew}
-                    >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add "{inputValue}"
-                    </Button>
-                ) : (
-                    emptyPlaceholder
-                )}
-            </CommandEmpty>
+            {filteredOptions.length === 0 && onAdd ? (
+              <CommandEmpty>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={handleAddNew}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add "{toTitleCase(inputValue)}"
+                </Button>
+              </CommandEmpty>
+            ) : (
+              <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
+            )}
             <CommandGroup>
-              {options
-                .filter(option => option.label.toLowerCase().includes(inputValue.toLowerCase()))
-                .map((option) => (
+              {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.value}
-                  onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "" : currentValue);
+                  onSelect={() => {
+                    onChange(option.value);
                     setOpen(false);
                   }}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0"
+                      selectedOption && selectedOption.value.toLowerCase() === option.value.toLowerCase()
+                        ? "opacity-100"
+                        : "opacity-0"
                     )}
                   />
-                  {option.label}
+                  {toTitleCase(option.label)}
                 </CommandItem>
               ))}
             </CommandGroup>
