@@ -50,6 +50,12 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
+type TotalOverview = {
+    totalOutstanding: number;
+    totalPayments: number;
+    totalTransactions: number;
+}
+
 
 export default function SupplierProfilePage() {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
@@ -58,6 +64,7 @@ export default function SupplierProfilePage() {
 
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
+  const [totalOverview, setTotalOverview] = useState<TotalOverview>({ totalOutstanding: 0, totalPayments: 0, totalTransactions: 0 });
 
 
   const updateCustomerSummary = useCallback(() => {
@@ -81,6 +88,9 @@ export default function SupplierProfilePage() {
              })
         }
     })
+
+    let overviewOutstanding = 0;
+    let overviewPayments = 0;
 
     customers.forEach(entry => {
       if(!entry.customerId) return;
@@ -111,7 +121,19 @@ export default function SupplierProfilePage() {
         data.totalOutstanding += netAmount;
         data.outstandingEntryIds.push(entry.id);
       }
-       data.totalPaid = data.totalAmount - data.totalOutstanding;
+       data.totalPaid = data.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
+       data.totalOutstanding = data.totalAmount - data.totalPaid;
+    });
+
+    newSummary.forEach(summary => {
+        overviewOutstanding += summary.totalOutstanding;
+        overviewPayments += summary.totalPaid;
+    });
+
+    setTotalOverview({
+        totalOutstanding: overviewOutstanding,
+        totalPayments: overviewPayments,
+        totalTransactions: customers.length
     });
 
     setCustomerSummary(newSummary);
@@ -144,7 +166,7 @@ export default function SupplierProfilePage() {
     'hsl(var(--destructive))',
   ];
 
-  const StatCard = ({ title, value, icon, colorClass }: { title: string, value: string, icon: React.ReactNode, colorClass?: string }) => (
+  const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -152,6 +174,7 @@ export default function SupplierProfilePage() {
       </CardHeader>
       <CardContent>
         <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </CardContent>
     </Card>
   )
@@ -181,122 +204,119 @@ export default function SupplierProfilePage() {
         </CardContent>
       </Card>
 
-      {selectedCustomerData && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 space-y-6">
-              <Card>
-                  <CardHeader>
-                      <CardTitle className="flex items-center gap-3">
-                          <UserCircle size={24} className="text-primary"/>
-                          {toTitleCase(selectedCustomerData.name)}
-                      </CardTitle>
-                      <CardDescription>S/O: {toTitleCase(selectedCustomerData.so || '')}</CardDescription>
-                  </CardHeader>
-                  <Separator />
-                  <CardContent className="pt-6 space-y-4">
-                      <DetailItem icon={<Phone size={14} />} label="Contact" value={selectedCustomerData.contact} />
-                      <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(selectedCustomerData.address || '')} />
-                  </CardContent>
-              </Card>
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Bank Details</CardTitle>
-                  </CardHeader>
-                   <Separator />
-                  <CardContent className="pt-6 space-y-4">
-                      <DetailItem icon={<Hash size={14} />} label="A/C No." value={selectedCustomerData.acNo} />
-                      <DetailItem icon={<Landmark size={14} />} label="IFSC" value={selectedCustomerData.ifscCode} />
-                      <DetailItem icon={<Building size={14} />} label="Bank" value={toTitleCase(selectedCustomerData.bank || '')} />
-                      <DetailItem icon={<Briefcase size={14} />} label="Branch" value={toTitleCase(selectedCustomerData.branch || '')} />
-                  </CardContent>
-              </Card>
-          </div>
-          <div className="lg:col-span-2 space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-              <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} />
-              <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-              <StatCard title="Outstanding Entries" value={selectedCustomerData.outstandingEntryIds.length.toString()} icon={<Hash />} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {selectedCustomerData && (
+            <div className="lg:col-span-8 space-y-6">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-3">
+                            <UserCircle size={24} className="text-primary"/>
+                            {toTitleCase(selectedCustomerData.name)}
+                        </CardTitle>
+                        <CardDescription>S/O: {toTitleCase(selectedCustomerData.so || '')}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                            <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} description={`${customers.filter(c => c.customerId === selectedCustomerKey).length} entries`}/>
+                            <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+                            <StatCard title="Outstanding Entries" value={selectedCustomerData.outstandingEntryIds.length.toString()} icon={<Hash />} />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Transaction History</CardTitle>
+                        <CardDescription>List of all transactions for this supplier.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>SR No</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead className="text-right">Total Amount</TableHead>
+                                        <TableHead className="text-right">Outstanding</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-center">Details</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {customers.filter(c => c.customerId === selectedCustomerKey).map(entry => (
+                                    <TableRow key={entry.id}>
+                                        <TableCell className="font-mono">{entry.srNo}</TableCell>
+                                        <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                                        <TableCell className="text-right font-semibold">₹{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-semibold text-destructive">₹{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={parseFloat(String(entry.netAmount)) === 0 ? "secondary" : "destructive"}>
+                                            {parseFloat(String(entry.netAmount)) === 0 ? "Paid" : "Outstanding"}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(entry)}>
+                                            <Info className="h-4 w-4" />
+                                        </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
+        )}
+
+        <div className="lg:col-span-4 space-y-6">
              <Card>
-                <CardHeader>
-                    <CardTitle>Financial Overview</CardTitle>
-                </CardHeader>
-                <CardContent className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          borderColor: 'hsl(var(--border))',
-                          fontSize: '12px',
-                          borderRadius: 'var(--radius)'
-                        }}
-                        formatter={(value: number) => `₹${value.toFixed(2)}`}
-                      />
-                      <Pie
-                        data={pieChartData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {pieChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <CardHeader><CardTitle>Total Overview</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                    <StatCard title="Total Outstanding (All)" value={`₹${totalOverview.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                    <StatCard title="Total Payments (All)" value={`₹${totalOverview.totalPayments.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+                    <StatCard title="Total Transactions (All)" value={totalOverview.totalTransactions.toString()} icon={<Briefcase />} />
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Transaction History</CardTitle>
-                    <CardDescription>List of all transactions for this supplier.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>SR No</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Total Amount</TableHead>
-                                    <TableHead className="text-right">Outstanding</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-center">Details</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                            {customers.filter(c => c.customerId === selectedCustomerKey).map(entry => (
-                                <TableRow key={entry.id}>
-                                    <TableCell className="font-mono">{entry.srNo}</TableCell>
-                                    <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                    <TableCell className="text-right font-semibold">₹{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-semibold text-destructive">₹{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={parseFloat(String(entry.netAmount)) === 0 ? "secondary" : "destructive"}>
-                                        {parseFloat(String(entry.netAmount)) === 0 ? "Paid" : "Outstanding"}
-                                        </Badge>
-                                    </TableCell>
-                                     <TableCell className="text-center">
-                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(entry)}>
-                                          <Info className="h-4 w-4" />
-                                      </Button>
-                                    </TableCell>
-                                </TableRow>
+           {selectedCustomerData && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Financial Overview</CardTitle>
+                         <CardDescription>{toTitleCase(selectedCustomerData.name)}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                        <Tooltip
+                            contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            borderColor: 'hsl(var(--border))',
+                            fontSize: '12px',
+                            borderRadius: 'var(--radius)'
+                            }}
+                            formatter={(value: number) => `₹${value.toFixed(2)}`}
+                        />
+                        <Pie
+                            data={pieChartData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                        >
+                            {pieChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
                             ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
-          </div>
+                        </Pie>
+                        <Legend wrapperStyle={{ fontSize: '12px' }} />
+                        </PieChart>
+                    </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+           )}
         </div>
-      )}
+      </div>
 
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
@@ -569,3 +589,5 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
+
+    
