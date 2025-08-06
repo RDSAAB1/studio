@@ -51,7 +51,6 @@ const formSchema = z.object({
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
-    receiptType: z.string().min(1, "Receipt type is required"),
     paymentType: z.string().min(1, "Payment type is required")
 });
 
@@ -161,30 +160,11 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                 <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
-                        <Controller
-                            name="receiptType"
-                            control={form.control}
-                            render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Receipt Type</Label>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="h-9 text-sm">
-                                        <div className="flex items-center gap-2"><Receipt className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select" /></div>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {appOptionsData.receiptTypes.map(type => (
-                                            <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                        />
                          <Controller
                             name="paymentType"
                             control={form.control}
                             render={({ field }) => (
-                                <div className="space-y-1 md:col-span-2">
+                                <div className="space-y-1">
                                     <Label className="text-xs">Payment Type</Label>
                                     <Select onValueChange={field.onChange} value={field.value}>
                                     <SelectTrigger className="h-9 text-sm">
@@ -556,7 +536,7 @@ export default function SupplierEntryClient() {
     defaultValues: {
       srNo: currentCustomer.srNo, date: new Date(), term: 0, name: "", so: "", address: "", contact: "",
       vehicleNo: "", variety: "", grossWeight: 0, teirWeight: 0, rate: 0, kartaPercentage: 0,
-      labouryRate: 0, kanta: 0, receiptType: "Cash", paymentType: "Full"
+      labouryRate: 0, kanta: 0, paymentType: "Full"
     },
   });
 
@@ -620,7 +600,7 @@ export default function SupplierEntryClient() {
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 0,
       labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 0,
-      receiptType: customerState.receiptType || 'Cash', paymentType: customerState.paymentType || 'Full'
+      paymentType: customerState.paymentType || 'Full'
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -811,7 +791,6 @@ export default function SupplierEntryClient() {
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                   <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                   <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                  <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
                                   <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
                                 </div>
                                 <Separator />
@@ -872,7 +851,6 @@ export default function SupplierEntryClient() {
                                 <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                                 <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                 <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
                                 <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
                             </CardContent>
                         </Card>
@@ -909,7 +887,6 @@ export default function SupplierEntryClient() {
                             <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                             <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                             <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                            <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
                             <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
                             <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="md:col-span-3" />
                          </div>
@@ -967,7 +944,6 @@ export default function SupplierEntryClient() {
                                     <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
                                     <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
                                     <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                    <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
                                     <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
                                 </CardContent>
                             </Card>
