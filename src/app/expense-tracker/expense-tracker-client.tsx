@@ -22,8 +22,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle } from "lucide-react";
+
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -80,12 +82,26 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
+const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <div className="text-muted-foreground">{icon}</div>
+    </CardHeader>
+    <CardContent>
+      <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    </CardContent>
+  </Card>
+);
+
 export default function ExpenseTrackerClient() {
   const { toast } = useToast();
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Expense, direction: 'ascending' | 'descending' } | null>(null);
-  
+  const [activeTab, setActiveTab] = useState("history");
+
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: getInitialFormState(expenses),
@@ -97,11 +113,13 @@ export default function ExpenseTrackerClient() {
       ...getInitialFormState(expenses),
       date: new Date(),
     });
+    setActiveTab("form");
   }, [expenses, form]);
   
   useEffect(() => {
-    handleNew();
-  }, [handleNew]);
+    // We don't want to reset the form on initial load this way anymore
+    // handleNew();
+  }, []);
 
   const handleEdit = (expense: Expense) => {
     setIsEditing(expense.id);
@@ -110,14 +128,15 @@ export default function ExpenseTrackerClient() {
       date: new Date(expense.date),
       taxAmount: expense.taxAmount || 0,
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveTab("form");
   };
 
   const handleDelete = (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
     toast({ title: "Success", description: "Expense deleted successfully." });
     if (isEditing === id) {
-      handleNew();
+      setIsEditing(null);
+      form.reset({ ...getInitialFormState(expenses), date: new Date() });
     }
   };
 
@@ -137,7 +156,9 @@ export default function ExpenseTrackerClient() {
       setExpenses(prev => [{ ...expenseData, id: newId }, ...prev]);
       toast({ title: "Success", description: "New expense saved successfully." });
     }
-    handleNew();
+    setIsEditing(null);
+    form.reset({ ...getInitialFormState(expenses), date: new Date() });
+    setActiveTab("history");
   };
 
   const requestSort = (key: keyof Expense) => {
@@ -168,215 +189,229 @@ export default function ExpenseTrackerClient() {
   
   const totalExpenses = useMemo(() => expenses.reduce((sum, e) => sum + e.amount, 0), [expenses]);
   const totalTax = useMemo(() => expenses.reduce((sum, e) => sum + (e.taxAmount || 0), 0), [expenses]);
+  const totalTransactions = expenses.length;
+  const averageExpense = totalTransactions > 0 ? totalExpenses / totalTransactions : 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1 space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">{isEditing ? 'Edit Expense' : 'Add New Expense'}</h1>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <Controller name="date" control={form.control} render={({ field }) => (
-                <div className="space-y-1">
-                    <Label className="text-xs">Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-[51]">
-                            <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-            )} />
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                    <Label htmlFor="amount" className="text-xs">Amount</Label>
-                    <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
-                        <Controller name="amount" control={form.control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" />} />
-                    </InputWithIcon>
-                    {form.formState.errors.amount && <p className="text-xs text-destructive mt-1">{form.formState.errors.amount.message}</p>}
-                </div>
-                 <div className="space-y-1">
-                    <Label htmlFor="category" className="text-xs">Category</Label>
-                    <InputWithIcon icon={<Tag className="h-4 w-4 text-muted-foreground" />}>
-                        <Controller name="category" control={form.control} render={({ field }) => <Input id="category" {...field} className="h-9 text-sm pl-10" />} />
-                    </InputWithIcon>
-                    {form.formState.errors.category && <p className="text-xs text-destructive mt-1">{form.formState.errors.category.message}</p>}
-                </div>
-            </div>
-
-            <div className="space-y-1">
-                <Label htmlFor="payee" className="text-xs">Payee</Label>
-                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                    <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-9 text-sm pl-10" />} />
-                </InputWithIcon>
-                {form.formState.errors.payee && <p className="text-xs text-destructive mt-1">{form.formState.errors.payee.message}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <Controller name="paymentMethod" control={form.control} render={({ field }) => (
-                    <div className="space-y-1">
-                        <Label className="text-xs">Payment Method</Label>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Cash">Cash</SelectItem>
-                                <SelectItem value="Online">Online</SelectItem>
-                                <SelectItem value="Cheque">Cheque</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )} />
-                <Controller name="status" control={form.control} render={({ field }) => (
-                    <div className="space-y-1">
-                        <Label className="text-xs">Status</Label>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Paid">Paid</SelectItem>
-                                <SelectItem value="Pending">Pending</SelectItem>
-                                <SelectItem value="Cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )} />
-            </div>
-
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                    <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
-                    <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                        <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-9 text-sm pl-10" />} />
-                    </InputWithIcon>
-                </div>
-                 <div className="space-y-1">
-                    <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
-                    <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                        <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-9 text-sm pl-10" />} />
-                    </InputWithIcon>
-                </div>
-            </div>
-
-             <Controller name="expenseType" control={form.control} render={({ field }) => (
-                <div className="space-y-2">
-                    <Label className="text-xs">Expense Type</Label>
-                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="Business" id="type-business" />
-                            <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="Personal" id="type-personal" />
-                            <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
-                        </div>
-                    </RadioGroup>
-                </div>
-            )} />
-
-             <Controller name="isRecurring" control={form.control} render={({ field }) => (
-                <div className="flex items-center space-x-2 pt-2">
-                    <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
-                    <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Expense</Label>
-                </div>
-             )} />
-
-
-            <div className="space-y-1">
-                <Label htmlFor="description" className="text-xs">Description</Label>
-                <Controller name="description" control={form.control} render={({ field }) => <Textarea id="description" {...field} className="text-sm" rows={3}/>} />
-            </div>
-
-            <div className="flex justify-start space-x-4 pt-4">
-              <Button type="submit" size="sm">
-                {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update Expense</> : <><Save className="mr-2 h-4 w-4" /> Save Expense</>}
-              </Button>
-              <Button type="button" variant="outline" onClick={handleNew} size="sm">
-                <PlusCircle className="mr-2 h-4 w-4" /> New
-              </Button>
-            </div>
-        </form>
-      </div>
-      <div className="lg:col-span-2 space-y-6">
-        <SectionCard>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Expense Overview</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-                <div>
-                    <div className="text-4xl font-bold">₹{totalExpenses.toFixed(2)}</div>
-                    <p className="text-xs text-muted-foreground">Total expenses recorded</p>
-                </div>
-                 <div>
-                    <div className="text-4xl font-bold">₹{totalTax.toFixed(2)}</div>
-                    <p className="text-xs text-muted-foreground">Total tax paid</p>
-                </div>
-            </CardContent>
-        </SectionCard>
-        <SectionCard>
+    <div className="space-y-6">
+      <SectionCard>
           <CardHeader>
-            <CardTitle>Expense History</CardTitle>
-            <CardDescription>A list of all recorded expenses.</CardDescription>
+              <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Expense Overview</CardTitle>
+              <CardDescription>A summary of your recorded expenses.</CardDescription>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                    <TableHead>Payee</TableHead>
-                    <TableHead>Recurring</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedExpenses.map((expense) => (
-                    <TableRow key={expense.id}>
-                      <TableCell>{format(new Date(expense.date), "dd-MMM-yy")}</TableCell>
-                      <TableCell>{expense.category}</TableCell>
-                      <TableCell><Badge variant={expense.expenseType === 'Business' ? 'default' : 'secondary'}>{expense.expenseType}</Badge></TableCell>
-                      <TableCell className="text-right font-medium">₹{expense.amount.toFixed(2)}</TableCell>
-                      <TableCell>{expense.payee}</TableCell>
-                      <TableCell className="text-center">{expense.isRecurring ? <RefreshCw className="h-4 w-4 text-blue-500"/> : '-'}</TableCell>
-                      <TableCell>
-                        <span className={cn("px-2 py-1 text-xs rounded-full", expense.status === 'Paid' ? 'bg-green-500/10 text-green-500' : expense.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500')}>
-                          {expense.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(expense)}><Pen className="h-4 w-4" /></Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>This will permanently delete the expense entry for "{expense.payee}" of ₹{expense.amount}.</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(expense.id)}>Continue</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+          <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <StatCard title="Total Expenses" value={`₹${totalExpenses.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-primary"/>
+              <StatCard title="Total Tax" value={`₹${totalTax.toFixed(2)}`} icon={<Landmark />} />
+              <StatCard title="Total Transactions" value={String(totalTransactions)} icon={<Hash />} />
+              <StatCard title="Average Expense" value={`₹${averageExpense.toFixed(2)}`} icon={<BarChart />} />
           </CardContent>
-        </SectionCard>
-      </div>
+      </SectionCard>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex justify-between items-center">
+          <TabsList>
+            <TabsTrigger value="history"><List className="mr-2 h-4 w-4"/>Expense History</TabsTrigger>
+            <TabsTrigger value="form"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Expense' : 'Add New Expense'}</TabsTrigger>
+          </TabsList>
+          {activeTab === 'history' && (
+             <Button onClick={handleNew} size="sm">
+                <PlusCircle className="mr-2 h-4 w-4" /> New Expense
+              </Button>
+          )}
+        </div>
+        <TabsContent value="history">
+          <SectionCard>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                      <TableHead>Payee</TableHead>
+                      <TableHead>Tax</TableHead>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Recurring</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedExpenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell>{format(new Date(expense.date), "dd-MMM-yy")}</TableCell>
+                        <TableCell>{expense.category}</TableCell>
+                        <TableCell><Badge variant={expense.expenseType === 'Business' ? 'default' : 'secondary'}>{expense.expenseType}</Badge></TableCell>
+                        <TableCell className="text-right font-medium">₹{expense.amount.toFixed(2)}</TableCell>
+                        <TableCell>{expense.payee}</TableCell>
+                        <TableCell className="text-right">₹{(expense.taxAmount || 0).toFixed(2)}</TableCell>
+                        <TableCell>{expense.invoiceNumber}</TableCell>
+                        <TableCell className="text-center">{expense.isRecurring ? <RefreshCw className="h-4 w-4 text-blue-500"/> : '-'}</TableCell>
+                        <TableCell>
+                          <span className={cn("px-2 py-1 text-xs rounded-full", expense.status === 'Paid' ? 'bg-green-500/10 text-green-500' : expense.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500')}>
+                            {expense.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(expense)}><Pen className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>This will permanently delete the expense entry for "{expense.payee}" of ₹{expense.amount}.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(expense.id)}>Continue</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </SectionCard>
+        </TabsContent>
+        <TabsContent value="form">
+           <SectionCard>
+              <CardContent className="p-6">
+                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <Controller name="date" control={form.control} render={({ field }) => (
+                          <div className="space-y-1">
+                              <Label className="text-xs">Date</Label>
+                              <Popover>
+                                  <PopoverTrigger asChild>
+                                      <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
+                                          <CalendarIcon className="mr-2 h-4 w-4" />
+                                          {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                      </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0 z-[51]">
+                                      <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
+                                  </PopoverContent>
+                              </Popover>
+                          </div>
+                      )} />
+
+                      <div className="space-y-1">
+                          <Label htmlFor="amount" className="text-xs">Amount</Label>
+                          <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
+                              <Controller name="amount" control={form.control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" />} />
+                          </InputWithIcon>
+                          {form.formState.errors.amount && <p className="text-xs text-destructive mt-1">{form.formState.errors.amount.message}</p>}
+                      </div>
+                       <div className="space-y-1">
+                          <Label htmlFor="category" className="text-xs">Category</Label>
+                          <InputWithIcon icon={<Tag className="h-4 w-4 text-muted-foreground" />}>
+                              <Controller name="category" control={form.control} render={({ field }) => <Input id="category" {...field} className="h-9 text-sm pl-10" />} />
+                          </InputWithIcon>
+                          {form.formState.errors.category && <p className="text-xs text-destructive mt-1">{form.formState.errors.category.message}</p>}
+                      </div>
+
+                      <div className="space-y-1 lg:col-span-3">
+                          <Label htmlFor="payee" className="text-xs">Payee / Vendor</Label>
+                           <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                              <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-9 text-sm pl-10" />} />
+                          </InputWithIcon>
+                          {form.formState.errors.payee && <p className="text-xs text-destructive mt-1">{form.formState.errors.payee.message}</p>}
+                      </div>
+
+                      <Controller name="paymentMethod" control={form.control} render={({ field }) => (
+                          <div className="space-y-1">
+                              <Label className="text-xs">Payment Method</Label>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="Cash">Cash</SelectItem>
+                                      <SelectItem value="Online">Online</SelectItem>
+                                      <SelectItem value="Cheque">Cheque</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                      )} />
+                      <Controller name="status" control={form.control} render={({ field }) => (
+                          <div className="space-y-1">
+                              <Label className="text-xs">Status</Label>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="Paid">Paid</SelectItem>
+                                      <SelectItem value="Pending">Pending</SelectItem>
+                                      <SelectItem value="Cancelled">Cancelled</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                      )} />
+
+                       <div className="space-y-1">
+                          <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
+                          <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                              <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-9 text-sm pl-10" />} />
+                          </InputWithIcon>
+                      </div>
+
+                       <div className="space-y-1">
+                          <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
+                          <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                              <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-9 text-sm pl-10" />} />
+                          </InputWithIcon>
+                      </div>
+
+                       <Controller name="expenseType" control={form.control} render={({ field }) => (
+                          <div className="space-y-2">
+                              <Label className="text-xs">Expense Type</Label>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="Business" id="type-business" />
+                                      <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="Personal" id="type-personal" />
+                                      <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
+                                  </div>
+                              </RadioGroup>
+                          </div>
+                      )} />
+
+                       <Controller name="isRecurring" control={form.control} render={({ field }) => (
+                          <div className="flex items-center space-x-2 pt-6">
+                              <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
+                              <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Expense</Label>
+                          </div>
+                       )} />
+
+                      <div className="space-y-1 lg:col-span-3">
+                          <Label htmlFor="description" className="text-xs">Description</Label>
+                          <Controller name="description" control={form.control} render={({ field }) => <Textarea id="description" {...field} className="text-sm" rows={3}/>} />
+                      </div>
+                    </div>
+                    <div className="flex justify-start space-x-4 pt-4">
+                      <Button type="submit" size="sm">
+                        {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update Expense</> : <><Save className="mr-2 h-4 w-4" /> Save Expense</>}
+                      </Button>
+                      {isEditing && (
+                        <Button type="button" variant="outline" onClick={() => {
+                          setIsEditing(null);
+                          form.reset({ ...getInitialFormState(expenses), date: new Date() });
+                        }} size="sm">
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                </form>
+              </CardContent>
+           </SectionCard>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
-
-    
