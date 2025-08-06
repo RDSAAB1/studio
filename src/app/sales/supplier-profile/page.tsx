@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Home, Phone, User, Banknote, Landmark, Hash } from "lucide-react";
 
 
@@ -105,17 +105,18 @@ export default function SupplierProfilePage() {
 
   const selectedCustomerData = selectedCustomerKey ? customerSummary.get(selectedCustomerKey) : null;
 
-  const chartData = useMemo(() => {
+  const pieChartData = useMemo(() => {
     if (!selectedCustomerData) return [];
     return [
-      {
-        name: toTitleCase(selectedCustomerData.name),
-        "Total Amount": selectedCustomerData.totalAmount,
-        "Total Outstanding": selectedCustomerData.totalOutstanding,
-        "Total Paid": selectedCustomerData.totalPaid,
-      },
+      { name: 'Total Paid', value: selectedCustomerData.totalPaid },
+      { name: 'Total Outstanding', value: selectedCustomerData.totalOutstanding },
     ];
   }, [selectedCustomerData]);
+
+  const PIE_CHART_COLORS = [
+    'hsl(var(--chart-2))',
+    'hsl(var(--destructive))',
+  ];
 
   const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) => (
     <div>
@@ -184,24 +185,31 @@ export default function SupplierProfilePage() {
                         </CardHeader>
                         <CardContent className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `₹${value/1000}k`} />
+                              <PieChart>
                                 <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'hsl(var(--background))',
-                                        borderColor: 'hsl(var(--border))',
-                                        fontSize: '12px',
-                                        borderRadius: 'var(--radius)'
-                                    }}
-                                    formatter={(value: number) => `₹${value.toFixed(2)}`}
+                                  contentStyle={{
+                                    backgroundColor: 'hsl(var(--background))',
+                                    borderColor: 'hsl(var(--border))',
+                                    fontSize: '12px',
+                                    borderRadius: 'var(--radius)'
+                                  }}
+                                  formatter={(value: number) => `₹${value.toFixed(2)}`}
                                 />
+                                <Pie
+                                  data={pieChartData}
+                                  cx="50%"
+                                  cy="50%"
+                                  labelLine={false}
+                                  outerRadius={80}
+                                  fill="#8884d8"
+                                  dataKey="value"
+                                >
+                                  {pieChartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
+                                  ))}
+                                </Pie>
                                 <Legend wrapperStyle={{ fontSize: '12px' }} />
-                                <Bar dataKey="Total Amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="Total Paid" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="Total Outstanding" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                            </BarChart>
+                              </PieChart>
                             </ResponsiveContainer>
                         </CardContent>
                     </Card>
