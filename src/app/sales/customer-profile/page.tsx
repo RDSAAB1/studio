@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase } from "lucide-react";
 
 
 export default function CustomerProfilePage() {
@@ -118,12 +118,24 @@ export default function CustomerProfilePage() {
     'hsl(var(--destructive))',
   ];
 
-  const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) => (
-    <div>
+  const DetailItem = ({ icon, label, value, className }: { icon: React.ReactNode, label: string, value: any, className?: string }) => (
+    <div className={className}>
         <dt className="text-sm text-muted-foreground flex items-center gap-2"><span className="text-primary">{icon}</span>{label}</dt>
-        <dd className="font-semibold">{value || '-'}</dd>
+        <dd className="font-semibold text-lg">{value || '-'}</dd>
     </div>
   );
+
+  const StatCard = ({ title, value, icon, colorClass }: { title: string, value: string, icon: React.ReactNode, colorClass?: string }) => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <div className="text-muted-foreground">{icon}</div>
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
+      </CardContent>
+    </Card>
+  )
 
   return (
     <div className="space-y-6">
@@ -152,32 +164,18 @@ export default function CustomerProfilePage() {
 
       {selectedCustomerData && (
         <div className="space-y-6">
-            <Card className="overflow-hidden">
-                <CardHeader>
-                    <CardTitle className="text-xl">{toTitleCase(selectedCustomerData.name)}</CardTitle>
-                    <CardDescription>S/O: {toTitleCase(selectedCustomerData.so || '')}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Total Outstanding</p>
-                            <p className="text-2xl font-bold text-destructive">₹{selectedCustomerData.totalOutstanding.toFixed(2)}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-muted-foreground">Total Transactions</p>
-                            <p className="text-2xl font-bold">₹{selectedCustomerData.totalAmount.toFixed(2)}</p>
-                        </div>
-                         <div>
-                            <p className="text-sm text-muted-foreground">Total Paid</p>
-                            <p className="text-2xl font-bold text-green-500">₹{selectedCustomerData.totalPaid.toFixed(2)}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-muted-foreground">Outstanding Entries</p>
-                            <p className="text-2xl font-bold">{selectedCustomerData.outstandingEntryIds.length}</p>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+          <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight">{toTitleCase(selectedCustomerData.name)}</h1>
+              <p className="text-muted-foreground">S/O: {toTitleCase(selectedCustomerData.so || '')}</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+            <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} />
+            <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+            <StatCard title="Outstanding Entries" value={selectedCustomerData.outstandingEntryIds.length.toString()} icon={<Hash />} />
+          </div>
+
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
@@ -185,7 +183,7 @@ export default function CustomerProfilePage() {
                         <CardHeader>
                             <CardTitle>Financial Overview</CardTitle>
                         </CardHeader>
-                        <CardContent className="h-64">
+                        <CardContent className="h-80">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Tooltip
@@ -202,7 +200,7 @@ export default function CustomerProfilePage() {
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                outerRadius={80}
+                                outerRadius={100}
                                 fill="#8884d8"
                                 dataKey="value"
                               >
@@ -256,21 +254,20 @@ export default function CustomerProfilePage() {
                     <Card>
                         <CardHeader><CardTitle>Contact & Address</CardTitle></CardHeader>
                         <CardContent>
-                            <dl className="space-y-4">
-                                <DetailItem icon={<User size={14} />} label="S/O" value={toTitleCase(selectedCustomerData.so || '')} />
-                                <DetailItem icon={<Phone size={14} />} label="Contact" value={selectedCustomerData.contact} />
-                                <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(selectedCustomerData.address || '')} />
+                            <dl className="space-y-6">
+                                <DetailItem icon={<Phone size={16} />} label="Contact" value={selectedCustomerData.contact} />
+                                <DetailItem icon={<Home size={16} />} label="Address" value={toTitleCase(selectedCustomerData.address || '')} />
                             </dl>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
                         <CardContent>
-                            <dl className="space-y-4">
-                                <DetailItem icon={<Hash size={14} />} label="A/C No." value={selectedCustomerData.acNo} />
-                                <DetailItem icon={<Landmark size={14} />} label="IFSC" value={selectedCustomerData.ifscCode} />
-                                <DetailItem icon={<Banknote size={14} />} label="Bank" value={toTitleCase(selectedCustomerData.bank || '')} />
-                                <DetailItem icon={<Landmark size={14} />} label="Branch" value={toTitleCase(selectedCustomerData.branch || '')} />
+                            <dl className="space-y-6">
+                                <DetailItem icon={<Hash size={16} />} label="A/C No." value={selectedCustomerData.acNo} />
+                                <DetailItem icon={<Landmark size={16} />} label="IFSC" value={selectedCustomerData.ifscCode} />
+                                <DetailItem icon={<Banknote size={16} />} label="Bank" value={toTitleCase(selectedCustomerData.bank || '')} />
+                                <DetailItem icon={<Landmark size={16} />} label="Branch" value={toTitleCase(selectedCustomerData.branch || '')} />
                             </dl>
                         </CardContent>
                     </Card>
