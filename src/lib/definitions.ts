@@ -61,6 +61,8 @@ export type Expense = {
     taxAmount?: number;
     expenseType: 'Personal' | 'Business';
     isRecurring: boolean;
+    mill?: string;
+    expenseNature?: 'Permanent' | 'Seasonal';
 };
 
 export type Payment = {
@@ -107,6 +109,8 @@ export type AppOptions = {
     receiptTypes: string[];
     paymentTypes: string[];
 }
+
+    
 
     
 

@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -42,6 +42,8 @@ const expenseSchema = z.object({
   taxAmount: z.coerce.number().optional(),
   expenseType: z.enum(["Personal", "Business"]),
   isRecurring: z.boolean(),
+  mill: z.string().optional(),
+  expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -64,6 +66,8 @@ const getInitialFormState = (expenses: Expense[]): Expense => {
     taxAmount: 0,
     expenseType: 'Business',
     isRecurring: false,
+    mill: '',
+    expenseNature: 'Permanent',
   };
 };
 
@@ -146,6 +150,7 @@ export default function ExpenseTrackerClient() {
       date: format(values.date, "yyyy-MM-dd"),
       payee: toTitleCase(values.payee),
       category: toTitleCase(values.category),
+      mill: toTitleCase(values.mill || ''),
     };
     
     if (isEditing) {
@@ -228,7 +233,9 @@ export default function ExpenseTrackerClient() {
                     <TableRow>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                      <TableHead>Mill</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Nature</TableHead>
                       <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                       <TableHead>Payee</TableHead>
                       <TableHead>Tax</TableHead>
@@ -243,7 +250,9 @@ export default function ExpenseTrackerClient() {
                       <TableRow key={expense.id}>
                         <TableCell>{format(new Date(expense.date), "dd-MMM-yy")}</TableCell>
                         <TableCell>{expense.category}</TableCell>
+                        <TableCell>{expense.mill}</TableCell>
                         <TableCell><Badge variant={expense.expenseType === 'Business' ? 'default' : 'secondary'}>{expense.expenseType}</Badge></TableCell>
+                        <TableCell><Badge variant={expense.expenseNature === 'Permanent' ? 'outline' : 'secondary'}>{expense.expenseNature}</Badge></TableCell>
                         <TableCell className="text-right font-medium">₹{expense.amount.toFixed(2)}</TableCell>
                         <TableCell>{expense.payee}</TableCell>
                         <TableCell className="text-right">₹{(expense.taxAmount || 0).toFixed(2)}</TableCell>
@@ -382,6 +391,30 @@ export default function ExpenseTrackerClient() {
                           </div>
                       )} />
 
+                        <Controller name="expenseNature" control={form.control} render={({ field }) => (
+                          <div className="space-y-2">
+                              <Label className="text-xs">Expense Nature</Label>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="Permanent" id="nature-permanent" />
+                                      <Label htmlFor="nature-permanent" className="font-normal text-sm flex items-center gap-2"><Landmark className="h-4 w-4"/> Permanent</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="Seasonal" id="nature-seasonal" />
+                                      <Label htmlFor="nature-seasonal" className="font-normal text-sm flex items-center gap-2"><SunMoon className="h-4 w-4"/> Seasonal</Label>
+                                  </div>
+                              </RadioGroup>
+                          </div>
+                        )} />
+
+                        <div className="space-y-1">
+                          <Label htmlFor="mill" className="text-xs">Mill</Label>
+                          <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
+                              <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-9 text-sm pl-10" />} />
+                          </InputWithIcon>
+                        </div>
+
+
                        <Controller name="isRecurring" control={form.control} render={({ field }) => (
                           <div className="flex items-center space-x-2 pt-6">
                               <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
@@ -415,3 +448,5 @@ export default function ExpenseTrackerClient() {
     </div>
   );
 }
+
+    
