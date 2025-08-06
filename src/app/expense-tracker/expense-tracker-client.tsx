@@ -20,7 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -33,6 +33,8 @@ const expenseSchema = z.object({
   paymentMethod: z.string().min(1, "Payment method is required."),
   status: z.string().min(1, "Status is required."),
   description: z.string().optional(),
+  invoiceNumber: z.string().optional(),
+  taxAmount: z.coerce.number().optional(),
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -51,6 +53,8 @@ const getInitialFormState = (expenses: Expense[]): Expense => {
     description: '',
     paymentMethod: 'Cash',
     status: 'Paid',
+    invoiceNumber: '',
+    taxAmount: 0,
   };
 };
 
@@ -94,6 +98,7 @@ export default function ExpenseTrackerClient() {
     form.reset({
       ...expense,
       date: new Date(expense.date),
+      taxAmount: expense.taxAmount || 0,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -137,10 +142,12 @@ export default function ExpenseTrackerClient() {
     let sortableItems = [...expenses];
     if (sortConfig !== null) {
         sortableItems.sort((a, b) => {
-            if (a[sortConfig.key] < b[sortConfig.key]) {
+            const valA = a[sortConfig.key] || '';
+            const valB = b[sortConfig.key] || '';
+            if (valA < valB) {
                 return sortConfig.direction === 'ascending' ? -1 : 1;
             }
-            if (a[sortConfig.key] > b[sortConfig.key]) {
+            if (valA > valB) {
                 return sortConfig.direction === 'ascending' ? 1 : -1;
             }
             return 0;
@@ -150,6 +157,7 @@ export default function ExpenseTrackerClient() {
   }, [expenses, sortConfig]);
   
   const totalExpenses = useMemo(() => expenses.reduce((sum, e) => sum + e.amount, 0), [expenses]);
+  const totalTax = useMemo(() => expenses.reduce((sum, e) => sum + (e.taxAmount || 0), 0), [expenses]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -227,6 +235,21 @@ export default function ExpenseTrackerClient() {
                 )} />
             </div>
 
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                    <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
+                    <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                        <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-9 text-sm pl-10" />} />
+                    </InputWithIcon>
+                </div>
+                 <div className="space-y-1">
+                    <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
+                    <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                        <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-9 text-sm pl-10" />} />
+                    </InputWithIcon>
+                </div>
+            </div>
+
             <div className="space-y-1">
                 <Label htmlFor="description" className="text-xs">Description</Label>
                 <Controller name="description" control={form.control} render={({ field }) => <Textarea id="description" {...field} className="text-sm" rows={3}/>} />
@@ -247,9 +270,15 @@ export default function ExpenseTrackerClient() {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Expense Overview</CardTitle>
             </CardHeader>
-            <CardContent>
-                <div className="text-4xl font-bold">₹{totalExpenses.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">Total expenses recorded</p>
+            <CardContent className="grid grid-cols-2 gap-4">
+                <div>
+                    <div className="text-4xl font-bold">₹{totalExpenses.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">Total expenses recorded</p>
+                </div>
+                 <div>
+                    <div className="text-4xl font-bold">₹{totalTax.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">Total tax paid</p>
+                </div>
             </CardContent>
         </SectionCard>
         <SectionCard>
@@ -264,7 +293,9 @@ export default function ExpenseTrackerClient() {
                   <TableRow>
                     <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                    <TableHead>Invoice #</TableHead>
                     <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => requestSort('taxAmount')}>Tax <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                     <TableHead>Payee</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-center">Actions</TableHead>
@@ -275,7 +306,9 @@ export default function ExpenseTrackerClient() {
                     <TableRow key={expense.id}>
                       <TableCell>{format(new Date(expense.date), "dd-MMM-yy")}</TableCell>
                       <TableCell>{expense.category}</TableCell>
+                      <TableCell className="font-mono text-xs">{expense.invoiceNumber}</TableCell>
                       <TableCell className="text-right font-medium">₹{expense.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium">₹{(expense.taxAmount || 0).toFixed(2)}</TableCell>
                       <TableCell>{expense.payee}</TableCell>
                       <TableCell>
                         <span className={cn("px-2 py-1 text-xs rounded-full", expense.status === 'Paid' ? 'bg-green-500/10 text-green-500' : expense.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500')}>
@@ -311,3 +344,5 @@ export default function ExpenseTrackerClient() {
     </div>
   );
 }
+
+    

@@ -57,6 +57,8 @@ export type Expense = {
     description?: string;
     paymentMethod: 'Cash' | 'Online' | 'Cheque';
     status: 'Paid' | 'Pending' | 'Cancelled';
+    invoiceNumber?: string;
+    taxAmount?: number;
 };
 
 export type Payment = {
@@ -103,5 +105,7 @@ export type AppOptions = {
     receiptTypes: string[];
     paymentTypes: string[];
 }
+
+    
 
     
