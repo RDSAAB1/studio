@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,8 @@ type TotalOverview = {
     totalPayments: number;
     totalTransactions: number;
 }
+
+const MILL_OVERVIEW_KEY = 'mill-overview';
 
 export default function CustomerProfilePage() {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
@@ -134,9 +136,15 @@ export default function CustomerProfilePage() {
         totalTransactions: customers.length
     });
 
-    setCustomerSummary(newSummary);
-    if (!selectedCustomerKey && newSummary.size > 0) {
-      setSelectedCustomerKey(Array.from(newSummary.keys())[0]);
+    const finalSummary = new Map<string, CustomerSummary>();
+    finalSummary.set(MILL_OVERVIEW_KEY, { name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, paymentHistory: [], outstandingEntryIds: [], totalAmount: 0, totalPaid: 0 });
+    newSummary.forEach((value, key) => {
+      finalSummary.set(key, value);
+    });
+
+    setCustomerSummary(finalSummary);
+    if (!selectedCustomerKey && finalSummary.size > 0) {
+      setSelectedCustomerKey(Array.from(finalSummary.keys())[0]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customers]); 
@@ -177,6 +185,8 @@ export default function CustomerProfilePage() {
     </Card>
   )
 
+  const isMillSelected = selectedCustomerKey === MILL_OVERVIEW_KEY;
+
   return (
     <div className="space-y-6">
         <Card>
@@ -193,7 +203,7 @@ export default function CustomerProfilePage() {
                         <SelectContent>
                         {Array.from(customerSummary.entries()).map(([key, data]) => (
                             <SelectItem key={key} value={key} className="text-sm">
-                            {toTitleCase(data.name)} ({data.contact})
+                            {toTitleCase(data.name)} {data.contact && `(${data.contact})`}
                             </SelectItem>
                         ))}
                         </SelectContent>
@@ -203,9 +213,21 @@ export default function CustomerProfilePage() {
         </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {selectedCustomerData && (
-            <div className="lg:col-span-8 space-y-6">
+        {isMillSelected ? (
+            <div className="lg:col-span-12 space-y-6">
                 <Card>
+                    <CardHeader><CardTitle>Total Overview (All Customers)</CardTitle></CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <StatCard title="Total Outstanding" value={`₹${totalOverview.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Payments" value={`₹${totalOverview.totalPayments.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+                        <StatCard title="Total Transactions" value={totalOverview.totalTransactions.toString()} icon={<Briefcase />} />
+                    </CardContent>
+                </Card>
+            </div>
+        ) : selectedCustomerData && (
+            <>
+            <div className="lg:col-span-4 space-y-6">
+                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-3">
                             <UserCircle size={24} className="text-primary"/>
@@ -213,12 +235,59 @@ export default function CustomerProfilePage() {
                         </CardTitle>
                         <CardDescription>S/O: {toTitleCase(selectedCustomerData.so || '')}</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <CardContent className="space-y-4">
+                        <DetailItem icon={<Phone size={14} />} label="Contact" value={selectedCustomerData.contact} />
+                        <DetailItem icon={<Home size={14} />} label="Address" value={selectedCustomerData.address} />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        <DetailItem icon={<Landmark size={14} />} label="Bank Name" value={selectedCustomerData.bank} />
+                        <DetailItem icon={<Hash size={14} />} label="Account No." value={selectedCustomerData.acNo} />
+                        <DetailItem icon={<Building size={14} />} label="IFSC Code" value={selectedCustomerData.ifscCode} />
+                    </CardContent>
+                </Card>
+            </div>
+
+            <div className="lg:col-span-8 space-y-6">
+                 <Card>
+                    <CardHeader><CardTitle>Financials</CardTitle></CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                        <div className="grid gap-4">
                             <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
                             <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} description={`${customers.filter(c => c.customerId === selectedCustomerKey).length} entries`}/>
                             <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
                             <StatCard title="Outstanding Entries" value={selectedCustomerData.outstandingEntryIds.length.toString()} icon={<Hash />} />
+                        </div>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                <Tooltip
+                                    contentStyle={{
+                                    backgroundColor: 'hsl(var(--background))',
+                                    borderColor: 'hsl(var(--border))',
+                                    fontSize: '12px',
+                                    borderRadius: 'var(--radius)'
+                                    }}
+                                    formatter={(value: number) => `₹${value.toFixed(2)}`}
+                                />
+                                <Pie
+                                    data={pieChartData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    outerRadius={100}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                >
+                                    {pieChartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
                         </div>
                     </CardContent>
                 </Card>
@@ -265,55 +334,8 @@ export default function CustomerProfilePage() {
                     </CardContent>
                 </Card>
             </div>
+            </>
         )}
-
-        <div className="lg:col-span-4 space-y-6">
-            <Card>
-                <CardHeader><CardTitle>Total Overview</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                    <StatCard title="Total Outstanding (All)" value={`₹${totalOverview.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                    <StatCard title="Total Payments (All)" value={`₹${totalOverview.totalPayments.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-                    <StatCard title="Total Transactions (All)" value={totalOverview.totalTransactions.toString()} icon={<Briefcase />} />
-                </CardContent>
-            </Card>
-           {selectedCustomerData && (
-             <Card>
-                <CardHeader>
-                    <CardTitle>Financial Overview</CardTitle>
-                    <CardDescription>{toTitleCase(selectedCustomerData.name)}</CardDescription>
-                </CardHeader>
-                <CardContent className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          borderColor: 'hsl(var(--border))',
-                          fontSize: '12px',
-                          borderRadius: 'var(--radius)'
-                        }}
-                        formatter={(value: number) => `₹${value.toFixed(2)}`}
-                      />
-                      <Pie
-                        data={pieChartData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {pieChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-            </Card>
-           )}
-        </div>
       </div>
 
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
