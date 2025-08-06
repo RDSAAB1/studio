@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
@@ -39,6 +39,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { format } from "date-fns";
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
+type ChartType = 'financial' | 'variety';
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
     <div className={cn("flex items-start gap-3", className)}>
@@ -74,6 +75,7 @@ export default function SupplierProfilePage() {
 
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
+  const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
@@ -215,6 +217,10 @@ export default function SupplierProfilePage() {
     return Object.entries(selectedCustomerData.transactionsByVariety).map(([name, value]) => ({ name, value }));
   }, [selectedCustomerData]);
 
+  const chartData = useMemo(() => {
+    return selectedChart === 'financial' ? financialPieChartData : varietyPieChartData;
+  }, [selectedChart, financialPieChartData, varietyPieChartData]);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -261,31 +267,37 @@ export default function SupplierProfilePage() {
                 </Card>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <Card>
-                        <CardHeader><CardTitle>Financial Overview</CardTitle></CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Visual Overview</CardTitle>
+                            <div className="w-48">
+                                <Select value={selectedChart} onValueChange={(val: ChartType) => setSelectedChart(val)}>
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Select chart" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="financial">Financial Overview</SelectItem>
+                                        <SelectItem value="variety">Transactions by Variety</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </CardHeader>
                         <CardContent className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number) => `₹${value.toFixed(2)}`} />
-                                <Pie data={financialPieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
-                                    {financialPieChartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? `₹${value.toFixed(2)}` : value} />
+                                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
+                                    {chartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
                                 </Pie>
                                 <Legend wrapperStyle={{ fontSize: '12px' }} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader><CardTitle>Transactions by Variety</CardTitle></CardHeader>
-                        <CardContent className="h-80">
-                             <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} />
-                                <Pie data={varietyPieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
-                                    {varietyPieChartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
-                                </Pie>
-                                <Legend wrapperStyle={{ fontSize: '12px' }} />
-                                </PieChart>
-                            </ResponsiveContainer>
+                     <Card>
+                        <CardHeader><CardTitle>Dummy Chart</CardTitle></CardHeader>
+                        <CardContent className="h-80 flex items-center justify-center text-muted-foreground">
+                            <AreaChart className="h-24 w-24" />
+                            <p>Another chart can go here.</p>
                         </CardContent>
                     </Card>
                 </div>
