@@ -28,11 +28,11 @@ export const initialCustomers: Customer[] = [
 ];
 
 export const initialExpenses: Expense[] = [
-    { id: '1', date: '2025-07-20', category: 'Operational', subCategory: 'Salaries', amount: 150000, payee: 'Staff Payroll', description: 'July 2025 Salaries', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-001', taxAmount: 75, expenseType: 'Business', isRecurring: true, mill: 'Main Mill', expenseNature: 'Permanent' },
-    { id: '2', date: '2025-07-19', category: 'Utilities', subCategory: 'Electricity', amount: 4500, payee: 'Electricity Board', description: 'Monthly electricity bill', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-002', taxAmount: 225, expenseType: 'Business', isRecurring: true, mill: 'Main Mill', expenseNature: 'Permanent' },
-    { id: '3', date: '2025-07-18', category: 'Transportation', subCategory: 'Fuel', amount: 850, payee: 'Indian Oil', description: 'Diesel for generator', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-003', taxAmount: 42.5, expenseType: 'Business', isRecurring: false, mill: 'Sales Office', expenseNature: 'Seasonal' },
-    { id: '4', date: '2025-07-18', category: 'Maintenance', subCategory: 'Machinery Repair', amount: 25000, payee: 'Agro Repairs Co.', description: 'Tractor maintenance', paymentMethod: 'Cheque', status: 'Pending', invoiceNumber: 'INV-004', taxAmount: 1250, expenseType: 'Business', isRecurring: false, mill: 'Main Mill', expenseNature: 'Seasonal' },
-    { id: '5', date: '2025-07-15', category: 'Operational', subCategory: 'Office Supplies', amount: 2500, payee: 'Local Stationary', description: 'A4 paper and pens', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-005', taxAmount: 125, expenseType: 'Business', isRecurring: false, mill: 'Warehouse', expenseNature: 'Permanent' }
+    { id: '1', date: '2025-07-20', category: 'Staff & Administrative Costs', subCategory: 'Salaries', amount: 150000, payee: 'Staff Payroll', description: 'July 2025 Salaries', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-001', taxAmount: 75, expenseType: 'Business', isRecurring: true, mill: 'Main Mill', expenseNature: 'Permanent' },
+    { id: '2', date: '2025-07-19', category: 'Production & Operational Costs', subCategory: 'Electricity & Fuel', amount: 4500, payee: 'Electricity Board', description: 'Monthly electricity bill', paymentMethod: 'Online', status: 'Paid', invoiceNumber: 'INV-002', taxAmount: 225, expenseType: 'Business', isRecurring: true, mill: 'Main Mill', expenseNature: 'Seasonal' },
+    { id: '3', date: '2025-07-18', category: 'Production & Operational Costs', subCategory: 'Electricity & Fuel', amount: 850, payee: 'Indian Oil', description: 'Diesel for generator', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-003', taxAmount: 42.5, expenseType: 'Business', isRecurring: false, mill: 'Sales Office', expenseNature: 'Seasonal' },
+    { id: '4', date: '2025-07-18', category: 'Repairs & Maintenance', subCategory: 'Annual Maintenance Contracts', amount: 25000, payee: 'Agro Repairs Co.', description: 'Tractor maintenance', paymentMethod: 'Cheque', status: 'Pending', invoiceNumber: 'INV-004', taxAmount: 1250, expenseType: 'Business', isRecurring: false, mill: 'Main Mill', expenseNature: 'Permanent' },
+    { id: '5', date: '2025-07-15', category: 'Staff & Administrative Costs', subCategory: 'Salaries', amount: 2500, payee: 'Local Stationary', description: 'A4 paper and pens', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'INV-005', taxAmount: 125, expenseType: 'Business', isRecurring: false, mill: 'Warehouse', expenseNature: 'Permanent' }
 ];
 
 export const appOptionsData = {
@@ -45,36 +45,52 @@ export const expenseCategories = {
     Permanent: {
         categories: [
             {
-                name: "Operational",
-                subCategories: ["Salaries", "Rent", "Office Supplies", "Insurance"]
+                name: "Land & Property Costs",
+                subCategories: ["Mill & Warehouse Rent", "Property Taxes"]
             },
             {
-                name: "Utilities",
-                subCategories: ["Electricity", "Water", "Internet", "Phone"]
+                name: "Staff & Administrative Costs",
+                subCategories: ["Salaries", "Employee Benefits"]
             },
             {
-                name: "Administrative",
-                subCategories: ["Legal Fees", "Accounting Fees", "Bank Charges"]
+                name: "Insurance",
+                subCategories: ["Property & Asset Insurance", "Worker's Compensation Insurance", "Liability Insurance"]
+            },
+            {
+                name: "Finance & Debt",
+                subCategories: ["Loan Repayments", "Interest Payments", "Bank Fees"]
+            },
+            {
+                name: "Utilities & Services",
+                subCategories: ["Fixed Utility Charges", "Accounting & Legal Fees"]
+            },
+            {
+                name: "Repairs & Maintenance",
+                subCategories: ["Annual Maintenance Contracts"]
             }
         ]
     },
     Seasonal: {
         categories: [
             {
-                name: "Raw Material",
-                subCategories: ["Paddy Purchase", "Wheat Purchase", "Other Grains"]
+                name: "Raw Material Costs",
+                subCategories: ["Paddy Procurement", "Transportation"]
             },
             {
-                name: "Maintenance",
-                subCategories: ["Machinery Repair", "Vehicle Repair", "Building Repair"]
+                name: "Labor Costs",
+                subCategories: ["Seasonal Labor Wages", "Overtime Pay"]
             },
             {
-                name: "Transportation",
-                subCategories: ["Truck Rental", "Fuel", "Logistics"]
+                name: "Production & Operational Costs",
+                subCategories: ["Electricity & Fuel", "Water Usage", "Consumables", "Packaging Materials"]
             },
             {
-                name: "Labour",
-                subCategories: ["Harvesting Labor", "Loading/Unloading", "Processing Labor"]
+                name: "Sales & Distribution Costs",
+                subCategories: ["Transportation of Finished Goods", "Commissions", "Marketing & Advertising"]
+            },
+            {
+                name: "Regulatory & Quality Control",
+                subCategories: ["Inspection Fees", "Quality Testing"]
             }
         ]
     }
