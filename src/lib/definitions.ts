@@ -48,6 +48,17 @@ export type Customer = {
   rtgsAmount?: number;
 };
 
+export type Expense = {
+    id: string;
+    date: string;
+    category: string;
+    amount: number;
+    payee: string;
+    description?: string;
+    paymentMethod: 'Cash' | 'Online' | 'Cheque';
+    status: 'Paid' | 'Pending' | 'Cancelled';
+};
+
 export type Payment = {
     paymentId: string;
     date: string;

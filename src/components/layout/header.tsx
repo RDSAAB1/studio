@@ -24,7 +24,7 @@ import {
   HeartHandshake, Briefcase, Users, Package, Megaphone, LayoutDashboard, FilePlus, 
   Book, PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database, 
   Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Volume2, Mail, 
-  LineChart, ClipboardCheck, Users2, UserPlus 
+  LineChart, ClipboardCheck, Users2, UserPlus, FileText
 } from "lucide-react";
 
 const menuItems = [
@@ -44,6 +44,14 @@ const menuItems = [
       { id: "Sub1-11", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
       { id: "Sub1-12", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-5 w-5" /> },
       { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
+    ],
+  },
+   {
+    id: "Main6",
+    name: "Expense Tracker",
+    icon: <FileText className="h-8 w-8" />,
+    subMenus: [
+        { id: "Sub6-1", name: "Expense Management", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
     ],
   },
   {

@@ -1,4 +1,4 @@
-import type { Customer } from "./definitions";
+import type { Customer, Expense } from "./definitions";
 
 export const initialCustomers: Customer[] = [
     {
@@ -25,6 +25,14 @@ export const initialCustomers: Customer[] = [
         netWeight: 1130.88, rate: 9, labouryRate: 0.45, labouryAmount: 513, kanta: 12, amount: 10177.92, netAmount: 9652.92,
         barcode: 'BAR004', receiptType: 'Online', paymentType: 'Full', customerId: 'amit kumar|9123456789'
     }
+];
+
+export const initialExpenses: Expense[] = [
+    { id: '1', date: '2025-07-20', category: 'Office Supplies', amount: 1500, payee: 'Staples Inc.', description: 'A4 paper and pens', paymentMethod: 'Online', status: 'Paid' },
+    { id: '2', date: '2025-07-19', category: 'Utilities', amount: 4500, payee: 'Electricity Board', description: 'Monthly electricity bill', paymentMethod: 'Online', status: 'Paid' },
+    { id: '3', date: '2025-07-18', category: 'Travel', amount: 850, payee: 'Ola Cabs', description: 'Client meeting travel', paymentMethod: 'Cash', status: 'Paid' },
+    { id: '4', date: '2025-07-18', category: 'Salaries', amount: 150000, payee: 'Staff Payroll', description: 'July 2025 Salaries', paymentMethod: 'Cheque', status: 'Pending' },
+    { id: '5', date: '2025-07-15', category: 'Maintenance', amount: 2500, payee: 'Local Hardware', description: 'Office repairs', paymentMethod: 'Cash', status: 'Paid' }
 ];
 
 export const appOptionsData = {
