@@ -1,4 +1,4 @@
-import type { Customer, Transaction } from "./definitions";
+import type { Customer, Transaction, FundTransaction } from "./definitions";
 
 export const initialCustomers: Customer[] = [
     {
@@ -34,6 +34,13 @@ export const initialTransactions: Transaction[] = [
     { id: '4', date: '2025-07-18', transactionType: 'Expense', category: 'Repairs & Maintenance', subCategory: 'Annual Maintenance Contracts', amount: 25000, payee: 'Agro Repairs Co.', description: 'Tractor maintenance', paymentMethod: 'Cheque', status: 'Pending', invoiceNumber: 'INV-004', taxAmount: 1250, expenseType: 'Business', isRecurring: false, mill: 'Main Mill', expenseNature: 'Permanent' },
     { id: '5', date: '2025-07-26', transactionType: 'Income', category: 'Service Income', subCategory: 'Milling Services', amount: 5000, payee: 'Local Farmer', description: 'Paddy milling service', paymentMethod: 'Cash', status: 'Paid', invoiceNumber: 'SERV-001', taxAmount: 250, isRecurring: false, mill: 'Service Unit' },
 ];
+
+export const initialFundTransactions: FundTransaction[] = [
+    { id: 'F1', date: '2025-06-01', type: 'CapitalInflow', source: 'OwnerCapital', destination: 'BankAccount', amount: 1000000, description: 'Initial capital from owner' },
+    { id: 'F2', date: '2025-06-05', type: 'CapitalInflow', source: 'BankLoan', destination: 'BankAccount', amount: 500000, description: 'Loan from HDFC Bank' },
+    { id: 'F3', date: '2025-06-10', type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: 50000, description: 'Cash for initial setup expenses' },
+];
+
 
 export const appOptionsData = {
     varieties: ['Wheat', 'Rice', 'Corn', 'Barley'],

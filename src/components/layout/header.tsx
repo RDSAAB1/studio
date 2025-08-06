@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -24,7 +23,7 @@ import {
   HeartHandshake, Briefcase, Users, Package, Megaphone, LayoutDashboard, FilePlus, 
   Book, PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database, 
   Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Volume2, Mail, 
-  LineChart, ClipboardCheck, Users2, UserPlus, FileText, ArrowLeftRight
+  LineChart, ClipboardCheck, Users2, UserPlus, FileText, ArrowLeftRight, PiggyBank, Landmark
 } from "lucide-react";
 
 const menuItems = [
@@ -52,6 +51,14 @@ const menuItems = [
     icon: <ArrowLeftRight className="h-8 w-8" />,
     subMenus: [
         { id: "Sub6-1", name: "Income & Expense Tracker", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
+    ],
+  },
+  {
+    id: "Main7",
+    name: "Cash & Bank",
+    icon: <PiggyBank className="h-8 w-8" />,
+    subMenus: [
+        { id: "Sub7-1", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
     ],
   },
   {

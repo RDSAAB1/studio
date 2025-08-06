@@ -67,6 +67,16 @@ export type Transaction = {
     expenseNature?: 'Permanent' | 'Seasonal';
 };
 
+export type FundTransaction = {
+    id: string;
+    date: string;
+    type: 'CapitalInflow' | 'BankWithdrawal' | 'BankDeposit';
+    source: 'OwnerCapital' | 'BankLoan' | 'ExternalLoan' | 'BankAccount' | 'CashInHand';
+    destination: 'BankAccount' | 'CashInHand';
+    amount: number;
+    description?: string;
+}
+
 export type Payment = {
     paymentId: string;
     date: string;
