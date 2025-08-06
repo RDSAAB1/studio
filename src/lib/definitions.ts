@@ -84,6 +84,7 @@ export type CustomerSummary = {
     totalOutstandingTransactions: number;
     allTransactions: Customer[];
     allPayments: Payment[];
+    transactionsByVariety?: { [key: string]: number };
 }
 
 export type AppOptions = {

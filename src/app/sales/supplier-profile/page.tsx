@@ -64,6 +64,7 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 );
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
+const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 
 export default function SupplierProfilePage() {
@@ -110,7 +111,8 @@ export default function SupplierProfilePage() {
           outstandingEntryIds: [],
           totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
           totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
-          totalOutstandingTransactions: 0, allTransactions: [], allPayments: []
+          totalOutstandingTransactions: 0, allTransactions: [], allPayments: [],
+          transactionsByVariety: {}
         });
       }
       const data = newSummary.get(key)!;
@@ -134,7 +136,8 @@ export default function SupplierProfilePage() {
         name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
-        totalOutstandingTransactions: 0, allTransactions: customers, allPayments: []
+        totalOutstandingTransactions: 0, allTransactions: customers, allPayments: [],
+        transactionsByVariety: {}
     };
     
     let totalRate = 0;
@@ -150,9 +153,14 @@ export default function SupplierProfilePage() {
             totalRate += c.rate;
             rateCount++;
         }
+        const variety = toTitleCase(c.variety) || 'Unknown';
+        if(millSummary.transactionsByVariety) {
+            millSummary.transactionsByVariety[variety] = (millSummary.transactionsByVariety[variety] || 0) + 1;
+        }
     });
 
     newSummary.forEach(summary => {
+        millSummary.totalAmount += summary.totalAmount;
         millSummary.totalOutstanding += summary.totalOutstanding;
         millSummary.totalPaid += summary.totalPaid;
         summary.paymentHistory.forEach(p => millSummary.allPayments.push(p));
@@ -188,15 +196,24 @@ export default function SupplierProfilePage() {
     setDetailsCustomer(customer);
   }
 
-  const pieChartData = useMemo(() => {
-    if (!selectedCustomerData || isMillSelected) return [];
+  const financialPieChartData = useMemo(() => {
+    if (!selectedCustomerData) return [];
+    if(isMillSelected) {
+        return [
+            { name: 'Total Paid', value: selectedCustomerData.totalPaid },
+            { name: 'Total Outstanding', value: selectedCustomerData.totalAmount - selectedCustomerData.totalPaid },
+        ]
+    }
     return [
       { name: 'Total Paid', value: selectedCustomerData.totalPaid },
       { name: 'Total Outstanding', value: selectedCustomerData.totalOutstanding },
     ];
   }, [selectedCustomerData, isMillSelected]);
 
-  const PIE_CHART_COLORS = ['hsl(var(--chart-2))', 'hsl(var(--destructive))'];
+  const varietyPieChartData = useMemo(() => {
+    if (!selectedCustomerData?.transactionsByVariety) return [];
+    return Object.entries(selectedCustomerData.transactionsByVariety).map(([name, value]) => ({ name, value }));
+  }, [selectedCustomerData]);
 
   return (
     <div className="space-y-6">
@@ -231,20 +248,47 @@ export default function SupplierProfilePage() {
                         <CardTitle>Mill Overview (All Suppliers)</CardTitle>
                         <CardDescription>A complete financial and transactional overview of the entire business.</CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                     <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <StatCard title="Total Gross Weight" value={`${selectedCustomerData.totalGrossWeight.toFixed(2)} kg`} icon={<Box />} />
-                        <StatCard title="Total Teir Weight" value={`${selectedCustomerData.totalTeirWeight.toFixed(2)} kg`} icon={<Box />} />
                         <StatCard title="Total Net Weight" value={`${selectedCustomerData.totalNetWeight.toFixed(2)} kg`} icon={<Weight />} />
                         <StatCard title="Average Rate" value={`₹${selectedCustomerData.averageRate.toFixed(2)}`} icon={<Calculator />} />
+                        <StatCard title="Total Transactions" value={`${selectedCustomerData.totalTransactions}`} icon={<Briefcase />} />
+                        <StatCard title="Total Outstanding" value={`₹${(selectedCustomerData.totalAmount - selectedCustomerData.totalPaid).toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
                         <StatCard title="Total Karta" value={`₹${selectedCustomerData.totalKartaAmount.toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
                         <StatCard title="Total Laboury" value={`₹${selectedCustomerData.totalLabouryAmount.toFixed(2)}`} icon={<Users />} colorClass="text-destructive" />
-                        <StatCard title="Total CD" value={`₹${selectedCustomerData.totalCdAmount.toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
-                        <StatCard title="Total Transactions" value={`${selectedCustomerData.totalTransactions}`} icon={<Briefcase />} />
-                        <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                        <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-                        <StatCard title="Total Outstanding Entries" value={`${selectedCustomerData.totalOutstandingTransactions}`} icon={<FileText />} />
                     </CardContent>
                 </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader><CardTitle>Financial Overview</CardTitle></CardHeader>
+                        <CardContent className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number) => `₹${value.toFixed(2)}`} />
+                                <Pie data={financialPieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
+                                    {financialPieChartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
+                                </Pie>
+                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader><CardTitle>Transactions by Variety</CardTitle></CardHeader>
+                        <CardContent className="h-80">
+                             <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} />
+                                <Pie data={varietyPieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
+                                    {varietyPieChartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
+                                </Pie>
+                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                </div>
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <Card>
                         <CardHeader><CardTitle>All Transactions</CardTitle></CardHeader>
@@ -358,7 +402,7 @@ export default function SupplierProfilePage() {
                                     formatter={(value: number) => `₹${value.toFixed(2)}`}
                                 />
                                 <Pie
-                                    data={pieChartData}
+                                    data={financialPieChartData}
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
@@ -366,7 +410,7 @@ export default function SupplierProfilePage() {
                                     fill="#8884d8"
                                     dataKey="value"
                                 >
-                                    {pieChartData.map((entry, index) => (
+                                    {financialPieChartData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
                                     ))}
                                 </Pie>
