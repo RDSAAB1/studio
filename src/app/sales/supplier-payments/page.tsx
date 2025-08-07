@@ -65,8 +65,19 @@ export default function SupplierPaymentsPage() {
 
         const savedSummary = localStorage.getItem("customer_summary");
         if(savedSummary) {
-          const parsedSummary = JSON.parse(savedSummary);
-          setCustomerSummary(new Map(parsedSummary));
+          const parsedSummary = JSON.parse(savedSummary, (key, value) => {
+             // This reviver ensures that the Map is correctly reconstructed
+              if(typeof value === 'object' && value !== null) {
+                if (value.dataType === 'Map') {
+                  return new Map(value.value);
+                }
+              }
+              return value;
+          });
+           // Because the top level is not a map, we get an array of [key, value] pairs
+          if (Array.isArray(parsedSummary)) {
+            setCustomerSummary(new Map(parsedSummary));
+          }
         } else {
             // If no summary, create one from customers
             const initialSummary = new Map<string, CustomerSummary>();
@@ -95,54 +106,78 @@ export default function SupplierPaymentsPage() {
     }
   }, []);
   
+  
   useEffect(() => {
+    if (!isClient) return;
+
+    const newSummary = new Map(customerSummary);
+    let hasChanged = false;
+
+    // First, ensure all customers have a summary entry.
+    customers.forEach(customer => {
+        if (customer.customerId && !newSummary.has(customer.customerId)) {
+            newSummary.set(customer.customerId, {
+                name: customer.name,
+                contact: customer.contact,
+                totalOutstanding: 0,
+                paymentHistory: [],
+                outstandingEntryIds: [],
+                totalAmount: 0,
+                totalPaid: 0,
+            });
+            hasChanged = true;
+        }
+    });
+
+    // Reset current calculations
+    newSummary.forEach(summary => {
+        summary.totalOutstanding = 0;
+        summary.outstandingEntryIds = [];
+        summary.totalAmount = 0;
+    });
+
+    // Recalculate totals based on the `customers` array
+    customers.forEach(customer => {
+        if (!customer.customerId) return;
+        const summary = newSummary.get(customer.customerId);
+        if (summary) {
+            const netAmount = parseFloat(String(customer.netAmount));
+            const amount = parseFloat(String(customer.amount));
+
+            summary.totalAmount += amount;
+            if (netAmount > 0) {
+                summary.totalOutstanding += netAmount;
+                summary.outstandingEntryIds.push(customer.id);
+            }
+        }
+    });
+
+    // Recalculate totalPaid from paymentHistory
+    newSummary.forEach(summary => {
+        summary.totalPaid = summary.paymentHistory.reduce((acc, p) => acc + p.amount + p.cdAmount, 0);
+    });
+
+    if (hasChanged || JSON.stringify(Array.from(customerSummary.entries())) !== JSON.stringify(Array.from(newSummary.entries()))) {
+      setCustomerSummary(newSummary);
+    }
+}, [customers, isClient]);
+
+
+ useEffect(() => {
     if(isClient) {
-        localStorage.setItem("customer_summary", JSON.stringify(Array.from(customerSummary.entries())));
+        // Custom replacer to handle Map serialization
+        localStorage.setItem("customer_summary", JSON.stringify(Array.from(customerSummary.entries()), (key, value) => {
+            if(value instanceof Map) {
+                return {
+                    dataType: 'Map',
+                    value: Array.from(value.entries()),
+                };
+            }
+            return value;
+        }));
     }
   }, [customerSummary, isClient]);
 
-
-  const updateCustomerSummary = useCallback(() => {
-      setCustomerSummary(prevSummary => {
-          const newSummary = new Map(prevSummary);
-
-          // Reset calculation fields for all customers to ensure accuracy
-          newSummary.forEach(summary => {
-              summary.totalOutstanding = 0;
-              summary.outstandingEntryIds = [];
-          });
-          
-          // Recalculate outstanding based on the source of truth: `customers` array
-          customers.forEach(customer => {
-              if(!customer.customerId) return;
-
-              let summary = newSummary.get(customer.customerId);
-              
-              if(!summary) {
-                  summary = {
-                      name: customer.name, contact: customer.contact, totalOutstanding: 0, paymentHistory: [],
-                      outstandingEntryIds: [], totalAmount: 0, totalPaid: 0,
-                  }
-                  newSummary.set(customer.customerId, summary);
-              }
-
-              const netAmount = parseFloat(String(customer.netAmount));
-              if (netAmount > 0) {
-                  summary.totalOutstanding += netAmount;
-                  summary.outstandingEntryIds.push(customer.id);
-              }
-          });
-          
-          return newSummary;
-      });
-  }, [customers]);
-
-
-  useEffect(() => {
-    if(isClient) {
-        updateCustomerSummary();
-    }
-  }, [customers, isClient, updateCustomerSummary]);
 
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
@@ -206,7 +241,7 @@ export default function SupplierPaymentsPage() {
     } else if (cdAt === 'unpaid_amount') {
         base = outstanding;
     } else if (cdAt === 'full_amount') {
-        base = outstanding; // Typically CD is on the total amount being settled.
+        base = outstanding; 
     } else if (cdAt === 'paid_amount') {
         if (selectedCustomerKey) {
             const summary = customerSummary.get(selectedCustomerKey);
@@ -240,7 +275,6 @@ export default function SupplierPaymentsPage() {
       return;
     }
 
-    // 1. Prepare the new payment record
     const newPaymentIdCounter = paymentIdCounter + 1;
     const newPayment: Payment = {
         paymentId: formatPaymentId(newPaymentIdCounter),
@@ -252,39 +286,39 @@ export default function SupplierPaymentsPage() {
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
     };
 
-    // 2. Update customer balances
     let remainingPayment = paymentAmount + calculatedCdAmount;
-    const updatedCustomers = [...customers];
-    selectedEntries.sort((a,b) => new Date(a.date).getTime() - new Date(a.date).getTime()) // FIFO
-      .forEach(entry => {
-        const entryInArray = updatedCustomers.find(c => c.id === entry.id)!;
-        const outstanding = parseFloat(String(entryInArray.netAmount));
-        if (remainingPayment >= outstanding) {
-          entryInArray.netAmount = 0;
-          remainingPayment -= outstanding;
-        } else {
-          entryInArray.netAmount = parseFloat((outstanding - remainingPayment).toFixed(2));
-          remainingPayment = 0;
+    const updatedCustomers = customers.map(c => {
+        if(selectedEntryIds.has(c.id)){
+             const outstanding = parseFloat(String(c.netAmount));
+             if (remainingPayment >= outstanding) {
+              remainingPayment -= outstanding;
+              return {...c, netAmount: 0};
+            } else {
+              const newNetAmount = parseFloat((outstanding - remainingPayment).toFixed(2));
+              remainingPayment = 0;
+              return {...c, netAmount: newNetAmount};
+            }
         }
-      });
+        return c;
+    });
     
-    // 3. Update state in a single batch
     setCustomerSummary(prevSummary => {
         const newSummary = new Map(prevSummary);
         const summary = newSummary.get(selectedCustomerKey!);
         if (summary) {
-            summary.paymentHistory = [...summary.paymentHistory, newPayment];
+            summary.paymentHistory.push(newPayment);
         }
         return newSummary;
     });
     
     setCustomers(updatedCustomers);
-    localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
-
+    
     setPaymentIdCounter(newPaymentIdCounter);
-    localStorage.setItem('payment_id_counter', String(newPaymentIdCounter));
+    if(isClient) {
+        localStorage.setItem('payment_id_counter', String(newPaymentIdCounter));
+        localStorage.setItem("customers_data", JSON.stringify(updatedCustomers));
+    }
 
-    // 4. Reset form
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
@@ -298,7 +332,7 @@ export default function SupplierPaymentsPage() {
         let summaryForCustomer = customerSummary.get(selectedCustomerKey);
 
         if (!summaryForCustomer) return;
-
+        
         const updatedPaymentHistory = summaryForCustomer.paymentHistory.filter(p => {
             if (p.paymentId === paymentIdToDelete) {
                 paymentToDelete = p;
@@ -312,20 +346,26 @@ export default function SupplierPaymentsPage() {
         const srNosInPayment = paymentToDelete.notes.match(/S\d{5}/g) || [];
         const amountToRestore = paymentToDelete.amount + paymentToDelete.cdAmount;
 
+        let tempAmountToRestore = amountToRestore;
+
         const updatedCustomers = customers.map(c => {
             if (srNosInPayment.includes(c.srNo)) {
-                // This is a simplification. For full accuracy, you'd need to track partial payments against original amounts.
-                // For now, we add the restored amount back to netAmount.
-                const originalAmount = c.amount;
+                // Find original full amount for this entry
+                const originalEntry = initialCustomers.find(ic => ic.srNo === c.srNo);
+                const originalAmount = originalEntry ? Number(originalEntry.netAmount) : Number(c.amount);
+
                 const currentNet = Number(c.netAmount);
-                const newNet = Math.min(originalAmount, currentNet + amountToRestore);
+                const restoredAmountForThisEntry = Math.min(tempAmountToRestore, originalAmount - currentNet);
+                
+                const newNet = currentNet + restoredAmountForThisEntry;
+                tempAmountToRestore -= restoredAmountForThisEntry;
+                
                 return { ...c, netAmount: newNet };
             }
             return c;
         });
         
         setCustomers(updatedCustomers);
-        localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
 
         setCustomerSummary(prevSummary => {
             const newSummary = new Map(prevSummary);
@@ -340,9 +380,9 @@ export default function SupplierPaymentsPage() {
     };
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
-  const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [];
-  const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0 && c.amount > 0) : [];
-  const paymentHistory = selectedCustomerKey ? customerSummary.get(selectedCustomerKey)?.paymentHistory || [] : [];
+  const outstandingEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
+  const paidEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0 && c.amount > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
+  const paymentHistory = useMemo(() => selectedCustomerKey ? customerSummary.get(selectedCustomerKey)?.paymentHistory || [] : [], [customerSummary, selectedCustomerKey]);
   
   if (!isClient) {
     return null;
@@ -360,11 +400,15 @@ export default function SupplierPaymentsPage() {
               <SelectValue placeholder="Select a supplier to process payments" />
             </SelectTrigger>
             <SelectContent>
-              {Array.from(customerSummary.entries()).map(([key, data]) => (
-                <SelectItem key={key} value={key}>
-                  {toTitleCase(data.name)} ({data.contact}) - Outstanding: {data.totalOutstanding.toFixed(2)}
-                </SelectItem>
-              ))}
+              {Array.from(customerSummary.keys()).map((key) => {
+                const data = customerSummary.get(key);
+                if (!data) return null;
+                return (
+                 <SelectItem key={key} value={key}>
+                    {toTitleCase(data.name)} ({data.contact}) - Outstanding: {data.totalOutstanding.toFixed(2)}
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
         </CardContent>
