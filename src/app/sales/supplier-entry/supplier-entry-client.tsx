@@ -66,8 +66,8 @@ const getInitialFormState = (customers: Customer[], lastVariety?: string): Custo
   return {
     id: "", srNo: formatSrNo(nextSrNum), date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
-    weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, barcode: '',
+    weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
   };
 };
@@ -452,6 +452,8 @@ export default function SupplierEntryClient() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       ...getInitialFormState(customers, lastVariety),
+      kartaPercentage: 1,
+      labouryRate: 2,
       kanta: 50,
     },
     shouldFocusError: false,
@@ -539,8 +541,8 @@ export default function SupplierEntryClient() {
       name: customerState.name, so: customerState.so, address: customerState.address,
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 0,
-      labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 50,
+      rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
+      labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
       paymentType: customerState.paymentType || 'Full'
     };
     setCurrentCustomer(customerState);
