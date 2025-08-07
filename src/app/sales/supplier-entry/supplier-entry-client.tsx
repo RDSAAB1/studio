@@ -199,7 +199,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="name" control={form.control} render={({ field }) => (
                                     <Input {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                                )} />
+                                )}/>
                             </InputWithIcon>
                                 {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                         </div>
@@ -208,7 +208,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                 <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="so" control={form.control} render={({ field }) => (
                                     <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                                )} />
+                                )}/>
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
@@ -216,7 +216,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="contact" control={form.control} render={({ field }) => (
                                     <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-9 text-sm pl-10" />
-                                )} />
+                                )}/>
                             </InputWithIcon>
                                 {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
                         </div>
@@ -225,7 +225,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="address" control={form.control} render={({ field }) => (
                                         <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                                )} />
+                                )}/>
                             </InputWithIcon>
                         </div>
                     </CardContent>
@@ -243,7 +243,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="vehicleNo" control={form.control} render={({ field }) => (
                                 <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                                )} />
+                                )}/>
                             </InputWithIcon>
                         </div>
                         <Controller
@@ -963,3 +963,5 @@ export default function SupplierEntryClient() {
     </>
   );
 }
+
+    
