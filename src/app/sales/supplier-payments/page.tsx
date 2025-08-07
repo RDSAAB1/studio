@@ -146,18 +146,24 @@ export default function SupplierPaymentsPage() {
         return;
     }
     let base = 0;
-    const amount = paymentAmount || 0;
+    const currentPaymentAmount = paymentAmount || 0;
     const outstanding = totalOutstandingForSelected;
 
-    if (cdAt === 'paid_amount' || cdAt === 'payment_amount') {
-        base = amount;
+    if (cdAt === 'payment_amount') {
+        base = currentPaymentAmount;
     } else if (cdAt === 'unpaid_amount') {
         base = outstanding;
     } else if (cdAt === 'full_amount') {
-        base = amount + outstanding;
+        base = outstanding; // Typically CD is on the total amount being settled.
+    } else if (cdAt === 'paid_amount') {
+        // This is tricky. "Paid Amount" means what was paid on these entries BEFORE this transaction.
+        // We need to find the original total amount of these entries and subtract the current outstanding.
+        const originalTotalAmount = selectedEntries.reduce((acc, entry) => acc + entry.amount, 0);
+        const amountAlreadyPaid = originalTotalAmount - outstanding;
+        base = amountAlreadyPaid;
     }
     setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
-  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt]);
+  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt, selectedEntries]);
 
 
   const processPayment = () => {
