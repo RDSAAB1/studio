@@ -34,6 +34,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Trash } from "lucide-react";
 
 export default function SupplierPaymentsPage() {
   const { toast } = useToast();
@@ -50,19 +52,41 @@ export default function SupplierPaymentsPage() {
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [paymentIdCounter, setPaymentIdCounter] = useState(0);
+  const [isClient, setIsClient] = useState(false);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      setIsClient(true);
       try {
         const savedCustomers = localStorage.getItem("customers_data");
         const parsedCustomers = savedCustomers ? JSON.parse(savedCustomers) : initialCustomers;
         setCustomers(Array.isArray(parsedCustomers) ? parsedCustomers : initialCustomers);
+
+        const savedSummary = localStorage.getItem("customer_summary");
+        if(savedSummary) {
+          const parsedSummary = JSON.parse(savedSummary);
+          setCustomerSummary(new Map(parsedSummary));
+        }
+
+        const savedCounter = localStorage.getItem("payment_id_counter");
+        if(savedCounter) {
+            setPaymentIdCounter(parseInt(savedCounter, 10));
+        }
+
       } catch (error) {
         console.error("Failed to load data from localStorage", error);
         setCustomers(initialCustomers);
       }
     }
   }, []);
+  
+  useEffect(() => {
+    if(isClient) {
+        localStorage.setItem("customer_summary", JSON.stringify(Array.from(customerSummary.entries())));
+    }
+  }, [customerSummary, isClient]);
+
 
   const updateCustomerSummary = useCallback(() => {
     setCustomerSummary(prevSummary => {
@@ -190,6 +214,17 @@ export default function SupplierPaymentsPage() {
 
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const updatedCustomers = [...customers];
+    
+    const newPaymentIdCounter = paymentIdCounter + 1;
+    const newPayment: Payment = {
+        paymentId: formatPaymentId(newPaymentIdCounter),
+        date: new Date().toISOString().split("T")[0],
+        amount: paymentAmount,
+        cdAmount: calculatedCdAmount,
+        type: paymentType,
+        receiptType: 'Online',
+        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
+    };
 
     selectedEntries.sort((a,b) => new Date(a.date).getTime() - new Date(a.date).getTime()) // FIFO
       .forEach(entry => {
@@ -203,17 +238,10 @@ export default function SupplierPaymentsPage() {
           remainingPayment = 0;
         }
       });
-    
-    const newPayment: Payment = {
-        paymentId: formatPaymentId(paymentIdCounter + 1),
-        date: new Date().toISOString().split("T")[0],
-        amount: paymentAmount,
-        cdAmount: calculatedCdAmount,
-        type: paymentType,
-        receiptType: 'Online',
-        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
-    };
 
+    setCustomers(updatedCustomers);
+    localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
+    
     setCustomerSummary(prevSummary => {
         const newSummary = new Map(prevSummary);
         const summary = newSummary.get(selectedCustomerKey!);
@@ -222,20 +250,72 @@ export default function SupplierPaymentsPage() {
         }
         return newSummary;
     });
-    setPaymentIdCounter(p => p + 1);
+    
+    setPaymentIdCounter(newPaymentIdCounter);
+    localStorage.setItem('payment_id_counter', String(newPaymentIdCounter));
 
-    setCustomers(updatedCustomers);
-    localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
     toast({ title: "Success", description: "Payment processed successfully." });
   };
   
+    const handleDeletePayment = (paymentIdToDelete: string) => {
+        if (!selectedCustomerKey) return;
+
+        let paymentToDelete: Payment | undefined;
+        let summaryForCustomer = customerSummary.get(selectedCustomerKey);
+
+        if (!summaryForCustomer) return;
+
+        const updatedPaymentHistory = summaryForCustomer.paymentHistory.filter(p => {
+            if (p.paymentId === paymentIdToDelete) {
+                paymentToDelete = p;
+                return false;
+            }
+            return true;
+        });
+
+        if (!paymentToDelete) return;
+
+        const srNosInPayment = paymentToDelete.notes.match(/S\d{5}/g) || [];
+        const amountToRestore = paymentToDelete.amount + paymentToDelete.cdAmount;
+
+        const updatedCustomers = customers.map(c => {
+            if (srNosInPayment.includes(c.srNo)) {
+                // This is a simplification. For full accuracy, you'd need to track partial payments against original amounts.
+                // For now, we add the restored amount back to netAmount.
+                const originalAmount = c.amount;
+                const currentNet = Number(c.netAmount);
+                const newNet = Math.min(originalAmount, currentNet + amountToRestore);
+                return { ...c, netAmount: newNet };
+            }
+            return c;
+        });
+        
+        setCustomers(updatedCustomers);
+        localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
+
+        setCustomerSummary(prevSummary => {
+            const newSummary = new Map(prevSummary);
+            const summary = newSummary.get(selectedCustomerKey!);
+            if (summary) {
+                summary.paymentHistory = updatedPaymentHistory;
+            }
+            return newSummary;
+        });
+
+        toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.` });
+    };
+
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [];
   const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0 && c.amount > 0) : [];
   const paymentHistory = selectedCustomerKey ? customerSummary.get(selectedCustomerKey)?.paymentHistory || [] : [];
+  
+  if (!isClient) {
+    return null;
+  }
 
   return (
     <div className="space-y-8">
@@ -377,7 +457,16 @@ export default function SupplierPaymentsPage() {
             <CardContent>
                 <div className="overflow-x-auto">
                 <Table>
-                    <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>CD Amount</TableHead><TableHead>Notes</TableHead></TableRow></TableHeader>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>ID</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>CD Amount</TableHead>
+                            <TableHead>Notes</TableHead>
+                            <TableHead>Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
                     <TableBody>
                     {paymentHistory.map(p => (
                         <TableRow key={p.paymentId}>
@@ -386,6 +475,23 @@ export default function SupplierPaymentsPage() {
                         <TableCell>{p.amount.toFixed(2)}</TableCell>
                         <TableCell>{p.cdAmount.toFixed(2)}</TableCell>
                         <TableCell>{p.notes}</TableCell>
+                        <TableCell>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount. This action cannot be undone.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeletePayment(p.paymentId)}>Continue</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                        </TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
@@ -398,3 +504,4 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+ 
