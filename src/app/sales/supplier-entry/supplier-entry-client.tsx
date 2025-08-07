@@ -87,13 +87,13 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox }: any) {
+const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox }: any) {
     const { toast } = useToast();
     const [newVariety, setNewVariety] = useState("");
     const [editingVariety, setEditingVariety] = useState<{ old: string; new: string } | null>(null);
 
     const handleAddVariety = () => {
-        if (newVariety && !varietyOptions.find(opt => opt.toLowerCase() === newVariety.toLowerCase())) {
+        if (newVariety && !varietyOptions.find((opt: string) => opt.toLowerCase() === newVariety.toLowerCase())) {
             const titleCasedVariety = toTitleCase(newVariety);
             setVarietyOptions((prev: string[]) => [...prev, titleCasedVariety].sort());
             setNewVariety("");
@@ -215,7 +215,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             <Label htmlFor="contact" className="text-xs">Contact</Label>
                             <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="contact" control={form.control} render={({ field }) => (
-                                    <Input {...field} className="h-9 text-sm pl-10" />
+                                    <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-9 text-sm pl-10" />
                                 )} />
                             </InputWithIcon>
                                 {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
@@ -252,118 +252,21 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             render={({ field }) => (
                             <div className="space-y-1">
                                 <Label className="text-xs">Variety</Label>
-                                <div className="flex items-center gap-2">
-                                <Popover open={openVarietyCombobox} onOpenChange={setOpenVarietyCombobox}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        aria-expanded={openVarietyCombobox}
-                                        className="w-full justify-between h-9 text-sm font-normal"
-                                        >
-                                        <div className="flex items-center gap-2"><Wheat className="h-4 w-4 text-muted-foreground" />
-                                        {field.value
-                                            ? toTitleCase(varietyOptions.find((v: string) => v.toLowerCase() === field.value.toLowerCase()) ?? field.value)
-                                            : "Select variety..."}
-                                        </div>
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[51]">
-                                        <Command>
-                                        <CommandInput placeholder="Search variety..." />
-                                        <CommandList>
-                                            <CommandEmpty>No variety found.</CommandEmpty>
-                                            <CommandGroup>
-                                            {varietyOptions.map((v: string) => (
-                                                <CommandItem
-                                                    key={v}
-                                                    value={v}
-                                                    onSelect={(currentValue) => {
-                                                        form.setValue("variety", toTitleCase(currentValue));
-                                                        setOpenVarietyCombobox(false);
-                                                    }}
-                                                >
-                                                <Check
-                                                    className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    field.value?.toLowerCase() === v.toLowerCase() ? "opacity-100" : "opacity-0"
-                                                    )}
-                                                />
-                                                {toTitleCase(v)}
-                                                </CommandItem>
-                                            ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                                <Dialog open={isManageVarietiesOpen} onOpenChange={setIsManageVarietiesOpen}>
-                                    <DialogTrigger asChild>
-                                    <Button variant="outline" size="icon" className="h-9 w-9"><Settings className="h-4 w-4"/></Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Manage Varieties</DialogTitle>
-                                        <DialogDescription>Add, edit, or remove varieties from the list.</DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                        <div className="flex gap-2">
-                                        <Input
-                                            placeholder="Add new variety"
-                                            value={newVariety}
-                                            onChange={(e) => setNewVariety(e.target.value)}
-                                        />
-                                        <Button onClick={handleAddVariety} size="icon"><Plus className="h-4 w-4" /></Button>
-                                        </div>
-                                        <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
-                                        {varietyOptions.map((v: string) => (
-                                            <div key={v} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                                            {editingVariety?.old === v ? (
-                                                <Input
-                                                value={editingVariety.new}
-                                                onChange={(e) => setEditingVariety({ ...editingVariety, new: e.target.value })}
-                                                autoFocus
-                                                onBlur={handleSaveEditedVariety}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleSaveEditedVariety()}
-                                                />
-                                            ) : (
-                                                <span className="flex-grow">{toTitleCase(v)}</span>
-                                            )}
-                                            <div className="flex gap-1">
-                                                {editingVariety?.old === v ? (
-                                                <Button size="icon" variant="ghost" onClick={handleSaveEditedVariety}><Save className="h-4 w-4 text-green-500" /></Button>
-                                                ) : (
-                                                <Button size="icon" variant="ghost" onClick={() => setEditingVariety({ old: v, new: v })}><Pen className="h-4 w-4" /></Button>
-                                                )}
-                                                <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        This will permanently delete the variety "{toTitleCase(v)}".
-                                                    </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteVariety(v)}>Continue</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                                </AlertDialog>
-                                            </div>
-                                            </div>
-                                        ))}
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button variant="outline" onClick={() => setIsManageVarietiesOpen(false)}>Done</Button>
-                                    </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                                </div>
+                                <DynamicCombobox
+                                    options={varietyOptions.map((v: string) => ({value: v, label: v}))}
+                                    value={field.value}
+                                    onChange={(val) => form.setValue("variety", val)}
+                                    onAdd={(newVal) => {
+                                        const titleCased = toTitleCase(newVal);
+                                        if (!varietyOptions.includes(titleCased)) {
+                                            setVarietyOptions((prev: any) => [...prev, titleCased].sort());
+                                        }
+                                        form.setValue("variety", titleCased);
+                                    }}
+                                    placeholder="Select or add variety..."
+                                    searchPlaceholder="Search variety..."
+                                    emptyPlaceholder="No variety found."
+                                />
                                 {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                             </div>
                             )}
@@ -651,6 +554,18 @@ export default function SupplierEntryClient() {
     }
   }
 
+  const handleContactBlur = (contactValue: string) => {
+    if (contactValue.length === 10) {
+      const foundCustomer = customers.find(c => c.contact === contactValue);
+      if (foundCustomer) {
+        form.setValue('name', foundCustomer.name);
+        form.setValue('so', foundCustomer.so);
+        form.setValue('address', foundCustomer.address);
+        toast({ title: "Supplier Found", description: `Details for ${toTitleCase(foundCustomer.name)} have been auto-filled.` });
+      }
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       const activeElement = document.activeElement as HTMLElement;
@@ -716,6 +631,7 @@ export default function SupplierEntryClient() {
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
                 handleCapitalizeOnBlur={handleCapitalizeOnBlur}
+                handleContactBlur={handleContactBlur}
                 varietyOptions={varietyOptions}
                 setVarietyOptions={setVarietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
@@ -1008,3 +924,4 @@ export default function SupplierEntryClient() {
     </>
   );
 }
+
