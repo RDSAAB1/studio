@@ -79,6 +79,7 @@ export type FundTransaction = {
 
 export type Payment = {
     paymentId: string;
+    customerId: string;
     date: string;
     amount: number;
     cdAmount: number;
@@ -102,17 +103,17 @@ export type CustomerSummary = {
     paymentHistory: Payment[];
     outstandingEntryIds: string[];
     // New fields for Mill Overview
-    totalGrossWeight: number;
-    totalTeirWeight: number;
-    totalNetWeight: number;
-    totalKartaAmount: number;
-    totalLabouryAmount: number;
-    totalCdAmount: number;
-    averageRate: number;
-    totalTransactions: number;
-    totalOutstandingTransactions: number;
-    allTransactions: Customer[];
-    allPayments: Payment[];
+    totalGrossWeight?: number;
+    totalTeirWeight?: number;
+    totalNetWeight?: number;
+    totalKartaAmount?: number;
+    totalLabouryAmount?: number;
+    totalCdAmount?: number;
+    averageRate?: number;
+    totalTransactions?: number;
+    totalOutstandingTransactions?: number;
+    allTransactions?: Customer[];
+    allPayments?: Payment[];
     transactionsByVariety?: { [key: string]: number };
 }
 
