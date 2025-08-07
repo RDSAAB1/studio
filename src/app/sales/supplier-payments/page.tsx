@@ -37,7 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function SupplierPaymentsPage() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -50,6 +50,19 @@ export default function SupplierPaymentsPage() {
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [paymentIdCounter, setPaymentIdCounter] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedCustomers = localStorage.getItem("customers_data");
+        const parsedCustomers = savedCustomers ? JSON.parse(savedCustomers) : initialCustomers;
+        setCustomers(Array.isArray(parsedCustomers) ? parsedCustomers : initialCustomers);
+      } catch (error) {
+        console.error("Failed to load data from localStorage", error);
+        setCustomers(initialCustomers);
+      }
+    }
+  }, []);
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
@@ -188,14 +201,16 @@ export default function SupplierPaymentsPage() {
     setPaymentIdCounter(p => p + 1);
 
     setCustomers(updatedCustomers);
+    localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
     toast({ title: "Success", description: "Payment processed successfully." });
   };
   
-  const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && parseFloat(String(c.netAmount)) > 0) : [];
-  const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && parseFloat(String(c.netAmount)) === 0) : [];
+  const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
+  const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [];
+  const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0) : [];
   const paymentHistory = selectedCustomerKey ? customerSummary.get(selectedCustomerKey)?.paymentHistory || [] : [];
 
   return (

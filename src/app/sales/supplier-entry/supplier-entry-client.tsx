@@ -13,23 +13,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator";
@@ -88,31 +83,6 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
 );
 
 const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox, handleFocus, lastVariety, setLastVariety }: any) {
-    const { toast } = useToast();
-    const [newVariety, setNewVariety] = useState("");
-    const [editingVariety, setEditingVariety] = useState<{ old: string; new: string } | null>(null);
-
-    const handleAddVariety = () => {
-        if (newVariety && !varietyOptions.find((opt: string) => opt.toLowerCase() === newVariety.toLowerCase())) {
-            const titleCasedVariety = toTitleCase(newVariety);
-            setVarietyOptions((prev: string[]) => [...prev, titleCasedVariety].sort());
-            setNewVariety("");
-            toast({ title: "Variety Added", description: `"${titleCasedVariety}" has been added.` });
-        }
-    };
-
-    const handleDeleteVariety = (varietyToDelete: string) => {
-        setVarietyOptions((prev: string[]) => prev.filter(v => v !== varietyToDelete));
-        toast({ title: "Variety Deleted", description: `"${varietyToDelete}" has been removed.` });
-    };
-    
-    const handleSaveEditedVariety = () => {
-        if (editingVariety) {
-            setVarietyOptions((prev: string[]) => prev.map(v => v === editingVariety.old ? toTitleCase(editingVariety.new) : v).sort());
-            setEditingVariety(null);
-            toast({ title: "Variety Updated" });
-        }
-    };
     
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -432,8 +402,8 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(initialCustomers));
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState([]));
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   
@@ -452,22 +422,34 @@ export default function SupplierEntryClient() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       ...getInitialFormState(customers, lastVariety),
-      kartaPercentage: 1,
-      labouryRate: 2,
-      kanta: 50,
     },
     shouldFocusError: false,
   });
 
   useEffect(() => {
-    if (isClient) {
-      const savedVariety = localStorage.getItem('lastSelectedVariety');
-      if (savedVariety) {
-        setLastVariety(savedVariety);
-        form.setValue('variety', savedVariety);
+    if (typeof window !== 'undefined') {
+      setIsClient(true);
+      try {
+        const savedCustomers = localStorage.getItem("customers_data");
+        const parsedCustomers = savedCustomers ? JSON.parse(savedCustomers) : initialCustomers;
+        setCustomers(Array.isArray(parsedCustomers) ? parsedCustomers : initialCustomers);
+        
+        const savedVariety = localStorage.getItem('lastSelectedVariety');
+        if (savedVariety) {
+          setLastVariety(savedVariety);
+        }
+      } catch (error) {
+        console.error("Failed to load data from localStorage", error);
+        setCustomers(initialCustomers);
       }
     }
-  }, [isClient, form]);
+  }, []);
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("customers_data", JSON.stringify(customers));
+    }
+  }, [customers, isClient]);
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -507,17 +489,14 @@ export default function SupplierEntryClient() {
     }));
   }, [form]);
   
-  useEffect(() => {
-    setIsClient(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
    useEffect(() => {
     if (isClient) {
-      handleNew();
+      const initialFormState = getInitialFormState(customers, lastVariety);
+      setCurrentCustomer(initialFormState);
+      resetFormToState(initialFormState);
     }
      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient]);
+  }, [isClient, customers, lastVariety]);
 
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -965,5 +944,3 @@ export default function SupplierEntryClient() {
     </>
   );
 }
-
-    
