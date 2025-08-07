@@ -65,32 +65,36 @@ export default function SupplierPaymentsPage() {
   }, []);
 
   const updateCustomerSummary = useCallback(() => {
-    const newSummary = new Map<string, CustomerSummary>();
-    customers.forEach(entry => {
-      if (!entry.name || !entry.contact) return;
-      const key = `${entry.name.toLowerCase()}|${entry.contact.toLowerCase()}`;
-      if (!newSummary.has(key)) {
-        newSummary.set(key, {
-          name: entry.name,
-          contact: entry.contact,
-          totalOutstanding: 0,
-          paymentHistory: customerSummary.get(key)?.paymentHistory || [],
-          outstandingEntryIds: [],
+    setCustomerSummary(prevSummary => {
+        const newSummary = new Map<string, CustomerSummary>();
+        customers.forEach(entry => {
+            if (!entry.name || !entry.contact) return;
+            const key = entry.customerId || `${entry.name.toLowerCase()}|${entry.contact.toLowerCase()}`;
+            if (!newSummary.has(key)) {
+                newSummary.set(key, {
+                    name: entry.name,
+                    contact: entry.contact,
+                    totalOutstanding: 0,
+                    paymentHistory: prevSummary.get(key)?.paymentHistory || [],
+                    outstandingEntryIds: [],
+                    totalAmount: 0,
+                    totalPaid: 0,
+                });
+            }
+            const data = newSummary.get(key)!;
+            const netAmount = parseFloat(String(entry.netAmount));
+            if (netAmount > 0) {
+                data.totalOutstanding += netAmount;
+                data.outstandingEntryIds.push(entry.id);
+            }
         });
-      }
-      const data = newSummary.get(key)!;
-      if (parseFloat(String(entry.netAmount)) > 0) {
-        data.totalOutstanding += parseFloat(String(entry.netAmount));
-        data.outstandingEntryIds.push(entry.id);
-      }
+        return newSummary;
     });
-    setCustomerSummary(newSummary);
-  }, [customers, customerSummary]);
+  }, [customers]);
 
   useEffect(() => {
     updateCustomerSummary();
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers]);
+  }, [customers, updateCustomerSummary]);
 
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
@@ -156,14 +160,22 @@ export default function SupplierPaymentsPage() {
     } else if (cdAt === 'full_amount') {
         base = outstanding; // Typically CD is on the total amount being settled.
     } else if (cdAt === 'paid_amount') {
-        // This is tricky. "Paid Amount" means what was paid on these entries BEFORE this transaction.
-        // We need to find the original total amount of these entries and subtract the current outstanding.
-        const originalTotalAmount = selectedEntries.reduce((acc, entry) => acc + entry.amount, 0);
-        const amountAlreadyPaid = originalTotalAmount - outstanding;
-        base = amountAlreadyPaid;
+        if (selectedCustomerKey) {
+            const summary = customerSummary.get(selectedCustomerKey);
+            if (summary) {
+                const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
+                const paidAmountForSelectedEntries = summary.paymentHistory
+                    .filter(p => {
+                        const noteSrNos = p.notes.match(/S\d{5}/g) || [];
+                        return noteSrNos.some(srNo => selectedSrNos.has(srNo));
+                    })
+                    .reduce((acc, p) => acc + p.amount, 0);
+                base = paidAmountForSelectedEntries;
+            }
+        }
     }
     setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
-  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt, selectedEntries]);
+  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt, selectedEntries, customerSummary, selectedCustomerKey]);
 
 
   const processPayment = () => {
@@ -179,7 +191,7 @@ export default function SupplierPaymentsPage() {
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const updatedCustomers = [...customers];
 
-    selectedEntries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // FIFO
+    selectedEntries.sort((a,b) => new Date(a.date).getTime() - new Date(a.date).getTime()) // FIFO
       .forEach(entry => {
         const entryInArray = updatedCustomers.find(c => c.id === entry.id)!;
         const outstanding = parseFloat(String(entryInArray.netAmount));
@@ -202,8 +214,14 @@ export default function SupplierPaymentsPage() {
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
     };
 
-    const summary = customerSummary.get(selectedCustomerKey!)!;
-    summary.paymentHistory.push(newPayment);
+    setCustomerSummary(prevSummary => {
+        const newSummary = new Map(prevSummary);
+        const summary = newSummary.get(selectedCustomerKey!);
+        if (summary) {
+            summary.paymentHistory.push(newPayment);
+        }
+        return newSummary;
+    });
     setPaymentIdCounter(p => p + 1);
 
     setCustomers(updatedCustomers);
@@ -216,7 +234,7 @@ export default function SupplierPaymentsPage() {
   
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [];
-  const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0) : [];
+  const paidEntries = selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0 && c.amount > 0) : [];
   const paymentHistory = selectedCustomerKey ? customerSummary.get(selectedCustomerKey)?.paymentHistory || [] : [];
 
   return (
@@ -226,7 +244,7 @@ export default function SupplierPaymentsPage() {
           <CardTitle>Select Supplier</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select onValueChange={handleCustomerSelect}>
+          <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || undefined}>
             <SelectTrigger className="w-full md:w-1/2">
               <SelectValue placeholder="Select a supplier to process payments" />
             </SelectTrigger>
