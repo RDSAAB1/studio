@@ -106,7 +106,7 @@ export default function SupplierPaymentsPage() {
       setCustomerSummary(prevSummary => {
           const newSummary = new Map(prevSummary);
 
-          // Reset calculation fields
+          // Reset calculation fields for all customers to ensure accuracy
           newSummary.forEach(summary => {
               summary.totalOutstanding = 0;
               summary.outstandingEntryIds = [];
@@ -227,6 +227,10 @@ export default function SupplierPaymentsPage() {
 
 
   const processPayment = () => {
+    if (!selectedCustomerKey) {
+        toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
+        return;
+    }
     if (selectedEntryIds.size === 0 || paymentAmount <= 0) {
       toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries and enter a valid payment amount." });
       return;
