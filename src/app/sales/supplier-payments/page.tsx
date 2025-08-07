@@ -90,35 +90,51 @@ export default function SupplierPaymentsPage() {
 
   const updateCustomerSummary = useCallback(() => {
     setCustomerSummary(prevSummary => {
-        const newSummary = new Map<string, CustomerSummary>();
-        customers.forEach(entry => {
-            if (!entry.name || !entry.contact) return;
-            const key = entry.customerId || `${entry.name.toLowerCase()}|${entry.contact.toLowerCase()}`;
-            if (!newSummary.has(key)) {
-                newSummary.set(key, {
-                    name: entry.name,
-                    contact: entry.contact,
+        const newSummaryMap = new Map<string, CustomerSummary>();
+
+        // 1. Initialize or carry over summaries
+        customers.forEach(c => {
+            const key = c.customerId;
+            if (!key) return;
+
+            if (!newSummaryMap.has(key)) {
+                // Get existing history or initialize
+                const existingHistory = prevSummary.get(key)?.paymentHistory || [];
+                newSummaryMap.set(key, {
+                    name: c.name,
+                    contact: c.contact,
                     totalOutstanding: 0,
-                    paymentHistory: prevSummary.get(key)?.paymentHistory || [],
+                    paymentHistory: existingHistory, // Preserve history
                     outstandingEntryIds: [],
                     totalAmount: 0,
                     totalPaid: 0,
                 });
             }
-            const data = newSummary.get(key)!;
-            const netAmount = parseFloat(String(entry.netAmount));
-            if (netAmount > 0) {
-                data.totalOutstanding += netAmount;
-                data.outstandingEntryIds.push(entry.id);
+        });
+
+        // 2. Calculate outstanding amounts and transaction details from source of truth (customers array)
+        customers.forEach(c => {
+            const key = c.customerId;
+            if (!key) return;
+            const summary = newSummaryMap.get(key);
+            if (summary) {
+                const netAmount = parseFloat(String(c.netAmount));
+                if (netAmount > 0) {
+                    summary.totalOutstanding += netAmount;
+                    summary.outstandingEntryIds.push(c.id);
+                }
             }
         });
-        return newSummary;
+
+        return newSummaryMap;
     });
   }, [customers]);
 
   useEffect(() => {
-    updateCustomerSummary();
-  }, [customers, updateCustomerSummary]);
+    if(isClient) {
+        updateCustomerSummary();
+    }
+  }, [customers, isClient, updateCustomerSummary]);
 
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
@@ -239,17 +255,19 @@ export default function SupplierPaymentsPage() {
         }
       });
 
-    setCustomers(updatedCustomers);
-    localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
     
     setCustomerSummary(prevSummary => {
         const newSummary = new Map(prevSummary);
         const summary = newSummary.get(selectedCustomerKey!);
         if (summary) {
-            summary.paymentHistory.push(newPayment);
+            const updatedHistory = [...summary.paymentHistory, newPayment];
+            summary.paymentHistory = updatedHistory;
         }
         return newSummary;
     });
+
+    setCustomers(updatedCustomers);
+    localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
     
     setPaymentIdCounter(newPaymentIdCounter);
     localStorage.setItem('payment_id_counter', String(newPaymentIdCounter));
