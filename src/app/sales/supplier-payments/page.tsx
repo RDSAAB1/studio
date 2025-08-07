@@ -67,6 +67,20 @@ export default function SupplierPaymentsPage() {
         if(savedSummary) {
           const parsedSummary = JSON.parse(savedSummary);
           setCustomerSummary(new Map(parsedSummary));
+        } else {
+            // If no summary, create one from customers
+            const initialSummary = new Map<string, CustomerSummary>();
+            parsedCustomers.forEach((c: Customer) => {
+                if(!c.customerId) return;
+                const key = c.customerId;
+                if(!initialSummary.has(key)) {
+                     initialSummary.set(key, {
+                        name: c.name, contact: c.contact, totalOutstanding: 0, paymentHistory: [],
+                        outstandingEntryIds: [], totalAmount: 0, totalPaid: 0,
+                    });
+                }
+            });
+            setCustomerSummary(initialSummary);
         }
 
         const savedCounter = localStorage.getItem("payment_id_counter");
@@ -89,46 +103,40 @@ export default function SupplierPaymentsPage() {
 
 
   const updateCustomerSummary = useCallback(() => {
-    setCustomerSummary(prevSummary => {
-        const newSummaryMap = new Map<string, CustomerSummary>();
+      setCustomerSummary(prevSummary => {
+          const newSummary = new Map(prevSummary);
 
-        // 1. Initialize or carry over summaries
-        customers.forEach(c => {
-            const key = c.customerId;
-            if (!key) return;
+          // Reset calculation fields
+          newSummary.forEach(summary => {
+              summary.totalOutstanding = 0;
+              summary.outstandingEntryIds = [];
+          });
+          
+          // Recalculate outstanding based on the source of truth: `customers` array
+          customers.forEach(customer => {
+              if(!customer.customerId) return;
 
-            if (!newSummaryMap.has(key)) {
-                // Get existing history or initialize
-                const existingHistory = prevSummary.get(key)?.paymentHistory || [];
-                newSummaryMap.set(key, {
-                    name: c.name,
-                    contact: c.contact,
-                    totalOutstanding: 0,
-                    paymentHistory: existingHistory, // Preserve history
-                    outstandingEntryIds: [],
-                    totalAmount: 0,
-                    totalPaid: 0,
-                });
-            }
-        });
+              let summary = newSummary.get(customer.customerId);
+              
+              if(!summary) {
+                  summary = {
+                      name: customer.name, contact: customer.contact, totalOutstanding: 0, paymentHistory: [],
+                      outstandingEntryIds: [], totalAmount: 0, totalPaid: 0,
+                  }
+                  newSummary.set(customer.customerId, summary);
+              }
 
-        // 2. Calculate outstanding amounts and transaction details from source of truth (customers array)
-        customers.forEach(c => {
-            const key = c.customerId;
-            if (!key) return;
-            const summary = newSummaryMap.get(key);
-            if (summary) {
-                const netAmount = parseFloat(String(c.netAmount));
-                if (netAmount > 0) {
-                    summary.totalOutstanding += netAmount;
-                    summary.outstandingEntryIds.push(c.id);
-                }
-            }
-        });
-
-        return newSummaryMap;
-    });
+              const netAmount = parseFloat(String(customer.netAmount));
+              if (netAmount > 0) {
+                  summary.totalOutstanding += netAmount;
+                  summary.outstandingEntryIds.push(customer.id);
+              }
+          });
+          
+          return newSummary;
+      });
   }, [customers]);
+
 
   useEffect(() => {
     if(isClient) {
@@ -228,9 +236,7 @@ export default function SupplierPaymentsPage() {
       return;
     }
 
-    let remainingPayment = paymentAmount + calculatedCdAmount;
-    const updatedCustomers = [...customers];
-    
+    // 1. Prepare the new payment record
     const newPaymentIdCounter = paymentIdCounter + 1;
     const newPayment: Payment = {
         paymentId: formatPaymentId(newPaymentIdCounter),
@@ -242,6 +248,9 @@ export default function SupplierPaymentsPage() {
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
     };
 
+    // 2. Update customer balances
+    let remainingPayment = paymentAmount + calculatedCdAmount;
+    const updatedCustomers = [...customers];
     selectedEntries.sort((a,b) => new Date(a.date).getTime() - new Date(a.date).getTime()) // FIFO
       .forEach(entry => {
         const entryInArray = updatedCustomers.find(c => c.id === entry.id)!;
@@ -254,24 +263,24 @@ export default function SupplierPaymentsPage() {
           remainingPayment = 0;
         }
       });
-
     
+    // 3. Update state in a single batch
     setCustomerSummary(prevSummary => {
         const newSummary = new Map(prevSummary);
         const summary = newSummary.get(selectedCustomerKey!);
         if (summary) {
-            const updatedHistory = [...summary.paymentHistory, newPayment];
-            summary.paymentHistory = updatedHistory;
+            summary.paymentHistory = [...summary.paymentHistory, newPayment];
         }
         return newSummary;
     });
-
+    
     setCustomers(updatedCustomers);
     localStorage.setItem('customers_data', JSON.stringify(updatedCustomers));
-    
+
     setPaymentIdCounter(newPaymentIdCounter);
     localStorage.setItem('payment_id_counter', String(newPaymentIdCounter));
 
+    // 4. Reset form
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
