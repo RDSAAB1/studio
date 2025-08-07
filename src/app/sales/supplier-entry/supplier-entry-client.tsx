@@ -58,16 +58,16 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
-const getInitialFormState = (customers: Customer[]): Customer => {
+const getInitialFormState = (customers: Customer[], lastVariety?: string): Customer => {
   const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
   const staticDate = new Date();
   staticDate.setHours(0,0,0,0);
 
   return {
     id: "", srNo: formatSrNo(nextSrNum), date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
-    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
+    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, barcode: '',
+    labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
   };
 };
@@ -87,7 +87,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox }: any) {
+const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox, handleFocus, lastVariety, setLastVariety }: any) {
     const { toast } = useToast();
     const [newVariety, setNewVariety] = useState("");
     const [editingVariety, setEditingVariety] = useState<{ old: string; new: string } | null>(null);
@@ -158,7 +158,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                         <div className="space-y-1">
                             <Label htmlFor="term" className="text-xs">Term (Days)</Label>
                                 <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
-                                <Input id="term" type="number" {...form.register('term')} className="h-9 text-sm pl-10" />
+                                <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
                          <Controller
@@ -255,13 +255,17 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                 <DynamicCombobox
                                     options={varietyOptions.map((v: string) => ({value: v, label: v}))}
                                     value={field.value}
-                                    onChange={(val) => form.setValue("variety", val)}
+                                    onChange={(val) => {
+                                        form.setValue("variety", val);
+                                        setLastVariety(val);
+                                    }}
                                     onAdd={(newVal) => {
                                         const titleCased = toTitleCase(newVal);
                                         if (!varietyOptions.includes(titleCased)) {
                                             setVarietyOptions((prev: any) => [...prev, titleCased].sort());
                                         }
                                         form.setValue("variety", titleCased);
+                                        setLastVariety(titleCased);
                                     }}
                                     placeholder="Select or add variety..."
                                     searchPlaceholder="Search variety..."
@@ -274,13 +278,13 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                         <div className="space-y-1">
                             <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
                                 <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                                <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
                                 <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} className="h-9 text-sm pl-10"/>)} />
+                                <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10"/>)} />
                             </InputWithIcon>
                         </div>
                     </CardContent>
@@ -294,25 +298,25 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                         <div className="space-y-1">
                             <Label htmlFor="rate" className="text-xs">Rate</Label>
                                 <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                                <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                                <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                                <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                                 <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} className="h-9 text-sm pl-10" />)} />
+                                <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                     </CardContent>
@@ -441,15 +445,35 @@ export default function SupplierEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<string[]>(appOptionsData.paymentTypes);
   const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
   const [openVarietyCombobox, setOpenVarietyCombobox] = useState(false);
+  const [lastVariety, setLastVariety] = useState<string>('');
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      srNo: currentCustomer.srNo, date: new Date(), term: 0, name: "", so: "", address: "", contact: "",
-      vehicleNo: "", variety: "", grossWeight: 0, teirWeight: 0, rate: 0, kartaPercentage: 0,
-      labouryRate: 0, kanta: 0, paymentType: "Full"
+      ...getInitialFormState(customers, lastVariety),
+      kanta: 50,
     },
+    shouldFocusError: false,
   });
+
+  useEffect(() => {
+    if (isClient) {
+      const savedVariety = localStorage.getItem('lastSelectedVariety');
+      if (savedVariety) {
+        setLastVariety(savedVariety);
+        form.setValue('variety', savedVariety);
+      }
+    }
+  }, [isClient, form]);
+  
+  const handleSetLastVariety = (variety: string) => {
+    setLastVariety(variety);
+    if(isClient) {
+        localStorage.setItem('lastSelectedVariety', variety);
+    }
+  }
+
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
     const values = {...form.getValues(), ...data};
@@ -483,9 +507,15 @@ export default function SupplierEntryClient() {
   
   useEffect(() => {
     setIsClient(true);
-    handleNew();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+   useEffect(() => {
+    if (isClient) {
+      handleNew();
+    }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]);
 
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -510,7 +540,7 @@ export default function SupplierEntryClient() {
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 0,
-      labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 0,
+      labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 50,
       paymentType: customerState.paymentType || 'Full'
     };
     setCurrentCustomer(customerState);
@@ -520,7 +550,7 @@ export default function SupplierEntryClient() {
 
   const handleNew = () => {
     setIsEditing(false);
-    const newState = getInitialFormState(customers);
+    const newState = getInitialFormState(customers, lastVariety);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     newState.date = today.toISOString().split("T")[0];
@@ -549,7 +579,7 @@ export default function SupplierEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
-        const currentState = {...getInitialFormState(customers), srNo: formattedSrNo};
+        const currentState = {...getInitialFormState(customers, lastVariety), srNo: formattedSrNo};
         resetFormToState(currentState);
     }
   }
@@ -618,6 +648,12 @@ export default function SupplierEntryClient() {
     const value = e.target.value;
     form.setValue(field, toTitleCase(value));
   };
+  
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (e.target.value === '0') {
+      e.target.select();
+    }
+  };
 
   if (!isClient) {
     return null;
@@ -640,6 +676,9 @@ export default function SupplierEntryClient() {
                 setIsManageVarietiesOpen={setIsManageVarietiesOpen}
                 openVarietyCombobox={openVarietyCombobox}
                 setOpenVarietyCombobox={setOpenVarietyCombobox}
+                handleFocus={handleFocus}
+                lastVariety={lastVariety}
+                setLastVariety={handleSetLastVariety}
             />
             
             <CalculatedSummary currentCustomer={currentCustomer} />
@@ -924,4 +963,3 @@ export default function SupplierEntryClient() {
     </>
   );
 }
-
