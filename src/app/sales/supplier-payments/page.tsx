@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -36,6 +35,13 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Trash } from "lucide-react";
+
+const cdOptions = [
+    { value: 'paid_amount', label: 'CD on Paid Amount' },
+    { value: 'unpaid_amount', label: 'CD on Unpaid Amount (Selected)' },
+    { value: 'payment_amount', label: 'CD on Payment Amount (Manual)' },
+    { value: 'full_amount', label: 'CD on Full Amount (Selected)' },
+];
 
 export default function SupplierPaymentsPage() {
   const { toast } = useToast();
@@ -153,10 +159,19 @@ export default function SupplierPaymentsPage() {
   }, [selectedEntries]);
 
   useEffect(() => {
-    if(paymentType === 'Full') {
+    if (paymentType === 'Full') {
+      if (cdEnabled && cdAt !== 'payment_amount') {
+        setPaymentAmount(totalOutstandingForSelected - calculatedCdAmount);
+      } else {
         setPaymentAmount(totalOutstandingForSelected);
+      }
+    } else {
+      // For partial payment, amount is manual and CD at must be payment_amount
+      if(cdAt !== 'payment_amount'){
+          setCdAt('payment_amount');
+      }
     }
-  }, [paymentType, totalOutstandingForSelected]);
+  }, [paymentType, totalOutstandingForSelected, cdEnabled, cdAt, calculatedCdAmount]);
 
   useEffect(() => {
     autoSetCDToggle();
@@ -208,7 +223,8 @@ export default function SupplierPaymentsPage() {
     }
     
     const lastPaymentNum = paymentHistory.reduce((max, p) => {
-        const num = parseInt(p.paymentId.substring(1), 10);
+        const numMatch = p.paymentId.match(/^P(\d+)$/);
+        const num = numMatch ? parseInt(numMatch[1], 10) : 0;
         return num > max ? num : max;
     }, 0);
 
@@ -291,6 +307,13 @@ export default function SupplierPaymentsPage() {
   const outstandingEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
   const paidEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0 && c.amount > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
   const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey) : [], [paymentHistory, selectedCustomerKey]);
+  
+  const availableCdOptions = useMemo(() => {
+    if (paymentType === 'Partial') {
+      return cdOptions.filter(opt => opt.value === 'payment_amount');
+    }
+    return cdOptions.filter(opt => opt.value !== 'payment_amount');
+  }, [paymentType]);
   
   if (!isClient) {
     return null;
@@ -378,7 +401,7 @@ export default function SupplierPaymentsPage() {
                       </div>
                       <div className="space-y-2">
                           <Label htmlFor="payment-amount">Payment Amount</Label>
-                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} />
+                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && cdAt !== 'payment_amount'} />
                       </div>
                       <div className="flex items-center space-x-2 pt-6">
                         <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
@@ -394,10 +417,9 @@ export default function SupplierPaymentsPage() {
                              <Select value={cdAt} onValueChange={setCdAt}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="paid_amount">CD on Paid Amount</SelectItem>
-                                    <SelectItem value="unpaid_amount">CD on Unpaid Amount (Selected)</SelectItem>
-                                    <SelectItem value="payment_amount">CD on Payment Amount (Manual)</SelectItem>
-                                    <SelectItem value="full_amount">CD on Full Amount (Selected)</SelectItem>
+                                    {availableCdOptions.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -483,6 +505,3 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
- 
-
-    
