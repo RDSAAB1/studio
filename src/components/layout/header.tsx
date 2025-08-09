@@ -23,26 +23,40 @@ import {
   HeartHandshake, Briefcase, Users, Package, Megaphone, LayoutDashboard, FilePlus, 
   Book, PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database, 
   Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Volume2, Mail, 
-  LineChart, ClipboardCheck, Users2, UserPlus, FileText, ArrowLeftRight, PiggyBank, Landmark
+  LineChart, ClipboardCheck, Users2, UserPlus, FileText, ArrowLeftRight, PiggyBank, Landmark, Truck
 } from "lucide-react";
 
 const menuItems = [
   {
     id: "Main1",
-    name: "Sales & CRM",
+    name: "Sales",
     icon: <HeartHandshake className="h-8 w-8" />,
     subMenus: [
       { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview", icon: <LayoutDashboard className="h-5 w-5" /> },
-      { id: "Sub1-2", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <FilePlus className="h-5 w-5" /> },
-      { id: "Sub1-10", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-5 w-5" /> },
       { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <Book className="h-5 w-5" /> },
       { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
       { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
-      { id: "Sub1-6", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Sub1-7", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
-      { id: "Sub1-11", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Sub1-12", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-5 w-5" /> },
       { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
+    ],
+  },
+  {
+    id: "Main8",
+    name: "Supplier",
+    icon: <Truck className="h-8 w-8" />,
+    subMenus: [
+       { id: "Sub8-1", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <FilePlus className="h-5 w-5" /> },
+       { id: "Sub8-2", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
+       { id: "Sub8-3", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
+    ],
+  },
+   {
+    id: "Main9",
+    name: "Customer",
+    icon: <Users className="h-8 w-8" />,
+    subMenus: [
+       { id: "Sub9-1", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-5 w-5" /> },
+       { id: "Sub9-2", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
+       { id: "Sub9-3", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-5 w-5" /> },
     ],
   },
    {
@@ -64,7 +78,7 @@ const menuItems = [
   {
     id: "Main2",
     name: "HR & Payroll",
-    icon: <Users className="h-8 w-8" />,
+    icon: <Users2 className="h-8 w-8" />,
     subMenus: [
       { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database className="h-5 w-5" /> },
       { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator className="h-5 w-5" /> },
