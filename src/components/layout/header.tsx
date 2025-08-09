@@ -150,21 +150,21 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
               {menuItems.map((item) => (
                 <NavigationMenuItem key={item.id} value={item.id}>
                     {item.href ? (
-                        <Link href={item.href} asChild>
-                           <Tooltip>
-                             <TooltipTrigger asChild>
-                               <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-                                  <a className={cn("px-2 h-12 w-12", pathname === item.href && "bg-accent text-accent-foreground")}>
-                                     {item.icon}
-                                     <span className="sr-only">{item.name}</span>
-                                  </a>
-                               </NavigationMenuLink>
-                             </TooltipTrigger>
-                             <TooltipContent>
-                               <p>{item.name}</p>
-                             </TooltipContent>
-                           </Tooltip>
-                        </Link>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={item.href} legacyBehavior={false} passHref>
+                              <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                                <a className={cn("px-2 h-12 w-12", pathname === item.href && "bg-accent text-accent-foreground")}>
+                                    {item.icon}
+                                    <span className="sr-only">{item.name}</span>
+                                </a>
+                              </NavigationMenuLink>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{item.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
                     ) : (
                         <Tooltip>
                             <TooltipTrigger asChild>

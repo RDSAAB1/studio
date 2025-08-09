@@ -176,10 +176,7 @@ export default function SupplierPaymentsPage() {
   const cdEligibleEntries = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return selectedEntries.filter(e => {
-        const dueDate = new Date(e.dueDate);
-        return dueDate >= today;
-    });
+    return selectedEntries.filter(e => new Date(e.dueDate) >= today);
 }, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
@@ -305,8 +302,31 @@ export default function SupplierPaymentsPage() {
   };
 
   const handleEditPayment = (payment: Payment) => {
-    handleDeletePayment(payment.paymentId, true); 
+    const paymentToEdit = paymentHistory.find(p => p.paymentId === payment.paymentId);
+    if (!paymentToEdit) return;
 
+    // Revert the state change from this payment
+    let tempAmountToRestore = paymentToEdit.amount + paymentToEdit.cdAmount;
+    const customerUpdates = customers.map(c => {
+        const paidForEntry = paymentToEdit.paidFor?.find(pf => pf.srNo === c.srNo);
+        if (paidForEntry) {
+            const amountToRestoreForThisEntry = paidForEntry.amount;
+            if (tempAmountToRestore > 0) {
+                const currentNet = Number(c.netAmount);
+                const restoredAmount = Math.min(tempAmountToRestore, amountToRestoreForThisEntry);
+                const newNet = currentNet + restoredAmount;
+                tempAmountToRestore -= restoredAmount;
+                return { ...c, netAmount: newNet };
+            }
+        }
+        return c;
+    });
+    setCustomers(customerUpdates);
+
+    // Remove the payment from history temporarily
+    setPaymentHistory(prev => prev.filter(p => p.paymentId !== payment.paymentId));
+    
+    // Set form for editing
     setEditingPaymentId(payment.paymentId);
     setPaymentId(payment.paymentId);
     setPaymentAmount(payment.amount);
@@ -315,7 +335,8 @@ export default function SupplierPaymentsPage() {
     setCalculatedCdAmount(payment.cdAmount);
 
     const srNosInPayment = (payment.paidFor || []).map(pf => pf.srNo);
-    const entryIdsToSelect = new Set(customers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
+    // Find entry IDs based on srNos, considering the reverted customer state
+    const entryIdsToSelect = new Set(customerUpdates.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
     setSelectedEntryIds(entryIdsToSelect);
     
     toast({ title: "Editing Payment", description: `Editing payment ${payment.paymentId}. Please make your changes and click 'Update Payment'.`});
