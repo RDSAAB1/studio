@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -149,48 +150,48 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
             <NavigationMenuList>
               {menuItems.map((item) => (
                 <NavigationMenuItem key={item.id} value={item.id}>
-                    {item.href ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link href={item.href} legacyBehavior={false} passHref>
-                              <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-                                <a className={cn("px-2 h-12 w-12", pathname === item.href && "bg-accent text-accent-foreground")}>
-                                    {item.icon}
-                                    <span className="sr-only">{item.name}</span>
-                                </a>
-                              </NavigationMenuLink>
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{item.name}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                    ) : (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                            <NavigationMenuTrigger className="px-2 h-12 w-12">
-                                {item.icon}
-                                <span className="sr-only">{item.name}</span>
-                            </NavigationMenuTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                            <p>{item.name}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    )}
+                  {item.href ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link href={item.href} passHref legacyBehavior={false}>
+                          <NavigationMenuLink
+                            className={cn(navigationMenuTriggerStyle(), "px-2 h-12 w-12", pathname === item.href && "bg-accent text-accent-foreground")}
+                          >
+                            {item.icon}
+                            <span className="sr-only">{item.name}</span>
+                          </NavigationMenuLink>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{item.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <NavigationMenuTrigger className="px-2 h-12 w-12">
+                          {item.icon}
+                          <span className="sr-only">{item.name}</span>
+                        </NavigationMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{item.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   {item.subMenus && (
                     <NavigationMenuContent>
-                        <ul className="grid w-[250px] gap-2 p-4">
+                      <ul className="grid w-[250px] gap-2 p-4">
                         {item.subMenus.map((subItem) => (
-                            <ListItem
+                          <ListItem
                             key={subItem.id}
                             href={subItem.href}
                             title={subItem.name}
                             icon={subItem.icon}
                             active={pathname === subItem.href}
-                            />
+                          />
                         ))}
-                        </ul>
+                      </ul>
                     </NavigationMenuContent>
                   )}
                 </NavigationMenuItem>
