@@ -176,19 +176,8 @@ export default function SupplierPaymentsPage() {
   const cdEligibleEntries = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    const srNosWithCD = new Set<string>();
-    paymentHistory.forEach(p => {
-        if (p.cdApplied) {
-            p.paidFor?.forEach(pf => srNosWithCD.add(pf.srNo));
-        }
-    });
-
-    return selectedEntries.filter(e => {
-        const dueDate = new Date(e.dueDate);
-        return dueDate > today && !srNosWithCD.has(e.srNo);
-    });
-  }, [selectedEntries, paymentHistory]);
+    return selectedEntries.filter(e => new Date(e.dueDate) > today);
+  }, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
     if (selectedEntries.length === 0) {
@@ -216,30 +205,47 @@ export default function SupplierPaymentsPage() {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
   
-  useEffect(() => {
-    if(!cdEnabled) {
-        setCalculatedCdAmount(0);
-        return;
-    }
-    
-    let base = 0;
-    const currentPaymentAmount = paymentAmount || 0;
-    
-    if (cdAt === 'payment_amount') {
-        base = currentPaymentAmount;
-    } else if (cdAt === 'unpaid_amount') {
-        base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
-    } else if (cdAt === 'full_amount') {
-        base = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount)), 0);
-    } else if (cdAt === 'paid_amount') {
-         base = cdEligibleEntries.reduce((acc, entry) => {
-            const originalAmount = entry.originalNetAmount || 0;
-            const outstandingAmount = Number(entry.netAmount);
-            return acc + (originalAmount - outstandingAmount);
+    useEffect(() => {
+        if (!cdEnabled) {
+            setCalculatedCdAmount(0);
+            return;
+        }
+
+        let base = 0;
+        const currentPaymentAmount = paymentAmount || 0;
+
+        // Calculate amount that has already received a CD for the eligible entries
+        const amountWithCDAlready = paymentHistory.reduce((acc, payment) => {
+            if (payment.paidFor) {
+                payment.paidFor.forEach(pf => {
+                    const correspondingEntry = cdEligibleEntries.find(e => e.srNo === pf.srNo);
+                    if (correspondingEntry && pf.cdApplied) {
+                        acc += pf.amount;
+                    }
+                });
+            }
+            return acc;
         }, 0);
-    }
-    setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
-  }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries]);
+
+
+        if (cdAt === 'payment_amount') {
+            base = currentPaymentAmount;
+        } else if (cdAt === 'unpaid_amount') {
+            base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
+        } else if (cdAt === 'full_amount') {
+            const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount)), 0);
+            base = totalOriginalAmount - amountWithCDAlready;
+        } else if (cdAt === 'paid_amount') {
+            const totalPaidAmount = cdEligibleEntries.reduce((acc, entry) => {
+                const originalAmount = entry.originalNetAmount || 0;
+                const outstandingAmount = Number(entry.netAmount);
+                return acc + (originalAmount - outstandingAmount);
+            }, 0);
+            base = totalPaidAmount - amountWithCDAlready;
+        }
+        
+        setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
+  }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory]);
 
   const clearForm = () => {
     setSelectedEntryIds(new Set());
@@ -674,3 +680,4 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+

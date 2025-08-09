@@ -78,6 +78,12 @@ export type FundTransaction = {
     description?: string;
 }
 
+export type PaidFor = {
+    srNo: string;
+    amount: number;
+    cdApplied: boolean;
+}
+
 export type Payment = {
     paymentId: string;
     customerId: string;
@@ -88,6 +94,7 @@ export type Payment = {
     type: string;
     receiptType: string;
     notes: string;
+    paidFor?: PaidFor[];
 }
 
 export type CustomerSummary = {
