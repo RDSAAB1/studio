@@ -25,6 +25,7 @@ export type Customer = {
   kanta: number;
   amount: number;
   netAmount: number | string;
+  originalNetAmount: number;
   barcode: string;
   receiptType: string;
   paymentType: string;

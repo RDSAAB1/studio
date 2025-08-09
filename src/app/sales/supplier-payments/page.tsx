@@ -191,11 +191,9 @@ export default function SupplierPaymentsPage() {
     } else if (cdAt === 'unpaid_amount') {
         base = outstanding;
     } else if (cdAt === 'full_amount') {
-        // "Full Amount" is the original total amount of the selected entries.
-        // It's the sum of what's paid + what's outstanding for those entries.
-        // This is stored in the `amount` field of each entry.
-        const originalTotalAmount = selectedEntries.reduce((acc, entry) => acc + entry.amount, 0);
-        base = originalTotalAmount; 
+        // "Full Amount" is the original total NET amount of the selected entries.
+        const originalTotalNetAmount = selectedEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || 0), 0);
+        base = originalTotalNetAmount; 
     } else if (cdAt === 'paid_amount') {
         if (selectedCustomerKey) {
             const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));

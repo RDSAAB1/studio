@@ -62,7 +62,7 @@ const getInitialFormState = (customers: Customer[], lastVariety?: string): Custo
     id: "", srNo: formatSrNo(nextSrNum), date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, barcode: '',
+    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
   };
 };
@@ -486,6 +486,7 @@ export default function SupplierEntryClient() {
       kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
       amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
       netAmount: parseFloat(netAmount.toFixed(2)),
+      originalNetAmount: parseFloat(netAmount.toFixed(2)),
     }));
   }, [form]);
   
