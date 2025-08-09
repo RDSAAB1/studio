@@ -51,7 +51,6 @@ export default function SupplierPaymentsPage() {
   const [cdAt, setCdAt] = useState('unpaid_amount');
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
-  const [paymentIdCounter, setPaymentIdCounter] = useState(0);
   const [isClient, setIsClient] = useState(false);
 
 
@@ -65,13 +64,10 @@ export default function SupplierPaymentsPage() {
         const savedPayments = localStorage.getItem("payment_history");
         setPaymentHistory(savedPayments ? JSON.parse(savedPayments) : []);
 
-        const savedCounter = localStorage.getItem("payment_id_counter");
-        setPaymentIdCounter(savedCounter ? parseInt(savedCounter, 10) : 0);
       } catch (error) {
         console.error("Failed to load data from localStorage", error);
         setCustomers(initialCustomers);
         setPaymentHistory([]);
-        setPaymentIdCounter(0);
       }
     }
   }, []);
@@ -210,8 +206,14 @@ export default function SupplierPaymentsPage() {
       toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
       return;
     }
+    
+    const lastPaymentNum = paymentHistory.reduce((max, p) => {
+        const num = parseInt(p.paymentId.substring(1), 10);
+        return num > max ? num : max;
+    }, 0);
 
-    const newPaymentIdCounter = paymentIdCounter + 1;
+    const newPaymentIdCounter = lastPaymentNum + 1;
+
     const newPayment: Payment = {
         paymentId: formatPaymentId(newPaymentIdCounter),
         customerId: selectedCustomerKey,
@@ -242,11 +244,6 @@ export default function SupplierPaymentsPage() {
     setCustomers(updatedCustomers);
     setPaymentHistory(prev => [...prev, newPayment]);
     
-    setPaymentIdCounter(newPaymentIdCounter);
-    if(isClient) {
-        localStorage.setItem('payment_id_counter', String(newPaymentIdCounter));
-    }
-
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
@@ -266,10 +263,12 @@ export default function SupplierPaymentsPage() {
 
     let tempAmountToRestore = amountToRestore;
 
+    const originalCustomersData = JSON.parse(localStorage.getItem('customers_data') || '[]') as Customer[];
+
     const updatedCustomers = customers.map(c => {
         if (srNosInPayment.includes(c.srNo)) {
-            const originalEntry = initialCustomers.find(ic => ic.srNo === c.srNo);
-            const originalAmount = originalEntry ? Number(originalEntry.netAmount) : Number(c.amount);
+            const originalEntry = originalCustomersData.find(ic => ic.srNo === c.srNo);
+            const originalAmount = originalEntry ? Number(originalEntry.amount) : Number(c.amount);
 
             const currentNet = Number(c.netAmount);
             const restoredAmountForThisEntry = Math.min(tempAmountToRestore, originalAmount - currentNet);
@@ -485,3 +484,4 @@ export default function SupplierPaymentsPage() {
   );
 }
  
+
