@@ -153,7 +153,7 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
                   {item.href ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Link href={item.href} passHref legacyBehavior={false}>
+                         <Link href={item.href} passHref legacyBehavior={false}>
                           <NavigationMenuLink
                             className={cn(navigationMenuTriggerStyle(), "px-2 h-12 w-12", pathname === item.href && "bg-accent text-accent-foreground")}
                           >
