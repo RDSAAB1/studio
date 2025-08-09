@@ -407,6 +407,39 @@ export default function SupplierPaymentsPage() {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter') {
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="listbox"]') || activeElement.closest('[role="dialog"]')) {
+        return;
+      }
+      e.preventDefault();
+      
+      const formEl = e.currentTarget;
+      const focusableElements = Array.from(
+        formEl.querySelectorAll('input, button, [role="combobox"], [role="switch"]')
+      ).filter(el => !(el as HTMLElement).hasAttribute('disabled') && (el as HTMLElement).offsetParent !== null) as HTMLElement[];
+
+      const currentElementIndex = focusableElements.findIndex(el => el === document.activeElement);
+      
+      if (currentElementIndex > -1 && currentElementIndex < focusableElements.length - 1) {
+        focusableElements[currentElementIndex + 1].focus();
+      }
+    }
+  };
+
+  const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value && !isNaN(Number(value))) {
+      setPaymentId(formatPaymentId(Number(value)));
+    } else if (value && !value.startsWith('P')) {
+       const numericPart = value.replace(/\D/g, '');
+       if(numericPart) {
+         setPaymentId(formatPaymentId(Number(numericPart)));
+       }
+    }
+  };
+
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
   const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [paymentHistory, selectedCustomerKey]);
@@ -486,7 +519,7 @@ export default function SupplierPaymentsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card onKeyDown={handleKeyDown}>
               <CardHeader><CardTitle>{editingPaymentId ? `Editing Payment` : 'Payment Processing'}</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                   <div className="p-4 border rounded-lg bg-card/30">
@@ -496,7 +529,7 @@ export default function SupplierPaymentsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="payment-id">Payment ID</Label>
-                        <Input id="payment-id" type="text" value={paymentId} onChange={e => setPaymentId(e.target.value)} />
+                        <Input id="payment-id" type="text" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} />
                       </div>
                       <div className="space-y-2">
                         <Label>Payment Type</Label>
@@ -650,5 +683,3 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
-
-    
