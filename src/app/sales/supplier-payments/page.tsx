@@ -176,8 +176,11 @@ export default function SupplierPaymentsPage() {
   const cdEligibleEntries = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return selectedEntries.filter(e => new Date(e.dueDate) > today);
-  }, [selectedEntries]);
+    return selectedEntries.filter(e => {
+        const dueDate = new Date(e.dueDate);
+        return dueDate >= today;
+    });
+}, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
     if (selectedEntries.length === 0) {
@@ -213,35 +216,25 @@ export default function SupplierPaymentsPage() {
 
         let base = 0;
         const currentPaymentAmount = paymentAmount || 0;
-
-        // Calculate amount that has already received a CD for the eligible entries
-        const amountWithCDAlready = paymentHistory.reduce((acc, payment) => {
-            if (payment.paidFor) {
-                payment.paidFor.forEach(pf => {
-                    const correspondingEntry = cdEligibleEntries.find(e => e.srNo === pf.srNo);
-                    if (correspondingEntry && pf.cdApplied) {
-                        acc += pf.amount;
-                    }
-                });
-            }
-            return acc;
+        
+        const amountWithCDAlready = cdEligibleEntries.reduce((acc, entry) => {
+            const paymentsForThisEntry = paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo && pf.cdApplied));
+            return acc + paymentsForThisEntry.reduce((sum, p) => sum + (p.paidFor?.find(pf => pf.srNo === entry.srNo)?.amount || 0), 0);
         }, 0);
-
-
+        
         if (cdAt === 'payment_amount') {
             base = currentPaymentAmount;
         } else if (cdAt === 'unpaid_amount') {
             base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
         } else if (cdAt === 'full_amount') {
-            const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount)), 0);
+            const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
             base = totalOriginalAmount - amountWithCDAlready;
         } else if (cdAt === 'paid_amount') {
-            const totalPaidAmount = cdEligibleEntries.reduce((acc, entry) => {
-                const originalAmount = entry.originalNetAmount || 0;
-                const outstandingAmount = Number(entry.netAmount);
-                return acc + (originalAmount - outstandingAmount);
+             const totalPaidForEligible = cdEligibleEntries.reduce((acc, entry) => {
+                const paidAmount = paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0);
+                return acc + paidAmount;
             }, 0);
-            base = totalPaidAmount - amountWithCDAlready;
+            base = totalPaidForEligible - amountWithCDAlready;
         }
         
         setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
@@ -436,6 +429,7 @@ export default function SupplierPaymentsPage() {
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
+  const paidEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0) : [], [customers, selectedCustomerKey, customerIdKey]);
   const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [paymentHistory, selectedCustomerKey]);
   
   const availableCdOptions = useMemo(() => {
@@ -592,6 +586,26 @@ export default function SupplierPaymentsPage() {
           </Card>
           
           <Card>
+            <CardHeader><CardTitle>Paid Entries</CardTitle></CardHeader>
+            <CardContent>
+                <div className="overflow-x-auto">
+                <Table>
+                    <TableHeader><TableRow><TableHead>SR No</TableHead><TableHead>Date</TableHead><TableHead>Original Amount</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                    {paidEntries.map(entry => (
+                        <TableRow key={entry.id}>
+                        <TableCell>{entry.srNo}</TableCell>
+                        <TableCell>{entry.date}</TableCell>
+                        <TableCell>{(entry.originalNetAmount || entry.amount).toFixed(2)}</TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+                </div>
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
@@ -680,4 +694,3 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
-
