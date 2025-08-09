@@ -84,6 +84,7 @@ export type Payment = {
     date: string;
     amount: number;
     cdAmount: number;
+    cdApplied: boolean;
     type: string;
     receiptType: string;
     notes: string;

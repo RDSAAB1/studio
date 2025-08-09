@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { initialCustomers } from "@/lib/data";
 import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
-import { toTitleCase, formatPaymentId } from "@/lib/utils";
+import { toTitleCase, formatPaymentId, cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -34,7 +34,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Trash } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -42,6 +44,17 @@ const cdOptions = [
     { value: 'payment_amount', label: 'CD on Payment Amount (Manual)' },
     { value: 'full_amount', label: 'CD on Full Amount (Selected)' },
 ];
+
+const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
+    <div className={cn("flex items-start gap-3", className)}>
+        {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
+        <div>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="font-semibold text-sm break-words">{String(value) || '-'}</p>
+        </div>
+    </div>
+);
+
 
 export default function SupplierPaymentsPage() {
   const { toast } = useToast();
@@ -58,6 +71,8 @@ export default function SupplierPaymentsPage() {
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [isClient, setIsClient] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
 
 
   useEffect(() => {
@@ -126,6 +141,7 @@ export default function SupplierPaymentsPage() {
     setPaymentAmount(0);
     setPaymentType('Full');
     setCdEnabled(false);
+    setEditingPaymentId(null);
   };
   
   const handleEntrySelect = (entryId: string) => {
@@ -191,7 +207,6 @@ export default function SupplierPaymentsPage() {
     } else if (cdAt === 'unpaid_amount') {
         base = outstanding;
     } else if (cdAt === 'full_amount') {
-        // "Full Amount" is the original total NET amount of the selected entries.
         const originalTotalNetAmount = selectedEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || 0), 0);
         base = originalTotalNetAmount; 
     } else if (cdAt === 'paid_amount') {
@@ -209,7 +224,13 @@ export default function SupplierPaymentsPage() {
     setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
   }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt, selectedEntries, paymentHistory, selectedCustomerKey]);
 
-
+  const clearForm = () => {
+    setSelectedEntryIds(new Set());
+    setPaymentAmount(0);
+    setCdEnabled(false);
+    setEditingPaymentId(null);
+  };
+  
   const processPayment = () => {
     if (!selectedCustomerKey) {
         toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
@@ -222,6 +243,11 @@ export default function SupplierPaymentsPage() {
      if (paymentType === 'Partial' && paymentAmount > totalOutstandingForSelected) {
       toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
       return;
+    }
+
+    if (editingPaymentId) {
+        handleUpdatePayment();
+        return;
     }
     
     const lastPaymentNum = paymentHistory.reduce((max, p) => {
@@ -238,6 +264,7 @@ export default function SupplierPaymentsPage() {
         date: new Date().toISOString().split("T")[0],
         amount: paymentAmount,
         cdAmount: calculatedCdAmount,
+        cdApplied: cdEnabled,
         type: paymentType,
         receiptType: 'Online',
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
@@ -262,13 +289,66 @@ export default function SupplierPaymentsPage() {
     setCustomers(updatedCustomers);
     setPaymentHistory(prev => [...prev, newPayment]);
     
-    setSelectedEntryIds(new Set());
-    setPaymentAmount(0);
-    setCdEnabled(false);
+    clearForm();
     toast({ title: "Success", description: "Payment processed successfully.", duration: 3000 });
   };
+
+  const handleEditPayment = (payment: Payment) => {
+     // First, revert the state to before this payment was made
+    handleDeletePayment(payment.paymentId, true); // silent = true
+
+    setEditingPaymentId(payment.paymentId);
+    setPaymentAmount(payment.amount);
+    setPaymentType(payment.type);
+    setCdEnabled(payment.cdApplied);
+    setCalculatedCdAmount(payment.cdAmount);
+
+    const srNosInPayment = payment.notes.match(/S\d{5}/g) || [];
+    const entryIdsToSelect = new Set(customers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
+    setSelectedEntryIds(entryIdsToSelect);
+    
+    toast({ title: "Editing Payment", description: `Editing payment ${payment.paymentId}. Please make your changes and click 'Update Payment'.`});
+  };
+
+  const handleUpdatePayment = () => {
+    if (!editingPaymentId || !selectedCustomerKey) return;
+    
+    const updatedPayment: Payment = {
+        paymentId: editingPaymentId,
+        customerId: selectedCustomerKey,
+        date: new Date().toISOString().split("T")[0],
+        amount: paymentAmount,
+        cdAmount: calculatedCdAmount,
+        cdApplied: cdEnabled,
+        type: paymentType,
+        receiptType: 'Online',
+        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
+    };
+
+    let remainingPayment = paymentAmount + calculatedCdAmount;
+    const updatedCustomers = customers.map(c => {
+        if(selectedEntryIds.has(c.id)){
+             const outstanding = parseFloat(String(c.netAmount));
+             if (remainingPayment >= outstanding) {
+              remainingPayment -= outstanding;
+              return {...c, netAmount: 0};
+            } else {
+              const newNetAmount = parseFloat((outstanding - remainingPayment).toFixed(2));
+              remainingPayment = 0;
+              return {...c, netAmount: newNetAmount};
+            }
+        }
+        return c;
+    });
+
+    setCustomers(updatedCustomers);
+    setPaymentHistory(prev => [...prev, updatedPayment]);
+
+    clearForm();
+    toast({ title: "Success", description: "Payment updated successfully.", duration: 3000 });
+  };
   
-  const handleDeletePayment = (paymentIdToDelete: string) => {
+  const handleDeletePayment = (paymentIdToDelete: string, silent = false) => {
     if (!selectedCustomerKey) return;
 
     const paymentToDelete = paymentHistory.find(p => p.paymentId === paymentIdToDelete);
@@ -286,10 +366,11 @@ export default function SupplierPaymentsPage() {
     const updatedCustomers = customers.map(c => {
         if (srNosInPayment.includes(c.srNo)) {
             const originalEntry = originalCustomersData.find(ic => ic.srNo === c.srNo);
-            const originalAmount = originalEntry ? Number(originalEntry.amount) : Number(c.amount);
+            const originalNetAmount = originalEntry ? Number(originalEntry.originalNetAmount) : 0;
 
             const currentNet = Number(c.netAmount);
-            const restoredAmountForThisEntry = Math.min(tempAmountToRestore, originalAmount - currentNet);
+            const canRestore = originalNetAmount - currentNet;
+            const restoredAmountForThisEntry = Math.min(tempAmountToRestore, canRestore);
             
             const newNet = currentNet + restoredAmountForThisEntry;
             tempAmountToRestore -= restoredAmountForThisEntry;
@@ -302,13 +383,15 @@ export default function SupplierPaymentsPage() {
     setCustomers(updatedCustomers);
     setPaymentHistory(updatedPaymentHistory);
 
-    toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
-};
+    if (!silent) {
+        toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
+    }
+  };
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
   const paidEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0 && c.amount > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
-  const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey) : [], [paymentHistory, selectedCustomerKey]);
+  const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [paymentHistory, selectedCustomerKey]);
   
   const availableCdOptions = useMemo(() => {
     if (paymentType === 'Partial') {
@@ -384,7 +467,7 @@ export default function SupplierPaymentsPage() {
           </Card>
 
           <Card>
-              <CardHeader><CardTitle>Payment Processing</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{editingPaymentId ? `Editing Payment ${editingPaymentId}` : 'Payment Processing'}</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                   <div className="p-4 border rounded-lg bg-card/30">
                       <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
@@ -431,28 +514,15 @@ export default function SupplierPaymentsPage() {
                         </div>
                       </>}
                   </div>
-                  <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>Process Payment</Button>
+                  <div className="flex gap-4">
+                    <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>
+                        {editingPaymentId ? 'Update Payment' : 'Process Payment'}
+                    </Button>
+                    {editingPaymentId && (
+                        <Button variant="outline" onClick={clearForm}>Cancel Edit</Button>
+                    )}
+                  </div>
               </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader><CardTitle>Paid Entries</CardTitle></CardHeader>
-            <CardContent>
-                <div className="overflow-x-auto">
-                <Table>
-                    <TableHeader><TableRow><TableHead>SR No</TableHead><TableHead>Date</TableHead><TableHead>Original Amount</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                    {paidEntries.map(entry => (
-                        <TableRow key={entry.id}>
-                        <TableCell>{entry.srNo}</TableCell>
-                        <TableCell>{entry.date}</TableCell>
-                        <TableCell>{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
-                        </TableRow>
-                    ))}
-                    </TableBody>
-                </Table>
-                </div>
-            </CardContent>
           </Card>
           
           <Card>
@@ -467,7 +537,7 @@ export default function SupplierPaymentsPage() {
                             <TableHead>Amount</TableHead>
                             <TableHead>CD Amount</TableHead>
                             <TableHead>Notes</TableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -477,23 +547,31 @@ export default function SupplierPaymentsPage() {
                         <TableCell>{p.date}</TableCell>
                         <TableCell>{p.amount.toFixed(2)}</TableCell>
                         <TableCell>{p.cdAmount.toFixed(2)}</TableCell>
-                        <TableCell>{p.notes}</TableCell>
-                        <TableCell>
-                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount. This action cannot be undone.</AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeletePayment(p.paymentId)}>Continue</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                        <TableCell className="max-w-xs truncate">{p.notes}</TableCell>
+                        <TableCell className="text-center">
+                            <div className="flex justify-center items-center gap-0">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsPayment(p)}>
+                                    <Info className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}>
+                                    <Pen className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount. This action cannot be undone.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeletePayment(p.paymentId)}>Continue</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
                         </TableCell>
                         </TableRow>
                     ))}
@@ -504,6 +582,35 @@ export default function SupplierPaymentsPage() {
           </Card>
         </>
       )}
+
+      <Dialog open={!!detailsPayment} onOpenChange={(open) => !open && setDetailsPayment(null)}>
+        <DialogContent className="max-w-lg">
+          {detailsPayment && (
+            <>
+            <DialogHeader>
+                <DialogTitle>Payment Details: {detailsPayment.paymentId}</DialogTitle>
+                <DialogDescription>
+                    Detailed information for this payment record.
+                </DialogDescription>
+            </DialogHeader>
+            <Separator />
+            <div className="space-y-4 py-4">
+                <DetailItem icon={<Calendar size={14} />} label="Payment Date" value={detailsPayment.date} />
+                <DetailItem icon={<Banknote size={14} />} label="Payment Amount" value={`₹${detailsPayment.amount.toFixed(2)}`} />
+                <DetailItem icon={<Percent size={14} />} label="CD Amount" value={`₹${detailsPayment.cdAmount.toFixed(2)}`} />
+                <DetailItem icon={<Hash size={14} />} label="Payment Type" value={detailsPayment.type} />
+                <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Paid For SR No(s)</Label>
+                    <p className="font-semibold text-sm break-words">{detailsPayment.notes.replace('Paid for SR No(s): ', '')}</p>
+                </div>
+            </div>
+             <DialogFooter>
+                <Button variant="outline" onClick={() => setDetailsPayment(null)}>Close</Button>
+            </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
