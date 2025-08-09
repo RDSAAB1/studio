@@ -1,15 +1,16 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { initialCustomers, initialTransactions, initialFundTransactions } from "@/lib/data";
-import type { Customer, Transaction, FundTransaction } from "@/lib/definitions";
+import type { Customer, Transaction, FundTransaction, Payment } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-import { TrendingUp, TrendingDown, Scale, Banknote, Landmark, HandCoins, PiggyBank, DollarSign, Users, FileText, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Scale, Banknote, Landmark, HandCoins, PiggyBank, DollarSign, Users, FileText, ArrowRight, Wallet } from "lucide-react";
 import { format } from "date-fns";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string; value: string; icon: React.ReactNode; colorClass?: string; description?: string }) => (
@@ -26,14 +27,27 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 );
 
 export default function DashboardOverviewClient() {
-    const [customers] = useState<Customer[]>(initialCustomers);
+    const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
     const [transactions] = useState<Transaction[]>(initialTransactions);
     const [fundTransactions] = useState<FundTransaction[]>(initialFundTransactions);
+    const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
-        setIsClient(true);
-    }, []);
+        if (typeof window !== 'undefined') {
+          setIsClient(true);
+          try {
+            const savedCustomers = localStorage.getItem("customers_data");
+            if(savedCustomers) setCustomers(JSON.parse(savedCustomers));
+
+            const savedPayments = localStorage.getItem("payment_history");
+            if(savedPayments) setPaymentHistory(JSON.parse(savedPayments));
+            
+          } catch (error) {
+            console.error("Failed to load data from localStorage", error);
+          }
+        }
+      }, []);
 
     const financialState = useMemo(() => {
         let bankBalance = 0;
@@ -81,13 +95,15 @@ export default function DashboardOverviewClient() {
     const salesState = useMemo(() => {
         const totalSalesAmount = customers.reduce((sum, c) => sum + c.amount, 0);
         const totalOutstanding = customers.reduce((sum, c) => sum + Number(c.netAmount), 0);
+        const totalPaid = paymentHistory.reduce((sum, p) => sum + p.amount, 0);
         const uniqueCustomerIds = new Set(customers.map(c => c.customerId));
         return {
             totalSalesAmount,
             totalOutstanding,
+            totalPaid,
             totalCustomers: uniqueCustomerIds.size,
         }
-    }, [customers]);
+    }, [customers, paymentHistory]);
     
     const recentTransactions = useMemo(() => {
         return [...transactions]
@@ -128,6 +144,7 @@ export default function DashboardOverviewClient() {
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard title="Total Sales Amount" value={`₹${salesState.totalSalesAmount.toFixed(2)}`} icon={<Banknote />} />
+                    <StatCard title="Total Paid" value={`₹${salesState.totalPaid.toFixed(2)}`} icon={<Wallet />} colorClass="text-green-500"/>
                     <StatCard title="Total Outstanding" value={`₹${salesState.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
                     <StatCard title="Total Customers" value={String(salesState.totalCustomers)} icon={<Users />} />
                 </CardContent>
@@ -169,9 +186,9 @@ export default function DashboardOverviewClient() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                              <Users className="h-5 w-5 text-primary" />
-                            Recent Customers
+                            Recent Supplier Entries
                         </CardTitle>
-                         <CardDescription>Your last 5 customer entries.</CardDescription>
+                         <CardDescription>Your last 5 supplier entries.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -200,3 +217,5 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
+
+    
