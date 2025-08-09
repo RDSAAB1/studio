@@ -30,7 +30,6 @@ export default function DashboardOverviewClient() {
     const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
     const [transactions] = useState<Transaction[]>(initialTransactions);
     const [fundTransactions] = useState<FundTransaction[]>(initialFundTransactions);
-    const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -39,9 +38,6 @@ export default function DashboardOverviewClient() {
           try {
             const savedCustomers = localStorage.getItem("customers_data");
             if(savedCustomers) setCustomers(JSON.parse(savedCustomers));
-
-            const savedPayments = localStorage.getItem("payment_history");
-            if(savedPayments) setPaymentHistory(JSON.parse(savedPayments));
             
           } catch (error) {
             console.error("Failed to load data from localStorage", error);
@@ -95,7 +91,7 @@ export default function DashboardOverviewClient() {
     const salesState = useMemo(() => {
         const totalSalesAmount = customers.reduce((sum, c) => sum + c.amount, 0);
         const totalOutstanding = customers.reduce((sum, c) => sum + Number(c.netAmount), 0);
-        const totalPaid = paymentHistory.reduce((sum, p) => sum + p.amount, 0);
+        const totalPaid = totalSalesAmount - totalOutstanding;
         const uniqueCustomerIds = new Set(customers.map(c => c.customerId));
         return {
             totalSalesAmount,
@@ -103,7 +99,7 @@ export default function DashboardOverviewClient() {
             totalPaid,
             totalCustomers: uniqueCustomerIds.size,
         }
-    }, [customers, paymentHistory]);
+    }, [customers]);
     
     const recentTransactions = useMemo(() => {
         return [...transactions]
@@ -217,5 +213,3 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
-
-    

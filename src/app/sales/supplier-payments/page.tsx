@@ -77,7 +77,6 @@ export default function SupplierPaymentsPage() {
   const [isClient, setIsClient] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
-  const [cdAppliedOnSrNos, setCdAppliedOnSrNos] = useState<Set<string>>(new Set());
 
 
   useEffect(() => {
@@ -173,32 +172,31 @@ export default function SupplierPaymentsPage() {
   const totalOutstandingForSelected = useMemo(() => {
     return selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0);
   }, [selectedEntries]);
-  
-  const autoSetCDToggle = useCallback(() => {
-    if (selectedEntries.length === 0) {
-        setCdEnabled(false);
-        setCdAppliedOnSrNos(new Set());
-        return;
-    }
+
+  const cdEligibleEntries = useMemo(() => {
     const today = new Date();
-    today.setHours(0,0,0,0);
-    const allDueInFuture = selectedEntries.every(e => new Date(e.dueDate) > today);
-    
+    today.setHours(0, 0, 0, 0);
+
     const srNosWithCD = new Set<string>();
     paymentHistory.forEach(p => {
         if (p.cdApplied) {
             p.paidFor?.forEach(pf => srNosWithCD.add(pf.srNo));
         }
     });
-    const anySelectedHasCD = selectedEntries.some(e => srNosWithCD.has(e.srNo));
 
-    if (anySelectedHasCD) {
-        setCdEnabled(false);
-    } else {
-        setCdEnabled(allDueInFuture);
-    }
-    setCdAppliedOnSrNos(srNosWithCD);
+    return selectedEntries.filter(e => {
+        const dueDate = new Date(e.dueDate);
+        return dueDate > today && !srNosWithCD.has(e.srNo);
+    });
   }, [selectedEntries, paymentHistory]);
+  
+  const autoSetCDToggle = useCallback(() => {
+    if (selectedEntries.length === 0) {
+        setCdEnabled(false);
+        return;
+    }
+    setCdEnabled(cdEligibleEntries.length > 0);
+  }, [selectedEntries.length, cdEligibleEntries.length]);
 
   useEffect(() => {
     if (paymentType === 'Full') {
@@ -223,13 +221,6 @@ export default function SupplierPaymentsPage() {
         setCalculatedCdAmount(0);
         return;
     }
-
-    const srNosOnWhichCdApplied = new Set<string>();
-    paymentHistory.forEach(p => {
-        if (p.cdApplied) {
-            p.paidFor?.forEach(pf => srNosOnWhichCdApplied.add(pf.srNo));
-        }
-    });
     
     let base = 0;
     const currentPaymentAmount = paymentAmount || 0;
@@ -237,24 +228,18 @@ export default function SupplierPaymentsPage() {
     if (cdAt === 'payment_amount') {
         base = currentPaymentAmount;
     } else if (cdAt === 'unpaid_amount') {
-        base = totalOutstandingForSelected;
+        base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
     } else if (cdAt === 'full_amount') {
-        const totalOriginalAmountForSelected = selectedEntries.reduce((acc, entry) => {
-            if (srNosOnWhichCdApplied.has(entry.srNo)) return acc;
-            return acc + (entry.originalNetAmount || 0);
-        }, 0);
-        base = totalOriginalAmountForSelected;
+        base = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount)), 0);
     } else if (cdAt === 'paid_amount') {
-         const paidAmountForSelectedEntriesWithoutCD = selectedEntries.reduce((acc, entry) => {
-            if (srNosOnWhichCdApplied.has(entry.srNo)) return acc;
+         base = cdEligibleEntries.reduce((acc, entry) => {
             const originalAmount = entry.originalNetAmount || 0;
             const outstandingAmount = Number(entry.netAmount);
             return acc + (originalAmount - outstandingAmount);
         }, 0);
-        base = paidAmountForSelectedEntriesWithoutCD;
     }
     setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
-  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt, selectedEntries, paymentHistory]);
+  }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries]);
 
   const clearForm = () => {
     setSelectedEntryIds(new Set());
@@ -292,7 +277,8 @@ export default function SupplierPaymentsPage() {
              if (remainingPayment > 0) {
                  const amountToPay = Math.min(outstanding, remainingPayment);
                  remainingPayment -= amountToPay;
-                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled });
+                 const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
+                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
                  return {...c, netAmount: outstanding - amountToPay};
              }
         }
@@ -348,7 +334,8 @@ export default function SupplierPaymentsPage() {
              if (remainingPayment > 0) {
                  const amountToPay = Math.min(outstanding, remainingPayment);
                  remainingPayment -= amountToPay;
-                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled });
+                 const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
+                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
                  return {...c, netAmount: outstanding - amountToPay};
              }
         }
@@ -452,7 +439,7 @@ export default function SupplierPaymentsPage() {
     return cdOptions.filter(opt => opt.value !== 'payment_amount');
   }, [paymentType]);
   
-  const isCdSwitchDisabled = selectedEntries.some(e => cdAppliedOnSrNos.has(e.srNo));
+  const isCdSwitchDisabled = cdEligibleEntries.length === 0;
 
   if (!isClient) {
     return null;
@@ -559,7 +546,7 @@ export default function SupplierPaymentsPage() {
                             </TooltipTrigger>
                             {isCdSwitchDisabled && (
                                 <TooltipContent>
-                                    <p>CD has already been applied to one or more selected entries.</p>
+                                    <p>No selected entries are eligible for CD.</p>
                                 </TooltipContent>
                             )}
                         </Tooltip>
