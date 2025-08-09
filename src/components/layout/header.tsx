@@ -10,6 +10,7 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import {
   Tooltip,
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PageMeta } from "@/app/types";
+import { cva } from "class-variance-authority";
 import { 
   HeartHandshake, Briefcase, Users, Package, Megaphone, LayoutDashboard, FilePlus, 
   Book, PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database, 
@@ -27,12 +29,17 @@ import {
 } from "lucide-react";
 
 const menuItems = [
+   {
+    id: "Main0",
+    name: "Dashboard",
+    icon: <LayoutDashboard className="h-8 w-8" />,
+    href: "/sales/dashboard-overview",
+  },
   {
     id: "Main1",
     name: "Sales",
     icon: <HeartHandshake className="h-8 w-8" />,
     subMenus: [
-      { id: "Sub1-1", name: "Dashboard Overview", href: "/sales/dashboard-overview", icon: <LayoutDashboard className="h-5 w-5" /> },
       { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <Book className="h-5 w-5" /> },
       { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
       { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
@@ -121,10 +128,11 @@ const menuItems = [
 export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
   const pathname = usePathname();
 
-  const currentPage = menuItems.flatMap(m => m.subMenus).find(s => s.href === pathname);
-  const currentMainMenu = menuItems.find(m => m.subMenus.some(s => s.href === pathname));
+  const currentPage = menuItems.flatMap(m => m.subMenus || []).find(s => s.href === pathname);
+  const currentDirectPage = menuItems.find(m => m.href === pathname);
+  const currentMainMenu = menuItems.find(m => (m.subMenus && m.subMenus.some(s => s.href === pathname)) || m.href === pathname);
 
-  const displayTitle = currentPage?.name || pageMeta?.title || 'BizSuite';
+  const displayTitle = currentDirectPage?.name || currentPage?.name || pageMeta?.title || 'BizSuite';
   const displayIcon = currentMainMenu?.icon || pageMeta?.icon;
 
   return (
@@ -141,30 +149,48 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
             <NavigationMenuList>
               {menuItems.map((item) => (
                 <NavigationMenuItem key={item.id} value={item.id}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <NavigationMenuTrigger className="px-2 h-12 w-12">
-                        {item.icon}
-                        <span className="sr-only">{item.name}</span>
-                      </NavigationMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{item.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[250px] gap-2 p-4">
-                      {item.subMenus.map((subItem) => (
-                        <ListItem
-                          key={subItem.id}
-                          href={subItem.href}
-                          title={subItem.name}
-                          icon={subItem.icon}
-                          active={pathname === subItem.href}
-                        />
-                      ))}
-                    </ul>
-                  </NavigationMenuContent>
+                    {item.href ? (
+                        <Link href={item.href} legacyBehavior passHref>
+                           <Tooltip>
+                             <TooltipTrigger asChild>
+                               <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), "px-2 h-12 w-12", pathname === item.href && "bg-accent text-accent-foreground")}>
+                                 {item.icon}
+                                 <span className="sr-only">{item.name}</span>
+                               </NavigationMenuLink>
+                             </TooltipTrigger>
+                             <TooltipContent>
+                               <p>{item.name}</p>
+                             </TooltipContent>
+                           </Tooltip>
+                        </Link>
+                    ) : (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                            <NavigationMenuTrigger className="px-2 h-12 w-12">
+                                {item.icon}
+                                <span className="sr-only">{item.name}</span>
+                            </NavigationMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                            <p>{item.name}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+                  {item.subMenus && (
+                    <NavigationMenuContent>
+                        <ul className="grid w-[250px] gap-2 p-4">
+                        {item.subMenus.map((subItem) => (
+                            <ListItem
+                            key={subItem.id}
+                            href={subItem.href}
+                            title={subItem.name}
+                            icon={subItem.icon}
+                            active={pathname === subItem.href}
+                            />
+                        ))}
+                        </ul>
+                    </NavigationMenuContent>
+                  )}
                 </NavigationMenuItem>
               ))}
             </NavigationMenuList>
