@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { initialCustomers } from "@/lib/data";
-import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn } from "@/lib/utils";
 import {
   Card,
@@ -37,6 +37,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -63,6 +65,7 @@ export default function SupplierPaymentsPage() {
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   
+  const [paymentId, setPaymentId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [cdEnabled, setCdEnabled] = useState(false);
@@ -73,6 +76,7 @@ export default function SupplierPaymentsPage() {
   const [isClient, setIsClient] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
+  const [cdAppliedOnSrNos, setCdAppliedOnSrNos] = useState<Set<string>>(new Set());
 
 
   useEffect(() => {
@@ -83,7 +87,9 @@ export default function SupplierPaymentsPage() {
         setCustomers(savedCustomers ? JSON.parse(savedCustomers) : initialCustomers);
 
         const savedPayments = localStorage.getItem("payment_history");
-        setPaymentHistory(savedPayments ? JSON.parse(savedPayments) : []);
+        const parsedPayments = savedPayments ? JSON.parse(savedPayments) : [];
+        setPaymentHistory(parsedPayments);
+        setPaymentId(getNextPaymentId(parsedPayments));
 
       } catch (error) {
         console.error("Failed to load data from localStorage", error);
@@ -134,14 +140,19 @@ export default function SupplierPaymentsPage() {
     return summary;
   }, [customers]);
 
+  const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
+    const lastPaymentNum = currentPayments.reduce((max, p) => {
+        const numMatch = p.paymentId.match(/^P(\d+)$/);
+        const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+        return num > max ? num : max;
+    }, 0);
+    return formatPaymentId(lastPaymentNum + 1);
+  }, []);
+
 
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
-    setSelectedEntryIds(new Set());
-    setPaymentAmount(0);
-    setPaymentType('Full');
-    setCdEnabled(false);
-    setEditingPaymentId(null);
+    clearForm();
   };
   
   const handleEntrySelect = (entryId: string) => {
@@ -165,14 +176,28 @@ export default function SupplierPaymentsPage() {
   const autoSetCDToggle = useCallback(() => {
     if (selectedEntries.length === 0) {
         setCdEnabled(false);
+        setCdAppliedOnSrNos(new Set());
         return;
     }
     const today = new Date();
     today.setHours(0,0,0,0);
     const allDueInFuture = selectedEntries.every(e => new Date(e.dueDate) > today);
+    
+    const srNosWithCD = new Set<string>();
+    paymentHistory.forEach(p => {
+        if (p.cdApplied) {
+            p.paidFor?.forEach(pf => srNosWithCD.add(pf.srNo));
+        }
+    });
+    const anySelectedHasCD = selectedEntries.some(e => srNosWithCD.has(e.srNo));
 
-    setCdEnabled(allDueInFuture);
-  }, [selectedEntries]);
+    if (anySelectedHasCD) {
+        setCdEnabled(false);
+    } else {
+        setCdEnabled(allDueInFuture);
+    }
+    setCdAppliedOnSrNos(srNosWithCD);
+  }, [selectedEntries, paymentHistory]);
 
   useEffect(() => {
     if (paymentType === 'Full') {
@@ -182,7 +207,6 @@ export default function SupplierPaymentsPage() {
         setPaymentAmount(totalOutstandingForSelected);
       }
     } else {
-      // For partial payment, amount is manual and CD at must be payment_amount
       if(cdEnabled && cdAt !== 'payment_amount'){
           setCdAt('payment_amount');
       }
@@ -198,37 +222,45 @@ export default function SupplierPaymentsPage() {
         setCalculatedCdAmount(0);
         return;
     }
+
+    const srNosOnWhichCdApplied = new Set<string>();
+    paymentHistory.forEach(p => {
+        if (p.cdApplied) {
+            p.paidFor?.forEach(pf => srNosOnWhichCdApplied.add(pf.srNo));
+        }
+    });
+    
     let base = 0;
     const currentPaymentAmount = paymentAmount || 0;
-    const outstanding = totalOutstandingForSelected;
-
+    
     if (cdAt === 'payment_amount') {
         base = currentPaymentAmount;
     } else if (cdAt === 'unpaid_amount') {
-        base = outstanding;
+        base = totalOutstandingForSelected;
     } else if (cdAt === 'full_amount') {
-        const originalTotalNetAmount = selectedEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || 0), 0);
-        base = originalTotalNetAmount; 
+        const totalOriginalAmountForSelected = selectedEntries.reduce((acc, entry) => {
+            if (srNosOnWhichCdApplied.has(entry.srNo)) return acc;
+            return acc + (entry.originalNetAmount || 0);
+        }, 0);
+        base = totalOriginalAmountForSelected;
     } else if (cdAt === 'paid_amount') {
-        if (selectedCustomerKey) {
-            const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-            const paidAmountForSelectedEntries = paymentHistory
-                .filter(p => {
-                    const noteSrNos = p.notes.match(/S\d{5}/g) || [];
-                    return noteSrNos.some(srNo => selectedSrNos.has(srNo));
-                })
-                .reduce((acc, p) => acc + p.amount, 0);
-            base = paidAmountForSelectedEntries;
-        }
+         const paidAmountForSelectedEntriesWithoutCD = selectedEntries.reduce((acc, entry) => {
+            if (srNosOnWhichCdApplied.has(entry.srNo)) return acc;
+            const originalAmount = entry.originalNetAmount || 0;
+            const outstandingAmount = Number(entry.netAmount);
+            return acc + (originalAmount - outstandingAmount);
+        }, 0);
+        base = paidAmountForSelectedEntriesWithoutCD;
     }
     setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
-  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt, selectedEntries, paymentHistory, selectedCustomerKey]);
+  }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt, selectedEntries, paymentHistory]);
 
   const clearForm = () => {
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
     setEditingPaymentId(null);
+    setPaymentId(getNextPaymentId(paymentHistory));
   };
   
   const processPayment = () => {
@@ -250,16 +282,24 @@ export default function SupplierPaymentsPage() {
         return;
     }
     
-    const lastPaymentNum = paymentHistory.reduce((max, p) => {
-        const numMatch = p.paymentId.match(/^P(\d+)$/);
-        const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-        return num > max ? num : max;
-    }, 0);
+    let remainingPayment = paymentAmount + calculatedCdAmount;
+    const paidForDetails: PaidFor[] = [];
 
-    const newPaymentIdCounter = lastPaymentNum + 1;
+    const updatedCustomers = customers.map(c => {
+        if(selectedEntryIds.has(c.id)){
+             const outstanding = parseFloat(String(c.netAmount));
+             if (remainingPayment > 0) {
+                 const amountToPay = Math.min(outstanding, remainingPayment);
+                 remainingPayment -= amountToPay;
+                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled });
+                 return {...c, netAmount: outstanding - amountToPay};
+             }
+        }
+        return c;
+    });
 
     const newPayment: Payment = {
-        paymentId: formatPaymentId(newPaymentIdCounter),
+        paymentId: paymentId || getNextPaymentId(paymentHistory),
         customerId: selectedCustomerKey,
         date: new Date().toISOString().split("T")[0],
         amount: paymentAmount,
@@ -267,24 +307,9 @@ export default function SupplierPaymentsPage() {
         cdApplied: cdEnabled,
         type: paymentType,
         receiptType: 'Online',
-        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
+        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
+        paidFor: paidForDetails,
     };
-
-    let remainingPayment = paymentAmount + calculatedCdAmount;
-    const updatedCustomers = customers.map(c => {
-        if(selectedEntryIds.has(c.id)){
-             const outstanding = parseFloat(String(c.netAmount));
-             if (remainingPayment >= outstanding) {
-              remainingPayment -= outstanding;
-              return {...c, netAmount: 0};
-            } else {
-              const newNetAmount = parseFloat((outstanding - remainingPayment).toFixed(2));
-              remainingPayment = 0;
-              return {...c, netAmount: newNetAmount};
-            }
-        }
-        return c;
-    });
     
     setCustomers(updatedCustomers);
     setPaymentHistory(prev => [...prev, newPayment]);
@@ -294,16 +319,16 @@ export default function SupplierPaymentsPage() {
   };
 
   const handleEditPayment = (payment: Payment) => {
-     // First, revert the state to before this payment was made
-    handleDeletePayment(payment.paymentId, true); // silent = true
+    handleDeletePayment(payment.paymentId, true); 
 
     setEditingPaymentId(payment.paymentId);
+    setPaymentId(payment.paymentId);
     setPaymentAmount(payment.amount);
     setPaymentType(payment.type);
     setCdEnabled(payment.cdApplied);
     setCalculatedCdAmount(payment.cdAmount);
 
-    const srNosInPayment = payment.notes.match(/S\d{5}/g) || [];
+    const srNosInPayment = (payment.paidFor || []).map(pf => pf.srNo);
     const entryIdsToSelect = new Set(customers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
     setSelectedEntryIds(entryIdsToSelect);
     
@@ -313,8 +338,24 @@ export default function SupplierPaymentsPage() {
   const handleUpdatePayment = () => {
     if (!editingPaymentId || !selectedCustomerKey) return;
     
+    let remainingPayment = paymentAmount + calculatedCdAmount;
+    const paidForDetails: PaidFor[] = [];
+
+    const updatedCustomers = customers.map(c => {
+        if(selectedEntryIds.has(c.id)){
+             const outstanding = parseFloat(String(c.netAmount));
+             if (remainingPayment > 0) {
+                 const amountToPay = Math.min(outstanding, remainingPayment);
+                 remainingPayment -= amountToPay;
+                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled });
+                 return {...c, netAmount: outstanding - amountToPay};
+             }
+        }
+        return c;
+    });
+
     const updatedPayment: Payment = {
-        paymentId: editingPaymentId,
+        paymentId: paymentId || editingPaymentId,
         customerId: selectedCustomerKey,
         date: new Date().toISOString().split("T")[0],
         amount: paymentAmount,
@@ -322,24 +363,9 @@ export default function SupplierPaymentsPage() {
         cdApplied: cdEnabled,
         type: paymentType,
         receiptType: 'Online',
-        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
+        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
+        paidFor: paidForDetails
     };
-
-    let remainingPayment = paymentAmount + calculatedCdAmount;
-    const updatedCustomers = customers.map(c => {
-        if(selectedEntryIds.has(c.id)){
-             const outstanding = parseFloat(String(c.netAmount));
-             if (remainingPayment >= outstanding) {
-              remainingPayment -= outstanding;
-              return {...c, netAmount: 0};
-            } else {
-              const newNetAmount = parseFloat((outstanding - remainingPayment).toFixed(2));
-              remainingPayment = 0;
-              return {...c, netAmount: newNetAmount};
-            }
-        }
-        return c;
-    });
 
     setCustomers(updatedCustomers);
     setPaymentHistory(prev => [...prev, updatedPayment]);
@@ -356,26 +382,19 @@ export default function SupplierPaymentsPage() {
     
     const updatedPaymentHistory = paymentHistory.filter(p => p.paymentId !== paymentIdToDelete);
 
-    const srNosInPayment = paymentToDelete.notes.match(/S\d{5}/g) || [];
-    const amountToRestore = paymentToDelete.amount + paymentToDelete.cdAmount;
-
-    let tempAmountToRestore = amountToRestore;
-
-    const originalCustomersData = JSON.parse(localStorage.getItem('customers_data') || '[]') as Customer[];
+    let tempAmountToRestore = paymentToDelete.amount + paymentToDelete.cdAmount;
 
     const updatedCustomers = customers.map(c => {
-        if (srNosInPayment.includes(c.srNo)) {
-            const originalEntry = originalCustomersData.find(ic => ic.srNo === c.srNo);
-            const originalNetAmount = originalEntry ? Number(originalEntry.originalNetAmount) : 0;
-
-            const currentNet = Number(c.netAmount);
-            const canRestore = originalNetAmount - currentNet;
-            const restoredAmountForThisEntry = Math.min(tempAmountToRestore, canRestore);
-            
-            const newNet = currentNet + restoredAmountForThisEntry;
-            tempAmountToRestore -= restoredAmountForThisEntry;
-            
-            return { ...c, netAmount: newNet };
+        const paidForEntry = paymentToDelete.paidFor?.find(pf => pf.srNo === c.srNo);
+        if (paidForEntry) {
+            const amountToRestoreForThisEntry = paidForEntry.amount;
+             if (tempAmountToRestore > 0) {
+                const currentNet = Number(c.netAmount);
+                const restoredAmount = Math.min(tempAmountToRestore, amountToRestoreForThisEntry);
+                const newNet = currentNet + restoredAmount;
+                tempAmountToRestore -= restoredAmount;
+                return { ...c, netAmount: newNet };
+             }
         }
         return c;
     });
@@ -390,7 +409,6 @@ export default function SupplierPaymentsPage() {
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
-  const paidEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0 && c.amount > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
   const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [paymentHistory, selectedCustomerKey]);
   
   const availableCdOptions = useMemo(() => {
@@ -400,6 +418,8 @@ export default function SupplierPaymentsPage() {
     return cdOptions.filter(opt => opt.value !== 'payment_amount');
   }, [paymentType]);
   
+  const isCdSwitchDisabled = selectedEntries.some(e => cdAppliedOnSrNos.has(e.srNo));
+
   if (!isClient) {
     return null;
   }
@@ -467,13 +487,17 @@ export default function SupplierPaymentsPage() {
           </Card>
 
           <Card>
-              <CardHeader><CardTitle>{editingPaymentId ? `Editing Payment ${editingPaymentId}` : 'Payment Processing'}</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{editingPaymentId ? `Editing Payment` : 'Payment Processing'}</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                   <div className="p-4 border rounded-lg bg-card/30">
                       <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
                       <p className="text-2xl font-bold text-primary">{totalOutstandingForSelected.toFixed(2)}</p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="payment-id">Payment ID</Label>
+                        <Input id="payment-id" type="text" value={paymentId} onChange={e => setPaymentId(e.target.value)} />
+                      </div>
                       <div className="space-y-2">
                         <Label>Payment Type</Label>
                         <Select value={paymentType} onValueChange={setPaymentType}>
@@ -488,10 +512,22 @@ export default function SupplierPaymentsPage() {
                           <Label htmlFor="payment-amount">Payment Amount</Label>
                           <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && cdAt !== 'payment_amount'} />
                       </div>
-                      <div className="flex items-center space-x-2 pt-6">
-                        <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
-                        <Label htmlFor="cd-toggle">Apply CD</Label>
-                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-2 pt-6">
+                                    <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
+                                    <Label htmlFor="cd-toggle" className={cn(isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
+                                </div>
+                            </TooltipTrigger>
+                            {isCdSwitchDisabled && (
+                                <TooltipContent>
+                                    <p>CD has already been applied to one or more selected entries.</p>
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
+                      </TooltipProvider>
+
                       {cdEnabled && <>
                         <div className="space-y-2">
                             <Label htmlFor="cd-percent">CD %</Label>
@@ -614,3 +650,5 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+
+    
