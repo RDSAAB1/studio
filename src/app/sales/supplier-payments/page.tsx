@@ -247,7 +247,7 @@ export default function SupplierPaymentsPage() {
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
-    toast({ title: "Success", description: "Payment processed successfully." });
+    toast({ title: "Success", description: "Payment processed successfully.", duration: 3000 });
   };
   
   const handleDeletePayment = (paymentIdToDelete: string) => {
@@ -284,7 +284,7 @@ export default function SupplierPaymentsPage() {
     setCustomers(updatedCustomers);
     setPaymentHistory(updatedPaymentHistory);
 
-    toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.` });
+    toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
 };
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
@@ -485,3 +485,4 @@ export default function SupplierPaymentsPage() {
 }
  
 
+    
