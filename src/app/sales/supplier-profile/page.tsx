@@ -69,38 +69,36 @@ const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var
 
 
 export default function SupplierProfilePage() {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
 
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsClient(true);
+      try {
+        const savedCustomers = localStorage.getItem("customers_data");
+        setCustomers(savedCustomers ? JSON.parse(savedCustomers) : initialCustomers);
+        const savedPayments = localStorage.getItem("payment_history");
+        setPaymentHistory(savedPayments ? JSON.parse(savedPayments) : []);
+      } catch (error) {
+        console.error("Failed to load data from localStorage", error);
+        setCustomers(initialCustomers);
+        setPaymentHistory([]);
+      }
+    }
+  }, []);
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
-    const tempPaymentHistory = new Map<string, Payment[]>();
-
-     // Simulate some payment history for demonstration
-     customers.forEach((c, index) => {
-        if(!c.customerId) return;
-        if(!tempPaymentHistory.has(c.customerId)) {
-            tempPaymentHistory.set(c.customerId, []);
-        }
-        if(index % 2 === 0 && parseFloat(String(c.netAmount)) > 5000) {
-             tempPaymentHistory.get(c.customerId)?.push({
-                 paymentId: `P0000${index + 1}`,
-                 date: '2025-07-28',
-                 amount: parseFloat(String(c.netAmount)) / 2,
-                 cdAmount: 50, // Simulated CD
-                 type: 'Partial',
-                 receiptType: 'Online',
-                 notes: `Simulated partial payment for SR ${c.srNo}`
-             })
-        }
-    });
     
-    // Create summaries for each customer
+    // Create summaries for each customer based on their entries
     customers.forEach(entry => {
       if(!entry.customerId) return;
       const key = entry.customerId;
@@ -109,8 +107,7 @@ export default function SupplierProfilePage() {
           name: entry.name, so: entry.so, contact: entry.contact, address: entry.address,
           acNo: entry.acNo, ifscCode: entry.ifscCode, bank: entry.bank, branch: entry.branch,
           totalOutstanding: 0, totalAmount: 0, totalPaid: 0, 
-          paymentHistory: tempPaymentHistory.get(key) || [], 
-          outstandingEntryIds: [],
+          paymentHistory: [], outstandingEntryIds: [],
           totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0, totalKartaAmount: 0,
           totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
           totalOutstandingTransactions: 0, allTransactions: [], allPayments: [],
@@ -118,19 +115,18 @@ export default function SupplierProfilePage() {
         });
       }
       const data = newSummary.get(key)!;
-      const totalAmount = parseFloat(String(entry.amount));
-      const netAmount = parseFloat(String(entry.netAmount));
-      
-      data.totalAmount += totalAmount;
-      if (netAmount > 0) {
-        data.outstandingEntryIds.push(entry.id);
-      }
+      data.totalAmount += parseFloat(String(entry.amount));
+      data.totalOutstanding += parseFloat(String(entry.netAmount));
+      data.allTransactions.push(entry);
     });
 
-    // Calculate totals for each customer
-    newSummary.forEach((summary) => {
-        summary.totalPaid = summary.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
-        summary.totalOutstanding = summary.totalAmount - summary.totalPaid;
+    // Add payment history to each summary
+    paymentHistory.forEach(payment => {
+        if(payment.customerId && newSummary.has(payment.customerId)) {
+            const data = newSummary.get(payment.customerId)!;
+            data.paymentHistory.push(payment);
+            data.totalPaid += payment.amount;
+        }
     });
 
     // Create the Mill overview summary
@@ -138,7 +134,7 @@ export default function SupplierProfilePage() {
         name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
-        totalOutstandingTransactions: 0, allTransactions: customers, allPayments: [],
+        totalOutstandingTransactions: 0, allTransactions: customers, allPayments: paymentHistory,
         transactionsByVariety: {}
     };
     
@@ -146,11 +142,14 @@ export default function SupplierProfilePage() {
     let rateCount = 0;
 
     customers.forEach(c => {
-        millSummary.totalGrossWeight += c.grossWeight;
-        millSummary.totalTeirWeight += c.teirWeight;
-        millSummary.totalNetWeight += c.netWeight;
-        millSummary.totalKartaAmount += c.kartaAmount;
-        millSummary.totalLabouryAmount += c.labouryAmount;
+        millSummary.totalGrossWeight! += c.grossWeight;
+        millSummary.totalTeirWeight! += c.teirWeight;
+        millSummary.totalNetWeight! += c.netWeight;
+        millSummary.totalKartaAmount! += c.kartaAmount;
+        millSummary.totalLabouryAmount! += c.labouryAmount;
+        millSummary.totalAmount! += c.amount;
+        millSummary.totalOutstanding! += Number(c.netAmount);
+
         if(c.rate > 0) {
             totalRate += c.rate;
             rateCount++;
@@ -161,14 +160,8 @@ export default function SupplierProfilePage() {
         }
     });
 
-    newSummary.forEach(summary => {
-        millSummary.totalAmount += summary.totalAmount;
-        millSummary.totalOutstanding += summary.totalOutstanding;
-        millSummary.totalPaid += summary.totalPaid;
-        summary.paymentHistory.forEach(p => millSummary.allPayments.push(p));
-    });
-    
-    millSummary.totalCdAmount = millSummary.allPayments.reduce((acc, p) => acc + p.cdAmount, 0);
+    millSummary.totalPaid = paymentHistory.reduce((acc, p) => acc + p.amount, 0);
+    millSummary.totalCdAmount = paymentHistory.reduce((acc, p) => acc + p.cdAmount, 0);
     millSummary.totalTransactions = customers.length;
     millSummary.totalOutstandingTransactions = customers.filter(c => parseFloat(String(c.netAmount)) > 0).length;
     millSummary.averageRate = rateCount > 0 ? totalRate / rateCount : 0;
@@ -184,12 +177,13 @@ export default function SupplierProfilePage() {
     if (!selectedCustomerKey) {
       setSelectedCustomerKey(MILL_OVERVIEW_KEY);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers]); 
+  }, [customers, paymentHistory, selectedCustomerKey]); 
 
   useEffect(() => {
-    updateCustomerSummary();
-  }, [updateCustomerSummary]);
+    if(isClient) {
+        updateCustomerSummary();
+    }
+  }, [isClient, updateCustomerSummary]);
 
   const selectedCustomerData = selectedCustomerKey ? customerSummary.get(selectedCustomerKey) : null;
   const isMillSelected = selectedCustomerKey === MILL_OVERVIEW_KEY;
@@ -200,17 +194,11 @@ export default function SupplierProfilePage() {
 
   const financialPieChartData = useMemo(() => {
     if (!selectedCustomerData) return [];
-    if(isMillSelected) {
-        return [
-            { name: 'Total Paid', value: selectedCustomerData.totalPaid },
-            { name: 'Total Outstanding', value: selectedCustomerData.totalAmount - selectedCustomerData.totalPaid },
-        ]
-    }
     return [
       { name: 'Total Paid', value: selectedCustomerData.totalPaid },
       { name: 'Total Outstanding', value: selectedCustomerData.totalOutstanding },
     ];
-  }, [selectedCustomerData, isMillSelected]);
+  }, [selectedCustomerData]);
 
   const varietyPieChartData = useMemo(() => {
     if (!selectedCustomerData?.transactionsByVariety) return [];
@@ -220,6 +208,10 @@ export default function SupplierProfilePage() {
   const chartData = useMemo(() => {
     return selectedChart === 'financial' ? financialPieChartData : varietyPieChartData;
   }, [selectedChart, financialPieChartData, varietyPieChartData]);
+
+  if (!isClient) {
+    return null; // Or a loading skeleton
+  }
 
   return (
     <div className="space-y-6">
@@ -255,14 +247,14 @@ export default function SupplierProfilePage() {
                         <CardDescription>A complete financial and transactional overview of the entire business.</CardDescription>
                     </CardHeader>
                      <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <StatCard title="Total Gross Weight" value={`${selectedCustomerData.totalGrossWeight.toFixed(2)} kg`} icon={<Box />} />
-                        <StatCard title="Total Net Weight" value={`${selectedCustomerData.totalNetWeight.toFixed(2)} kg`} icon={<Weight />} />
-                        <StatCard title="Average Rate" value={`₹${selectedCustomerData.averageRate.toFixed(2)}`} icon={<Calculator />} />
+                        <StatCard title="Total Gross Weight" value={`${(selectedCustomerData.totalGrossWeight || 0).toFixed(2)} kg`} icon={<Box />} />
+                        <StatCard title="Total Net Weight" value={`${(selectedCustomerData.totalNetWeight || 0).toFixed(2)} kg`} icon={<Weight />} />
+                        <StatCard title="Average Rate" value={`₹${(selectedCustomerData.averageRate || 0).toFixed(2)}`} icon={<Calculator />} />
                         <StatCard title="Total Transactions" value={`${selectedCustomerData.totalTransactions}`} icon={<Briefcase />} />
-                        <StatCard title="Total Outstanding" value={`₹${(selectedCustomerData.totalAmount - selectedCustomerData.totalPaid).toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                        <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-                        <StatCard title="Total Karta" value={`₹${selectedCustomerData.totalKartaAmount.toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
-                        <StatCard title="Total Laboury" value={`₹${selectedCustomerData.totalLabouryAmount.toFixed(2)}`} icon={<Users />} colorClass="text-destructive" />
+                        <StatCard title="Total Outstanding" value={`₹${(selectedCustomerData.totalOutstanding || 0).toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Paid" value={`₹${(selectedCustomerData.totalPaid || 0).toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+                        <StatCard title="Total Karta" value={`₹${(selectedCustomerData.totalKartaAmount || 0).toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
+                        <StatCard title="Total Laboury" value={`₹${(selectedCustomerData.totalLabouryAmount || 0).toFixed(2)}`} icon={<Users />} colorClass="text-destructive" />
                     </CardContent>
                 </Card>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
