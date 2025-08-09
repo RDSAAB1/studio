@@ -191,7 +191,8 @@ export default function SupplierPaymentsPage() {
     } else if (cdAt === 'unpaid_amount') {
         base = outstanding;
     } else if (cdAt === 'full_amount') {
-        base = outstanding; 
+        const originalTotalAmount = selectedEntries.reduce((acc, entry) => acc + entry.amount, 0);
+        base = originalTotalAmount; 
     } else if (cdAt === 'paid_amount') {
         if (selectedCustomerKey) {
             const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
