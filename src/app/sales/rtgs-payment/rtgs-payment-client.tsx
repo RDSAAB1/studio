@@ -7,14 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { initialCustomers } from "@/lib/data";
 import type { Customer } from "@/lib/definitions";
-import { toTitleCase } from "@/lib/utils";
+import { toTitleCase, formatPaymentId } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Pen, Save, PlusCircle, Trash, ArrowUpDown } from "lucide-react";
+import { Pen, Save, PlusCircle, Trash, ArrowUpDown, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -420,84 +420,87 @@ export default function RtgspaymentClient() {
   return (
     <div className="space-y-8">
        <Card>
-        <CardHeader>
-          <CardTitle>Select Customer</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-end gap-4">
-          <div className="flex-grow">
-            <DynamicCombobox
-                options={customerComboboxOptions}
-                value={selectedCustomerId}
-                onChange={handleCustomerSelect}
-                onAdd={handleAddNewCustomer}
-                placeholder="Select or add a customer..."
-                searchPlaceholder="Search customer..."
-                emptyPlaceholder="No customer found."
-            />
-          </div>
-          {selectedCustomerId && (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline">View Outstanding ({outstandingEntries.length})</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl">
-                  <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(customers.find(c=>c.id === selectedCustomerId)?.name || '')}</DialogTitle></DialogHeader>
-                  <div className="max-h-[60vh] overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead><Checkbox
-                            checked={selectedOutstandingIds.size > 0 && selectedOutstandingIds.size === outstandingEntries.length}
-                            onCheckedChange={(checked) => {
-                              const newSet = new Set<string>();
-                              if (checked) {
-                                outstandingEntries.forEach(e => newSet.add(e.id));
-                              }
-                              setSelectedOutstandingIds(newSet);
-                            }}
-                           /></TableHead>
-                          <TableHead>SR No</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Net Amount</TableHead>
-                          <TableHead>Variety</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {outstandingEntries.map(entry => (
-                          <TableRow key={entry.id}>
-                            <TableCell><Checkbox 
-                              checked={selectedOutstandingIds.has(entry.id)}
-                              onCheckedChange={() => {
-                                const newSet = new Set(selectedOutstandingIds);
-                                if (newSet.has(entry.id)) {
-                                  newSet.delete(entry.id);
-                                } else {
-                                  newSet.add(entry.id);
-                                }
-                                setSelectedOutstandingIds(newSet);
-                              }}
-                            /></TableCell>
-                            <TableCell>{entry.srNo}</TableCell>
-                            <TableCell>{entry.date}</TableCell>
-                            <TableCell>{Number(entry.netAmount).toFixed(2)}</TableCell>
-                            <TableCell>{entry.variety}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                   <DialogFooter>
-                    <p className="mr-auto text-sm text-muted-foreground">
-                      Selected: {selectedOutstandingIds.size} | Total: {totalOutstandingForSelected.toFixed(2)}
-                    </p>
-                    <Button id="close-outstanding-modal" variant="ghost">Cancel</Button>
-                    <Button onClick={handlePaySelectedOutstanding} disabled={selectedOutstandingIds.size === 0}>
-                      Pay Selected
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-          )}
+        <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-primary" />
+                <h3 className="text-base font-semibold">Select Customer</h3>
+            </div>
+            <div className="w-full sm:w-auto sm:min-w-64 flex items-end gap-2">
+                 <div className="flex-grow">
+                     <DynamicCombobox
+                        options={customerComboboxOptions}
+                        value={selectedCustomerId}
+                        onChange={handleCustomerSelect}
+                        onAdd={handleAddNewCustomer}
+                        placeholder="Select or add a customer..."
+                        searchPlaceholder="Search customer..."
+                        emptyPlaceholder="No customer found."
+                    />
+                 </div>
+                 {selectedCustomerId && (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">View Outstanding ({outstandingEntries.length})</Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl">
+                          <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(customers.find(c=>c.id === selectedCustomerId)?.name || '')}</DialogTitle></DialogHeader>
+                          <div className="max-h-[60vh] overflow-y-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead><Checkbox
+                                    checked={selectedOutstandingIds.size > 0 && selectedOutstandingIds.size === outstandingEntries.length}
+                                    onCheckedChange={(checked) => {
+                                      const newSet = new Set<string>();
+                                      if (checked) {
+                                        outstandingEntries.forEach(e => newSet.add(e.id));
+                                      }
+                                      setSelectedOutstandingIds(newSet);
+                                    }}
+                                   /></TableHead>
+                                  <TableHead>SR No</TableHead>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead>Net Amount</TableHead>
+                                  <TableHead>Variety</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {outstandingEntries.map(entry => (
+                                  <TableRow key={entry.id}>
+                                    <TableCell><Checkbox 
+                                      checked={selectedOutstandingIds.has(entry.id)}
+                                      onCheckedChange={() => {
+                                        const newSet = new Set(selectedOutstandingIds);
+                                        if (newSet.has(entry.id)) {
+                                          newSet.delete(entry.id);
+                                        } else {
+                                          newSet.add(entry.id);
+                                        }
+                                        setSelectedOutstandingIds(newSet);
+                                      }}
+                                    /></TableCell>
+                                    <TableCell>{entry.srNo}</TableCell>
+                                    <TableCell>{entry.date}</TableCell>
+                                    <TableCell>{Number(entry.netAmount).toFixed(2)}</TableCell>
+                                    <TableCell>{entry.variety}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                           <DialogFooter>
+                            <p className="mr-auto text-sm text-muted-foreground">
+                              Selected: {selectedOutstandingIds.size} | Total: {totalOutstandingForSelected.toFixed(2)}
+                            </p>
+                            <Button id="close-outstanding-modal" variant="ghost">Cancel</Button>
+                            <Button onClick={handlePaySelectedOutstanding} disabled={selectedOutstandingIds.size === 0}>
+                              Pay Selected
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                  )}
+            </div>
         </CardContent>
       </Card>
       
@@ -716,4 +719,5 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
+
 

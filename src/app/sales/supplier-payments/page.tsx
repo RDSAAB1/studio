@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -35,7 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -460,22 +461,25 @@ export default function SupplierPaymentsPage() {
   return (
     <div className="space-y-8">
       <Card>
-        <CardHeader>
-          <CardTitle>Select Supplier</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || undefined}>
-            <SelectTrigger className="w-full md:w-1/2">
-              <SelectValue placeholder="Select a supplier to process payments" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                 <SelectItem key={key} value={key}>
-                    {toTitleCase(data.name)} ({data.contact}) - Outstanding: {data.totalOutstanding.toFixed(2)}
-                  </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-primary" />
+              <h3 className="text-base font-semibold">Select Supplier</h3>
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-64">
+            <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || undefined}>
+              <SelectTrigger className="w-full h-9 text-sm">
+                <SelectValue placeholder="Select a supplier to process payments" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
+                   <SelectItem key={key} value={key} className="text-sm">
+                      {toTitleCase(data.name)} ({data.contact}) - Outstanding: {data.totalOutstanding.toFixed(2)}
+                    </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
 
