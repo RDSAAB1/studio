@@ -231,7 +231,7 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
   const isActiveParent = item.subMenus && item.subMenus.some(sub => activePath.startsWith(sub.href || ''));
 
   return (
-    <li className="my-1 relative"> {/* Added relative here for consistency with Link's pseudo-element if needed */}
+    <li className="my-1 relative"> 
       <div
         className={cn(
           "flex items-center justify-between p-2 cursor-pointer rounded-md transition-colors h-12",
@@ -253,7 +253,7 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
         </div>
         {item.subMenus && isSidebarOpen && ( /* Only show chevron if sidebar is open and has sub-menus */
           <div className="flex-shrink-0">
-            {isOpen ? <ChevronDown className="h-5 w-5 text-white" /> : <ChevronRight className="h-5 w-5 text-white" />} {/* Direct white icons */}
+            {isOpen ? <ChevronDown className="h-6 w-6 text-white" /> : <ChevronRight className="h-6 w-6 text-white" />} {/* Direct white icons */}
           </div>
         )}
       </div>
