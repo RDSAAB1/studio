@@ -11,6 +11,7 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
+  NavigationMenuViewport, 
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import {
@@ -23,25 +24,26 @@ import { cn } from "@/lib/utils";
 import type { PageMeta } from "@/app/types";
 import { cva } from "class-variance-authority";
 import { 
-  HeartHandshake, Briefcase, Users, Package, Megaphone, LayoutDashboard, FilePlus, 
-  Book, PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database, 
-  Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Volume2, Mail, 
-  LineChart, ClipboardCheck, Users2, UserPlus, FileText, ArrowLeftRight, PiggyBank, Landmark, Truck
+  Briefcase, Users, Package, LayoutDashboard, FilePlus, 
+  PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database, 
+  Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Mail, 
+  LineChart, ClipboardCheck, Users2, UserPlus, Landmark, Truck, 
+  Scale, Rocket, TrendingUp, Sparkles
 } from "lucide-react";
 
 const menuItems = [
    {
     id: "Main0",
     name: "Dashboard",
-    icon: <LayoutDashboard className="h-8 w-8" />,
+    icon: <LayoutDashboard className="h-5 w-5" />,
     href: "/sales/dashboard-overview",
   },
   {
     id: "Main1",
     name: "Sales",
-    icon: <HeartHandshake className="h-8 w-8" />,
+    icon: <TrendingUp className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <Book className="h-5 w-5" /> },
+      { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
       { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
       { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
       { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
@@ -50,9 +52,9 @@ const menuItems = [
   {
     id: "Main8",
     name: "Supplier",
-    icon: <Truck className="h-8 w-8" />,
+    icon: <Truck className="h-5 w-5" />,
     subMenus: [
-       { id: "Sub8-1", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <FilePlus className="h-5 w-5" /> },
+       { id: "Sub8-1", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <UserPlus className="h-5 w-5" /> },
        { id: "Sub8-2", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
        { id: "Sub8-3", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
     ],
@@ -60,7 +62,7 @@ const menuItems = [
    {
     id: "Main9",
     name: "Customer",
-    icon: <Users className="h-8 w-8" />,
+    icon: <Users className="h-5 w-5" />,
     subMenus: [
        { id: "Sub9-1", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-5 w-5" /> },
        { id: "Sub9-2", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
@@ -70,7 +72,7 @@ const menuItems = [
    {
     id: "Main6",
     name: "Income & Expense",
-    icon: <ArrowLeftRight className="h-8 w-8" />,
+    icon: <Scale className="h-5 w-5" />,
     subMenus: [
         { id: "Sub6-1", name: "Income & Expense Tracker", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
     ],
@@ -78,7 +80,7 @@ const menuItems = [
   {
     id: "Main7",
     name: "Cash & Bank",
-    icon: <PiggyBank className="h-8 w-8" />,
+    icon: <Landmark className="h-5 w-5" />,
     subMenus: [
         { id: "Sub7-1", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
     ],
@@ -86,7 +88,7 @@ const menuItems = [
   {
     id: "Main2",
     name: "HR & Payroll",
-    icon: <Users2 className="h-8 w-8" />,
+    icon: <Users2 className="h-5 w-5" />,
     subMenus: [
       { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database className="h-5 w-5" /> },
       { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator className="h-5 w-5" /> },
@@ -96,7 +98,7 @@ const menuItems = [
   {
     id: "Main3",
     name: "Inventory",
-    icon: <Package className="h-8 w-8" />,
+    icon: <Package className="h-5 w-5" />,
     subMenus: [
       { id: "Sub3-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: <Boxes className="h-5 w-5" /> },
       { id: "Sub3-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: <Building2 className="h-5 w-5" /> },
@@ -106,9 +108,9 @@ const menuItems = [
   {
     id: "Main4",
     name: "Marketing",
-    icon: <Megaphone className="h-8 w-8" />,
+    icon: <Sparkles className="h-5 w-5" />,
     subMenus: [
-      { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Volume2 className="h-5 w-5" /> },
+      { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Rocket className="h-5 w-5" /> },
       { id: "Sub4-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: <Mail className="h-5 w-5" /> },
       { id: "Sub4-3", name: "Analytics", href: "/marketing/analytics", icon: <LineChart className="h-5 w-5" /> },
     ],
@@ -116,7 +118,7 @@ const menuItems = [
   {
     id: "Main5",
     name: "Project Management",
-    icon: <Briefcase className="h-8 w-8" />,
+    icon: <Briefcase className="h-5 w-5" />,
     subMenus: [
       { id: "Sub5-1", name: "Project Dashboard", href: "/projects/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
       { id: "Sub5-2", name: "Task Management", href: "/projects/tasks", icon: <ClipboardCheck className="h-5 w-5" /> },
@@ -145,39 +147,33 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
                 {displayTitle}
             </span>
         </div>
-        <NavigationMenu>
+        <NavigationMenu className="relative"> 
           <TooltipProvider>
             <NavigationMenuList>
               {menuItems.map((item) => (
-                <NavigationMenuItem key={item.id} value={item.id}>
+                <NavigationMenuItem key={item.id} value={item.id}> 
                   {item.href ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                         <Link href={item.href} passHref legacyBehavior={false}>
-                          <NavigationMenuLink
+                         <NavigationMenuLink
+                            asChild
                             className={cn(navigationMenuTriggerStyle(), "px-2 h-12 w-12", pathname === item.href && "bg-accent text-accent-foreground")}
                           >
-                            {item.icon}
-                            <span className="sr-only">{item.name}</span>
+                            <Link href={item.href}> {/* Removed passHref and legacyBehavior={false} */} 
+                                {item.icon}
+                                <span className="sr-only">{item.name}</span>
+                            </Link>
                           </NavigationMenuLink>
-                        </Link>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>{item.name}</p>
                       </TooltipContent>
                     </Tooltip>
                   ) : (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <NavigationMenuTrigger className="px-2 h-12 w-12">
-                          {item.icon}
-                          <span className="sr-only">{item.name}</span>
-                        </NavigationMenuTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{item.name}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <NavigationMenuTrigger className="px-2 h-12 w-12">
+                      {item.icon}
+                      <span className="sr-only">{item.name}</span>
+                    </NavigationMenuTrigger>
                   )}
                   {item.subMenus && (
                     <NavigationMenuContent>
@@ -198,6 +194,7 @@ export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
               ))}
             </NavigationMenuList>
           </TooltipProvider>
+          <NavigationMenuViewport />
         </NavigationMenu>
       </div>
     </header>
@@ -215,7 +212,7 @@ const ListItem = React.forwardRef<
           href={props.href || "#"}
           ref={ref}
           className={cn(
-            "flex items-center gap-3 select-none space-y-1 rounded-md p-2 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+            "flex items-center gap-3 select-none space-y-1 rounded-md p-2 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:focus:text-accent-foreground focus:outline-none",
             active ? "bg-accent/50" : "",
             className
           )}
