@@ -1,236 +1,233 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  NavigationMenuViewport,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PageMeta } from "@/app/types";
-import { cva } from "class-variance-authority";
 import {
-  Briefcase, Users, Package, LayoutDashboard, FilePlus,
-  PackageCheck, BarChart3, Wallet, UserCircle, Banknote, Database,
-  Calculator, CalendarCheck, Boxes, Building2, ShoppingCart, Mail,
-  LineChart, ClipboardCheck, Users2, UserPlus, Landmark, Truck,
-  Scale, Rocket, TrendingUp, Sparkles
+  Menu,
+  LayoutDashboard,
+  Home,
+  Settings as SettingsIcon, 
+  BarChart3,
+  Users,
+  LogOut,
+  ChevronRight,
+  ChevronDown,
+  Search,
+  UserCircle,
+  TrendingUp,
+  ShoppingCart,
+  PackageCheck,
+  Banknote,
+  Truck,
+  UserPlus,
+  Wallet,
+  Scale,
+  Calculator,
+  Landmark,
+  Database,
+  CalendarCheck,
+  Boxes,
+  Building2,
+  Sparkles,
+  Rocket,
+  Mail,
+  LineChart,
+  ClipboardCheck,
+  Briefcase,
+  Users2,
+  Package as PackageIcon 
 } from "lucide-react";
 
-const menuItems = [
-   {
-   id: "Main0",
-   name: "Dashboard",
-   icon: <LayoutDashboard className="h-5 w-5" />,
-   href: "/sales/dashboard-overview",
- },
- {
-   id: "Main1",
-   name: "Sales",
-   icon: <TrendingUp className="h-5 w-5" />,
-   subMenus: [
-     { id: "Sub1-3", name: "Product Catalog", href: "/sales/product-catalog", icon: <ShoppingCart className="h-5 w-5" /> },
-     { id: "Sub1-4", name: "Order Tracking", href: "/sales/order-tracking", icon: <PackageCheck className="h-5 w-5" /> },
-     { id: "Sub1-5", name: "Sales Reports", href: "/sales/sales-reports", icon: <BarChart3 className="h-5 w-5" /> },
-     { id: "Sub1-8", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: <Banknote className="h-5 w-5" /> },
-   ],
- },
- {
-   id: "Main8",
-   name: "Supplier",
-   icon: <Truck className="h-5 w-5" />,
-   subMenus: [
-      { id: "Sub8-1", name: "Supplier Entry", href: "/sales/supplier-entry", icon: <UserPlus className="h-5 w-5" /> },
-      { id: "Sub8-2", name: "Supplier Payments", href: "/sales/supplier-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Sub8-3", name: "Supplier Profile", href: "/sales/supplier-profile", icon: <UserCircle className="h-5 w-5" /> },
-   ],
- },
-   {
-   id: "Main9",
-   name: "Customer",
-   icon: <Users className="h-5 w-5" />,
-   subMenus: [
-      { id: "Sub9-1", name: "Customer Entry", href: "/sales/customer-entry", icon: <UserPlus className="h-5 w-5" /> },
-      { id: "Sub9-2", name: "Customer Payments", href: "/sales/customer-payments", icon: <Wallet className="h-5 w-5" /> },
-      { id: "Sub9-3", name: "Customer Profile", href: "/sales/customer-profile", icon: <UserCircle className="h-5 w-5" /> },
-   ],
- },
-   {
-   id: "Main6",
-   name: "Income & Expense",
-   icon: <Scale className="h-5 w-5" />,
-   subMenus: [
-       { id: "Sub6-1", name: "Income & Expense Tracker", href: "/expense-tracker", icon: <Calculator className="h-5 w-5" /> },
-   ],
- },
- {
-   id: "Main7",
-   name: "Cash & Bank",
-   icon: <Landmark className="h-5 w-5" />,
-   subMenus: [
-       { id: "Sub7-1", name: "Cash & Bank Management", href: "/cash-bank", icon: <Landmark className="h-5 w-5" /> },
-   ],
- },
- {
-   id: "Main2",
-   name: "HR & Payroll",
-   icon: <Users2 className="h-5 w-5" />,
-   subMenus: [
-     { id: "Sub2-1", name: "Employee Database", href: "/hr/employee-database", icon: <Database className="h-5 w-5" /> },
-     { id: "Sub2-2", name: "Payroll Management", href: "/hr/payroll-management", icon: <Calculator className="h-5 w-5" /> },
-     { id: "Sub2-3", name: "Attendance Tracking", href: "/hr/attendance-tracking", icon: <CalendarCheck className="h-5 w-5" /> },
-   ],
- },
- {
-   id: "Main3",
-   name: "Inventory",
-   icon: <Package className="h-5 w-5" />,
-   subMenus: [
-     { id: "Sub3-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: <Boxes className="h-5 w-5" /> },
-     { id: "Sub3-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: <Building2 className="h-5 w-5" /> },
-     { id: "Sub3-3", name: "Purchase Orders", href: "/inventory/purchase-orders", icon: <ShoppingCart className="h-5 w-5" /> },
-   ],
- },
- {
-   id: "Main4",
-   name: "Marketing",
-   icon: <Sparkles className="h-5 w-5" />,
-   subMenus: [
-     { id: "Sub4-1", name: "Campaigns", href: "/marketing/campaigns", icon: <Rocket className="h-5 w-5" /> },
-     { id: "Sub4-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: <Mail className="h-5 w-5" /> },
-     { id: "Sub4-3", name: "Analytics", href: "/marketing/analytics", icon: <LineChart className="h-5 w-5" /> },
-   ],
- },
- {
-   id: "Main5",
-   name: "Project Management",
-   icon: <Briefcase className="h-5 w-5" />,
-   subMenus: [
-     { id: "Sub5-1", name: "Project Dashboard", href: "/projects/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
-     { id: "Sub5-2", name: "Task Management", href: "/projects/tasks", icon: <ClipboardCheck className="h-5 w-5" /> },
-     { id: "Sub5-3", name: "Team Collaboration", href: "/projects/collaboration", icon: <Users2 className="h-5 w-5" /> },
-   ],
- },
+interface HeaderProps {
+  pageMeta?: PageMeta;
+  toggleSidebar: () => void; 
+  isSidebarOpen: boolean; 
+}
+
+// NOTE: This menuItems array is duplicated from custom-sidebar.tsx to allow Header
+// to determine the current page's icon and title based on the full menu structure.
+const allMenuItems = [
+  {
+    id: "main-home",
+    name: "Home",
+    icon: Home,
+    href: "/sales/dashboard-overview", 
+  },
+  {
+    id: "main-dashboard-from-image",
+    name: "Dashboard", 
+    icon: SettingsIcon, 
+    href: "/sales/dashboard-overview", 
+  },
+  {
+    id: "main-settings-from-image",
+    name: "Settings",
+    icon: SettingsIcon,
+    href: "/settings",
+  },
+  {
+    id: "main-reports-from-image",
+    name: "Reports",
+    icon: BarChart3,
+    href: "/sales/sales-reports", 
+  },
+  {
+    id: "main-users-from-image",
+    name: "Users",
+    icon: Users,
+    href: "/hr/employee-database", 
+  },
+  // Your original detailed menu items follow:
+  {
+    id: "main-sales",
+    name: "Sales",
+    icon: TrendingUp,
+    subMenus: [
+      { id: "sub-sales-1", name: "Product Catalog", href: "/sales/product-catalog", icon: ShoppingCart },
+      { id: "sub-sales-2", name: "Order Tracking", href: "/sales/order-tracking", icon: PackageCheck },
+      { id: "sub-sales-3", name: "Sales Reports", href: "/sales/sales-reports", icon: BarChart3 },
+      { id: "sub-sales-4", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: Banknote },
+    ],
+  },
+  {
+    id: "main-suppliers",
+    name: "Suppliers",
+    icon: Truck,
+    subMenus: [
+      { id: "sub-suppliers-1", name: "Supplier Entry", href: "/sales/supplier-entry", icon: UserPlus },
+      { id: "sub-suppliers-2", name: "Supplier Payments", href: "/sales/supplier-payments", icon: Wallet },
+      { id: "sub-suppliers-3", name: "Supplier Profile", href: "/sales/supplier-profile", icon: UserCircle },
+    ],
+  },
+  {
+    id: "main-customers",
+    name: "Customers",
+    icon: Users,
+    subMenus: [
+      { id: "sub-customers-1", name: "Customer Entry", href: "/sales/customer-entry", icon: UserPlus },
+      { id: "sub-customers-2", name: "Customer Payments", href: "/sales/customer-payments", icon: Wallet },
+      { id: "sub-customers-3", name: "Customer Profile", href: "/sales/customer-profile", icon: UserCircle },
+    ],
+  },
+  {
+    id: "main-income-expense",
+    name: "Income & Expense",
+    icon: Scale,
+    subMenus: [
+      { id: "sub-income-expense-1", name: "Income & Expense Tracker", href: "/expense-tracker", icon: Calculator },
+    ],
+  },
+  {
+    id: "main-cash-bank",
+    name: "Cash & Bank",
+    icon: Landmark,
+    subMenus: [
+      { id: "sub-cash-bank-1", name: "Cash & Bank Management", href: "/cash-bank", icon: Landmark },
+    ],
+  },
+  {
+    id: "main-hr-payroll",
+    name: "HR & Payroll",
+    icon: Users2,
+    subMenus: [
+      { id: "sub-hr-1", name: "Employee Database", href: "/hr/employee-database", icon: Database },
+      { id: "sub-hr-2", name: "Payroll Management", href: "/hr/payroll-management", icon: Calculator },
+      { id: "sub-hr-3", name: "Attendance Tracking", href: "/hr/attendance-tracking", icon: CalendarCheck },
+    ],
+  },
+  {
+    id: "main-inventory",
+    name: "Inventory",
+    icon: PackageIcon,
+    subMenus: [
+      { id: "sub-inventory-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: Boxes },
+      { id: "sub-inventory-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: Building2 },
+      { id: "sub-inventory-3", name: "Purchase Orders", href: "/inventory/purchase-orders", icon: ShoppingCart },
+    ],
+  },
+  {
+    id: "main-marketing",
+    name: "Marketing",
+    icon: Sparkles,
+    subMenus: [
+      { id: "sub-marketing-1", name: "Campaigns", href: "/marketing/campaigns", icon: Rocket },
+      { id: "sub-marketing-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: Mail },
+      { id: "sub-marketing-3", name: "Analytics", href: "/marketing/analytics", icon: LineChart },
+    ],
+  },
+  {
+    id: "main-project-management",
+    name: "Project Management",
+    icon: Briefcase,
+    subMenus: [
+      { id: "sub-project-1", name: "Project Dashboard", href: "/projects/dashboard", icon: LayoutDashboard },
+      { id: "sub-project-2", name: "Task Management", href: "/projects/tasks", icon: ClipboardCheck },
+      { id: "sub-project-3", name: "Team Collaboration", href: "/projects/collaboration", icon: Users2 },
+    ],
+  },
+  {
+    id: "main-logout",
+    name: "Logout",
+    icon: LogOut,
+    href: "/logout", 
+  },
 ];
 
-
-export function Header({ pageMeta }: { pageMeta?: PageMeta }) {
+export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) {
   const pathname = usePathname();
 
-  const currentPage = menuItems.flatMap(m => m.subMenus || []).find(s => s.href === pathname);
-  const currentDirectPage = menuItems.find(m => m.href === pathname);
-  const currentMainMenu = menuItems.find(m => (m.subMenus && m.subMenus.some(s => s.href === pathname)) || m.href === pathname);
+  // Determine current page details based on pathname from the consolidated menuItems
+  const currentPage = allMenuItems.flatMap(m => m.subMenus || []).find(s => pathname.startsWith(s.href || '')) ||
+                      allMenuItems.find(m => pathname.startsWith(m.href || ''));
 
-  const displayTitle = currentDirectPage?.name || currentPage?.name || pageMeta?.title || 'BizSuite';
-  const displayIcon = currentMainMenu?.icon || pageMeta?.icon;
+  const DisplayIconComponent = currentPage?.icon || pageMeta?.icon;
+  const displayIcon = DisplayIconComponent ? <DisplayIconComponent className="h-5 w-5"  /> : null;
+  const displayTitle = currentPage?.name || pageMeta?.title || 'BizSuite';
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
-        <div className="flex items-center space-x-2">
-            <div className="text-primary">{displayIcon}</div>
-            <span className="font-bold font-headline sm:inline-block">
-                {displayTitle}
-            </span>
+    <header className="sticky top-0 z-30 w-full bg-[--sidebar-bg] text-[--sidebar-text] shadow-md"> 
+      <div className="container flex h-16 max-w-screen-2xl items-center justify-between px-4"> 
+        {/* Left section: Toggle button, Page Icon, Page Title */}
+        <div className="flex items-center space-x-4">
+          {/* Mobile menu toggle button (visible on small screens) */}
+          <button
+            onClick={toggleSidebar}
+            className={cn(
+              "p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-focus-ring]", 
+              "lg:hidden" 
+            )}
+            aria-label={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+          >
+            <Menu className="h-6 w-6 text-[--sidebar-text]" /> 
+          </button>
+
+          {displayIcon && <div className="text-[--sidebar-text]">{displayIcon}</div>} 
+          <span className="text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis text-[--sidebar-text]"> 
+            {displayTitle}
+          </span>
         </div>
-        <NavigationMenu className="relative">
-          <TooltipProvider>
-            <NavigationMenuList>
-              {menuItems.map((item) => (
-                <NavigationMenuItem key={item.id} value={item.id} className="relative">
-                  {item.href ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <NavigationMenuLink
-                            asChild
-                            className={cn(
-                              navigationMenuTriggerStyle(),
-                              "px-2 h-12 w-12",
-                              pathname === item.href && "bg-accent text-accent-foreground"
-                            )}
-                          >
-                            <Link href={item.href}>
-                                {item.icon}
-                                <span className="sr-only">{item.name}</span>
-                            </Link>
-                          </NavigationMenuLink>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{item.name}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                  ) : (
-                    <NavigationMenuTrigger className="px-2 h-12 w-12">
-                      {item.icon}
-                      <span className="sr-only">{item.name}</span>
-                    </NavigationMenuTrigger>
-                  )}
-                  {item.subMenus && (
-                    <NavigationMenuContent>
-                        <ul className="grid w-[250px] gap-2 p-4">
-                        {item.subMenus.map((subItem) => (
-                            <ListItem
-                            key={subItem.id}
-                            href={subItem.href}
-                            title={subItem.name}
-                            icon={subItem.icon}
-                            active={pathname === subItem.href}
-                            />
-                        ))}
-                        </ul>
-                    </NavigationMenuContent>
-                  )}
-                </NavigationMenuItem>
-              ))}
-            </NavigationMenuList>
-          </TooltipProvider>
-          <NavigationMenuViewport />
-        </NavigationMenu>
+
+        {/* Right section: Profile Icon, Settings Icon */}
+        <div className="flex items-center space-x-4">
+          {/* Profile Icon */}
+          <button 
+            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-focus-ring] transition-colors"
+            aria-label="User Profile"
+          >
+            <UserCircle className="h-6 w-6 text-[--sidebar-text]" />
+          </button>
+
+          {/* Settings Icon */}
+          <button 
+            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-focus-ring] transition-colors"
+            aria-label="Settings"
+          >
+            <SettingsIcon className="h-6 w-6 text-[--sidebar-text]" />
+          </button>
+        </div>
       </div>
     </header>
   );
 }
-
-const ListItem = React.forwardRef<
-  React.ElementRef<"a">,
-  React.ComponentPropsWithoutRef<"a"> & { active?: boolean; icon?: React.ReactNode }
->(({ className, title, icon, children, active, ...props }, ref) => {
-  return (
-    <li>
-      <NavigationMenuLink asChild>
-        <Link
-          href={props.href || "#"}
-          ref={ref}
-          className={cn(
-            "flex items-center gap-3 select-none space-y-1 rounded-md p-2 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:focus:text-accent-foreground focus:outline-none",
-            active ? "bg-accent/50" : "",
-            className
-          )}
-          {...props}
-        >
-          <div className="text-primary">{icon}</div>
-          <div className="flex flex-col">
-            <div className="text-sm font-medium leading-none">{title}</div>
-            <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
-              {children}
-            </p>
-          </div>
-        </Link>
-      </NavigationMenuLink>
-    </li>
-  );
-});
-ListItem.displayName = "ListItem";
