@@ -39,7 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchUpdateSuppliersOnPaymentChange } from '@/lib/firestore';
-import { runTransaction, doc, writeBatch, collection, getDocs, query, where } from "firebase/firestore";
+import { collection, runTransaction, doc, writeBatch, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const suppliersCollection = collection(db, "suppliers");
@@ -207,36 +207,36 @@ export default function SupplierPaymentsPage() {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
   
-    useEffect(() => {
-        if (!cdEnabled) {
-            setCalculatedCdAmount(0);
-            return;
-        }
+  useEffect(() => {
+      if (!cdEnabled) {
+          setCalculatedCdAmount(0);
+          return;
+      }
 
-        let base = 0;
-        const currentPaymentAmount = paymentAmount || 0;
-        
-        const amountWithCDAlready = cdEligibleEntries.reduce((acc, entry) => {
-            const paymentsForThisEntry = paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo && pf.cdApplied));
-            return acc + paymentsForThisEntry.reduce((sum, p) => sum + (p.paidFor?.find(pf => pf.srNo === entry.srNo)?.amount || 0), 0);
-        }, 0);
-        
-        if (cdAt === 'payment_amount') {
-            base = currentPaymentAmount;
-        } else if (cdAt === 'unpaid_amount') {
-            base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
-        } else if (cdAt === 'full_amount') {
-            const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
-            base = totalOriginalAmount - amountWithCDAlready;
-        } else if (cdAt === 'paid_amount') {
-             const totalPaidForEligible = cdEligibleEntries.reduce((acc, entry) => {
-                const paidAmount = paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0);
-                return acc + paidAmount;
-            }, 0);
-            base = totalPaidForEligible - amountWithCDAlready;
-        }
-        
-        setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
+      let base = 0;
+      const currentPaymentAmount = paymentAmount || 0;
+      
+      const amountWithCDAlready = cdEligibleEntries.reduce((acc, entry) => {
+          const paymentsForThisEntry = paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo && pf.cdApplied));
+          return acc + paymentsForThisEntry.reduce((sum, p) => sum + (p.paidFor?.find(pf => pf.srNo === entry.srNo)?.amount || 0), 0);
+      }, 0);
+      
+      if (cdAt === 'payment_amount') {
+          base = currentPaymentAmount;
+      } else if (cdAt === 'unpaid_amount') {
+          base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
+      } else if (cdAt === 'full_amount') {
+          const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
+          base = totalOriginalAmount - amountWithCDAlready;
+      } else if (cdAt === 'paid_amount') {
+            const totalPaidForEligible = cdEligibleEntries.reduce((acc, entry) => {
+              const paidAmount = paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0);
+              return acc + paidAmount;
+          }, 0);
+          base = totalPaidForEligible - amountWithCDAlready;
+      }
+      
+      setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
   }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory]);
 
   const clearForm = () => {
@@ -247,162 +247,172 @@ export default function SupplierPaymentsPage() {
     setPaymentId(getNextPaymentId(paymentHistory));
   };
 
-  const processPayment = async () => {
-    if (!selectedCustomerKey) {
-        toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
-        return;
-    }
-    if (selectedEntryIds.size === 0) {
-        toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
-        return;
-    }
-    if (paymentAmount <= 0 && calculatedCdAmount <= 0) {
-        toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
-        return;
-    }
-    if (paymentType === 'Partial' && !editingPayment && paymentAmount > totalOutstandingForSelected) {
-        toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
-        return;
-    }
+    const processPayment = async () => {
+        if (!selectedCustomerKey) {
+            toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
+            return;
+        }
+        if (selectedEntryIds.size === 0) {
+            toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
+            return;
+        }
+        if (paymentAmount <= 0 && calculatedCdAmount <= 0) {
+            toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
+            return;
+        }
+        if (paymentType === 'Partial' && !editingPayment && paymentAmount > totalOutstandingForSelected) {
+            toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
+            return;
+        }
 
-    try {
-        await runTransaction(db, async (transaction) => {
-            const tempEditingPayment = editingPayment;
-            
-            // --- READ PHASE ---
-            const allInvolvedSrNos = new Set<string>();
-            if (tempEditingPayment) {
-                (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
-            }
-            selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
-
-            const involvedSupplierDocs = new Map<string, any>();
-            for (const srNo of allInvolvedSrNos) {
-                const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
-                if (supplierToUpdate) {
-                    const docRef = doc(db, "suppliers", supplierToUpdate.id);
-                    const supplierDoc = await transaction.get(docRef);
-                    if (supplierDoc.exists()) {
-                        involvedSupplierDocs.set(srNo, supplierDoc);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const tempEditingPayment = editingPayment;
+                
+                // --- READ PHASE ---
+                // Get all involved supplier documents to ensure we have the latest data
+                const allInvolvedSrNos = new Set<string>();
+                if (tempEditingPayment) {
+                    (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
+                }
+                selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
+                
+                const involvedSupplierDocs = new Map<string, any>();
+                for (const srNo of allInvolvedSrNos) {
+                    const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
+                    if (supplierToUpdate) {
+                        const docRef = doc(db, "suppliers", supplierToUpdate.id);
+                        const supplierDoc = await transaction.get(docRef);
+                        if(supplierDoc.exists()){
+                            involvedSupplierDocs.set(srNo, supplierDoc);
+                        }
                     }
                 }
-            }
-            
-            // --- LOGIC & WRITE PHASE ---
-            const outstandingBalances = new Map<string, number>();
-            involvedSupplierDocs.forEach((doc, srNo) => {
-                outstandingBalances.set(srNo, Number(doc.data().netAmount));
-            });
-            
-            if (tempEditingPayment) {
-                (tempEditingPayment.paidFor || []).forEach(detail => {
-                    if(outstandingBalances.has(detail.srNo)) {
-                       const currentBalance = outstandingBalances.get(detail.srNo)!;
-                       outstandingBalances.set(detail.srNo, currentBalance + detail.amount);
+
+                // --- LOGIC & WRITE PHASE ---
+                const outstandingBalances: { [key: string]: number } = {};
+                involvedSupplierDocs.forEach((doc, srNo) => {
+                    outstandingBalances[srNo] = Number(doc.data().netAmount);
+                });
+
+                if (tempEditingPayment) {
+                    // Revert the old payment amount to the outstanding balance
+                    (tempEditingPayment.paidFor || []).forEach(detail => {
+                        if (outstandingBalances[detail.srNo] !== undefined) {
+                            outstandingBalances[detail.srNo] += detail.amount;
+                        }
+                    });
+                }
+
+                let remainingPayment = paymentAmount + calculatedCdAmount;
+                const paidForDetails: PaidFor[] = [];
+                const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+                sortedEntries.forEach(entryData => {
+                    if (remainingPayment > 0 && outstandingBalances[entryData.srNo] !== undefined) {
+                        const currentOutstanding = outstandingBalances[entryData.srNo];
+                        const amountToPay = Math.min(currentOutstanding, remainingPayment);
+
+                        if(amountToPay > 0){
+                            const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
+                            paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                            
+                            outstandingBalances[entryData.srNo] -= amountToPay;
+                            remainingPayment -= amountToPay;
+                        }
                     }
                 });
-            }
 
-            let remainingPayment = paymentAmount + calculatedCdAmount;
-            const paidForDetails: PaidFor[] = [];
-            const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                for (const srNo in outstandingBalances) {
+                    const newBalance = outstandingBalances[srNo];
+                    const supplierDoc = involvedSupplierDocs.get(srNo);
+                    if (supplierDoc) {
+                        // Use toFixed to prevent floating point inaccuracies
+                        transaction.update(supplierDoc.ref, { netAmount: parseFloat(newBalance.toFixed(2)) });
+                    }
+                }
 
-            sortedEntries.forEach(entryData => {
-                const currentOutstanding = outstandingBalances.get(entryData.srNo);
-                if (remainingPayment > 0 && typeof currentOutstanding !== 'undefined') {
-                    const amountToPay = Math.min(currentOutstanding, remainingPayment);
-                    remainingPayment -= amountToPay;
-                    const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
-                    paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-                    outstandingBalances.set(entryData.srNo, currentOutstanding - amountToPay);
+                const paymentData: Omit<Payment, 'id'> = {
+                    paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
+                    customerId: selectedCustomerKey,
+                    date: new Date().toISOString().split("T")[0],
+                    amount: paymentAmount,
+                    cdAmount: calculatedCdAmount,
+                    cdApplied: cdEnabled,
+                    type: paymentType,
+                    receiptType: 'Online',
+                    notes: `Paid for SR No(s): ${sortedEntries.map(e => e.srNo).join(', ')}`,
+                    paidFor: paidForDetails,
+                };
+
+                if (tempEditingPayment) {
+                    const paymentRef = doc(db, "payments", tempEditingPayment.id);
+                    transaction.update(paymentRef, paymentData);
+                } else {
+                    const newPaymentRef = doc(collection(db, "payments"));
+                    transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
                 }
             });
 
-            for (const [srNo, newBalance] of outstandingBalances.entries()) {
-                const supplierDoc = involvedSupplierDocs.get(srNo);
-                if(supplierDoc){
-                    transaction.update(supplierDoc.ref, { netAmount: newBalance });
-                }
-            }
+            clearForm();
+            toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
 
-            const paymentData: Omit<Payment, 'id'> = {
-              paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-              customerId: selectedCustomerKey,
-              date: new Date().toISOString().split("T")[0],
-              amount: paymentAmount,
-              cdAmount: calculatedCdAmount,
-              cdApplied: cdEnabled,
-              type: paymentType,
-              receiptType: 'Online',
-              notes: `Paid for SR No(s): ${sortedEntries.map(e => e.srNo).join(', ')}`,
-              paidFor: paidForDetails,
-            };
-
-            if (tempEditingPayment) {
-                const paymentRef = doc(db, "payments", tempEditingPayment.id);
-                transaction.update(paymentRef, paymentData);
-            } else {
-                const newPaymentRef = doc(collection(db, "payments"));
-                transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
-            }
-        });
-
-        clearForm();
-        toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
-
-    } catch (error) {
-        console.error("Error processing payment:", error);
-        toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment. Please try again." });
-    }
-  };
-
-
-  const handleEditPayment = async (paymentToEdit: Payment) => {
-    const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-    const associatedEntries = suppliers.filter(s => srNosInPayment.includes(s.srNo));
-    const associatedEntryIds = associatedEntries.map(e => e.id);
-
-    if (associatedEntryIds.length !== srNosInPayment.length) {
-        toast({
-            variant: "destructive",
-            title: "Cannot Edit Payment",
-            description: "Some original supplier entries for this payment could not be found. They may have been deleted.",
-        });
-    }
-    const entryIdsToSelect = new Set(associatedEntryIds);
-
-    setSelectedCustomerKey(paymentToEdit.customerId);
-    setEditingPayment(paymentToEdit);
-    setPaymentId(paymentToEdit.paymentId);
-    setPaymentAmount(paymentToEdit.amount);
-    setPaymentType(paymentToEdit.type);
-    setCdEnabled(paymentToEdit.cdApplied);
-    setCalculatedCdAmount(paymentToEdit.cdAmount);
-    setSelectedEntryIds(entryIdsToSelect);
-  
-    toast({
-      title: "Editing Mode",
-      description: `Editing payment ${paymentToEdit.paymentId}. Associated entries have been selected.`,
-    });
-  };
-
-  const handleDeletePayment = async (paymentIdToDelete: string) => {
-    const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
-    if (!paymentToDelete || !paymentToDelete.id) {
-        toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
-        return;
-    }
-    try {
-        await batchUpdateSuppliersOnPaymentChange(paymentToDelete.id, paymentToDelete.paidFor || [], true);
-        toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
-        if (editingPayment?.id === paymentIdToDelete) {
-          clearForm();
+        } catch (error) {
+            console.error("Error processing payment:", error);
+            toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment. Please try again." });
         }
-    } catch (error) {
-        console.error("Error in batch deletion:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
-    }
-  };
+    };
+
+
+    const handleEditPayment = async (paymentToEdit: Payment) => {
+        // Find all supplier entries this payment was for
+        const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
+        const associatedEntries = suppliers.filter(s => srNosInPayment.includes(s.srNo));
+        const associatedEntryIds = new Set(associatedEntries.map(e => e.id));
+
+        // Check if all original entries still exist
+        if (associatedEntryIds.size !== srNosInPayment.length) {
+            toast({
+                variant: "destructive",
+                title: "Cannot Edit Payment",
+                description: "Some original supplier entries for this payment could not be found. They may have been deleted.",
+            });
+            return;
+        }
+
+        // Set the form state to match the payment being edited
+        setSelectedCustomerKey(paymentToEdit.customerId);
+        setEditingPayment(paymentToEdit);
+        setPaymentId(paymentToEdit.paymentId);
+        setPaymentAmount(paymentToEdit.amount);
+        setPaymentType(paymentToEdit.type);
+        setCdEnabled(paymentToEdit.cdApplied);
+        setCalculatedCdAmount(paymentToEdit.cdAmount);
+        setSelectedEntryIds(associatedEntryIds);
+    
+        toast({
+            title: "Editing Mode",
+            description: `Editing payment ${paymentToEdit.paymentId}. Associated entries have been selected.`,
+        });
+    };
+
+    const handleDeletePayment = async (paymentIdToDelete: string) => {
+        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
+        if (!paymentToDelete || !paymentToDelete.id) {
+            toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
+            return;
+        }
+        try {
+            await batchUpdateSuppliersOnPaymentChange(paymentToDelete.id, paymentToDelete.paidFor || [], true);
+            toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
+            if (editingPayment?.id === paymentIdToDelete) {
+                clearForm();
+            }
+        } catch (error) {
+            console.error("Error in batch deletion:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
+        }
+    };
 
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
