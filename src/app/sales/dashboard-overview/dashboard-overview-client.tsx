@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { initialCustomers, initialTransactions, initialFundTransactions } from "@/lib/data";
 import type { Customer, Transaction, FundTransaction, Payment } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
 
@@ -13,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Scale, Banknote, Landmark, HandCoins, PiggyBank, DollarSign, Users, FileText, ArrowRight, Wallet } from "lucide-react";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { format } from "date-fns";
+import { db } from "@/lib/firebase";
+import { getSuppliersRealtime, getTransactionsRealtime, getFundTransactionsRealtime } from "@/lib/firestore";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string; value: string; icon: React.ReactNode; colorClass?: string; description?: string }) => (
   <Card className="bg-card/60 backdrop-blur-sm border-white/10">
@@ -28,70 +29,40 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 );
 
 export default function DashboardOverviewClient() {
-    const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-    const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(initialFundTransactions);
+    const [suppliers, setSuppliers] = useState<Customer[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [isClient, setIsClient] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
- setIsClient(true);
+        setIsClient(true);
+        setLoading(true);
 
- const fetchData = async () => {
- try {
- // Import Firestore dynamically
- const { db } = await import("@/lib/firebase");
+        const unsubSuppliers = getSuppliersRealtime((data) => {
+            setSuppliers(data);
+            if(loading) setLoading(false); // Set loading to false on first data fetch
+        });
 
- // Set up real-time listeners for relevant collections
- const customersRef = collection(db, "customers");
- const transactionsRef = collection(db, "transactions");
- const fundTransactionsRef = collection(db, "fundTransactions");
+        const unsubTransactions = getTransactionsRealtime((data) => {
+            setTransactions(data);
+        });
 
- const unsubscribeCustomers = onSnapshot(customersRef, (snapshot) => {
- const customerList = snapshot.docs.map(doc => ({
- id: doc.id,
- ...doc.data() as Customer
- }));
- setCustomers(customerList);
- setLoading(false);
- });
+        const unsubFundTransactions = getFundTransactionsRealtime((data) => {
+            setFundTransactions(data);
+        });
 
- const unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
- const transactionList = snapshot.docs.map(doc => ({
- id: doc.id,
- ...doc.data() as Transaction
- }));
- setTransactions(transactionList);
- });
-
- const unsubscribeFundTransactions = onSnapshot(fundTransactionsRef, (snapshot) => {
- const fundTransactionList = snapshot.docs.map(doc => ({
- id: doc.id,
- ...doc.data() as FundTransaction
- }));
- setFundTransactions(fundTransactionList);
- });
-
- // Clean up listeners on component unmount
- return () => {
- unsubscribeCustomers();
- unsubscribeTransactions();
- unsubscribeFundTransactions();
- };
- } catch (error) {
- console.error("Error fetching data from Firestore:", error);
- setLoading(false);
- }
- };
-
- fetchData();
-        }
- , []); // Empty dependency array means this effect runs once on mount
+        return () => {
+            unsubSuppliers();
+            unsubTransactions();
+            unsubFundTransactions();
+        };
+    }, []);
 
     const financialState = useMemo(() => {
- let bankBalance = 0;
- let cashInHand = 0;
- let totalLiabilities = 0;
+        let bankBalance = 0;
+        let cashInHand = 0;
+        let totalLiabilities = 0;
 
         fundTransactions.forEach(t => {
             if (t.type === 'CapitalInflow') {
@@ -117,12 +88,12 @@ export default function DashboardOverviewClient() {
             }
         });
         
- const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
- const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
+        const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
+        const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
 
- return { 
- bankBalance, 
- cashInHand, 
+        return { 
+            bankBalance, 
+            cashInHand, 
             totalAssets: bankBalance + cashInHand, 
             totalLiabilities,
             totalIncome,
@@ -132,31 +103,31 @@ export default function DashboardOverviewClient() {
     }, [transactions, fundTransactions]);
 
     const salesState = useMemo(() => {
-        const totalSalesAmount = customers.reduce((sum, c) => sum + c.amount, 0);
-        const totalOutstanding = customers.reduce((sum, c) => sum + Number(c.netAmount), 0);
+        const totalSalesAmount = suppliers.reduce((sum, c) => sum + c.amount, 0);
+        const totalOutstanding = suppliers.reduce((sum, c) => sum + Number(c.netAmount), 0);
         const totalPaid = totalSalesAmount - totalOutstanding;
-        const uniqueCustomerIds = new Set(customers.map(c => c.customerId));
+        const uniqueCustomerIds = new Set(suppliers.map(c => c.customerId));
         return {
             totalSalesAmount,
             totalOutstanding,
             totalPaid,
             totalCustomers: uniqueCustomerIds.size,
         }
-    }, [customers]);
+    }, [suppliers]);
     
-    const recentTransactions = useMemo(() => { // Assuming Transaction objects have a 'date' field
+    const recentTransactions = useMemo(() => {
         return [...transactions]
             .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 5);
     }, [transactions]);
     
-    const recentCustomers = useMemo(() => {
-         return [...customers]
- .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Assuming Customer objects have a 'date' field
+    const recentSuppliers = useMemo(() => {
+         return [...suppliers]
+            .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 5);
-    }, [customers]);
+    }, [suppliers]);
 
-    if (!isClient || loading) return <div>Loading...</div>; // Show loading state
+    if (!isClient || loading) return <div>Loading Dashboard...</div>;
 
     return (
         <div className="space-y-6">
@@ -178,14 +149,14 @@ export default function DashboardOverviewClient() {
 
              <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-primary"/>Sales & Customer Overview</CardTitle>
-                    <CardDescription>Key metrics from your sales and customer activities.</CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-primary"/>Sales & Supplier Overview</CardTitle>
+                    <CardDescription>Key metrics from your sales and supplier activities.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard title="Total Sales Amount" value={`₹${salesState.totalSalesAmount.toFixed(2)}`} icon={<Banknote />} />
                     <StatCard title="Total Paid" value={`₹${salesState.totalPaid.toFixed(2)}`} icon={<Wallet />} colorClass="text-green-500"/>
                     <StatCard title="Total Outstanding" value={`₹${salesState.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                    <StatCard title="Total Customers" value={String(salesState.totalCustomers)} icon={<Users />} />
+                    <StatCard title="Total Suppliers" value={String(salesState.totalCustomers)} icon={<Users />} />
                 </CardContent>
             </Card>
             
@@ -240,7 +211,7 @@ export default function DashboardOverviewClient() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {recentCustomers.map(c => (
+                                {recentSuppliers.map(c => (
                                     <TableRow key={c.id}>
                                         <TableCell>{format(new Date(c.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell className="font-mono">{c.srNo}</TableCell>

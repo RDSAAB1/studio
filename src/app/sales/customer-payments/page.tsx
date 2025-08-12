@@ -313,29 +313,6 @@ export default function CustomerPaymentsPage() {
       {selectedCustomerKey && (
         <>
           <Card>
-            <CardHeader>
-          <CardTitle>Select Customer</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select onValueChange={handleCustomerSelect}>
-            <SelectTrigger className="w-full md:w-1/2">
-              <SelectValue placeholder="Select a customer to process payments" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from(customerSummary.entries()).map(([key, data]) => (
-                <SelectItem key={key} value={key}>
-                  {toTitleCase(data.name)} ({data.contact}) - Outstanding: {data.totalOutstanding.toFixed(2)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-            <CardHeader><CardTitle>Outstanding Entries</CardTitle></CardHeader>
-
-      {selectedCustomerKey && (
-        <>
-          <Card>
             <CardHeader><CardTitle>Outstanding Entries</CardTitle></CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
