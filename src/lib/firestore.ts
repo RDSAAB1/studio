@@ -1,3 +1,4 @@
+
 import { db } from "./firebase";
 import {
   collection,
@@ -55,6 +56,10 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
 }
 
 export async function deleteSupplier(id: string): Promise<void> {
+  if (!id) {
+    console.error("deleteSupplier requires a valid ID.");
+    return;
+  }
   await deleteDoc(doc(db, "suppliers", id));
 }
 
