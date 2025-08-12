@@ -191,18 +191,22 @@ export default function SupplierPaymentsPage() {
   }, [selectedEntries.length, cdEligibleEntries.length]);
 
   useEffect(() => {
-    if (paymentType === 'Full') {
+    // This effect now ONLY auto-calculates for new, "Full" payments.
+    // It will NOT run when editing a payment.
+    if (paymentType === 'Full' && !editingPayment) {
       if (cdEnabled && cdAt !== 'payment_amount') {
         setPaymentAmount(totalOutstandingForSelected - calculatedCdAmount);
       } else {
         setPaymentAmount(totalOutstandingForSelected);
       }
-    } else {
+    } else if (paymentType === 'Partial' && !editingPayment) {
+      // Reset payment amount for partial payments if not editing
+      setPaymentAmount(0);
       if(cdEnabled && cdAt !== 'payment_amount'){
           setCdAt('payment_amount');
       }
     }
-  }, [paymentType, totalOutstandingForSelected, cdEnabled, cdAt, calculatedCdAmount]);
+  }, [paymentType, totalOutstandingForSelected, cdEnabled, cdAt, calculatedCdAmount, editingPayment]);
 
   useEffect(() => {
     autoSetCDToggle();
@@ -550,7 +554,7 @@ export default function SupplierPaymentsPage() {
                       </div>
                       <div className="space-y-2">
                           <Label htmlFor="payment-amount">Payment Amount</Label>
-                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && cdAt !== 'payment_amount'} />
+                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && cdAt !== 'payment_amount' && !editingPayment} />
                       </div>
                       <TooltipProvider>
                         <Tooltip>
