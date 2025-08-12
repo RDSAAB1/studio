@@ -38,7 +38,9 @@ import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2 
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchDeletePaymentAndUpdateSuppliers } from '@/lib/firestore';
+import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchUpdateSuppliersOnPaymentChange } from '@/lib/firestore';
+import { runTransaction, doc, writeBatch } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -266,107 +268,98 @@ export default function SupplierPaymentsPage() {
       toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
       return;
     }
-  
-    // If editing, we first revert the state by "deleting" the old payment silently
-    if (editingPayment) {
-      // The state reversion is now handled in handleEditPayment.
-      // We just need to remove the old payment record from history.
-      const paymentToDeleteId = editingPayment.id;
-      // We must also remove it from the database
-      await deletePayment(paymentToDeleteId);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            let tempEditingPayment = editingPayment;
+
+            // Step 1: If editing, revert the old payment's effect first.
+            if (tempEditingPayment) {
+                for (const detail of tempEditingPayment.paidFor || []) {
+                    const supplierQuery = query(suppliersCollection, where("srNo", "==", detail.srNo));
+                    const supplierSnapshot = await getDocs(supplierQuery);
+                    if (!supplierSnapshot.empty) {
+                        const supplierDoc = supplierSnapshot.docs[0];
+                        const currentNetAmount = Number(supplierDoc.data().netAmount);
+                        const newNetAmount = currentNetAmount + detail.amount;
+                        transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
+                    }
+                }
+            }
+
+            // Step 2: Apply the new/updated payment.
+            let remainingPayment = paymentAmount + calculatedCdAmount;
+            const paidForDetails: PaidFor[] = [];
+            const sortedEntries = Array.from(selectedEntryIds)
+              .map(id => suppliers.find(s => s.id === id))
+              .filter((c): c is Customer => !!c)
+              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+            for (const c of sortedEntries) {
+                const supplierDocRef = doc(db, "suppliers", c.id);
+                const supplierDoc = await transaction.get(supplierDocRef);
+                if (!supplierDoc.exists()) throw new Error(`Supplier ${c.id} not found.`);
+                
+                const outstanding = Number(supplierDoc.data().netAmount);
+                if (remainingPayment > 0) {
+                    const amountToPay = Math.min(outstanding, remainingPayment);
+                    remainingPayment -= amountToPay;
+                    const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
+                    paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                    transaction.update(supplierDocRef, { netAmount: outstanding - amountToPay });
+                }
+            }
+
+            // Step 3: Create or update the payment document.
+            const paymentData: Omit<Payment, 'id'> = {
+              paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
+              customerId: selectedCustomerKey,
+              date: new Date().toISOString().split("T")[0],
+              amount: paymentAmount,
+              cdAmount: calculatedCdAmount,
+              cdApplied: cdEnabled,
+              type: paymentType,
+              receiptType: 'Online',
+              notes: `Paid for SR No(s): ${sortedEntries.map(e => e.srNo).join(', ')}`,
+              paidFor: paidForDetails,
+            };
+
+            if (tempEditingPayment) {
+                const paymentRef = doc(db, "payments", tempEditingPayment.id);
+                transaction.update(paymentRef, paymentData);
+            } else {
+                const newPaymentRef = doc(collection(db, "payments"));
+                transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
+            }
+        });
+
+        clearForm();
+        toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
+
+    } catch (error) {
+        console.error("Error processing payment:", error);
+        toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment. Please try again." });
     }
-  
-    let remainingPayment = paymentAmount + calculatedCdAmount;
-    const paidForDetails: PaidFor[] = [];
-  
-    // Important: Get fresh supplier data to avoid race conditions
-    const currentSuppliers = suppliers;
-  
-    const sortedEntries = Array.from(selectedEntryIds)
-      .map(id => currentSuppliers.find(s => s.id === id))
-      .filter((c): c is Customer => !!c)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-    const customerUpdatesPromises = sortedEntries.map(async (c) => {
-      const outstanding = parseFloat(String(c.netAmount));
-      if (remainingPayment > 0) {
-        const amountToPay = Math.min(outstanding, remainingPayment);
-        remainingPayment -= amountToPay;
-        const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
-        paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-        // Use the Firestore update function
-        await updateSupplier(c.id, { netAmount: outstanding - amountToPay });
-      }
-    });
-  
-    // Wait for all supplier updates to complete
-    await Promise.all(customerUpdatesPromises);
-  
-    const paymentData: Payment = {
-      id: editingPayment ? editingPayment.id : '', // Reuse ID if editing
-      paymentId: editingPayment ? editingPayment.paymentId : paymentId,
-      customerId: selectedCustomerKey,
-      date: new Date().toISOString().split("T")[0],
-      amount: paymentAmount,
-      cdAmount: calculatedCdAmount,
-      cdApplied: cdEnabled,
-      type: paymentType,
-      receiptType: 'Online',
-      notes: `Paid for SR No(s): ${sortedEntries.map(e => e.srNo).join(', ')}`,
-      paidFor: paidForDetails,
-    };
-  
-    // Use update for editing, add for new
-    const savePromise = editingPayment
-      ? updatePayment(editingPayment.id, paymentData)
-      : addPayment(paymentData);
-  
-    savePromise.then(() => {
-      clearForm();
-      toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
-    }).catch(error => {
-      console.error("Error saving payment:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to save payment." });
-    });
   };
 
-  const handleEditPayment = (paymentToEdit: Payment) => {
-    // 1. Temporarily revert the payment's effect on the local `suppliers` state.
-    const tempSuppliers = suppliers.map(s => {
-        const paidDetail = paymentToEdit.paidFor?.find(pf => pf.srNo === s.srNo);
-        if (paidDetail) {
-            // This supplier was part of the payment, so add the paid amount back to its netAmount.
-            return {
-                ...s,
-                netAmount: Number(s.netAmount) + paidDetail.amount,
-            };
-        }
-        return s;
-    });
-
-    // Update the local suppliers state with the reverted amounts.
-    setSuppliers(tempSuppliers);
-
-    // 2. Now find the associated entries from the *updated* temp suppliers list.
+  const handleEditPayment = async (paymentToEdit: Payment) => {
+    // 1. Find all supplier entries associated with this payment
     const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-    const associatedEntryIds = tempSuppliers
+    const associatedEntryIds = suppliers
         .filter(s => s.customerId === paymentToEdit.customerId && srNosInPayment.includes(s.srNo))
         .map(e => e.id);
-    
+
     if (associatedEntryIds.length === 0) {
         toast({
             variant: "destructive",
             title: "Cannot Edit Payment",
-            description: "Could not find the original supplier entries for this payment.",
+            description: "Could not find the original supplier entries for this payment. They may have been deleted.",
         });
-        // Revert the state change if we can't proceed
-        setSuppliers(suppliers);
         return;
     }
-
     const entryIdsToSelect = new Set(associatedEntryIds);
 
-    // 3. Set the state to edit mode
+    // 2. Set the state to edit mode
     setSelectedCustomerKey(paymentToEdit.customerId);
     setEditingPayment(paymentToEdit);
     setPaymentId(paymentToEdit.paymentId);
@@ -374,7 +367,7 @@ export default function SupplierPaymentsPage() {
     setPaymentType(paymentToEdit.type);
     setCdEnabled(paymentToEdit.cdApplied);
     setCalculatedCdAmount(paymentToEdit.cdAmount);
-    setSelectedEntryIds(entryIdsToSelect);
+    setSelectedEntryIds(entryIdsToSelect); // Pre-select the associated entries
   
     toast({
       title: "Editing Mode",
@@ -388,12 +381,9 @@ export default function SupplierPaymentsPage() {
         toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
         return;
     }
-
-    // This performs the database operations in a single batch.
     try {
-        await batchDeletePaymentAndUpdateSuppliers(paymentToDelete);
+        await batchUpdateSuppliersOnPaymentChange(paymentToDelete.id, paymentToDelete.paidFor || [], true);
         toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
-        
         if (editingPayment?.id === paymentIdToDelete) {
           clearForm();
         }
@@ -444,8 +434,7 @@ export default function SupplierPaymentsPage() {
   const currentPaymentHistory = useMemo(() => {
     if (!selectedCustomerKey) return [];
     const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
-    const uniquePayments = Array.from(new Map(customerPayments.map(p => [p.id, p])).values());
-    return uniquePayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return customerPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [paymentHistory, selectedCustomerKey]);
   
   const availableCdOptions = useMemo(() => {

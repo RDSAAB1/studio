@@ -15,8 +15,9 @@ import {
   limit,
   setDoc,
   writeBatch,
+  runTransaction,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -155,34 +156,38 @@ export async function deletePayment(id: string): Promise<void> {
     await deleteDoc(paymentRef);
 }
 
-export async function batchDeletePaymentAndUpdateSuppliers(payment: Payment): Promise<void> {
+export async function batchUpdateSuppliersOnPaymentChange(
+  paymentId: string,
+  paidForDetails: PaidFor[],
+  isDeletionOrRevert: boolean
+): Promise<void> {
   const batch = writeBatch(db);
-  
-  if (!payment.id) {
-      throw new Error("Payment ID is missing.");
+
+  for (const detail of paidForDetails) {
+    const supplierQuery = query(suppliersCollection, where("srNo", "==", detail.srNo));
+    const supplierSnapshot = await getDocs(supplierQuery);
+
+    if (!supplierSnapshot.empty) {
+      const supplierDoc = supplierSnapshot.docs[0];
+      const currentNetAmount = Number(supplierDoc.data().netAmount);
+      const paymentAmount = detail.amount;
+      
+      const newNetAmount = isDeletionOrRevert 
+        ? currentNetAmount + paymentAmount // Add back on delete/revert
+        : currentNetAmount - paymentAmount; // Subtract on creation/update
+
+      batch.update(supplierDoc.ref, { netAmount: newNetAmount });
+    } else {
+      console.warn(`Could not find supplier with SR No: ${detail.srNo} to update.`);
+    }
   }
 
-  // 1. Delete the payment document
-  const paymentRef = doc(db, "payments", payment.id);
-  batch.delete(paymentRef);
-
-  // 2. Find and update all related supplier documents
-  const srNosToUpdate = payment.paidFor?.map(pf => pf.srNo) || [];
-  if (srNosToUpdate.length > 0) {
-      const q = query(collection(db, "suppliers"), where("srNo", "in", srNosToUpdate), where("customerId", "==", payment.customerId));
-      const suppliersToUpdateSnapshot = await getDocs(q);
-
-      suppliersToUpdateSnapshot.forEach(supplierDoc => {
-          const supplier = { id: supplierDoc.id, ...supplierDoc.data() } as Customer;
-          const paymentDetail = payment.paidFor?.find(pf => pf.srNo === supplier.srNo);
-          if (paymentDetail) {
-              const newNetAmount = Number(supplier.netAmount) + paymentDetail.amount;
-              batch.update(supplierDoc.ref, { netAmount: newNetAmount });
-          }
-      });
+  // Delete the payment document if it's a deletion operation
+  if (isDeletionOrRevert) {
+      const paymentRef = doc(db, "payments", paymentId);
+      batch.delete(paymentRef);
   }
 
-  // Commit the batch
   await batch.commit();
 }
 
