@@ -136,6 +136,7 @@ export async function updatePayment(id: string, paymentData: Partial<Payment>): 
     }
     try {
         const paymentRef = doc(db, "payments", id);
+        // Use setDoc instead of updateDoc to handle cases where the doc might have been temporarily removed
         await setDoc(paymentRef, paymentData, { merge: true });
         return true;
     } catch (error) {
@@ -154,18 +155,32 @@ export async function deletePayment(id: string): Promise<void> {
     await deleteDoc(paymentRef);
 }
 
-export async function batchDeletePaymentAndUpdateSuppliers(paymentId: string, supplierUpdates: { id: string; newNetAmount: number; }[]): Promise<void> {
+export async function batchDeletePaymentAndUpdateSuppliers(payment: Payment): Promise<void> {
   const batch = writeBatch(db);
+  
+  if (!payment.id) {
+      throw new Error("Payment ID is missing.");
+  }
 
   // 1. Delete the payment document
-  const paymentRef = doc(db, "payments", paymentId);
+  const paymentRef = doc(db, "payments", payment.id);
   batch.delete(paymentRef);
 
-  // 2. Update supplier documents
-  supplierUpdates.forEach(update => {
-    const supplierRef = doc(db, "suppliers", update.id);
-    batch.update(supplierRef, { netAmount: update.newNetAmount });
-  });
+  // 2. Find and update all related supplier documents
+  const srNosToUpdate = payment.paidFor?.map(pf => pf.srNo) || [];
+  if (srNosToUpdate.length > 0) {
+      const q = query(collection(db, "suppliers"), where("srNo", "in", srNosToUpdate), where("customerId", "==", payment.customerId));
+      const suppliersToUpdateSnapshot = await getDocs(q);
+
+      suppliersToUpdateSnapshot.forEach(supplierDoc => {
+          const supplier = { id: supplierDoc.id, ...supplierDoc.data() } as Customer;
+          const paymentDetail = payment.paidFor?.find(pf => pf.srNo === supplier.srNo);
+          if (paymentDetail) {
+              const newNetAmount = Number(supplier.netAmount) + paymentDetail.amount;
+              batch.update(supplierDoc.ref, { netAmount: newNetAmount });
+          }
+      });
+  }
 
   // Commit the batch
   await batch.commit();

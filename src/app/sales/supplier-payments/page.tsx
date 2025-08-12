@@ -191,8 +191,6 @@ export default function SupplierPaymentsPage() {
   }, [selectedEntries.length, cdEligibleEntries.length]);
 
   useEffect(() => {
-    // This effect now ONLY auto-calculates for new, "Full" payments.
-    // It will NOT run when editing a payment.
     if (paymentType === 'Full' && !editingPayment) {
       if (cdEnabled && cdAt !== 'payment_amount') {
         setPaymentAmount(totalOutstandingForSelected - calculatedCdAmount);
@@ -200,7 +198,6 @@ export default function SupplierPaymentsPage() {
         setPaymentAmount(totalOutstandingForSelected);
       }
     } else if (paymentType === 'Partial' && !editingPayment) {
-      // Reset payment amount for partial payments if not editing
       setPaymentAmount(0);
       if(cdEnabled && cdAt !== 'payment_amount'){
           setCdAt('payment_amount');
@@ -272,7 +269,11 @@ export default function SupplierPaymentsPage() {
   
     // If editing, we first revert the state by "deleting" the old payment silently
     if (editingPayment) {
-      await handleDeletePayment(editingPayment.id, true); // silent deletion
+      // The state reversion is now handled in handleEditPayment.
+      // We just need to remove the old payment record from history.
+      const paymentToDeleteId = editingPayment.id;
+      // We must also remove it from the database
+      await deletePayment(paymentToDeleteId);
     }
   
     let remainingPayment = paymentAmount + calculatedCdAmount;
@@ -302,7 +303,7 @@ export default function SupplierPaymentsPage() {
     await Promise.all(customerUpdatesPromises);
   
     const paymentData: Payment = {
-      id: editingPayment ? editingPayment.id : '',
+      id: editingPayment ? editingPayment.id : '', // Reuse ID if editing
       paymentId: editingPayment ? editingPayment.paymentId : paymentId,
       customerId: selectedCustomerKey,
       date: new Date().toISOString().split("T")[0],
@@ -330,22 +331,42 @@ export default function SupplierPaymentsPage() {
   };
 
   const handleEditPayment = (paymentToEdit: Payment) => {
-    // Find all supplier entries associated with this payment, paid or not.
+    // 1. Temporarily revert the payment's effect on the local `suppliers` state.
+    const tempSuppliers = suppliers.map(s => {
+        const paidDetail = paymentToEdit.paidFor?.find(pf => pf.srNo === s.srNo);
+        if (paidDetail) {
+            // This supplier was part of the payment, so add the paid amount back to its netAmount.
+            return {
+                ...s,
+                netAmount: Number(s.netAmount) + paidDetail.amount,
+            };
+        }
+        return s;
+    });
+
+    // Update the local suppliers state with the reverted amounts.
+    setSuppliers(tempSuppliers);
+
+    // 2. Now find the associated entries from the *updated* temp suppliers list.
     const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-    const associatedEntries = suppliers.filter(s => s.customerId === paymentToEdit.customerId && srNosInPayment.includes(s.srNo));
-  
-    if (associatedEntries.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Cannot Edit Payment",
-        description: "Could not find the original supplier entries for this payment. They may have been deleted.",
-      });
-      return;
+    const associatedEntryIds = tempSuppliers
+        .filter(s => s.customerId === paymentToEdit.customerId && srNosInPayment.includes(s.srNo))
+        .map(e => e.id);
+    
+    if (associatedEntryIds.length === 0) {
+        toast({
+            variant: "destructive",
+            title: "Cannot Edit Payment",
+            description: "Could not find the original supplier entries for this payment.",
+        });
+        // Revert the state change if we can't proceed
+        setSuppliers(suppliers);
+        return;
     }
-  
-    const entryIdsToSelect = new Set(associatedEntries.map(e => e.id));
-  
-    // Set the state to edit mode
+
+    const entryIdsToSelect = new Set(associatedEntryIds);
+
+    // 3. Set the state to edit mode
     setSelectedCustomerKey(paymentToEdit.customerId);
     setEditingPayment(paymentToEdit);
     setPaymentId(paymentToEdit.paymentId);
@@ -361,35 +382,24 @@ export default function SupplierPaymentsPage() {
     });
   };
 
-  const handleDeletePayment = async (paymentIdToDelete: string, silent = false) => {
+  const handleDeletePayment = async (paymentIdToDelete: string) => {
     const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
     if (!paymentToDelete || !paymentToDelete.id) {
-        if (!silent) toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
+        toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
         return;
     }
 
-    const supplierUpdates = (paymentToDelete.paidFor || []).map(pf => {
-        const supplier = suppliers.find(s => s.srNo === pf.srNo && s.customerId === paymentToDelete.customerId);
-        if (!supplier) return null;
-        return {
-            id: supplier.id,
-            newNetAmount: parseFloat(String(supplier.netAmount)) + pf.amount
-        };
-    }).filter((u): u is { id: string; newNetAmount: number; } => u !== null);
-
+    // This performs the database operations in a single batch.
     try {
-        await batchDeletePaymentAndUpdateSuppliers(paymentToDelete.id, supplierUpdates);
-        if (!silent) {
-            toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
-        }
+        await batchDeletePaymentAndUpdateSuppliers(paymentToDelete);
+        toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
+        
         if (editingPayment?.id === paymentIdToDelete) {
           clearForm();
         }
     } catch (error) {
         console.error("Error in batch deletion:", error);
-        if (!silent) {
-            toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
-        }
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
     }
   };
 
