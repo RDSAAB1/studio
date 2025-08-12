@@ -653,10 +653,8 @@ export default function SupplierEntryClient() {
       variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
       term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
-    if (isEditing) {
-      setCustomers(prev => prev.map(c => c.id === completeEntry.id ? completeEntry : c));
-      toast({ title: "Success", description: "Entry updated successfully." });
-      updateSupplier(completeEntry)
+    if (isEditing && completeEntry.id) {
+      updateSupplier(completeEntry.id, completeEntry)
         .then(() => {
           toast({ title: "Success", description: "Entry updated successfully." });
         })
@@ -665,8 +663,8 @@ export default function SupplierEntryClient() {
           toast({ title: "Error", description: "Failed to update entry.", variant: "destructive" });
         });
     } else {
-      const newEntry = { ...completeEntry, id: Date.now().toString() };
-      addSupplier(newEntry)
+      const { id, ...newEntryData } = completeEntry;
+      addSupplier(newEntryData)
         .then(() => {
           toast({ title: "Success", description: "New entry saved successfully." });
         })
@@ -675,7 +673,6 @@ export default function SupplierEntryClient() {
           toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
         });
     }
-     // Clear form after saving/updating
 
     handleNew();
   };
