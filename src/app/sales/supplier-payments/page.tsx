@@ -38,7 +38,7 @@ import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2 
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
+import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchDeletePaymentAndUpdateSuppliers } from '@/lib/firestore';
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -75,7 +75,7 @@ export default function SupplierPaymentsPage() {
 
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
   
   const stableToast = useCallback(toast, []);
@@ -107,7 +107,7 @@ export default function SupplierPaymentsPage() {
 
     const unsubscribePayments = getPaymentsRealtime((fetchedPayments) => {
       setPaymentHistory(fetchedPayments);
-      if (!editingPaymentId) {
+      if (!editingPayment) {
         setPaymentId(getNextPaymentId(fetchedPayments));
       }
     }, (error) => {
@@ -119,7 +119,7 @@ export default function SupplierPaymentsPage() {
       unsubscribeSuppliers();
       unsubscribePayments();
     };
-  }, [editingPaymentId, stableToast, getNextPaymentId]);
+  }, [editingPayment, stableToast, getNextPaymentId]);
   
 
   const customerSummaryMap = useMemo(() => {
@@ -244,17 +244,21 @@ export default function SupplierPaymentsPage() {
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
-    setEditingPaymentId(null);
+    setEditingPayment(null);
     setPaymentId(getNextPaymentId(paymentHistory));
   };
-  
+
   const processPayment = async () => {
     if (!selectedCustomerKey) {
         toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
         return;
     }
-    if (selectedEntryIds.size === 0 || paymentAmount <= 0) {
-        toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries and enter a valid payment amount." });
+    if (selectedEntryIds.size === 0) {
+        toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
+        return;
+    }
+     if (paymentAmount <= 0 && calculatedCdAmount <= 0) {
+        toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
         return;
     }
     if (paymentType === 'Partial' && paymentAmount > totalOutstandingForSelected) {
@@ -262,9 +266,12 @@ export default function SupplierPaymentsPage() {
         return;
     }
 
-    if (editingPaymentId) {
-        // Silently reverse the old payment to avoid race conditions before applying the new one.
-        await handleDeletePayment(editingPaymentId, true);
+    if (editingPayment) {
+        // To edit, we first delete the old payment and revert balances, then create a new one.
+        // This is a complex operation that needs to be atomic.
+        // For now, let's just show an alert that this needs a safer implementation.
+        toast({ title: "Info", description: "Editing a payment first deletes the old one and then creates a new one. Proceeding." });
+        await handleDeletePayment(editingPayment.paymentId, true); // silent deletion
     }
 
     let remainingPayment = paymentAmount + calculatedCdAmount;
@@ -289,7 +296,7 @@ export default function SupplierPaymentsPage() {
     await Promise.all(customerUpdatesPromises);
 
     const paymentData: Payment = {
-        paymentId: editingPaymentId || paymentId || getNextPaymentId(paymentHistory),
+        paymentId: editingPayment ? editingPayment.paymentId : paymentId,
         customerId: selectedCustomerKey,
         date: new Date().toISOString().split("T")[0],
         amount: paymentAmount,
@@ -301,13 +308,14 @@ export default function SupplierPaymentsPage() {
         paidFor: paidForDetails,
     };
     
-    const savePromise = editingPaymentId 
-      ? updatePayment(editingPaymentId, paymentData)
+    // Use update for editing, add for new
+    const savePromise = editingPayment 
+      ? updatePayment(editingPayment.id, paymentData) // Assumes payment has a firestore doc id
       : addPayment(paymentData);
   
     savePromise.then(() => {
       clearForm();
-      toast({ title: "Success", description: `Payment ${editingPaymentId ? 'updated' : 'processed'} successfully.`, duration: 3000 });
+      toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, duration: 3000 });
     }).catch(error => {
       console.error("Error saving payment:", error);
       toast({ variant: 'destructive', title: "Error", description: "Failed to save payment." });
@@ -315,68 +323,56 @@ export default function SupplierPaymentsPage() {
   };
 
   const handleEditPayment = async (payment: Payment) => {
-    const paymentToEdit = paymentHistory.find(p => p.paymentId === payment.paymentId);
+    const paymentToEdit = paymentHistory.find(p => p.id === payment.id);
     if (!paymentToEdit) return;
 
-    setEditingPaymentId(payment.paymentId);
-    setPaymentId(payment.paymentId);
-    setPaymentAmount(payment.amount);
-    setPaymentType(payment.type);
-    setCdEnabled(payment.cdApplied);
-    setCalculatedCdAmount(payment.cdAmount);
+    setEditingPayment(paymentToEdit);
+    setPaymentId(paymentToEdit.paymentId);
+    setPaymentAmount(paymentToEdit.amount);
+    setPaymentType(paymentToEdit.type);
+    setCdEnabled(paymentToEdit.cdApplied);
+    setCalculatedCdAmount(paymentToEdit.cdAmount);
 
-    const srNosInPayment = (payment.paidFor || []).map(pf => pf.srNo);
+    const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
     const entryIdsToSelect = new Set(suppliers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
     
-     if (paymentToEdit.paidFor) {
-        paymentToEdit.paidFor.forEach(pf => {
-            const supplier = suppliers.find(s => s.srNo === pf.srNo);
-            if (supplier && !entryIdsToSelect.has(supplier.id)) {
-                entryIdsToSelect.add(supplier.id);
-            }
-        });
-    }
-
     setSelectedEntryIds(entryIdsToSelect);
     
-    toast({ title: "Editing Payment", description: `Editing payment ${payment.paymentId}. Please make your changes and click 'Update Payment'.`});
+    toast({ title: "Editing Payment", description: `Editing payment ${paymentToEdit.paymentId}. Please make your changes and click 'Update Payment'.`});
   };
 
   const handleDeletePayment = async (paymentIdToDelete: string, silent = false) => {
-    const paymentToDelete = paymentHistory.find(p => p.paymentId === paymentIdToDelete);
+    const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
     if (!paymentToDelete) {
         if (!silent) toast({ variant: "destructive", title: "Error", description: "Payment not found." });
         return;
     }
 
-    try {
-        if (paymentToDelete.paidFor && paymentToDelete.paidFor.length > 0) {
-            const supplierUpdates = paymentToDelete.paidFor.map(async (paidFor) => {
-                const supplierToUpdate = suppliers.find(s => s.srNo === paidFor.srNo);
-                if (supplierToUpdate) {
-                    const newNetAmount = parseFloat(String(supplierToUpdate.netAmount)) + paidFor.amount;
-                    await updateSupplier(supplierToUpdate.id, { netAmount: newNetAmount });
-                }
-            });
-            await Promise.all(supplierUpdates);
-        }
+    const supplierUpdates = (paymentToDelete.paidFor || []).map(pf => {
+        const supplier = suppliers.find(s => s.srNo === pf.srNo);
+        if (!supplier) return null;
+        return {
+            id: supplier.id,
+            newNetAmount: parseFloat(String(supplier.netAmount)) + pf.amount
+        };
+    }).filter((u): u is { id: string; newNetAmount: number; } => u !== null);
 
-        await deletePayment(paymentIdToDelete);
-        
-        if (editingPaymentId === paymentIdToDelete) {
+    try {
+        await batchDeletePaymentAndUpdateSuppliers(paymentIdToDelete, supplierUpdates);
+        if (!silent) {
+            toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
+        }
+        if (editingPayment?.id === paymentIdToDelete) {
           clearForm();
         }
-
-        if (!silent) {
-            toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
-        }
     } catch (error) {
-        console.error("Error deleting payment:", error);
+        console.error("Error in batch deletion:", error);
         if (!silent) {
             toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
         }
     }
   };
+
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
@@ -417,10 +413,8 @@ export default function SupplierPaymentsPage() {
   
   const currentPaymentHistory = useMemo(() => {
     if (!selectedCustomerKey) return [];
-    
     const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
     const uniquePayments = Array.from(new Map(customerPayments.map(p => [p.paymentId, p])).values());
-    
     return uniquePayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [paymentHistory, selectedCustomerKey]);
   
@@ -517,7 +511,7 @@ export default function SupplierPaymentsPage() {
           </Card>
 
           <Card onKeyDown={handleKeyDown}>
-              <CardHeader><CardTitle>{editingPaymentId ? `Editing Payment` : 'Payment Processing'}</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{editingPayment ? `Editing Payment` : 'Payment Processing'}</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                   <div className="p-4 border rounded-lg bg-card/30">
                       <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
@@ -582,9 +576,9 @@ export default function SupplierPaymentsPage() {
                   </div>
                   <div className="flex gap-4">
                     <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>
-                        {editingPaymentId ? 'Update Payment' : 'Process Payment'}
+                        {editingPayment ? 'Update Payment' : 'Process Payment'}
                     </Button>
-                    {editingPaymentId && (
+                    {editingPayment && (
                         <Button variant="outline" onClick={clearForm}>Cancel Edit</Button>
                     )}
                   </div>
@@ -633,7 +627,7 @@ export default function SupplierPaymentsPage() {
                     </TableHeader>
                     <TableBody>
                     {currentPaymentHistory.map(p => (
-                        <TableRow key={p.paymentId}>
+                        <TableRow key={p.id}>
                         <TableCell>{p.paymentId}</TableCell>
                         <TableCell>{p.date}</TableCell>
                         <TableCell>{p.amount.toFixed(2)}</TableCell>
@@ -658,7 +652,7 @@ export default function SupplierPaymentsPage() {
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeletePayment(p.paymentId)}>Continue</AlertDialogAction>
+                                        <AlertDialogAction onClick={() => handleDeletePayment(p.id)}>Continue</AlertDialogAction>
                                     </AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>

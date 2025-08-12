@@ -124,7 +124,9 @@ export async function deleteInventoryItem(id: string) {
 
 export async function addPayment(paymentData: Omit<Payment, 'id'> & { id?: string }): Promise<Payment> {
   const docRef = await addDoc(paymentsCollection, paymentData);
-  return { id: docRef.id, ...paymentData } as Payment;
+  const finalPaymentData = { id: docRef.id, ...paymentData };
+  await updateDoc(docRef, { id: docRef.id }); // Add the generated ID to the document itself
+  return finalPaymentData as Payment;
 }
 
 export async function updatePayment(id: string, paymentData: Partial<Payment>): Promise<boolean> {
@@ -151,6 +153,24 @@ export async function deletePayment(id: string): Promise<void> {
     const paymentRef = doc(db, "payments", id);
     await deleteDoc(paymentRef);
 }
+
+export async function batchDeletePaymentAndUpdateSuppliers(paymentId: string, supplierUpdates: { id: string; newNetAmount: number; }[]): Promise<void> {
+  const batch = writeBatch(db);
+
+  // 1. Delete the payment document
+  const paymentRef = doc(db, "payments", paymentId);
+  batch.delete(paymentRef);
+
+  // 2. Update supplier documents
+  supplierUpdates.forEach(update => {
+    const supplierRef = doc(db, "suppliers", update.id);
+    batch.update(supplierRef, { netAmount: update.newNetAmount });
+  });
+
+  // Commit the batch
+  await batch.commit();
+}
+
 
 export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onError: (error: Error) => void): () => void {
   const q = query(paymentsCollection, orderBy("date", "desc"));

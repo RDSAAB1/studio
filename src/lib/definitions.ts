@@ -31,6 +31,7 @@ export type Customer = {
   paymentType: string;
   customerId: string;
   searchValue?: string;
+  otherCharges?: number;
   
   // Fields from RTGS form
   fatherName?: string;
@@ -47,6 +48,7 @@ export type Customer = {
   checkNo?: string;
   utrNo?: string;
   rtgsAmount?: number;
+  payments?: Payment[]; // To track which payments have been applied
 };
 
 export type Transaction = {
@@ -85,6 +87,7 @@ export type PaidFor = {
 }
 
 export type Payment = {
+    id: string;
     paymentId: string;
     customerId: string;
     date: string;
