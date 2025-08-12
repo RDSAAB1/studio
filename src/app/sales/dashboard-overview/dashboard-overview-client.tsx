@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { initialCustomers, initialTransactions, initialFundTransactions } from "@/lib/data";
 import type { Customer, Transaction, FundTransaction, Payment } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 
 import { TrendingUp, TrendingDown, Scale, Banknote, Landmark, HandCoins, PiggyBank, DollarSign, Users, FileText, ArrowRight, Wallet } from "lucide-react";
+import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { format } from "date-fns";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string; value: string; icon: React.ReactNode; colorClass?: string; description?: string }) => (
@@ -28,28 +29,70 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 
 export default function DashboardOverviewClient() {
     const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-    const [transactions] = useState<Transaction[]>(initialTransactions);
-    const [fundTransactions] = useState<FundTransaction[]>(initialFundTransactions);
+    const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(initialFundTransactions);
     const [isClient, setIsClient] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-          setIsClient(true);
-          try {
-            const savedCustomers = localStorage.getItem("customers_data");
-            if(savedCustomers) setCustomers(JSON.parse(savedCustomers));
-            
-          } catch (error) {
-            console.error("Failed to load data from localStorage", error);
-          }
+ setIsClient(true);
+
+ const fetchData = async () => {
+ try {
+ // Import Firestore dynamically
+ const { db } = await import("@/lib/firebase");
+
+ // Set up real-time listeners for relevant collections
+ const customersRef = collection(db, "customers");
+ const transactionsRef = collection(db, "transactions");
+ const fundTransactionsRef = collection(db, "fundTransactions");
+
+ const unsubscribeCustomers = onSnapshot(customersRef, (snapshot) => {
+ const customerList = snapshot.docs.map(doc => ({
+ id: doc.id,
+ ...doc.data() as Customer
+ }));
+ setCustomers(customerList);
+ setLoading(false);
+ });
+
+ const unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
+ const transactionList = snapshot.docs.map(doc => ({
+ id: doc.id,
+ ...doc.data() as Transaction
+ }));
+ setTransactions(transactionList);
+ });
+
+ const unsubscribeFundTransactions = onSnapshot(fundTransactionsRef, (snapshot) => {
+ const fundTransactionList = snapshot.docs.map(doc => ({
+ id: doc.id,
+ ...doc.data() as FundTransaction
+ }));
+ setFundTransactions(fundTransactionList);
+ });
+
+ // Clean up listeners on component unmount
+ return () => {
+ unsubscribeCustomers();
+ unsubscribeTransactions();
+ unsubscribeFundTransactions();
+ };
+ } catch (error) {
+ console.error("Error fetching data from Firestore:", error);
+ setLoading(false);
+ }
+ };
+
+ fetchData();
         }
-      }, []);
+ , []); // Empty dependency array means this effect runs once on mount
 
     const financialState = useMemo(() => {
-        let bankBalance = 0;
-        let cashInHand = 0;
-        let totalLiabilities = 0;
-        
+ let bankBalance = 0;
+ let cashInHand = 0;
+ let totalLiabilities = 0;
+
         fundTransactions.forEach(t => {
             if (t.type === 'CapitalInflow') {
                 if(t.destination === 'BankAccount') bankBalance += t.amount;
@@ -74,12 +117,12 @@ export default function DashboardOverviewClient() {
             }
         });
         
-        const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
-        const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
+ const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
+ const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
 
-        return { 
-            bankBalance, 
-            cashInHand, 
+ return { 
+ bankBalance, 
+ cashInHand, 
             totalAssets: bankBalance + cashInHand, 
             totalLiabilities,
             totalIncome,
@@ -101,7 +144,7 @@ export default function DashboardOverviewClient() {
         }
     }, [customers]);
     
-    const recentTransactions = useMemo(() => {
+    const recentTransactions = useMemo(() => { // Assuming Transaction objects have a 'date' field
         return [...transactions]
             .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 5);
@@ -109,11 +152,11 @@ export default function DashboardOverviewClient() {
     
     const recentCustomers = useMemo(() => {
          return [...customers]
-            .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+ .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Assuming Customer objects have a 'date' field
             .slice(0, 5);
     }, [customers]);
 
-    if (!isClient) return null; // Or a loading skeleton
+    if (!isClient || loading) return <div>Loading...</div>; // Show loading state
 
     return (
         <div className="space-y-6">

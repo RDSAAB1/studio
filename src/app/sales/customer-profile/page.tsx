@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { initialCustomers } from "@/lib/data";
 import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { getCustomerById, getCustomers } from "@/lib/firestore"; // Import firestore functions
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 type ChartType = 'financial' | 'variety';
@@ -68,10 +69,40 @@ const MILL_OVERVIEW_KEY = 'mill-overview';
 const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function CustomerProfilePage() {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]); // Start with empty array
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   
+  const [loading, setLoading] = useState(true); // Loading state
+
+  // Fetch initial data and set up real-time listener
+  useEffect(() => {
+    setLoading(true);
+    const unsubscribe = getCustomers((fetchedCustomers) => {
+      setCustomers(fetchedCustomers);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching customers: ", error);
+      setLoading(false);
+      // Optionally show an error message to the user
+    });
+
+    // Cleanup the listener on component unmount
+    return () => unsubscribe();
+  }, []);
+
+  // Update customer summary whenever customers data changes
+  useEffect(() => {
+    updateCustomerSummary();
+  }, [customers]); // Depend on customers state
+
+  // Simulate some payment history for demonstration (REMOVE THIS AFTER INTEGRATING REAL PAYMENTS)
+  const tempPaymentHistory = useMemo(() => {
+      const history = new Map<string, Payment[]>();
+       // Your simulation logic here... (or remove if you integrate real payments)
+      return history;
+  }, [customers]); // Recalculate if customers change
+
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
@@ -79,25 +110,7 @@ export default function CustomerProfilePage() {
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
     const tempPaymentHistory = new Map<string, Payment[]>();
-
-     // Simulate some payment history for demonstration
-     customers.forEach((c, index) => {
-        if(!c.customerId) return;
-        if(!tempPaymentHistory.has(c.customerId)) {
-            tempPaymentHistory.set(c.customerId, []);
-        }
-        if(index % 2 === 0 && parseFloat(String(c.netAmount)) > 5000) {
-             tempPaymentHistory.get(c.customerId)?.push({
-                 paymentId: `P0000${index + 1}`,
-                 date: '2025-07-28',
-                 amount: parseFloat(String(c.netAmount)) / 2,
-                 cdAmount: 50, // Simulated CD
-                 type: 'Partial',
-                 receiptType: 'Online',
-                 notes: `Simulated partial payment for SR ${c.srNo}`
-             })
-        }
-    });
+    // This part will need to fetch actual payment data for each customer later.
     
     // Create summaries for each customer
     customers.forEach(entry => {
@@ -179,10 +192,6 @@ export default function CustomerProfilePage() {
       finalSummary.set(key, value);
     });
 
-    setCustomerSummary(finalSummary);
-    if (!selectedCustomerKey) {
-      setSelectedCustomerKey(MILL_OVERVIEW_KEY);
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customers]); 
 
@@ -222,6 +231,10 @@ export default function CustomerProfilePage() {
 
   return (
     <div className="space-y-6">
+        {loading && (
+            <div className="flex items-center justify-center h-32"><p>Loading customers...</p></div>
+        )}
+        {!loading && (
         <Card>
             <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -478,6 +491,7 @@ export default function CustomerProfilePage() {
             </>
         )}
       </div>
+      )}
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
           {detailsCustomer && (

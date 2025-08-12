@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { initialCustomers } from "@/lib/data";
 import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId } from "@/lib/utils";
@@ -35,17 +35,23 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
+import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { updateCustomerFirestore } from "@/lib/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
-  
+
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
+  // Note: 'payment_amount' and 'full_amount' options for CD calculation might be less common/intuitive in a real scenario. Review if needed.
   const [cdAt, setCdAt] = useState('unpaid_amount');
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
@@ -74,11 +80,70 @@ export default function CustomerPaymentsPage() {
     setCustomerSummary(newSummary);
   }, [customers, customerSummary]);
 
-  useEffect(() => {
-    updateCustomerSummary();
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers]);
+   const isInitialLoad = useRef(true);
 
+  useEffect(() => {
+    if (!db) return; // Ensure db is initialized
+
+    const q = query(collection(db, "customers"), orderBy("date", "asc")); // Order by date, or maybe srNo?
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const customersData: Customer[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          srNo: data.srNo,
+          date: data.date, // Stored as ISO string
+          term: data.term,
+          dueDate: data.dueDate, // Stored as ISO string
+          name: data.name,
+          so: data.so,
+          address: data.address,
+          contact: data.contact,
+          vehicleNo: data.vehicleNo,
+          variety: data.variety,
+          grossWeight: data.grossWeight,
+          teirWeight: data.teirWeight,
+          weight: data.weight,
+          kartaPercentage: data.kartaPercentage,
+          kartaWeight: data.kartaWeight,
+          kartaAmount: data.kartaAmount,
+          netWeight: data.netWeight,
+          rate: data.rate,
+          labouryRate: data.labouryRate,
+          labouryAmount: data.labouryAmount,
+          kanta: data.kanta,
+          otherCharges: data.otherCharges, // Ensure this field is included if used
+          amount: data.amount,
+          netAmount: data.netAmount,
+          originalNetAmount: data.originalNetAmount || data.amount, // Store original amount
+          barcode: data.barcode || '',
+          receiptType: data.receiptType || 'Cash',
+          paymentType: data.paymentType || 'Full',
+          customerId: data.customerId,
+          searchValue: data.searchValue || '',
+          payments: data.payments || [], // Ensure payments array is included
+        } as Customer; // Cast to Customer type
+      });
+
+      setCustomers(customersData);
+      if (isInitialLoad.current) {
+          isInitialLoad.current = false;
+      }
+    }, (error) => {
+      console.error("Error fetching customers:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Failed to load customer data." });
+    });
+
+    // Clean up listener on unmount
+    return () => unsubscribe();
+  }, []); // Empty dependency array means this runs once on mount
+
+    useEffect(() => {
+        updateCustomerSummary();
+    }, [customers, updateCustomerSummary]);
+
+    // Preserve selected customer and entries on data update
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
     setSelectedEntryIds(new Set());
@@ -86,7 +151,7 @@ export default function CustomerPaymentsPage() {
     setPaymentType('Full');
     setCdEnabled(false);
   };
-  
+
   const handleEntrySelect = (entryId: string) => {
     const newSet = new Set(selectedEntryIds);
     if (newSet.has(entryId)) {
@@ -99,11 +164,11 @@ export default function CustomerPaymentsPage() {
 
   const selectedEntries = useMemo(() => {
     return customers.filter(c => selectedEntryIds.has(c.id));
-  }, [customers, selectedEntryIds]);
-  
+  }, [customers, selectedEntryIds]); // Depend on customers state
+
   const totalOutstandingForSelected = useMemo(() => {
     return selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0);
-  }, [selectedEntries]);
+  }, [selectedEntries]); // Depend on selectedEntries
   
   const autoSetCDToggle = useCallback(() => {
     if (selectedEntries.length === 0) {
@@ -146,7 +211,7 @@ export default function CustomerPaymentsPage() {
     setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
   }, [cdEnabled, paymentAmount, totalOutstandingForSelected, cdPercent, cdAt]);
 
-
+  // Function to process payment and update Firestore
   const processPayment = () => {
     if (selectedEntryIds.size === 0 || paymentAmount <= 0) {
       toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries and enter a valid payment amount." });
@@ -157,41 +222,64 @@ export default function CustomerPaymentsPage() {
       return;
     }
 
+    // Calculate total amount paid including CD
     let remainingPayment = paymentAmount + calculatedCdAmount;
-    const updatedCustomers = [...customers];
 
-    selectedEntries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // FIFO
-      .forEach(entry => {
-        const entryInArray = updatedCustomers.find(c => c.id === entry.id)!;
-        const outstanding = parseFloat(String(entryInArray.netAmount));
-        if (remainingPayment >= outstanding) {
-          entryInArray.netAmount = 0;
-          remainingPayment -= outstanding;
-        } else {
-          entryInArray.netAmount = parseFloat((outstanding - remainingPayment).toFixed(2));
-          remainingPayment = 0;
-        }
-      });
-    
+    // Create the new payment object
     const newPayment: Payment = {
-        paymentId: formatPaymentId(paymentIdCounter + 1),
-        date: new Date().toISOString().split("T")[0],
-        amount: paymentAmount,
-        cdAmount: calculatedCdAmount,
-        type: paymentType,
-        receiptType: 'Online',
-        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`
+      paymentId: formatPaymentId(paymentIdCounter + 1), // This counter logic needs persistence, perhaps in Firestore or a cloud function
+      date: new Date().toISOString().split("T")[0],
+      amount: paymentAmount,
+      cdAmount: calculatedCdAmount,
+      type: paymentType,
+      receiptType: 'Online', // Or add a selection for this
+      notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
+      entryIds: Array.from(selectedEntryIds) // Store which entries this payment is for
     };
 
-    const summary = customerSummary.get(selectedCustomerKey!)!;
-    summary.paymentHistory.push(newPayment);
-    setPaymentIdCounter(p => p + 1);
+    // Prepare updates for selected entries
+    const updates = selectedEntries
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // FIFO
+      .map(entry => {
+        const outstanding = parseFloat(String(entry.netAmount));
+        let updatedNetAmount;
 
-    setCustomers(updatedCustomers);
-    setSelectedEntryIds(new Set());
-    setPaymentAmount(0);
-    setCdEnabled(false);
-    toast({ title: "Success", description: "Payment processed successfully." });
+        if (remainingPayment >= outstanding) {
+          updatedNetAmount = 0;
+          remainingPayment -= outstanding;
+        } else {
+          updatedNetAmount = parseFloat((outstanding - remainingPayment).toFixed(2));
+          remainingPayment = 0;
+        }
+
+        // Add payment to the entry's payment history
+         const updatedPayments = [...(entry.payments || []), newPayment]; // Append new payment
+
+        return {
+          ...entry, // Keep existing data
+          netAmount: updatedNetAmount, // Update netAmount
+          payments: updatedPayments // Update payments array
+        };
+      });
+
+    // Batch write to update all selected entries in Firestore
+    // This requires a batch operation if updating multiple documents
+    const batch = db.batch();
+    updates.forEach(update => {
+        const docRef = db.collection('customers').doc(update.id);
+        batch.update(docRef, { netAmount: update.netAmount, payments: update.payments });
+    });
+
+    batch.commit().then(() => {
+        // No need to update local state directly, listener will handle it
+        setSelectedEntryIds(new Set());
+        setPaymentAmount(0);
+        setCdEnabled(false); // Reset CD state
+        toast({ title: "Success", description: "Payment processed successfully." });
+    }).catch(error => {
+        console.error("Error processing payment:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Failed to process payment." });
+    });
   };
   
   const outstandingEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && parseFloat(String(c.netAmount)) > 0) : [];
@@ -201,7 +289,31 @@ export default function CustomerPaymentsPage() {
   return (
     <div className="space-y-8">
       <Card>
-        <CardHeader>
+        <CardHeader><CardTitle>Select Customer</CardTitle></CardHeader>
+        <CardContent>
+          {isInitialLoad.current ? (
+             <Skeleton className="w-full md:w-1/2 h-10" />
+          ) : (
+              <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
+                <SelectTrigger className="w-full md:w-1/2">
+                  <SelectValue placeholder="Select a customer to process payments" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(customerSummary.entries()).map(([key, data]) => (
+                    <SelectItem key={key} value={key}>
+                      {toTitleCase(data.name)} ({data.contact}) - Outstanding: {data.totalOutstanding.toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+          )}
+        </CardContent>
+      </Card>
+
+      {selectedCustomerKey && (
+        <>
+          <Card>
+            <CardHeader>
           <CardTitle>Select Customer</CardTitle>
         </CardHeader>
         <CardContent>
@@ -219,6 +331,7 @@ export default function CustomerPaymentsPage() {
           </Select>
         </CardContent>
       </Card>
+            <CardHeader><CardTitle>Outstanding Entries</CardTitle></CardHeader>
 
       {selectedCustomerKey && (
         <>
@@ -308,7 +421,8 @@ export default function CustomerPaymentsPage() {
                             <Input value={calculatedCdAmount.toFixed(2)} readOnly className="font-bold text-primary" />
                         </div>
                       </>}
-                  </div>
+                  </div> {/* End grid */}
+
                   <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>Process Payment</Button>
               </CardContent>
           </Card>
@@ -335,23 +449,28 @@ export default function CustomerPaymentsPage() {
           
           <Card>
             <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-            <CardContent>
+             <CardContent>
+                {paymentHistory.length > 0 ? (
                 <div className="overflow-x-auto">
                 <Table>
                     <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>CD Amount</TableHead><TableHead>Notes</TableHead></TableRow></TableHeader>
                     <TableBody>
                     {paymentHistory.map(p => (
-                        <TableRow key={p.paymentId}>
+                        <TableRow key={p.paymentId + p.date}> {/* Add date to key just in case paymentId repeats (which it shouldn't) */}
                         <TableCell>{p.paymentId}</TableCell>
                         <TableCell>{p.date}</TableCell>
                         <TableCell>{p.amount.toFixed(2)}</TableCell>
                         <TableCell>{p.cdAmount.toFixed(2)}</TableCell>
                         <TableCell>{p.notes}</TableCell>
+
                         </TableRow>
                     ))}
                     </TableBody>
                 </Table>
                 </div>
+                ) : (
+                    <p className="text-muted-foreground text-sm">No payment history available for this customer.</p>
+                )}
             </CardContent>
           </Card>
         </>

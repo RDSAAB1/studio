@@ -8,50 +8,32 @@ body {
 
 @layer base {
   :root {
-    /* Main Light Theme Colors (Red & White Software Wide) */
-    --background: 0 0% 100%; /* Pure White Background */
-    --foreground: 0 0% 15%; /* Dark Gray/Black Text for contrast */
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 15%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 15%;
+    /* Desert Plain Theme Colors */
+    --background: 15 26% 92%; /* #E5D4CD - Light Peach/Pink */
+    --foreground: 200 26% 26%; /* #304655 - Dark Blue-Gray */
+    --card: 15 26% 95%; /* Slightly lighter for cards */
+    --card-foreground: 200 26% 26%; /* Dark Blue-Gray */
+    --popover: 15 26% 95%; /* Slightly lighter for popover */
+    --popover-foreground: 200 26% 26%; /* Dark Blue-Gray */
 
-    --primary: 0 78% 54%; /* The vibrant red from the sidebar for primary elements */
-    --primary-foreground: 0 0% 100%; /* White text on primary red */
+    --primary: 21 24% 62%; /* #B59283 - Medium Brown/Taupe */
+    --primary-foreground: 0 0% 100%; /* White text on primary */
 
-    --secondary: 0 0% 95%; /* Light gray for secondary elements */
-    --secondary-foreground: 0 0% 25%; /* Darker gray text on secondary */
+    --secondary: 200 20% 45%; /* Derived from #304655 for secondary */
+    --secondary-foreground: 0 0% 98%; /* Light text on secondary */
 
-    --muted: 0 0% 90%; /* Even lighter gray for muted elements */
-    --muted-foreground: 0 0% 40%; /* Medium gray text */
+    --muted: 15 20% 88%; /* Derived from #E5D4CD for muted */
+    --muted-foreground: 200 15% 50%; /* Medium gray/blue text */
 
-    --accent: 0 0% 95%; /* Accent same as secondary for general highlights */
-    --accent-foreground: 0 0% 25%;
+    --accent: 21 24% 62%; /* #B59283 - Using primary for accent */
+    --accent-foreground: 0 0% 100%; /* White text on accent */
 
     --destructive: 0 84.2% 60.2%; /* Standard red for destructive actions */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 85%; /* Light gray borders for general elements */
-    --input: 0 0% 90%; /* Light gray input backgrounds */
-    --ring: 0 78% 54%; /* Primary red for focus rings */
-
-    /* Custom Sidebar Red & White Colors (Matching Image - slightly adjusted for better contrast and glow) */
-    --sidebar-bg: 350 70% 40%; /* Deeper red */
-    --sidebar-text: 0 0% 100%; /* White text */
-    --sidebar-hover-bg: 350 70% 50%; /* Lighter for hover */
-    --sidebar-active-bg: 350 70% 50%; /* Active same as hover for consistent block */
-    --sidebar-border: 350 70% 60%; /* Even lighter for internal borders/separators */
-    --sidebar-icon: 0 0% 100%; /* White icons */
-    --sidebar-search-bg: 350 70% 30%; /* Darker red for search input background */
-    --sidebar-search-text: 0 0% 100%; /* White text for search */
-    --sidebar-search-placeholder: 0 0% 80%; /* Light placeholder */
-    --sidebar-focus-ring: 0 0% 100%; /* White focus ring on red */
-
-    --chart-1: 0 78% 54%; /* Align chart colors with primary red */
-    --chart-2: 0 78% 65%;
-    --chart-3: 0 78% 75%;
-    --chart-4: 0 78% 85%;
-    --chart-5: 0 78% 95%;
+    --border: 200 18% 38%; /* Derived from #304655 for borders */
+    --input: 15 22% 90%; /* Derived from #E5D4CD for inputs */
+    --ring: 21 24% 62%; /* Primary color for focus rings */
     --radius: 0.5rem;
   }
 }
@@ -65,61 +47,11 @@ body {
   }
 }
 
-/* Custom CSS for glowing effect on active/hovered menu items */
-.menu-item-glow {
-  position: relative;
+/* Custom scrollbar hide utility */
+.scrollbar-hide {
+  scrollbar-width: none; /* For Firefox */
+  -ms-overflow-style: none;  /* For Internet Explorer and Edge */
 }
-
-.menu-item-glow::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: 0; /* Position at the bottom of the item */
-  width: 100%; /* Full width of the item */
-  height: 2px; /* Height of the glow line */
-  background: linear-gradient(90deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 100%);
-  opacity: 0; /* Initially hidden */
-  transform: scaleX(0); /* Start hidden, scale from left */
-  transform-origin: left; /* Scale from the left edge */
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; /* Smooth transition */
-}
-
-/* Apply glow on hover of the parent link */
-.menu-item-glow:hover::after {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
-/* Apply glow to active menu item */
-.menu-item-glow.active::after {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
-/* Custom scrollbar styling */
-.scrollbar-thin {
-  scrollbar-width: thin; /* For Firefox */
-  scrollbar-color: var(--sidebar-search-bg) var(--sidebar-bg); /* thumb then track */
-}
-
-/* For Webkit browsers (Chrome, Safari) */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 8px; /* width of the entire scrollbar */
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: var(--sidebar-bg); /* color of the tracking area */
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--sidebar-search-bg); /* color of the scroll thumb */
-  border-radius: 20px; /* roundness of the scroll thumb */
-  border: 3px solid var(--sidebar-bg); /* creates padding around scroll thumb */
-}
-
-/* Glowing outline effect for selected menu items */
-.menu-item-outlined.active {
-    outline: 2px solid silver;
-    outline-offset: -2px; /* To make the outline sit inside the element */
-    box-shadow: 0 0 5px silver; /* Add a subtle glow */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* For Chrome, Safari, and Opera */
 }

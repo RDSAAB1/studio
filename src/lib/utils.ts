@@ -20,3 +20,10 @@ export function formatSrNo(num: number | string) {
 export function formatPaymentId(num: number | string) {
   return 'P' + String(num).padStart(5, '0');
 }
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD', // You can change the currency code as needed
+  }).format(amount);
+}

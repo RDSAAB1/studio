@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { initialTransactions } from "@/lib/data";
@@ -19,8 +18,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { useForm, Controller } from "react-hook-form";
+
+import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase"; // Assuming firebase.ts is in lib
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -29,6 +31,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { transactionCategories } from "@/lib/data";
 
+// Zod Schema
 const transactionSchema = z.object({
   id: z.string().optional(),
   date: z.date(),
@@ -44,11 +47,12 @@ const transactionSchema = z.object({
   taxAmount: z.coerce.number().optional(),
   expenseType: z.enum(["Personal", "Business"]).optional(),
   isRecurring: z.boolean(),
-  mill: z.string().optional(),
+  mill: z.string().optional(), // Note: This might need review based on how 'Mill' relates to Income/Expense
   expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
 });
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
+type TransactionFormData = Omit<TransactionFormValues, 'date'> & { date: string }; // For Firestore compatibility
 
 const getInitialFormState = (transactions: Transaction[]): Omit<Transaction, 'id' | 'date'> & { date: Date } => {
   const staticDate = new Date();
@@ -56,13 +60,14 @@ const getInitialFormState = (transactions: Transaction[]): Omit<Transaction, 'id
 
   return {
     date: staticDate,
-    transactionType: 'Expense',
+    transactionType: 'Expense', // Default to Expense
     category: '',
     subCategory: '',
     amount: 0,
     payee: '',
     description: '',
     paymentMethod: 'Cash',
+    // isRecurring: false, // Default handled by form.reset
     status: 'Paid',
     invoiceNumber: '',
     taxAmount: 0,
@@ -104,8 +109,8 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 export default function IncomeExpenseClient() {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<string | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction, direction: 'ascending' | 'descending' } | null>(null);
   const [activeTab, setActiveTab] = useState("history");
 
   const form = useForm<TransactionFormValues>({
@@ -132,6 +137,27 @@ export default function IncomeExpenseClient() {
     return categoryObj?.subCategories || [];
   }, [selectedCategory, availableCategories]);
 
+  // Fetch data from Firestore in real-time
+  useEffect(() => {
+    const q = query(collection(db, "transactions"), orderBy("date", "desc")); // Order by date
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const transactionsData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: new Date(data.date) // Convert Firestore Timestamp or string back to Date
+        } as Transaction;
+      });
+      setTransactions(transactionsData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching transactions: ", error);
+      setLoading(false);
+    });
+    return () => unsubscribe(); // Clean up the listener
+  }, []);
+
   useEffect(() => {
     form.setValue('category', '');
     form.setValue('subCategory', '');
@@ -142,7 +168,7 @@ export default function IncomeExpenseClient() {
   }, [selectedCategory, form]);
 
   const handleNew = useCallback(() => {
-    setIsEditing(null);
+    setIsEditing(null); // Reset editing state
     form.reset(getInitialFormState(transactions));
     setActiveTab("form");
   }, [transactions, form]);
@@ -151,29 +177,47 @@ export default function IncomeExpenseClient() {
     setIsEditing(transaction.id);
     form.reset({
       ...transaction,
-      date: new Date(transaction.date),
+      date: new Date(transaction.date), // Ensure date is a Date object for the form
       taxAmount: transaction.taxAmount || 0,
     });
     setActiveTab("form");
   };
 
-  const handleDelete = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
-    toast({ title: "Success", description: "Transaction deleted successfully." });
-    if (isEditing === id) {
-      setIsEditing(null);
-      form.reset(getInitialFormState(transactions));
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "transactions", id));
+      toast({ title: "Success", description: "Transaction deleted successfully." });
+      if (isEditing === id) {
+        setIsEditing(null);
+        form.reset(getInitialFormState(transactions)); // Reset form if the deleted item was being edited
+      }
+    } catch (error) {
+      console.error("Error deleting transaction: ", error);
+      toast({ title: "Error", description: "Failed to delete transaction.", variant: "destructive" });
     }
   };
 
-  const onSubmit = (values: TransactionFormValues) => {
-    const transactionData: Transaction = {
-      ...values,
-      date: format(values.date, "yyyy-MM-dd"),
-      payee: toTitleCase(values.payee),
-      mill: toTitleCase(values.mill || ''),
-    };
-    
+  const onSubmit = async (values: TransactionFormValues) => {
+    setLoading(true); // Show loading while saving
+    try {
+      const transactionData: TransactionFormData = {
+        ...values,
+        date: format(values.date, "yyyy-MM-dd"), // Save date as string
+        payee: toTitleCase(values.payee),
+        mill: toTitleCase(values.mill || ''),
+        // isRecurring handled by values
+      };
+
+      if (isEditing) {
+        // Update existing transaction
+        await setDoc(doc(db, "transactions", isEditing), transactionData);
+        toast({ title: "Success", description: "Transaction updated successfully." });
+      } else {
+        // Add new transaction with a new ID
+        const newDocRef = doc(collection(db, "transactions"));
+        await setDoc(newDocRef, { ...transactionData, id: newDocRef.id });
+        toast({ title: "Success", description: "New transaction saved successfully." });
+      }
     if (isEditing) {
       setTransactions(prev => prev.map(t => t.id === isEditing ? { ...transactionData, id: isEditing } : t));
       toast({ title: "Success", description: "Transaction updated successfully." });

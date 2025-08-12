@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Home,
-  Settings as SettingsIcon, // Renamed to avoid conflict with 'Settings' text
+  Settings as SettingsIcon,
   BarChart3,
   Users,
   LogOut,
@@ -36,47 +36,16 @@ import {
   ClipboardCheck,
   Briefcase,
   Users2,
-  Package as PackageIcon // Use PackageIcon for Inventory main icon
+  Package as PackageIcon
 } from 'lucide-react';
 
-// A simple 'cn' utility similar to shadcn/ui for conditional class merging
-function cn(...classes: (string | boolean | undefined | null)[]) {
+function cn(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-// --- Sidebar Navigation Data (Full menu re-integrated, with image-specific icons/labels for prominent items) ---
+// Sidebar Navigation Data
 const menuItems = [
-  {
-    id: "main-home",
-    name: "Home",
-    icon: Home,
-    href: "/sales/dashboard-overview", // Mapping to an existing dashboard page
-  },
-  {
-    id: "main-dashboard-from-image",
-    name: "Dashboard", // Label from image
-    icon: SettingsIcon, // Using Settings icon as per image for Dashboard
-    href: "/sales/dashboard-overview", // Mapping to an existing dashboard route for functionality
-  },
-  {
-    id: "main-settings-from-image",
-    name: "Settings",
-    icon: SettingsIcon,
-    href: "/settings",
-  },
-  {
-    id: "main-reports-from-image",
-    name: "Reports",
-    icon: BarChart3,
-    href: "/sales/sales-reports", // Mapping to existing sales reports
-  },
-  {
-    id: "main-users-from-image",
-    name: "Users",
-    icon: Users,
-    href: "/hr/employee-database", // Mapping to existing employee database
-  },
-  // Your original detailed menu items follow:
+  { id: "main-dashboard-from-image", name: "Dashboard", icon: SettingsIcon, href: "/sales/dashboard-overview" },
   {
     id: "main-sales",
     name: "Sales",
@@ -164,12 +133,6 @@ const menuItems = [
       { id: "sub-project-3", name: "Team Collaboration", href: "/projects/collaboration", icon: Users2 },
     ],
   },
-  {
-    id: "main-logout",
-    name: "Logout",
-    icon: LogOut,
-    href: "/logout", // Assuming a logout route or handler
-  },
 ];
 
 interface MenuItem {
@@ -183,104 +146,117 @@ interface MenuItem {
 interface SubMenuProps {
   item: MenuItem;
   isSidebarOpen: boolean;
+  hoveredMenuItemId: string | null;
+  setHoveredMenuItemId: (id: string | null) => void;
   activePath: string;
   onLinkClick: (path: string) => void;
   setIsSidebarOpen: (isOpen: boolean) => void;
-  isDesktop: boolean; // Add isDesktop prop
+  isDesktop: boolean;
 }
 
-const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLinkClick, setIsSidebarOpen, isDesktop }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, hoveredMenuItemId, setHoveredMenuItemId, activePath, onLinkClick, setIsSidebarOpen, isDesktop }) => {
+  const isActiveParent = item.subMenus && item.subMenus.some(sub => activePath.startsWith(sub.href || ''));
+  const [isOpen, setIsOpen] = useState(isActiveParent);
   const Icon = item.icon;
-
+  
+  // Updated logic: Parent item glows if hovered OR if it's the active parent in a minimized state.
+  const isCurrentlyHovered = hoveredMenuItemId === item.id;
+  const shouldParentGlow = isCurrentlyHovered || (!isSidebarOpen && isActiveParent);
+  
   useEffect(() => {
-    // Open parent if any sub-item is active
-    if (item.subMenus && item.subMenus.some(sub => activePath.startsWith(sub.href || ''))) {
+    if (isSidebarOpen && isActiveParent) {
       setIsOpen(true);
-    } else {
-      // Close if no sub-item is active AND sidebar is expanded
-      // This prevents sub-menus from closing when sidebar is collapsed and you hover away
-      if (isSidebarOpen) {
-        setIsOpen(false);
-      }
-    }
-  }, [activePath, item.subMenus, isSidebarOpen]);
-
-  const handleToggle = () => {
-    if (!isSidebarOpen && isDesktop) { // If sidebar is collapsed on desktop, expand it and open sub-menu
-      setIsSidebarOpen(true);
-      setIsOpen(true);
-    } else { // Otherwise, just toggle the sub-menu
-      setIsOpen(!isOpen);
-    }
-  };
-
-  const handleMouseEnter = () => {
-    if (!isSidebarOpen && isDesktop) { // Only on desktop when sidebar is collapsed
-      setIsOpen(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    // Only on desktop when sidebar is collapsed, and no sub-item is active
-    if (!isSidebarOpen && isDesktop && !item.subMenus?.some(sub => activePath.startsWith(sub.href || ''))) {
+    } else if (isSidebarOpen) {
       setIsOpen(false);
     }
+  }, [isSidebarOpen, isActiveParent]);
+
+  const handleToggle = () => {
+    if (isSidebarOpen && item.subMenus) {
+      setIsOpen(!isOpen);
+    } else if (item.href) {
+      onLinkClick(item.href);
+      setIsSidebarOpen(false);
+    }
   };
 
-  const isActiveParent = item.subMenus && item.subMenus.some(sub => activePath.startsWith(sub.href || ''));
-
   return (
-    <li className="my-1 relative"> 
+    <li
+      className="my-1 relative"
+      onMouseEnter={() => setHoveredMenuItemId(item.id)}
+      onMouseLeave={() => setHoveredMenuItemId(null)}
+    >
       <div
         className={cn(
-          "flex items-center justify-between p-2 cursor-pointer rounded-md transition-colors h-12",
-          "bg-red-900 text-white", // Direct red background and white text
-          "hover:bg-red-700", // Direct red hover
-          (item.subMenus && isOpen) || isActiveParent ? "bg-red-700" : "", // Direct red active
+          "flex items-center justify-between p-2 cursor-pointer rounded-md h-12 group transition-all duration-300 ease-in-out",
+          "text-[#E5D4CD] transform-gpu",
+          shouldParentGlow && "scale-[1.02] shadow-md shadow-[#E5D4CD]/30",
+          "relative overflow-visible"
         )}
         onClick={handleToggle}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
       >
+        <span className={cn(
+          "absolute inset-x-0 h-[2px] bg-[#E5D4CD] transition-transform duration-300",
+          "top-0 origin-left transform",
+          shouldParentGlow ? "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]" : "scale-x-0"
+        )}></span>
+        <span className={cn(
+          "absolute inset-x-0 h-[2px] bg-[#E5D4CD] transition-transform duration-300",
+          "bottom-0 origin-right transform",
+          shouldParentGlow ? "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]" : "scale-x-0"
+        )}></span>
         <div className="flex items-center flex-grow">
-          {Icon && <Icon className="mr-3 h-6 w-6 text-white" />} {/* Direct white icons */}
+          {Icon && <Icon className={cn("mr-3 h-6 w-6 transition-colors", "text-[#E5D4CD]")} />}
           {isSidebarOpen && (
-            <span className="text-base font-medium whitespace-nowrap overflow-hidden text-ellipsis text-white"> 
+            <span className={cn("text-base font-medium whitespace-nowrap overflow-hidden text-ellipsis transition-colors", "text-[#E5D4CD]")}>
               {item.name}
             </span>
           )}
         </div>
-        {item.subMenus && isSidebarOpen && ( /* Only show chevron if sidebar is open and has sub-menus */
+        {item.subMenus && isSidebarOpen && (
           <div className="flex-shrink-0">
-            {isOpen ? <ChevronDown className="h-6 w-6 text-white" /> : <ChevronRight className="h-6 w-6 text-white" />} {/* Direct white icons */}
+            {isOpen ? <ChevronDown className={cn("h-6 w-6 transition-colors", "text-[#E5D4CD]")} /> : <ChevronRight className={cn("h-6 w-6 transition-colors", "text-[#E5D4CD]")} />}
           </div>
         )}
       </div>
-      {item.subMenus && isOpen && (
-        <ul className={cn("ml-6", !isSidebarOpen && isDesktop && "absolute left-full top-0 bg-red-900 border border-red-700 rounded-md shadow-lg py-2 w-48 z-50", !isSidebarOpen && !isDesktop && "hidden")}>
+      {item.subMenus && isOpen && isSidebarOpen && (
+        <ul className="ml-6 py-2">
           {item.subMenus.map(subItem => {
             const SubIcon = subItem.icon;
             const isActive = activePath.startsWith(subItem.href || '');
+            const isSubItemHovered = hoveredMenuItemId === subItem.id;
+            const shouldSubItemGlow = isSubItemHovered || (isActive && hoveredMenuItemId === null);
             return (
-              <li key={subItem.id} className="my-1">
+              <li 
+                key={subItem.id} 
+                className="my-1"
+                onMouseEnter={() => setHoveredMenuItemId(subItem.id)}
+                onMouseLeave={() => setHoveredMenuItemId(null)}
+              >
                 <Link
                   href={subItem.href || '#'}
                   onClick={() => {
                     onLinkClick(subItem.href || '#');
-                    setIsSidebarOpen(false); // Minimize on sub-item click
+                    setIsSidebarOpen(false);
                   }}
                   className={cn(
-                    "flex items-center p-2 rounded-md transition-colors relative overflow-hidden", // Added relative & overflow-hidden for glow
-                    "hover:bg-red-700 text-white text-sm", // Direct red hover and white text
-                    isActive ? "bg-red-700 font-semibold" : "", // Direct red active
-                    'menu-item-outlined', // Apply outlined style
-                    isSidebarOpen && "h-12", 
-                    { 'active': isActive, 'menu-item-glow': true } 
+                    "flex items-center p-2 rounded-md relative overflow-visible group transition-all duration-300 ease-in-out",
+                    "text-sm text-[#E5D4CD] transform-gpu",
+                    shouldSubItemGlow ? "scale-[1.02] shadow-md shadow-[#E5D4CD]/30" : "",
                   )}
                 >
-                  {SubIcon && <SubIcon className="mr-3 h-5 w-5 text-white" />}
-                  <span className="whitespace-nowrap overflow-hidden text-ellipsis text-white">
+                  <span className={cn(
+                    "absolute inset-x-0 h-[2px] bg-[#E5D4CD] transition-transform duration-300",
+                    "top-0 origin-left transform",
+                    shouldSubItemGlow ? "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]" : "scale-x-0"
+                  )}></span>
+                  <span className={cn(
+                    "absolute inset-x-0 h-[2px] bg-[#E5D4CD] transition-transform duration-300",
+                    "bottom-0 origin-right transform",
+                    shouldSubItemGlow ? "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]" : "scale-x-0"
+                  )}></span>
+                  {SubIcon && <SubIcon className={cn("h-5 w-5 mr-3 transition-colors", "text-[#E5D4CD]")} />}
+                  <span className={cn("whitespace-nowrap overflow-hidden text-ellipsis transition-colors", "text-[#E5D4CD]")}>
                     {subItem.name}
                   </span>
                 </Link>
@@ -305,18 +281,34 @@ interface CustomSidebarProps {
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSidebar, activePath, onLinkClick, setIsSidebarOpen, sidebarRef }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDesktop, setIsDesktop] = useState(false);
+  const [hoveredMenuItemId, setHoveredMenuItemId] = useState<string | null>(null);
+  const [isExplicitlyOpen, setIsExplicitlyOpen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 768); // md breakpoint
+      if (window.innerWidth < 768) setIsSidebarOpen(false);
+      setIsDesktop(window.innerWidth >= 768);
     };
 
     window.addEventListener('resize', handleResize);
-    handleResize(); // Set initial state
+    handleResize();
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [setIsSidebarOpen]);
 
-  // Filter menu items based on search term
+  const handleToggleSidebar = () => {
+    const newState = !isSidebarOpen;
+    setIsSidebarOpen(newState);
+    setIsExplicitlyOpen(newState);
+  };
+
+  const handleMouseEnterSidebar = () => {
+    if (!isSidebarOpen && isDesktop && !isExplicitlyOpen) setIsSidebarOpen(true);
+  };
+
+  const handleMouseLeaveSidebar = () => {
+    if (!isExplicitlyOpen && isDesktop) setIsSidebarOpen(false);
+  };
+
   const filteredMenuItems = menuItems.filter(item => {
     const matchesMain = item.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSub = item.subMenus && item.subMenus.some(sub =>
@@ -331,31 +323,31 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
     <aside
       ref={sidebarRef}
       className={cn(
-        "fixed inset-y-0 left-0 bg-red-900 text-white flex flex-col transition-all duration-300 ease-in-out z-40 shadow-xl",
-        isSidebarOpen ? "w-64" : "w-20",
+        "fixed inset-y-0 left-0 flex flex-col transition-all duration-300 ease-in-out z-40 shadow-xl",
+        "bg-[#B59283]",
         isDesktop ? (isSidebarOpen ? "w-64" : "w-20") : (isSidebarOpen ? "w-64" : "w-0 overflow-hidden"),
         "pt-4",
-        !isSidebarOpen && isDesktop && "overflow-visible" // Allows hover sub-menu to escape bounds
+        !isSidebarOpen && isDesktop && "overflow-visible"
       )}
-      style={{ overflowY: isSidebarOpen ? 'auto' : 'hidden' }}
+      onMouseEnter={handleMouseEnterSidebar}
+      onMouseLeave={handleMouseLeaveSidebar}
+      style={{ overflowY: 'auto' }}
     >
-      {/* Top Section: Logo/Title and Toggle Button */}
-      <div className="flex items-center justify-between px-4 pb-4 border-b border-red-700 mb-4"> {/* Direct red border */}
+      <div className="flex items-center justify-between px-4 pb-4 border-b border-[#E5D4CD] mb-4">
         {isSidebarOpen ? (
-          <h1 className="text-2xl font-bold whitespace-nowrap overflow-hidden text-white">SM</h1>
+          <h1 className="text-2xl font-bold whitespace-nowrap overflow-hidden text-[#E5D4CD]">BizSuite</h1>
         ) : (
-          <h1 className="text-2xl font-bold whitespace-nowrap overflow-hidden text-white w-full text-center">S</h1> // Collapsed logo
+          <div className="flex items-center justify-center w-full h-8 bg-[#E5D4CD] rounded-full"></div>
         )}
         <button
-          onClick={toggleSidebar}
-          className="p-2 rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white transition-colors" // Direct red hover, white ring
+          onClick={handleToggleSidebar}
+          className="p-2 rounded-full hover:bg-[#E5D4CD] focus:outline-none focus:ring-2 focus:ring-[#B59283] transition-colors"
           aria-label={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
         >
-          <Menu className="h-6 w-6 text-white" />
+          <Menu className="h-6 w-6 text-[#E5D4CD] hover:text-[#B59283]" />
         </button>
       </div>
 
-      {/* Search Bar */}
       <div className="px-4 mb-4">
         <div className="relative">
           <input
@@ -364,17 +356,17 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className={cn(
-              "w-full p-2 pl-10 rounded-md bg-red-800 text-white placeholder-red-300 focus:outline-none focus:ring-2 focus:ring-white", // Direct red colors
+              "w-full p-2 pl-10 rounded-md focus:outline-none focus:ring-2",
+              "bg-[#9d8075] text-[#E5D4CD] placeholder-[#E5D4CD] focus:ring-[#E5D4CD]",
               !isSidebarOpen && "md:opacity-0 md:pointer-events-none md:w-0"
             )}
           />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#E5D4CD]" />
         </div>
       </div>
 
-      {/* Navigation Links */}
-      <nav className="flex-1 overflow-y-auto px-4 scrollbar-hide"> {/* Direct red scrollbar colors */}
-        <ul>
+      <nav className="flex-1 overflow-y-auto px-4 scrollbar-hide">
+        <ul className="space-y-1">
           {filteredMenuItems.map(item =>
             item.subMenus ? (
               <SubMenu
@@ -385,27 +377,47 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
                 onLinkClick={onLinkClick}
                 setIsSidebarOpen={setIsSidebarOpen}
                 isDesktop={isDesktop}
+                hoveredMenuItemId={hoveredMenuItemId}
+                setHoveredMenuItemId={setHoveredMenuItemId}
               />
             ) : (
-              <li key={item.id} className="my-1"> {/* Added relative here for consistency with Link's pseudo-element if needed */}
+              <li 
+                key={item.id}
+                onMouseEnter={() => setHoveredMenuItemId(item.id)}
+                onMouseLeave={() => setHoveredMenuItemId(null)}
+              >
                 <Link
                   href={item.href || '#'}
                   onClick={() => {
+                    setHoveredMenuItemId(null);
                     onLinkClick(item.href || '#');
                     setIsSidebarOpen(false);
                   }}
                   className={cn(
-                    "flex items-center p-2 rounded-md transition-colors relative overflow-hidden", 
-                    "hover:bg-red-700 text-white", // Direct red hover, white text
-                    activePath === item.href ? "bg-red-700 font-semibold" : "",
-                    'menu-item-outlined', // Apply outlined style
-                    isSidebarOpen && "h-12", 
-                    { 'active': activePath === item.href, 'menu-item-glow': true } 
+                    "flex items-center p-2 rounded-md h-12 group relative transition-all duration-300 ease-in-out",
+                    "text-[#E5D4CD] transform-gpu",
+                    (activePath === item.href && hoveredMenuItemId === null) && "scale-[1.02] shadow-md shadow-[#E5D4CD]/30",
+                    hoveredMenuItemId === item.id && "scale-[1.02] shadow-md shadow-[#E5D4CD]/30",
+                    "relative overflow-visible"
                   )}
                 >
-                  {React.createElement(item.icon, { className: "mr-3 h-6 w-6 text-white" })} 
+                  <span className={cn(
+                    "absolute inset-x-0 h-[2px] bg-[#E5D4CD] transition-transform duration-300",
+                    "top-0 origin-left transform",
+                    (activePath === item.href && hoveredMenuItemId === null) ? "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]" : "scale-x-0",
+                    hoveredMenuItemId === item.id && "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]"
+                  )}></span>
+                  <span className={cn(
+                    "absolute inset-x-0 h-[2px] bg-[#E5D4CD] transition-transform duration-300",
+                    "bottom-0 origin-right transform",
+                    (activePath === item.href && hoveredMenuItemId === null) ? "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]" : "scale-x-0",
+                    hoveredMenuItemId === item.id && "scale-x-100 shadow-[0_0_5px_#E5D4CD,0_0_10px_#E5D4CD]"
+                  )}></span>
+                  <div className={isSidebarOpen ? "mr-3" : "w-full text-center"}>
+                    {React.createElement(item.icon, { className: "h-6 w-6 text-[#E5D4CD]" })}
+                  </div>
                   {isSidebarOpen && (
-                    <span className="text-base font-medium whitespace-nowrap overflow-hidden text-ellipsis text-white">
+                    <span className="text-base font-medium whitespace-nowrap overflow-hidden text-ellipsis text-[#E5D4CD]">
                       {item.name}
                     </span>
                   )}
@@ -416,26 +428,8 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
         </ul>
       </nav>
 
-      {/* User Profile / Footer Section */}
-      <div className="mt-auto px-4 py-4 border-t border-red-700 flex items-center justify-between text-white"> {/* Direct red border, white text */}
-        <div className="flex items-center">
-          <UserCircle className="h-8 w-8 text-white mr-3" />
-          {isSidebarOpen && (
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">John Doe</span>
-              <span className="text-xs text-white">Admin</span>
-            </div>
-          )}
-        </div>
-        {isSidebarOpen && (
-          <button className="p-2 rounded-full hover:bg-red-700 text-white transition-colors" aria-label="Logout"> 
-            <LogOut className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-      {/* Copyright or version info */}
-      <div className="px-4 py-2 text-center text-xs text-white opacity-70">
-        {isSidebarOpen && `© ${new Date().getFullYear()} BizSuite`}
+      <div className="mt-auto px-4 py-2 text-center text-xs text-[#E5D4CD] opacity-70">
+        {isSidebarOpen && `© ${currentYear} BizSuite`}
       </div>
     </aside>
   );

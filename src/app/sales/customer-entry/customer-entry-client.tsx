@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { initialCustomers, appOptionsData } from "@/lib/data";
 import type { Customer } from "@/lib/definitions";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
@@ -26,6 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore";
+import { DocumentData, QuerySnapshot, onSnapshot, collection } from "firebase/firestore";
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -135,7 +137,7 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                        {field.value ? (field.value instanceof Date ? format(field.value, "PPP") : String(field.value)) : <span>Pick a date</span>}
                                     </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0 z-[51]">
@@ -481,7 +483,7 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
                                     <TableRow key={customer.id} className="h-12">
                                         <TableCell className="font-mono px-3 py-1 text-sm">{customer.srNo}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
+                                        <TableCell className="px-3 py-1 text-sm">{customer.name}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
                                         <TableCell className="text-right font-semibold px-3 py-1 text-sm">{Number(customer.netAmount).toFixed(2)}</TableCell>
@@ -503,7 +505,7 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                        This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
+                                                        This action cannot be undone. This will permanently delete the entry for {customer.name} (SR No: {customer.srNo}).
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
@@ -539,11 +541,11 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 export default function CustomerEntryClient() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState(initialCustomers));
+  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState([]));
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
   
-  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
 
 
@@ -555,11 +557,11 @@ export default function CustomerEntryClient() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       srNo: currentCustomer.srNo, date: new Date(), term: 0, name: "", so: "", address: "", contact: "",
-      vehicleNo: "", variety: "", grossWeight: 0, teirWeight: 0, rate: 0, kartaPercentage: 0,
+      vehicleNo: "", variety: "", grossWeight: 0, teirWeight: 0, rate: 0, kartaPercentage: 0, detailsCustomer:null,
       labouryRate: 0, kanta: 0, receiptType: "Cash", paymentType: "Full"
     },
   });
-
+  const detailsCustomer = form.watch("detailsCustomer") as Customer | null;
   const performCalculations = useCallback((data: Partial<FormValues>) => {
     const values = {...form.getValues(), ...data};
     const date = values.date;
@@ -590,10 +592,69 @@ export default function CustomerEntryClient() {
     }));
   }, [form]);
   
+ // Load customers from Firestore and set up real-time listener
   useEffect(() => {
     setIsClient(true);
-    handleNew();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setLoading(true);
+
+    const unsubscribe = onSnapshot(collection(getCustomers), (snapshot: QuerySnapshot<DocumentData>) => {
+      const fetchedCustomers: Customer[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // Basic validation and mapping to Customer type
+        return {
+          id: doc.id,
+          srNo: data.srNo || '',
+          date: data.date || new Date().toISOString().split('T')[0],
+          term: data.term?.toString() || '0',
+          dueDate: data.dueDate || new Date().toISOString().split('T')[0],
+          name: data.name || '',
+          so: data.so || '',
+          address: data.address || '',
+          contact: data.contact || '',
+          vehicleNo: data.vehicleNo || '',
+          variety: data.variety || '',
+          grossWeight: Number(data.grossWeight) || 0,
+          teirWeight: Number(data.teirWeight) || 0,
+          weight: Number(data.weight) || 0,
+          kartaPercentage: Number(data.kartaPercentage) || 0,
+          kartaWeight: Number(data.kartaWeight) || 0,
+          kartaAmount: Number(data.kartaAmount) || 0,
+          netWeight: Number(data.netWeight) || 0,
+          rate: Number(data.rate) || 0,
+          labouryRate: Number(data.labouryRate) || 0,
+          labouryAmount: Number(data.labouryAmount) || 0,
+          kanta: Number(data.kanta) || 0,
+          amount: Number(data.amount) || 0,
+          netAmount: Number(data.netAmount) || 0,
+          barcode: data.barcode || '',
+          receiptType: data.receiptType || 'Cash',
+          paymentType: data.paymentType || 'Full',
+          customerId: data.customerId || '',
+          searchValue: data.searchValue || '',
+          payments: data.payments || [], // Assuming payments might be stored here
+        };
+      });
+      setCustomers(fetchedCustomers);
+      setLoading(false);
+       // If currently editing a customer that was deleted or changed, reset form
+      if (isEditing && !fetchedCustomers.find(c => c.id === currentCustomer.id)) {
+         handleNew(fetchedCustomers);
+      } else if (!isEditing && fetchedCustomers.length > 0) {
+         // If not editing and data loaded, perhaps set form for new entry based on new data
+         // This might be adjusted based on desired behavior after data load
+         handleNew(fetchedCustomers);
+      } else if (!isEditing && fetchedCustomers.length === 0) {
+          // Handle case where there's no data yet
+           handleNew([]);
+      }
+    }, (error) => {
+      console.error("Error fetching customers: ", error);
+      toast({ title: "Error", description: "Failed to load customer data.", variant: "destructive" });
+      setLoading(false);
+    });
+
+    // Clean up the listener when the component unmounts
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -603,7 +664,7 @@ export default function CustomerEntryClient() {
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
 
-  const resetFormToState = (customerState: Customer) => {
+  const resetFormToState = useCallback((customerState: Customer) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     let formDate;
@@ -619,22 +680,22 @@ export default function CustomerEntryClient() {
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 0,
-      labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 0,
-      receiptType: customerState.receiptType || 'Cash', paymentType: customerState.paymentType || 'Full'
+      labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 0, detailsCustomer:null,
+      receiptType: customerState.receiptType || 'Cash', paymentType: customerState.paymentType || 'Full',
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
     performCalculations(formValues);
-  }
+  }, [form, performCalculations]);
 
-  const handleNew = () => {
+  const handleNew = useCallback((currentCustomers: Customer[] = customers) => {
     setIsEditing(false);
-    const newState = getInitialFormState(customers);
+    const newState = getInitialFormState(currentCustomers);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     newState.date = today.toISOString().split("T")[0];
     newState.dueDate = today.toISOString().split("T")[0];
-    resetFormToState(newState);
+    resetFormToState({...newState, detailsCustomer: null}); // Clear detailsCustomer state
   };
 
   const handleEdit = (id: string) => {
@@ -644,7 +705,7 @@ export default function CustomerEntryClient() {
       resetFormToState(customerToEdit);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  };
+  }, [customers, resetFormToState]);
 
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
@@ -658,8 +719,8 @@ export default function CustomerEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
-        const currentState = {...getInitialFormState(customers), srNo: formattedSrNo};
-        resetFormToState(currentState);
+        const newState = getInitialFormState(customers);
+        resetFormToState({...newState, srNo: formattedSrNo, detailsCustomer: null});
     }
   }
 
@@ -679,21 +740,27 @@ export default function CustomerEntryClient() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    setCustomers(prev => prev.filter(c => c.id !== id));
-    toast({ title: "Success", description: "Entry deleted successfully." });
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteCustomer(id);
+      toast({ title: "Success", description: "Entry deleted successfully." });
+    } catch (error) {
+      console.error("Error deleting customer: ", error);
+      toast({ title: "Error", description: "Failed to delete entry.", variant: "destructive" });
+    }
+     // Firestore listener will update state automatically
     if (currentCustomer.id === id) {
       handleNew();
     }
   };
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     const completeEntry: Customer = {
       ...currentCustomer, ...values,
       name: toTitleCase(values.name), so: toTitleCase(values.so),
       address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
       variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
-      term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+      term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`, // Keep existing customerId logic or refine
     };
     if (isEditing) {
       setCustomers(prev => prev.map(c => c.id === completeEntry.id ? completeEntry : c));
@@ -707,8 +774,8 @@ export default function CustomerEntryClient() {
   };
   
   const handleShowDetails = (customer: Customer) => {
-    setDetailsCustomer(customer);
-  }
+    form.setValue("detailsCustomer", customer);
+  };
 
   const handleCapitalizeOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const field = e.target.name as keyof FormValues;
@@ -716,8 +783,13 @@ export default function CustomerEntryClient() {
     form.setValue(field, toTitleCase(value));
   };
 
-  if (!isClient) {
-    return null;
+ if (!isClient || loading) {
+    return (
+        <div className="flex justify-center items-center h-screen">
+            <Server className="h-10 w-10 text-muted-foreground animate-pulse"/>
+            <span className="sr-only">Loading...</span>
+        </div>
+    );
   }
 
   return (
@@ -751,7 +823,7 @@ export default function CustomerEntryClient() {
       
       <CustomerTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
         
-      <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
+      <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && form.setValue("detailsCustomer", null)}>
         <DialogContent className="max-w-4xl p-0">
           {detailsCustomer && (
             <>

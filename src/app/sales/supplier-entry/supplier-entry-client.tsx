@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { initialCustomers, appOptionsData } from "@/lib/data";
 import type { Customer } from "@/lib/definitions";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
@@ -28,7 +28,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator";
-
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier } from "@/lib/firestore";
+import { formatCurrency } from "@/lib/utils";
 const formSchema = z.object({
     srNo: z.string(),
     date: z.date(),
@@ -46,7 +47,8 @@ const formSchema = z.object({
     rate: z.coerce.number().min(0),
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
-    kanta: z.coerce.number().min(0),
+    kanta: z.coerce.number().min(0), // Assuming kanta is a fixed cost per entry, not related to weight
+    otherCharges: z.coerce.number().min(0), // Added for flexibility
     paymentType: z.string().min(1, "Payment type is required")
 });
 
@@ -55,14 +57,14 @@ type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
 const getInitialFormState = (customers: Customer[], lastVariety?: string): Customer => {
   const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-  const staticDate = new Date();
-  staticDate.setHours(0,0,0,0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   return {
-    id: "", srNo: formatSrNo(nextSrNum), date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
+    id: "", srNo: formatSrNo(nextSrNum), date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    labouryRate: 2, labouryAmount: 0, kanta: 50, otherCharges: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
   };
 };
@@ -82,7 +84,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox, handleFocus, lastVariety, setLastVariety }: any) {
+const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox, handleFocus, lastVariety, setLastVariety, appOptionsData }: any) {
     
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -289,7 +291,13 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                 <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
-                    </CardContent>
+                         <div className="space-y-1">
+                            <Label htmlFor="otherCharges" className="text-xs">Other Charges</Label>
+                                <InputWithIcon icon={<CircleDollarSign className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="otherCharges" control={form.control} render={({ field }) => (<Input id="otherCharges" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                   </CardContent>
                 </SectionCard>
             </div>
         </div>
@@ -305,7 +313,7 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
           { label: "Karta Weight", value: currentCustomer.kartaWeight }, { label: "Karta Amount", value: currentCustomer.kartaAmount },
           { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Laboury Amount", value: currentCustomer.labouryAmount },
           { label: "Amount", value: currentCustomer.amount }, { label: "Net Amount", value: currentCustomer.netAmount, isBold: true },
-        ]
+        ];
       }, [currentCustomer]);
 
     return (
@@ -324,7 +332,7 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
 
 const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete, onShowDetails }: any) {
     return (
-        <div className="mt-6">
+        <div className="mt-6 min-h-[200px]"> {/* Added min-height to avoid layout shift */}
             <Card>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
@@ -406,22 +414,25 @@ export default function SupplierEntryClient() {
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState([]));
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
 
 
-  const [varietyOptions, setVarietyOptions] = useState<string[]>(appOptionsData.varieties);
-  const [paymentTypeOptions, setPaymentTypeOptions] = useState<string[]>(appOptionsData.paymentTypes);
+  const [varietyOptions, setVarietyOptions] = useState<string[]>([]); // Initialize empty, will load from data
+  const [paymentTypeOptions, setPaymentTypeOptions] = useState<string[]>([]); // Initialize empty, will load from data
   const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
   const [openVarietyCombobox, setOpenVarietyCombobox] = useState(false);
   const [lastVariety, setLastVariety] = useState<string>('');
 
+  // Ensure customers is always an array
+  const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ...getInitialFormState(customers, lastVariety),
+      ...getInitialFormState(safeCustomers, lastVariety),
     },
     shouldFocusError: false,
   });
@@ -429,27 +440,43 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsClient(true);
-      try {
-        const savedCustomers = localStorage.getItem("customers_data");
-        const parsedCustomers = savedCustomers ? JSON.parse(savedCustomers) : initialCustomers;
-        setCustomers(Array.isArray(parsedCustomers) ? parsedCustomers : initialCustomers);
-        
-        const savedVariety = localStorage.getItem('lastSelectedVariety');
-        if (savedVariety) {
-          setLastVariety(savedVariety);
-        }
-      } catch (error) {
-        console.error("Failed to load data from localStorage", error);
-        setCustomers(initialCustomers);
-      }
     }
   }, []);
 
+  // Fetch data from Firestore and set up real-time listener
   useEffect(() => {
-    if (isClient) {
-      localStorage.setItem("customers_data", JSON.stringify(customers));
+    if (!isClient) return;
+
+    setIsLoading(true);
+    const unsubscribe = getSuppliersRealtime((data: Customer[]) => {
+      setCustomers(data);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching suppliers: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to load supplier data. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    });
+
+    // Load options data (varieties, payment types)
+    setVarietyOptions(appOptionsData.varieties);
+    setPaymentTypeOptions(appOptionsData.paymentTypes);
+
+    // Load last selected variety from localStorage (or perhaps user settings in the future)
+    const savedVariety = localStorage.getItem('lastSelectedVariety');
+    if (savedVariety) {
+      setLastVariety(savedVariety);
     }
-  }, [customers, isClient]);
+
+    // Set initial form date
+    form.setValue('date', new Date());
+
+    // Cleanup the listener when the component unmounts
+    return () => unsubscribe();
+  }, [isClient, form, toast]); // Depend on isClient, form, and toast
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -477,7 +504,8 @@ export default function SupplierEntryClient() {
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
-    const netAmount = amount - labouryAmount - kanta - kartaAmount;
+    const otherCharges = values.otherCharges || 0; // Added other charges
+    const netAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges; // Deduct other charges
     setCurrentCustomer(prev => ({
       ...prev, ...values,
       date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
@@ -485,14 +513,14 @@ export default function SupplierEntryClient() {
       weight: parseFloat(weight.toFixed(2)), kartaWeight: parseFloat(kartaWeight.toFixed(2)),
       kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
       amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
-      netAmount: parseFloat(netAmount.toFixed(2)),
+      kanta: parseFloat(kanta.toFixed(2)), otherCharges: parseFloat(otherCharges.toFixed(2)), netAmount: parseFloat(netAmount.toFixed(2)),
       originalNetAmount: parseFloat(netAmount.toFixed(2)),
     }));
   }, [form]);
   
    useEffect(() => {
     if (isClient) {
-      const initialFormState = getInitialFormState(customers, lastVariety);
+      const initialFormState = getInitialFormState(safeCustomers, lastVariety);
       setCurrentCustomer(initialFormState);
       resetFormToState(initialFormState);
     }
@@ -523,7 +551,8 @@ export default function SupplierEntryClient() {
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
       labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
-      paymentType: customerState.paymentType || 'Full'
+      otherCharges: customerState.otherCharges || 0, // Include other charges
+      paymentType: customerState.paymentType || 'Full',
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -532,16 +561,18 @@ export default function SupplierEntryClient() {
 
   const handleNew = () => {
     setIsEditing(false);
-    const newState = getInitialFormState(customers, lastVariety);
+    const newState = getInitialFormState(safeCustomers, lastVariety);
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    newState.date = today.toISOString().split("T")[0];
-    newState.dueDate = today.toISOString().split("T")[0];
+    const year = today.getFullYear();
+    const month = (today.getMonth() + 1).toString().padStart(2, '0'); // Month is 0-indexed
+    const day = today.getDate().toString().padStart(2, '0');
+    const localDateString = `${year}-${month}-${day}`;
+    resetFormToState({ ...newState, date: new Date(localDateString), dueDate: localDateString });
     resetFormToState(newState);
   };
 
   const handleEdit = (id: string) => {
-    const customerToEdit = customers.find(c => c.id === id);
+    const customerToEdit = safeCustomers.find(c => c.id === id);
     if (customerToEdit) {
       setIsEditing(true);
       resetFormToState(customerToEdit);
@@ -555,13 +586,13 @@ export default function SupplierEntryClient() {
         formattedSrNo = formatSrNo(parseInt(formattedSrNo));
         form.setValue('srNo', formattedSrNo);
     }
-    const foundCustomer = customers.find(c => c.srNo === formattedSrNo);
+    const foundCustomer = safeCustomers.find(c => c.srNo === formattedSrNo);
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
-        const currentState = {...getInitialFormState(customers, lastVariety), srNo: formattedSrNo};
+        const currentState = {...getInitialFormState(safeCustomers, lastVariety), srNo: formattedSrNo};
         resetFormToState(currentState);
     }
   }
@@ -569,7 +600,7 @@ export default function SupplierEntryClient() {
   const handleContactBlur = (contactValue: string) => {
     if (contactValue.length === 10) {
       const foundCustomer = customers.find(c => c.contact === contactValue);
-      if (foundCustomer) {
+      if (foundCustomer && foundCustomer.id !== currentCustomer.id) { // Only auto-fill if not the current customer being edited
         form.setValue('name', foundCustomer.name);
         form.setValue('so', foundCustomer.so);
         form.setValue('address', foundCustomer.address);
@@ -595,17 +626,29 @@ export default function SupplierEntryClient() {
   };
 
   const handleDelete = (id: string) => {
-    setCustomers(prev => prev.filter(c => c.id !== id));
-    toast({ title: "Success", description: "Entry deleted successfully." });
-    if (currentCustomer.id === id) {
-      handleNew();
-    }
+     deleteSupplier(id)
+       .then(() => {
+         toast({ title: "Success", description: "Entry deleted successfully." });
+         if (currentCustomer.id === id) {
+           handleNew(); // Clear form if deleting the currently edited customer
+         }
+       })
+       .catch((error) => {
+         console.error("Error deleting supplier: ", error);
+         toast({
+           title: "Error",
+           description: "Failed to delete entry. Please try again.",
+           variant: "destructive",
+         });
+       });
   };
 
   const onSubmit = (values: FormValues) => {
     const completeEntry: Customer = {
       ...currentCustomer, ...values,
       name: toTitleCase(values.name), so: toTitleCase(values.so),
+      // Ensure calculated fields are included and correctly formatted
+      weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges, netAmount: currentCustomer.netAmount, originalNetAmount: currentCustomer.originalNetAmount,
       address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
       variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
       term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
@@ -613,11 +656,27 @@ export default function SupplierEntryClient() {
     if (isEditing) {
       setCustomers(prev => prev.map(c => c.id === completeEntry.id ? completeEntry : c));
       toast({ title: "Success", description: "Entry updated successfully." });
+      updateSupplier(completeEntry)
+        .then(() => {
+          toast({ title: "Success", description: "Entry updated successfully." });
+        })
+        .catch((error) => {
+          console.error("Error updating supplier: ", error);
+          toast({ title: "Error", description: "Failed to update entry.", variant: "destructive" });
+        });
     } else {
       const newEntry = { ...completeEntry, id: Date.now().toString() };
-      setCustomers(prev => [newEntry, ...prev]);
-      toast({ title: "Success", description: "New entry saved successfully." });
+      addSupplier(newEntry)
+        .then(() => {
+          toast({ title: "Success", description: "New entry saved successfully." });
+        })
+        .catch((error) => {
+          console.error("Error adding supplier: ", error);
+          toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
+        });
     }
+     // Clear form after saving/updating
+
     handleNew();
   };
   
@@ -638,6 +697,15 @@ export default function SupplierEntryClient() {
   };
 
   if (!isClient) {
+    return null; // Render nothing on the server
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-[calc(100vh-200px)]"> {/* Adjust height as needed */}
+        <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
+      </div>
+    );
     return null;
   }
 
@@ -661,6 +729,7 @@ export default function SupplierEntryClient() {
                 handleFocus={handleFocus}
                 lastVariety={lastVariety}
                 setLastVariety={handleSetLastVariety}
+                appOptionsData={appOptionsData}
             />
             
             <CalculatedSummary currentCustomer={currentCustomer} />
@@ -674,7 +743,7 @@ export default function SupplierEntryClient() {
               </Button>
             </div>
         </form>
-      </FormProvider>
+      </FormProvider>      
       
       <SupplierTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
         
@@ -778,6 +847,35 @@ export default function SupplierEntryClient() {
                     </Card>
                   </div>
                 )}
+                {/* Payment Details Section */}
+                {detailsCustomer && (
+                    <Card className="mt-4">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0">
+                            {detailsCustomer.payments && detailsCustomer.payments.length > 0 ? (
+                                <Table className="text-sm">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                            <TableHead className="p-2 text-xs">Date</TableHead>
+                                            <TableHead className="text-right p-2 text-xs">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {/* Assuming detailsCustomer has a 'payments' array */}
+                                        {detailsCustomer.payments.map((payment, index) => (
+                                            <TableRow key={index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="text-right p-2 font-semibold">{formatCurrency(payment.amount)}</TableCell></TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-center text-muted-foreground text-sm">No payment details available.</p>
+                            )}
+                        </CardContent>
+                    </Card>                 
+                )}
                  {/* Layout 2: Compact List */}
                  {activeLayout === 'compact' && (
                     <div className="space-y-4">
@@ -821,6 +919,34 @@ export default function SupplierEntryClient() {
                              </CardContent>
                         </Card>
                     </div>
+                )}
+                {/* Payment Details Section (Compact Layout) */}
+                {activeLayout === 'compact' && detailsCustomer && (
+                     <Card>
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2">
+                            {detailsCustomer.payments && detailsCustomer.payments.length > 0 ? (
+                                <Table className="text-sm">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                            <TableHead className="p-2 text-xs">Date</TableHead>
+                                            <TableHead className="text-right p-2 text-xs">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {detailsCustomer.payments.map((payment, index) => (
+                                            <TableRow key={index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="text-right p-2 font-semibold">{formatCurrency(payment.amount)}</TableCell></TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-center text-muted-foreground text-sm">No payment details available.</p>
+                            )}
+                        </CardContent>
+                    </Card>                 
                 )}
                 {/* Layout 3: Grid */}
                 {activeLayout === 'grid' && (
@@ -869,6 +995,34 @@ export default function SupplierEntryClient() {
                             </CardContent>
                         </Card>
                      </div>
+                )}
+                 {/* Payment Details Section (Grid Layout) */}
+                 {activeLayout === 'grid' && detailsCustomer && (
+                      <Card className="mt-4">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2">
+                            {detailsCustomer.payments && detailsCustomer.payments.length > 0 ? (
+                                <Table className="text-sm">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                            <TableHead className="p-2 text-xs">Date</TableHead>
+                                            <TableHead className="text-right p-2 text-xs">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {detailsCustomer.payments.map((payment, index) => (
+                                            <TableRow key={index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="text-right p-2 font-semibold">{formatCurrency(payment.amount)}</TableCell></TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-center text-muted-foreground text-sm">No payment details available.</p>
+                            )}
+                        </CardContent>
+                    </Card>                 
                 )}
                 {/* Layout 4: Step-by-Step */}
                 {activeLayout === 'step-by-step' && (
@@ -935,6 +1089,34 @@ export default function SupplierEntryClient() {
                           </Card>
                       </div>
                   </div>
+                )}
+                 {/* Payment Details Section (Step-by-Step Layout) */}
+                 {activeLayout === 'step-by-step' && detailsCustomer && (
+                      <Card className="mt-4 w-full">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2">
+                            {detailsCustomer.payments && detailsCustomer.payments.length > 0 ? (
+                                <Table className="text-sm">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                            <TableHead className="p-2 text-xs">Date</TableHead>
+                                            <TableHead className="text-right p-2 text-xs">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {detailsCustomer.payments.map((payment, index) => (
+                                            <TableRow key={index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="text-right p-2 font-semibold">{formatCurrency(payment.amount)}</TableCell></TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-center text-muted-foreground text-sm">No payment details available.</p>
+                            )}
+                        </CardContent>
+                    </Card>                 
                 )}
               </div>
             </ScrollArea>

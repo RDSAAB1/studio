@@ -2,7 +2,6 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
 import { initialCustomers } from "@/lib/data";
 import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn } from "@/lib/utils";
@@ -31,6 +30,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +40,7 @@ import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users } from "l
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+import { addPayment, deletePayment, updateCustomer, updatePayment, getCustomersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -78,39 +79,23 @@ export default function SupplierPaymentsPage() {
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
 
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
-      try {
-        const savedCustomers = localStorage.getItem("customers_data");
-        setCustomers(savedCustomers ? JSON.parse(savedCustomers) : initialCustomers);
+    setIsClient(true);
+    const unsubscribeCustomers = getCustomersRealtime((fetchedCustomers) => {
+      setCustomers(fetchedCustomers);
+    });
 
-        const savedPayments = localStorage.getItem("payment_history");
-        const parsedPayments = savedPayments ? JSON.parse(savedPayments) : [];
-        setPaymentHistory(parsedPayments);
-        setPaymentId(getNextPaymentId(parsedPayments));
+    const unsubscribePayments = getPaymentsRealtime((fetchedPayments) => {
+      setPaymentHistory(fetchedPayments);
+      setPaymentId(getNextPaymentId(fetchedPayments));
+    });
 
-      } catch (error) {
-        console.error("Failed to load data from localStorage", error);
-        setCustomers(initialCustomers);
-        setPaymentHistory([]);
-      }
-    }
+    return () => {
+      unsubscribeCustomers();
+      unsubscribePayments();
+    };
   }, []);
   
-  
- useEffect(() => {
-    if(isClient) {
-        localStorage.setItem("customers_data", JSON.stringify(customers));
-    }
-  }, [customers, isClient]);
-
-  useEffect(() => {
-    if (isClient) {
-      localStorage.setItem("payment_history", JSON.stringify(paymentHistory));
-    }
-  }, [paymentHistory, isClient]);
 
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
@@ -267,20 +252,20 @@ export default function SupplierPaymentsPage() {
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const paidForDetails: PaidFor[] = [];
 
-    const updatedCustomers = customers.map(c => {
+    const customerUpdatesPromises = customers.map(async c => {
         if(selectedEntryIds.has(c.id)){
              const outstanding = parseFloat(String(c.netAmount));
              if (remainingPayment > 0) {
                  const amountToPay = Math.min(outstanding, remainingPayment);
                  remainingPayment -= amountToPay;
                  const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
-                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-                 return {...c, netAmount: outstanding - amountToPay};
+                 paidForDetails.push({ id: c.id, srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                 // Update customer's netAmount in Firestore
+                 await updateCustomer(c.id!, { netAmount: outstanding - amountToPay });
              }
         }
         return c;
     });
-
     const newPayment: Payment = {
         paymentId: paymentId || getNextPaymentId(paymentHistory),
         customerId: selectedCustomerKey,
@@ -293,12 +278,12 @@ export default function SupplierPaymentsPage() {
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
         paidFor: paidForDetails,
     };
-    
-    setCustomers(updatedCustomers);
-    setPaymentHistory(prev => [...prev, newPayment]);
-    
-    clearForm();
-    toast({ title: "Success", description: "Payment processed successfully.", duration: 3000 });
+
+    addPayment(newPayment)
+      .then(() => {
+        clearForm();
+        toast({ title: "Success", description: "Payment processed successfully.", duration: 3000 });
+      });
   };
 
   const handleEditPayment = (payment: Payment) => {
@@ -307,25 +292,22 @@ export default function SupplierPaymentsPage() {
 
     // Revert the state change from this payment
     let tempAmountToRestore = paymentToEdit.amount + paymentToEdit.cdAmount;
-    const customerUpdates = customers.map(c => {
-        const paidForEntry = paymentToEdit.paidFor?.find(pf => pf.srNo === c.srNo);
+    const customerUpdatesPromises = (paymentToEdit.paidFor || []).map(async paidForEntry => {
+        const customer = customers.find(c => c.srNo === paidForEntry.srNo);
+        if (!customer) return; // Should not happen if data is consistent
         if (paidForEntry) {
             const amountToRestoreForThisEntry = paidForEntry.amount;
-            if (tempAmountToRestore > 0) {
-                const currentNet = Number(c.netAmount);
-                const restoredAmount = Math.min(tempAmountToRestore, amountToRestoreForThisEntry);
-                const newNet = currentNet + restoredAmount;
-                tempAmountToRestore -= restoredAmount;
-                return { ...c, netAmount: newNet };
-            }
+            const currentNet = Number(customer.netAmount);
+            const newNet = currentNet + amountToRestoreForThisEntry;
+             // Update customer's netAmount in Firestore
+            await updateCustomer(customer.id!, { netAmount: newNet });
         }
-        return c;
     });
-    setCustomers(customerUpdates);
 
     // Remove the payment from history temporarily
-    setPaymentHistory(prev => prev.filter(p => p.paymentId !== payment.paymentId));
-    
+    // We don't remove from state directly because Firestore listener will handle it.
+    deletePayment(payment.paymentId);
+
     // Set form for editing
     setEditingPaymentId(payment.paymentId);
     setPaymentId(payment.paymentId);
@@ -335,8 +317,8 @@ export default function SupplierPaymentsPage() {
     setCalculatedCdAmount(payment.cdAmount);
 
     const srNosInPayment = (payment.paidFor || []).map(pf => pf.srNo);
-    // Find entry IDs based on srNos, considering the reverted customer state
-    const entryIdsToSelect = new Set(customerUpdates.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
+    // Find entry IDs based on srNos
+    const entryIdsToSelect = new Set(customers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
     setSelectedEntryIds(entryIdsToSelect);
     
     toast({ title: "Editing Payment", description: `Editing payment ${payment.paymentId}. Please make your changes and click 'Update Payment'.`});
@@ -347,21 +329,21 @@ export default function SupplierPaymentsPage() {
     
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const paidForDetails: PaidFor[] = [];
-
-    const updatedCustomers = customers.map(c => {
+    
+     const customerUpdatesPromises = customers.map(async c => {
         if(selectedEntryIds.has(c.id)){
              const outstanding = parseFloat(String(c.netAmount));
              if (remainingPayment > 0) {
                  const amountToPay = Math.min(outstanding, remainingPayment);
                  remainingPayment -= amountToPay;
                  const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
-                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-                 return {...c, netAmount: outstanding - amountToPay};
+                 paidForDetails.push({ id: c.id, srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                 // Update customer's netAmount in Firestore
+                 await updateCustomer(c.id!, { netAmount: outstanding - amountToPay });
              }
         }
         return c;
     });
-
     const updatedPayment: Payment = {
         paymentId: paymentId || editingPaymentId,
         customerId: selectedCustomerKey,
@@ -374,12 +356,12 @@ export default function SupplierPaymentsPage() {
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
         paidFor: paidForDetails
     };
-
-    setCustomers(updatedCustomers);
-    setPaymentHistory(prev => [...prev, updatedPayment]);
-
-    clearForm();
-    toast({ title: "Success", description: "Payment updated successfully.", duration: 3000 });
+    
+     updatePayment(updatedPayment)
+      .then(() => {
+        clearForm();
+        toast({ title: "Success", description: "Payment updated successfully.", duration: 3000 });
+      });
   };
   
   const handleDeletePayment = (paymentIdToDelete: string, silent = false) => {
@@ -388,31 +370,21 @@ export default function SupplierPaymentsPage() {
     const paymentToDelete = paymentHistory.find(p => p.paymentId === paymentIdToDelete);
     if (!paymentToDelete) return;
     
-    const updatedPaymentHistory = paymentHistory.filter(p => p.paymentId !== paymentIdToDelete);
-
-    let tempAmountToRestore = paymentToDelete.amount + paymentToDelete.cdAmount;
-
-    const updatedCustomers = customers.map(c => {
-        const paidForEntry = paymentToDelete.paidFor?.find(pf => pf.srNo === c.srNo);
+    // Restore outstanding amounts for affected customers
+     const customerRestorations = (paymentToDelete.paidFor || []).map(async paidForEntry => {
+        const customer = customers.find(c => c.srNo === paidForEntry.srNo);
+        if (!customer) return;
         if (paidForEntry) {
             const amountToRestoreForThisEntry = paidForEntry.amount;
-             if (tempAmountToRestore > 0) {
-                const currentNet = Number(c.netAmount);
-                const restoredAmount = Math.min(tempAmountToRestore, amountToRestoreForThisEntry);
-                const newNet = currentNet + restoredAmount;
-                tempAmountToRestore -= restoredAmount;
-                return { ...c, netAmount: newNet };
-             }
+            const currentNet = Number(customer.netAmount);
+            const newNet = currentNet + amountToRestoreForThisEntry;
+             await updateCustomer(customer.id!, { netAmount: newNet });
         }
-        return c;
     });
-    
-    setCustomers(updatedCustomers);
-    setPaymentHistory(updatedPaymentHistory);
 
-    if (!silent) {
+    deletePayment(paymentIdToDelete).then(() => {
         toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
-    }
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {

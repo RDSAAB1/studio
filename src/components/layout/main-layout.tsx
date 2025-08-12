@@ -4,30 +4,30 @@ import React, { useState, useEffect, useRef } from "react";
 import { Header } from "./header";
 import type { PageLayoutProps } from "@/app/types";
 import { usePathname } from "next/navigation";
-import CustomSidebar from "./custom-sidebar"; // Import the new custom sidebar
+import CustomSidebar from "./custom-sidebar";
 
 // A simple 'cn' utility similar to shadcn/ui for conditional class merging
-function cn(...classes: (string | boolean | undefined | null)[]) {
+function cn(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-export default function MainLayout({ children, pageMeta }: PageLayoutProps) {
+export default function MainLayout({ children, pageMeta }) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const sidebarRef = useRef<HTMLElement>(null);
+  const sidebarRef = useRef(null);
 
   // Handle initial sidebar state based on screen size
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) { // Tailwind's 'md' breakpoint
+      // Close sidebar on small screens
+      if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
-      } else {
+      } else { // Open sidebar on large screens
         setIsSidebarOpen(true);
       }
     };
-
-    window.addEventListener('resize', handleResize);
     handleResize(); // Set initial state
+    window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -35,10 +35,10 @@ export default function MainLayout({ children, pageMeta }: PageLayoutProps) {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  // Handle clicks outside the sidebar to close it on all screen sizes
+  // Handle clicks outside the sidebar to close it on small screens
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event) => {
+      if (isSidebarOpen && window.innerWidth < 1024 && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
         setIsSidebarOpen(false);
       }
     };
@@ -50,29 +50,40 @@ export default function MainLayout({ children, pageMeta }: PageLayoutProps) {
   }, [isSidebarOpen]);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="relative flex min-h-screen bg-gray-100">
       {/* Custom Sidebar Component */}
       <CustomSidebar
         isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
         activePath={pathname}
-        onLinkClick={(path) => { /* Next.js Link handles navigation */ }}
+        onLinkClick={() => { /* Next.js Link handles navigation */ }}
         setIsSidebarOpen={setIsSidebarOpen}
         sidebarRef={sidebarRef}
       />
 
-      {/* Main content area */}
-      <main className={cn(
-        "flex-1 transition-all duration-300 ease-in-out p-4 pt-16", // Added pt-16 for header clearance
-        isSidebarOpen ? "ml-64" : "ml-20" // Adjust margin based on sidebar state
-      )}
-      style={{marginTop: 0}}>
-        {/* Header will now receive toggleSidebar to show menu button on mobile */}
+      {/* Header fixed at the top */}
+      <header
+        className={cn(
+          "fixed top-0 right-0 z-30 h-14 flex items-center shadow-md",
+          "bg-[#B59283] text-[#E5D4CD]",
+          "transition-all duration-300 ease-in-out"
+        )}
+        style={{ width: isSidebarOpen ? 'calc(100% - 256px)' : 'calc(100% - 80px)' }}
+      >
         <Header pageMeta={pageMeta} toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+      </header>
+
+      {/* Main content area */}
+      <div className={cn(
+        "flex-1 transition-all duration-300 ease-in-out",
+        "mt-14", // Margin top equal to header height (h-14)
+        isSidebarOpen ? "ml-[256px]" : "ml-[80px]" // Margin left based on sidebar width
+      )}
+      >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
           {children}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

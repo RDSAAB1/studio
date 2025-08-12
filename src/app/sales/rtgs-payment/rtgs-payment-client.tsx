@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { initialCustomers } from "@/lib/data";
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
 import { DynamicCombobox, type ComboboxOption } from "@/components/ui/dynamic-combobox";
 
 
@@ -107,7 +108,7 @@ const initialFormState: FormValues = {
 
 export default function RtgspaymentClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]); // Fetch customers from Firestore
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
@@ -129,6 +130,7 @@ export default function RtgspaymentClient() {
   const [cdAt, setCdAt] = useState('unpaid_amount');
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
+  const db = getFirestore(); // Get Firestore instance
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialFormState,
@@ -153,41 +155,33 @@ export default function RtgspaymentClient() {
   }, [outstandingEntries, selectedOutstandingIds]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
-      try {
-        const savedRecords = localStorage.getItem("rtgs_records");
-        const parsedRecords = savedRecords ? JSON.parse(savedRecords) : [];
-        if (Array.isArray(parsedRecords)) {
-          setAllRecords(parsedRecords);
-           if (editingRecordIndex === null) {
-              form.setValue("srNo", generateSrNo(parsedRecords));
-           }
-        }
-        
-        const savedCustomers = localStorage.getItem("customers_data");
-        if (savedCustomers) {
-            setCustomers(JSON.parse(savedCustomers));
-        }
+    setIsClient(true); // Set client flag
 
-      } catch (error) {
-        console.error("Failed to load data from localStorage", error);
-        setAllRecords([]);
-        if (editingRecordIndex === null) {
-            form.setValue("srNo", generateSrNo([]));
-        }
+    // Listen for real-time updates on RTGS records
+    const unsubscribeRecords = onSnapshot(collection(db, "rtgs_payments"), (snapshot) => {
+      const recordsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllRecords(recordsData);
+      if (editingRecordIndex === null) {
+         form.setValue("srNo", generateSrNo(recordsData));
       }
-    }
+    }, (error) => {
+      console.error("Error fetching RTGS records:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load RTGS records.' });
+    });
+
+    // Listen for real-time updates on Customers
+    const unsubscribeCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
+      const customersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
+      setCustomers(customersData);
+    }, (error) => {
+      console.error("Error fetching customers:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load customers.' });
+    });
+
+    return () => { unsubscribeRecords(); unsubscribeCustomers(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-
-  useEffect(() => {
-    if (isClient) {
-        localStorage.setItem("rtgs_records", JSON.stringify(allRecords));
-        localStorage.setItem("customers_data", JSON.stringify(customers));
+  }, [db, editingRecordIndex]); // Depend on db and editingRecordIndex
     }
-  }, [allRecords, customers, isClient]);
 
   // CD Calculation Effect
   useEffect(() => {
@@ -213,10 +207,13 @@ export default function RtgspaymentClient() {
   const handleCustomerSelect = (customerId: string) => {
     setSelectedCustomerId(customerId);
     const customer = customers.find(c => c.id === customerId);
+
     if(customer) {
       form.reset({
         ...initialFormState,
         srNo: generateSrNo(allRecords),
+        // Prefill details from selected customer
+        // Ensure all fields from FormValues are covered or set to default/optional
         name: customer.name,
         fatherName: customer.so,
         mobileNo: customer.contact,
@@ -228,7 +225,8 @@ export default function RtgspaymentClient() {
         parchiName: customer.parchiName,
         parchiAddress: customer.parchiAddress,
       });
-      setEditingRecordIndex(null);
+       // Fetch outstanding entries for the selected customer from Firestore
+      const customerOutstanding = customers.filter(c => c.customerId === customer.customerId && Number(c.netAmount) > 0); // Assuming netAmount is a number
       const customerOutstanding = customers.filter(c => c.customerId === customer.customerId && Number(c.netAmount) > 0);
       setOutstandingEntries(customerOutstanding);
     } else {
@@ -236,23 +234,41 @@ export default function RtgspaymentClient() {
     }
   }
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     const finalValues = {
         ...values,
         amount: values.amount + calculatedCdAmount,
+         // Include customerId for linking payment to customer
+        customerId: selectedCustomerId || null, 
     }
 
     let message = "";
     if (editingRecordIndex !== null) {
-      const updatedRecords = [...allRecords];
-      updatedRecords[editingRecordIndex] = finalValues;
-      setAllRecords(updatedRecords);
-      setEditingRecordIndex(null);
-      message = "Record updated successfully!";
+       const recordToUpdate = allRecords[editingRecordIndex];
+       if (recordToUpdate && recordToUpdate.id) {
+         try {
+           await updateDoc(doc(db, "rtgs_payments", recordToUpdate.id), finalValues);
+           message = "Record updated successfully!";
+           toast({ title: "Success", description: message });
+           handleNew(allRecords); // Reset form and generate new SR No.
+         } catch (error) {
+           console.error("Error updating record:", error);
+           toast({ variant: 'destructive', title: 'Error', description: 'Failed to update record.' });
+         }
+       }
     } else {
-      setAllRecords((prev) => [...prev, finalValues]);
-      message = "Record saved successfully!";
+       try {
+         await addDoc(collection(db, "rtgs_payments"), finalValues);
+         message = "Record saved successfully!";
+         toast({ title: "Success", description: message });
+         handleNew([...allRecords, { id: 'temp', ...finalValues }]); // Pass potential new record list for SR No generation
+       } catch (error) {
+         console.error("Error adding record:", error);
+         toast({ variant: 'destructive', title: 'Error', description: 'Failed to save record.' });
+       }
     }
+  };
+
     toast({ title: "Success", description: message });
     handleNew(allRecords);
   };
@@ -279,8 +295,13 @@ export default function RtgspaymentClient() {
     toast({ title: "Customer Added", description: `Added "${customerName}". Please fill in other details.` });
   };
 
-
   const handleEdit = (index: number) => {
+     const record = allRecords[index];
+     if (record) {
+       form.reset(record);
+       setEditingRecordIndex(index);
+       // Select the customer associated with this record
+       setSelectedCustomerId(record.customerId);
     const record = allRecords[index];
     form.reset(record);
     setEditingRecordIndex(index);
@@ -288,13 +309,21 @@ export default function RtgspaymentClient() {
   };
 
   const handleDelete = (index: number) => {
-    const updatedRecords = allRecords.filter((_, i) => i !== index);
-    setAllRecords(updatedRecords);
-    toast({ title: "Success", description: "Record deleted successfully." });
-    if(editingRecordIndex === index){
-        handleNew(updatedRecords);
-    }
+     const recordToDelete = allRecords[index];
+     if (recordToDelete && recordToDelete.id) {
+       try {
+         await deleteDoc(doc(db, "rtgs_payments", recordToDelete.id));
+         toast({ title: "Success", description: "Record deleted successfully." });
+         if(editingRecordIndex === index){
+             handleNew(allRecords.filter((_, i) => i !== index)); // Pass potentially updated list
+         }
+       } catch (error) {
+         console.error("Error deleting record:", error);
+         toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete record.' });
+       }
+     }
   };
+
 
   const handleGeneratePaymentOptions = () => {
     if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate > calcMaxRate) {
@@ -701,7 +730,7 @@ export default function RtgspaymentClient() {
               <TableBody>
                 {allRecords.map((record, index) => (
                   <TableRow key={index}>
-                    <TableCell>{record.srNo}</TableCell>
+                    <TableCell>{record.srNo || 'N/A'}</TableCell>
                     <TableCell>{toTitleCase(record.name)}</TableCell>
                     <TableCell>{record.amount}</TableCell>
                     <TableCell>{record.date}</TableCell>

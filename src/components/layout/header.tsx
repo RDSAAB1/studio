@@ -5,13 +5,11 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { PageMeta } from "@/app/types";
 import {
-  Menu,
   LayoutDashboard,
-  Home,
-  Settings as SettingsIcon, 
+  Settings as SettingsIcon,
   BarChart3,
   Users,
-  LogOut,
+  Menu,
   ChevronRight,
   ChevronDown,
   Search,
@@ -37,49 +35,24 @@ import {
   ClipboardCheck,
   Briefcase,
   Users2,
-  Package as PackageIcon 
+  Package as PackageIcon,
 } from "lucide-react";
 
 interface HeaderProps {
   pageMeta?: PageMeta;
-  toggleSidebar: () => void; 
-  isSidebarOpen: boolean; 
+  toggleSidebar: () => void;
+  isSidebarOpen: boolean;
 }
 
 // NOTE: This menuItems array is duplicated from custom-sidebar.tsx to allow Header
 // to determine the current page's icon and title based on the full menu structure.
 const allMenuItems = [
   {
-    id: "main-home",
-    name: "Home",
-    icon: Home,
-    href: "/sales/dashboard-overview", 
-  },
-  {
     id: "main-dashboard-from-image",
-    name: "Dashboard", 
-    icon: SettingsIcon, 
-    href: "/sales/dashboard-overview", 
-  },
-  {
-    id: "main-settings-from-image",
-    name: "Settings",
+    name: "Dashboard",
     icon: SettingsIcon,
-    href: "/settings",
+    href: "/sales/dashboard-overview",
   },
-  {
-    id: "main-reports-from-image",
-    name: "Reports",
-    icon: BarChart3,
-    href: "/sales/sales-reports", 
-  },
-  {
-    id: "main-users-from-image",
-    name: "Users",
-    icon: Users,
-    href: "/hr/employee-database", 
-  },
-  // Your original detailed menu items follow:
   {
     id: "main-sales",
     name: "Sales",
@@ -167,44 +140,39 @@ const allMenuItems = [
       { id: "sub-project-3", name: "Team Collaboration", href: "/projects/collaboration", icon: Users2 },
     ],
   },
-  {
-    id: "main-logout",
-    name: "Logout",
-    icon: LogOut,
-    href: "/logout", 
-  },
 ];
 
 export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) {
   const pathname = usePathname();
 
   // Determine current page details based on pathname from the consolidated menuItems
-  const currentPage = allMenuItems.flatMap(m => m.subMenus || []).find(s => pathname.startsWith(s.href || '')) ||
-                      allMenuItems.find(m => pathname.startsWith(m.href || ''));
+  const currentPage =
+    allMenuItems.flatMap(m => m.subMenus || []).find(s => pathname.startsWith(s.href || '')) ||
+    allMenuItems.find(m => pathname.startsWith(m.href || ''));
 
   const DisplayIconComponent = currentPage?.icon || pageMeta?.icon;
-  const displayIcon = DisplayIconComponent ? <DisplayIconComponent className="h-5 w-5"  /> : null;
+  const displayIcon = DisplayIconComponent ? <DisplayIconComponent className="h-5 w-5" /> : null;
   const displayTitle = currentPage?.name || pageMeta?.title || 'BizSuite';
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-[--sidebar-bg] text-[--sidebar-text] shadow-md"> 
-      <div className="container flex h-16 max-w-screen-2xl items-center justify-between px-4"> 
+    <header className="sticky top-0 z-30 w-full shadow-md">
+      <div className="container flex h-14 max-w-screen-2xl items-center justify-between px-4">
         {/* Left section: Toggle button, Page Icon, Page Title */}
         <div className="flex items-center space-x-4">
           {/* Mobile menu toggle button (visible on small screens) */}
           <button
             onClick={toggleSidebar}
             className={cn(
-              "p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-focus-ring]", 
-              "lg:hidden" 
+              "p-2 rounded-full hover:bg-[#9d8075] focus:outline-none focus:ring-2 focus:ring-[#E5D4CD] transition-colors",
+              "lg:hidden"
             )}
             aria-label={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
           >
-            <Menu className="h-6 w-6 text-[--sidebar-text]" /> 
+            <Menu className="h-6 w-6 text-[#E5D4CD]" />
           </button>
 
-          {displayIcon && <div className="text-[--sidebar-text]">{displayIcon}</div>} 
-          <span className="text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis text-[--sidebar-text]"> 
+          {displayIcon && <div className="text-[#E5D4CD]">{displayIcon}</div>}
+          <span className="text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis text-[#E5D4CD]">
             {displayTitle}
           </span>
         </div>
@@ -212,19 +180,19 @@ export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) 
         {/* Right section: Profile Icon, Settings Icon */}
         <div className="flex items-center space-x-4">
           {/* Profile Icon */}
-          <button 
-            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-focus-ring] transition-colors"
+          <button
+            className="p-2 rounded-full hover:bg-[#9d8075] focus:outline-none focus:ring-2 focus:ring-[#E5D4CD] transition-colors"
             aria-label="User Profile"
           >
-            <UserCircle className="h-6 w-6 text-[--sidebar-text]" />
+            <UserCircle className="h-6 w-6 text-[#E5D4CD]" />
           </button>
 
           {/* Settings Icon */}
-          <button 
-            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-focus-ring] transition-colors"
+          <button
+            className="p-2 rounded-full hover:bg-[#9d8075] focus:outline-none focus:ring-2 focus:ring-[#E5D4CD] transition-colors"
             aria-label="Settings"
           >
-            <SettingsIcon className="h-6 w-6 text-[--sidebar-text]" />
+            <SettingsIcon className="h-6 w-6 text-[#E5D4CD]" />
           </button>
         </div>
       </div>

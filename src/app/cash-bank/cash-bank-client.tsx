@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { initialTransactions, initialFundTransactions } from "@/lib/data";
 import type { FundTransaction, Transaction } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
@@ -17,28 +16,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 
-import { PiggyBank, Landmark, HandCoins, ArrowLeftRight, PlusCircle, MinusCircle, DollarSign, Wallet, Scale, ArrowDown, ArrowUp, Save } from "lucide-react";
+import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowDown, ArrowUp, Save } from "lucide-react";
 import { format } from "date-fns";
 
-const capitalInflowSchema = z.object({
-  source: z.enum(["OwnerCapital", "BankLoan", "ExternalLoan"]),
-  destination: z.enum(["BankAccount", "CashInHand"]),
-  amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
-  description: z.string().optional(),
-});
-type CapitalInflowValues = z.infer<typeof capitalInflowSchema>;
-
-const withdrawalSchema = z.object({
-  amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
-  description: z.string().optional(),
-});
-type WithdrawalValues = z.infer<typeof withdrawalSchema>;
-
-const depositSchema = z.object({
-    amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
-    description: z.string().optional(),
-});
-type DepositValues = z.infer<typeof depositSchema>;
+import { addFundTransaction, getFundTransactionsRealtime } from "@/lib/firestore";
+import { cashBankFormSchemas, type CapitalInflowValues, type WithdrawalValues, type DepositValues } from "./formSchemas"; // Assuming you will create this file
 
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
@@ -69,13 +51,25 @@ const TransactionFormCard = ({ title, description, children }: { title: string, 
 
 export default function CashBankClient() {
     const { toast } = useToast();
-    const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>(initialFundTransactions);
+    // We will likely fetch transactions from Firestore as well eventually, but for now, focus on fund transactions
+    // const [transactions, setTransactions] = useState<Transaction[]>([]); 
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [isClient, setIsClient] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    useEffect(() => { setIsClient(true); }, []);
+    useEffect(() => {
+        setIsClient(true);
+        const unsubscribe = getFundTransactionsRealtime((data) => {
+            setFundTransactions(data);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching fund transactions:", error);
+            toast({ title: "Error", description: "Failed to load fund transactions.", variant: "destructive" });
+            setLoading(false);
+        });
+        return () => unsubscribe(); // Clean up the listener on component unmount
+    }, [toast]);
 
-    const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(capitalInflowSchema), defaultValues: { amount: 0, description: "" } });
     const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(withdrawalSchema), defaultValues: { amount: 0, description: "" } });
     const depositForm = useForm<DepositValues>({ resolver: zodResolver(depositSchema), defaultValues: { amount: 0, description: "" } });
 
@@ -107,28 +101,34 @@ export default function CashBankClient() {
                  if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
             }
         });
-
-        return { bankBalance, cashInHand, totalAssets: bankBalance + cashInHand, totalLiabilities };
-    }, [transactions, fundTransactions]);
+        
+        // Note: Calculating total assets and liabilities based only on fund transactions and non-fund transactions 
+        // available here might not give a complete picture. A true balance sheet would require more data.
+        return { bankBalance, cashInHand, totalAssets: bankBalance + cashInHand, totalLiabilities }; // Simplified calculation
+    }, [fundTransactions]); // transactions dependency removed for now
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
-        const fullTransaction: FundTransaction = {
-            ...transaction,
-            id: String(Date.now()),
-            date: new Date().toISOString().split('T')[0],
-        };
-        setFundTransactions(prev => [fullTransaction, ...prev]);
-        toast({title: "Success", description: "Transaction recorded successfully."});
+        addFundTransaction(transaction)
+            .then(() => {
+                toast({ title: "Success", description: "Transaction recorded successfully." });
+            })
+            .catch((error) => {
+                console.error("Error adding fund transaction:", error);
+                toast({ title: "Error", description: "Failed to record transaction.", variant: "destructive" });
+            });
     };
     
     const onCapitalInflowSubmit = (values: CapitalInflowValues) => {
         handleAddFundTransaction({ type: 'CapitalInflow', source: values.source, destination: values.destination, amount: values.amount, description: values.description });
-        capitalInflowForm.reset();
+        // capitalInflowForm.reset(); // Reset on success handled by promise
     };
 
     const onWithdrawalSubmit = (values: WithdrawalValues) => {
         handleAddFundTransaction({ type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: values.amount, description: values.description });
-        withdrawalForm.reset();
+        // withdrawalForm.reset(); // Reset on success handled by promise
+    };
+
+    const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(cashBankFormSchemas.capitalInflowSchema), defaultValues: { source: undefined, destination: undefined, amount: 0, description: "" } });
     };
 
     const onDepositSubmit = (values: DepositValues) => {
@@ -136,7 +136,7 @@ export default function CashBankClient() {
         depositForm.reset();
     };
 
-    if (!isClient) return null;
+    if (!isClient || loading) return <div>Loading...</div>; // Simple loading state
 
     return (
         <div className="space-y-6">
@@ -198,7 +198,7 @@ export default function CashBankClient() {
                     <TransactionFormCard title="Withdraw from Bank" description="Move funds from your bank to cash in hand.">
                         <form onSubmit={withdrawalForm.handleSubmit(onWithdrawalSubmit)} className="space-y-4">
                             <div className="space-y-1">
-                                <Label htmlFor="withdrawal-amount">Amount</Label>
+                            <Label htmlFor="withdrawal-amount">Amount <span className="text-destructive">*</span></Label>
                                 <Input id="withdrawal-amount" type="number" {...withdrawalForm.register('amount')} />
                                 {withdrawalForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{withdrawalForm.formState.errors.amount.message}</p>}
                             </div>
@@ -213,7 +213,7 @@ export default function CashBankClient() {
                     <TransactionFormCard title="Deposit to Bank" description="Move cash from hand to your bank account.">
                         <form onSubmit={depositForm.handleSubmit(onDepositSubmit)} className="space-y-4">
                              <div className="space-y-1">
-                                <Label htmlFor="deposit-amount">Amount</Label>
+                                <Label htmlFor="deposit-amount">Amount <span className="text-destructive">*</span></Label>
                                 <Input id="deposit-amount" type="number" {...depositForm.register('amount')} />
                                 {depositForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{depositForm.formState.errors.amount.message}</p>}
                             </div>
@@ -262,7 +262,7 @@ export default function CashBankClient() {
                                 ))}
                             </TableBody>
                         </Table>
-                    </div>
+                    </div> {/* Added closing div */}
                 </CardContent>
             </Card>
         </div>

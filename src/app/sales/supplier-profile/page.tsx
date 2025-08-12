@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { initialCustomers } from "@/lib/data";
-import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
 
 import {
@@ -41,7 +41,7 @@ import { format } from "date-fns";
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 type ChartType = 'financial' | 'variety';
 
-const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
+const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: string | number | null | undefined, className?: string }) => (
     <div className={cn("flex items-start gap-3", className)}>
         {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
         <div>
@@ -70,29 +70,47 @@ const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var
 
 export default function SupplierProfilePage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  // NOTE: The Supplier Profile page was using 'customers' state, which seems incorrect.
+  // Renaming to 'suppliers' to match the context of the page.
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
 
-  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+  const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
-  const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
 
+  // Fetch data from Firestore on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
-      try {
-        const savedCustomers = localStorage.getItem("customers_data");
-        setCustomers(savedCustomers ? JSON.parse(savedCustomers) : initialCustomers);
-        const savedPayments = localStorage.getItem("payment_history");
-        setPaymentHistory(savedPayments ? JSON.parse(savedPayments) : []);
-      } catch (error) {
+    setLoading(true);
+    // Assuming getSuppliers and getPayments functions exist in src/lib/firestore.ts
+    // And assuming your supplier data is stored in a 'suppliers' collection
+    // and payment history is stored in a 'payments' collection.
+    const unsubscribeSuppliers = onSnapshot(collection(db, "suppliers"), (snapshot) => {
+      const fetchedSuppliers: Supplier[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier));
+      setSuppliers(fetchedSuppliers);
+      setLoading(false);
+    }, (error) => {
         console.error("Failed to load data from localStorage", error);
         setCustomers(initialCustomers);
         setPaymentHistory([]);
       }
     }
+  }, []);
+
+    const unsubscribePayments = onSnapshot(collection(db, "payments"), (snapshot) => {
+      const fetchedPayments: Payment[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+      setPaymentHistory(fetchedPayments);
+      setLoading(false);
+    }, (error) => {
+        console.error("Failed to load data from localStorage", error);
+        setCustomers(initialCustomers);
+        setPaymentHistory([]);
+      });
+
+    return () => { unsubscribeSuppliers(); unsubscribePayments(); };
   }, []);
 
   const updateCustomerSummary = useCallback(() => {
@@ -177,11 +195,11 @@ export default function SupplierProfilePage() {
     if (!selectedCustomerKey) {
       setSelectedCustomerKey(MILL_OVERVIEW_KEY);
     }
-  }, [customers, paymentHistory, selectedCustomerKey]); 
+  }, [suppliers, paymentHistory, selectedCustomerKey]); 
 
   useEffect(() => {
-    if(isClient) {
-        updateCustomerSummary();
+    if(!loading) { // Only update summary after data is loaded
+      updateCustomerSummary();
     }
   }, [isClient, updateCustomerSummary]);
 
