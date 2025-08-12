@@ -80,6 +80,9 @@ export default function SupplierPaymentsPage() {
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
   
   const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
+    if (!currentPayments || currentPayments.length === 0) {
+        return formatPaymentId(1);
+    }
     const lastPaymentNum = currentPayments.reduce((max, p) => {
         const numMatch = p.paymentId.match(/^P(\d+)$/);
         const num = numMatch ? parseInt(numMatch[1], 10) : 0;
@@ -308,17 +311,10 @@ export default function SupplierPaymentsPage() {
     const paymentToEdit = paymentHistory.find(p => p.paymentId === payment.paymentId);
     if (!paymentToEdit) return;
 
-    const customerUpdatesPromises = (paymentToEdit.paidFor || []).map(async paidForEntry => {
-        const customer = suppliers.find(c => c.srNo === paidForEntry.srNo);
-        if (!customer || !customer.id) return;
-        const amountToRestoreForThisEntry = paidForEntry.amount;
-        const currentNet = Number(customer.netAmount);
-        const newNet = currentNet + amountToRestoreForThisEntry;
-        await updateSupplier(customer.id, { netAmount: newNet });
-    });
+    // This operation should be UNDONE before editing, not a permanent delete.
+    // The logic to restore outstanding amounts will be part of the update.
+    handleDeletePayment(payment.paymentId, true); // silent delete
 
-    await Promise.all(customerUpdatesPromises);
-    
     setEditingPaymentId(payment.paymentId);
     setPaymentId(payment.paymentId);
     setPaymentAmount(payment.amount);
@@ -336,45 +332,42 @@ export default function SupplierPaymentsPage() {
   const handleUpdatePayment = async () => {
     if (!editingPaymentId || !selectedCustomerKey) return;
 
-    const success = await updatePayment(editingPaymentId, {
-        amount: paymentAmount,
-        cdAmount: calculatedCdAmount,
-        cdApplied: cdEnabled,
-        type: paymentType,
-        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
-    });
-
-
-    if (success) {
-        clearForm();
-        toast({ title: "Success", description: "Payment updated successfully.", duration: 3000 });
-    } else {
-        toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
-    }
+    // This is essentially the same as making a new payment, since the old one was reversed.
+    await processPayment();
   };
   
-  const handleDeletePayment = (paymentIdToDelete: string, silent = false) => {
-    if (!selectedCustomerKey) return;
-
+  const handleDeletePayment = async (paymentIdToDelete: string, silent = false) => {
     const paymentToDelete = paymentHistory.find(p => p.paymentId === paymentIdToDelete);
-    if (!paymentToDelete) return;
-    
-     const customerRestorations = (paymentToDelete.paidFor || []).map(async paidForEntry => {
-        const customer = suppliers.find(c => c.srNo === paidForEntry.srNo);
-        if (!customer || !customer.id) return;
-        const amountToRestoreForThisEntry = paidForEntry.amount;
-        const currentNet = Number(customer.netAmount);
-        const newNet = currentNet + amountToRestoreForThisEntry;
-         await updateSupplier(customer.id, { netAmount: newNet });
-    });
+    if (!paymentToDelete) {
+        if (!silent) toast({ variant: "destructive", title: "Error", description: "Payment not found." });
+        return;
+    }
 
-    Promise.all(customerRestorations).then(() => {
-        deletePayment(paymentIdToDelete).then(() => {
-            if (!silent) {
-                toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
-            }
-        });
-    });
+    try {
+        // Restore amounts for each supplier entry associated with the payment
+        if (paymentToDelete.paidFor && paymentToDelete.paidFor.length > 0) {
+            const supplierUpdates = paymentToDelete.paidFor.map(async (paidFor) => {
+                const supplierToUpdate = suppliers.find(s => s.srNo === paidFor.srNo);
+                if (supplierToUpdate) {
+                    const newNetAmount = parseFloat(String(supplierToUpdate.netAmount)) + paidFor.amount;
+                    await updateSupplier(supplierToUpdate.id, { netAmount: newNetAmount });
+                }
+            });
+            await Promise.all(supplierUpdates);
+        }
+
+        // Delete the payment document itself
+        await deletePayment(paymentIdToDelete);
+
+        if (!silent) {
+            toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
+        }
+    } catch (error) {
+        console.error("Error deleting payment:", error);
+        if (!silent) {
+            toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
+        }
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -478,7 +471,7 @@ export default function SupplierPaymentsPage() {
                             }
                             setSelectedEntryIds(newSet);
                         }}
-                        checked={selectedEntryIds.size > 0 && selectedEntryIds.size === outstandingEntries.length}
+                        checked={selectedEntryIds.size > 0 && selectedEntryIds.size === outstandingEntries.length && outstandingEntries.length > 0}
                          /></TableHead>
                         <TableHead>SR No</TableHead>
                         <TableHead>Date</TableHead>
@@ -496,6 +489,11 @@ export default function SupplierPaymentsPage() {
                         <TableCell className="text-right">{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
                         </TableRow>
                     ))}
+                    {outstandingEntries.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">No outstanding entries for this supplier.</TableCell>
+                        </TableRow>
+                    )}
                     </TableBody>
                 </Table>
                 </div>
@@ -591,6 +589,11 @@ export default function SupplierPaymentsPage() {
                         <TableCell>{(entry.originalNetAmount || entry.amount).toFixed(2)}</TableCell>
                         </TableRow>
                     ))}
+                     {paidEntries.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">No paid entries for this supplier.</TableCell>
+                        </TableRow>
+                    )}
                     </TableBody>
                 </Table>
                 </div>
@@ -647,6 +650,11 @@ export default function SupplierPaymentsPage() {
                         </TableCell>
                         </TableRow>
                     ))}
+                     {currentPaymentHistory.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground">No payment history for this supplier.</TableCell>
+                        </TableRow>
+                    )}
                     </TableBody>
                 </Table>
                 </div>

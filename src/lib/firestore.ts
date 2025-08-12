@@ -139,7 +139,11 @@ export async function updatePayment(id: string, paymentData: Partial<Payment>): 
 
 
 export async function deletePayment(id: string): Promise<void> {
-  await deleteDoc(doc(db, "payments", id));
+    if (!id) {
+        console.error("deletePayment requires a valid ID.");
+        return;
+    }
+    await deleteDoc(doc(db, "payments", id));
 }
 
 export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onError: (error: Error) => void): () => void {
