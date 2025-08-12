@@ -155,7 +155,7 @@ export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) 
   const displayTitle = currentPage?.name || pageMeta?.title || 'BizSuite';
 
   return (
-    <header className="sticky top-0 z-30 w-full shadow-md">
+    <header className="sticky top-0 z-30 w-full">
       <div className="container flex h-14 max-w-screen-2xl items-center justify-between px-4">
         {/* Left section: Toggle button, Page Icon, Page Title */}
         <div className="flex items-center space-x-4">
@@ -163,16 +163,16 @@ export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) 
           <button
             onClick={toggleSidebar}
             className={cn(
-              "p-2 rounded-full hover:bg-[#9d8075] focus:outline-none focus:ring-2 focus:ring-[#E5D4CD] transition-colors",
+              "p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-ring] transition-colors",
               "lg:hidden"
             )}
             aria-label={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
           >
-            <Menu className="h-6 w-6 text-[#E5D4CD]" />
+            <Menu className="h-6 w-6" />
           </button>
 
-          {displayIcon && <div className="text-[#E5D4CD]">{displayIcon}</div>}
-          <span className="text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis text-[#E5D4CD]">
+          {displayIcon && <div className="">{displayIcon}</div>}
+          <span className="text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis">
             {displayTitle}
           </span>
         </div>
@@ -181,18 +181,18 @@ export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) 
         <div className="flex items-center space-x-4">
           {/* Profile Icon */}
           <button
-            className="p-2 rounded-full hover:bg-[#9d8075] focus:outline-none focus:ring-2 focus:ring-[#E5D4CD] transition-colors"
+            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-ring] transition-colors"
             aria-label="User Profile"
           >
-            <UserCircle className="h-6 w-6 text-[#E5D4CD]" />
+            <UserCircle className="h-6 w-6" />
           </button>
 
           {/* Settings Icon */}
           <button
-            className="p-2 rounded-full hover:bg-[#9d8075] focus:outline-none focus:ring-2 focus:ring-[#E5D4CD] transition-colors"
+            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-ring] transition-colors"
             aria-label="Settings"
           >
-            <SettingsIcon className="h-6 w-6 text-[#E5D4CD]" />
+            <SettingsIcon className="h-6 w-6" />
           </button>
         </div>
       </div>
