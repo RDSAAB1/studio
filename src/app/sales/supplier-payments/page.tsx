@@ -39,7 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchUpdateSuppliersOnPaymentChange } from '@/lib/firestore';
-import { runTransaction, doc, writeBatch } from "firebase/firestore";
+import { runTransaction, doc, writeBatch, collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const cdOptions = [
@@ -253,41 +253,45 @@ export default function SupplierPaymentsPage() {
 
   const processPayment = async () => {
     if (!selectedCustomerKey) {
-      toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
-      return;
+        toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
+        return;
     }
     if (selectedEntryIds.size === 0) {
-      toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
-      return;
+        toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
+        return;
     }
     if (paymentAmount <= 0 && calculatedCdAmount <= 0) {
-      toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
-      return;
+        toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
+        return;
     }
-    if (paymentType === 'Partial' && paymentAmount > totalOutstandingForSelected) {
-      toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
-      return;
+    if (paymentType === 'Partial' && !editingPayment && paymentAmount > totalOutstandingForSelected) {
+        toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
+        return;
     }
 
     try {
         await runTransaction(db, async (transaction) => {
-            let tempEditingPayment = editingPayment;
+            const tempEditingPayment = editingPayment;
 
             // Step 1: If editing, revert the old payment's effect first.
+            // This brings supplier balances back to the state before this payment was made.
             if (tempEditingPayment) {
                 for (const detail of tempEditingPayment.paidFor || []) {
-                    const supplierQuery = query(suppliersCollection, where("srNo", "==", detail.srNo));
-                    const supplierSnapshot = await getDocs(supplierQuery);
-                    if (!supplierSnapshot.empty) {
-                        const supplierDoc = supplierSnapshot.docs[0];
-                        const currentNetAmount = Number(supplierDoc.data().netAmount);
-                        const newNetAmount = currentNetAmount + detail.amount;
-                        transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
+                    // Find the corresponding supplier document by srNo
+                    const supplierToUpdate = suppliers.find(s => s.srNo === detail.srNo);
+                    if (supplierToUpdate) {
+                        const supplierDocRef = doc(db, "suppliers", supplierToUpdate.id);
+                        const supplierDoc = await transaction.get(supplierDocRef);
+                        if (supplierDoc.exists()) {
+                            const currentNetAmount = Number(supplierDoc.data().netAmount);
+                            const newNetAmount = currentNetAmount + detail.amount;
+                            transaction.update(supplierDocRef, { netAmount: newNetAmount });
+                        }
                     }
                 }
             }
 
-            // Step 2: Apply the new/updated payment.
+            // Step 2: Apply the new/updated payment to the selected entries.
             let remainingPayment = paymentAmount + calculatedCdAmount;
             const paidForDetails: PaidFor[] = [];
             const sortedEntries = Array.from(selectedEntryIds)
@@ -297,7 +301,7 @@ export default function SupplierPaymentsPage() {
 
             for (const c of sortedEntries) {
                 const supplierDocRef = doc(db, "suppliers", c.id);
-                const supplierDoc = await transaction.get(supplierDocRef);
+                const supplierDoc = await transaction.get(supplierDocRef); // Re-read the doc inside the transaction
                 if (!supplierDoc.exists()) throw new Error(`Supplier ${c.id} not found.`);
                 
                 const outstanding = Number(supplierDoc.data().netAmount);
