@@ -267,11 +267,7 @@ export default function SupplierPaymentsPage() {
     }
 
     if (editingPayment) {
-        // To edit, we first delete the old payment and revert balances, then create a new one.
-        // This is a complex operation that needs to be atomic.
-        // For now, let's just show an alert that this needs a safer implementation.
-        toast({ title: "Info", description: "Editing a payment first deletes the old one and then creates a new one. Proceeding." });
-        await handleDeletePayment(editingPayment.paymentId, true); // silent deletion
+        await handleDeletePayment(editingPayment.id, true); // silent deletion
     }
 
     let remainingPayment = paymentAmount + calculatedCdAmount;
@@ -296,6 +292,7 @@ export default function SupplierPaymentsPage() {
     await Promise.all(customerUpdatesPromises);
 
     const paymentData: Payment = {
+        id: editingPayment ? editingPayment.id : '', // Keep original ID if editing
         paymentId: editingPayment ? editingPayment.paymentId : paymentId,
         customerId: selectedCustomerKey,
         date: new Date().toISOString().split("T")[0],
@@ -310,7 +307,7 @@ export default function SupplierPaymentsPage() {
     
     // Use update for editing, add for new
     const savePromise = editingPayment 
-      ? updatePayment(editingPayment.id, paymentData) // Assumes payment has a firestore doc id
+      ? updatePayment(editingPayment.id, paymentData)
       : addPayment(paymentData);
   
     savePromise.then(() => {
@@ -332,13 +329,14 @@ export default function SupplierPaymentsPage() {
     setPaymentType(paymentToEdit.type);
     setCdEnabled(paymentToEdit.cdApplied);
     setCalculatedCdAmount(paymentToEdit.cdAmount);
-
+    
+    // Select all entries this payment was for, regardless of their current outstanding amount
     const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-    const entryIdsToSelect = new Set(suppliers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
+    const entryIdsToSelect = new Set(suppliers.filter(s => s.customerId === paymentToEdit.customerId && srNosInPayment.includes(s.srNo)).map(c => c.id));
     
     setSelectedEntryIds(entryIdsToSelect);
     
-    toast({ title: "Editing Payment", description: `Editing payment ${paymentToEdit.paymentId}. Please make your changes and click 'Update Payment'.`});
+    toast({ title: "Editing Payment", description: `Editing payment ${paymentToEdit.paymentId}. Associated entries selected.`});
   };
 
   const handleDeletePayment = async (paymentIdToDelete: string, silent = false) => {
@@ -414,7 +412,7 @@ export default function SupplierPaymentsPage() {
   const currentPaymentHistory = useMemo(() => {
     if (!selectedCustomerKey) return [];
     const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
-    const uniquePayments = Array.from(new Map(customerPayments.map(p => [p.paymentId, p])).values());
+    const uniquePayments = Array.from(new Map(customerPayments.map(p => [p.id, p])).values());
     return uniquePayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [paymentHistory, selectedCustomerKey]);
   
