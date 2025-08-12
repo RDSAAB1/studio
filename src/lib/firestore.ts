@@ -61,6 +61,9 @@ export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<s
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<void> {
+    if (!id) {
+        throw new Error("Update failed: Document ID is missing.");
+    }
     const customerRef = doc(db, "customers", id);
     await updateDoc(customerRef, customerData);
 }

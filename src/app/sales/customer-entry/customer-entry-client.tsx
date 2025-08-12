@@ -26,8 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-import { addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore";
-import { DocumentData, QuerySnapshot, onSnapshot, collection } from "firebase/firestore";
+import { addCustomer, updateCustomer, deleteCustomer, getCustomers, getCustomersRealtime } from "@/lib/firestore";
+import { DocumentData, QuerySnapshot, onSnapshot, collection, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
@@ -71,7 +71,8 @@ const getInitialFormState = (customers: Customer[]): Customer => {
     id: "", srNo: formatSrNo(nextSrNum), date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, barcode: '',
+    labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0,
+    barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
   };
 };
@@ -599,65 +600,19 @@ export default function CustomerEntryClient() {
     setIsClient(true);
     setLoading(true);
 
-    const unsubscribe = onSnapshot(collection(db, "customers"), (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedCustomers: Customer[] = snapshot.docs.map(doc => {
-        const data = doc.data();
-        // Basic validation and mapping to Customer type
-        return {
-          id: doc.id,
-          srNo: data.srNo || '',
-          date: data.date || new Date().toISOString().split('T')[0],
-          term: data.term?.toString() || '0',
-          dueDate: data.dueDate || new Date().toISOString().split('T')[0],
-          name: data.name || '',
-          so: data.so || '',
-          address: data.address || '',
-          contact: data.contact || '',
-          vehicleNo: data.vehicleNo || '',
-          variety: data.variety || '',
-          grossWeight: Number(data.grossWeight) || 0,
-          teirWeight: Number(data.teirWeight) || 0,
-          weight: Number(data.weight) || 0,
-          kartaPercentage: Number(data.kartaPercentage) || 0,
-          kartaWeight: Number(data.kartaWeight) || 0,
-          kartaAmount: Number(data.kartaAmount) || 0,
-          netWeight: Number(data.netWeight) || 0,
-          rate: Number(data.rate) || 0,
-          labouryRate: Number(data.labouryRate) || 0,
-          labouryAmount: Number(data.labouryAmount) || 0,
-          kanta: Number(data.kanta) || 0,
-          amount: Number(data.amount) || 0,
-          netAmount: Number(data.netAmount) || 0,
-          barcode: data.barcode || '',
-          receiptType: data.receiptType || 'Cash',
-          paymentType: data.paymentType || 'Full',
-          customerId: data.customerId || '',
-          searchValue: data.searchValue || '',
-          payments: data.payments || [], // Assuming payments might be stored here
-        };
-      });
+    const q = query(collection(db, "customers"), orderBy("date", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+      const fetchedCustomers: Customer[] = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer));
       setCustomers(fetchedCustomers);
       setLoading(false);
-       // If currently editing a customer that was deleted or changed, reset form
-      if (isEditing && !fetchedCustomers.find(c => c.id === currentCustomer.id)) {
-         handleNew(fetchedCustomers);
-      } else if (!isEditing && fetchedCustomers.length > 0) {
-         // If not editing and data loaded, perhaps set form for new entry based on new data
-         // This might be adjusted based on desired behavior after data load
-         handleNew(fetchedCustomers);
-      } else if (!isEditing && fetchedCustomers.length === 0) {
-          // Handle case where there's no data yet
-           handleNew([]);
-      }
     }, (error) => {
       console.error("Error fetching customers: ", error);
       toast({ title: "Error", description: "Failed to load customer data.", variant: "destructive" });
       setLoading(false);
     });
 
-    // Clean up the listener when the component unmounts
     return () => unsubscribe();
-  }, [isEditing, currentCustomer.id]);
+  }, [toast]);
 
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -691,14 +646,14 @@ export default function CustomerEntryClient() {
     performCalculations(formValues);
   }, [form, performCalculations]);
 
-  const handleNew = useCallback((currentCustomers: Customer[] = customers) => {
+  const handleNew = useCallback(() => {
     setIsEditing(false);
-    const newState = getInitialFormState(currentCustomers);
+    const newState = getInitialFormState(customers);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     newState.date = today.toISOString().split("T")[0];
     newState.dueDate = today.toISOString().split("T")[0];
-    resetFormToState({...newState, detailsCustomer: null}); // Clear detailsCustomer state
+    resetFormToState({...newState, detailsCustomer: null});
   }, [customers, resetFormToState]);
 
   const handleEdit = (id: string) => {
@@ -751,7 +706,6 @@ export default function CustomerEntryClient() {
       console.error("Error deleting customer: ", error);
       toast({ title: "Error", description: "Failed to delete entry.", variant: "destructive" });
     }
-     // Firestore listener will update state automatically
     if (currentCustomer.id === id) {
       handleNew();
     }
@@ -759,20 +713,32 @@ export default function CustomerEntryClient() {
 
   const onSubmit = async (values: FormValues) => {
     const completeEntry: Customer = {
-      ...currentCustomer, ...values,
-      name: toTitleCase(values.name), so: toTitleCase(values.so),
-      address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
-      variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
-      term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`, // Keep existing customerId logic or refine
+        ...currentCustomer, // This includes the original id
+        ...values,
+        date: values.date.toISOString().split('T')[0],
+        name: toTitleCase(values.name),
+        so: toTitleCase(values.so),
+        address: toTitleCase(values.address),
+        vehicleNo: toTitleCase(values.vehicleNo),
+        variety: toTitleCase(values.variety),
+        term: String(values.term),
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
-    if (isEditing) {
-      await updateCustomer(completeEntry.id, completeEntry);
-      toast({ title: "Success", description: "Entry updated successfully." });
-    } else {
-      await addCustomer(completeEntry);
-      toast({ title: "Success", description: "New entry saved successfully." });
+
+    try {
+        if (isEditing && completeEntry.id) {
+            await updateCustomer(completeEntry.id, completeEntry);
+            toast({ title: "Success", description: "Entry updated successfully." });
+        } else {
+            const { id, ...newEntryData } = completeEntry;
+            await addCustomer(newEntryData);
+            toast({ title: "Success", description: "New entry saved successfully." });
+        }
+        handleNew();
+    } catch (error) {
+        console.error("Error saving customer:", error);
+        toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
     }
-    handleNew();
   };
   
   const handleShowDetails = (customer: Customer) => {
@@ -816,7 +782,7 @@ export default function CustomerEntryClient() {
               <Button type="submit" size="sm">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
               </Button>
-              <Button type="button" variant="outline" onClick={() => handleNew()} size="sm">
+              <Button type="button" variant="outline" onClick={handleNew} size="sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
               </Button>
             </div>
