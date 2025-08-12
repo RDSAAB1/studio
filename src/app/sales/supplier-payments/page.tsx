@@ -39,8 +39,12 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchUpdateSuppliersOnPaymentChange } from '@/lib/firestore';
-import { runTransaction, doc, writeBatch, collection, getDocs } from "firebase/firestore";
+import { runTransaction, doc, writeBatch, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+const suppliersCollection = collection(db, "suppliers");
+const paymentsCollection = collection(db, "payments");
+
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -272,49 +276,75 @@ export default function SupplierPaymentsPage() {
     try {
         await runTransaction(db, async (transaction) => {
             const tempEditingPayment = editingPayment;
-
-            // Step 1: If editing, revert the old payment's effect first.
-            // This brings supplier balances back to the state before this payment was made.
+            
+            // --- READ PHASE ---
+            // 1. Get all documents that will be involved in the transaction.
+            
+            // Documents to revert if we are editing
+            const suppliersToRevertRefs = [];
             if (tempEditingPayment) {
                 for (const detail of tempEditingPayment.paidFor || []) {
-                    // Find the corresponding supplier document by srNo
                     const supplierToUpdate = suppliers.find(s => s.srNo === detail.srNo);
                     if (supplierToUpdate) {
-                        const supplierDocRef = doc(db, "suppliers", supplierToUpdate.id);
-                        const supplierDoc = await transaction.get(supplierDocRef);
-                        if (supplierDoc.exists()) {
-                            const currentNetAmount = Number(supplierDoc.data().netAmount);
-                            const newNetAmount = currentNetAmount + detail.amount;
-                            transaction.update(supplierDocRef, { netAmount: newNetAmount });
-                        }
+                        suppliersToRevertRefs.push(doc(db, "suppliers", supplierToUpdate.id));
                     }
                 }
             }
+            const revertedSupplierDocs = await Promise.all(suppliersToRevertRefs.map(ref => transaction.get(ref)));
 
-            // Step 2: Apply the new/updated payment to the selected entries.
-            let remainingPayment = paymentAmount + calculatedCdAmount;
-            const paidForDetails: PaidFor[] = [];
+            // Documents to update with the new payment
             const sortedEntries = Array.from(selectedEntryIds)
               .map(id => suppliers.find(s => s.id === id))
               .filter((c): c is Customer => !!c)
               .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+            const suppliersToUpdateRefs = sortedEntries.map(entry => doc(db, "suppliers", entry.id));
+            const updatedSupplierDocs = await Promise.all(suppliersToUpdateRefs.map(ref => transaction.get(ref)));
 
-            for (const c of sortedEntries) {
-                const supplierDocRef = doc(db, "suppliers", c.id);
-                const supplierDoc = await transaction.get(supplierDocRef); // Re-read the doc inside the transaction
-                if (!supplierDoc.exists()) throw new Error(`Supplier ${c.id} not found.`);
+
+            // --- WRITE PHASE ---
+            
+            // 2. If editing, revert the old payment's effect first.
+            if (tempEditingPayment) {
+                revertedSupplierDocs.forEach((supplierDoc, index) => {
+                    const detail = (tempEditingPayment.paidFor || [])[index];
+                    if (supplierDoc.exists()) {
+                        const currentNetAmount = Number(supplierDoc.data().netAmount);
+                        const newNetAmount = currentNetAmount + detail.amount;
+                        transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
+                    }
+                });
+            }
+
+            // 3. Apply the new/updated payment to the selected entries.
+            let remainingPayment = paymentAmount + calculatedCdAmount;
+            const paidForDetails: PaidFor[] = [];
+
+            updatedSupplierDocs.forEach((supplierDoc, index) => {
+                const entryData = sortedEntries[index];
+                if (!supplierDoc.exists()) throw new Error(`Supplier ${entryData.id} not found.`);
                 
-                const outstanding = Number(supplierDoc.data().netAmount);
+                // Use the live data from the transaction for calculation.
+                let outstanding = Number(supplierDoc.data().netAmount);
+
+                // If we are editing, we need to consider the reverted amount for the current transaction run
+                if(tempEditingPayment) {
+                    const revertDetail = tempEditingPayment.paidFor?.find(d => d.srNo === entryData.srNo);
+                    if(revertDetail) {
+                        outstanding += revertDetail.amount;
+                    }
+                }
+
                 if (remainingPayment > 0) {
                     const amountToPay = Math.min(outstanding, remainingPayment);
                     remainingPayment -= amountToPay;
-                    const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
-                    paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-                    transaction.update(supplierDocRef, { netAmount: outstanding - amountToPay });
+                    const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
+                    paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                    transaction.update(supplierDoc.ref, { netAmount: outstanding - amountToPay });
                 }
-            }
+            });
 
-            // Step 3: Create or update the payment document.
+            // 4. Create or update the payment document.
             const paymentData: Omit<Payment, 'id'> = {
               paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
               customerId: selectedCustomerKey,
@@ -346,20 +376,23 @@ export default function SupplierPaymentsPage() {
     }
   };
 
+
   const handleEditPayment = async (paymentToEdit: Payment) => {
     // 1. Find all supplier entries associated with this payment
     const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-    const associatedEntryIds = suppliers
-        .filter(s => s.customerId === paymentToEdit.customerId && srNosInPayment.includes(s.srNo))
-        .map(e => e.id);
+    
+    // Check both current suppliers and all previously known suppliers if necessary
+    const associatedEntries = suppliers.filter(s => srNosInPayment.includes(s.srNo));
+    
+    const associatedEntryIds = associatedEntries.map(e => e.id);
 
-    if (associatedEntryIds.length === 0) {
+    if (associatedEntryIds.length !== srNosInPayment.length) {
         toast({
             variant: "destructive",
             title: "Cannot Edit Payment",
-            description: "Could not find the original supplier entries for this payment. They may have been deleted.",
+            description: "Some original supplier entries for this payment could not be found. They may have been deleted.",
         });
-        return;
+       // return; // Decide if you want to allow partial editing or block completely
     }
     const entryIdsToSelect = new Set(associatedEntryIds);
 
