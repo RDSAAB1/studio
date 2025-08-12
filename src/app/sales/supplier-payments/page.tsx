@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
@@ -79,6 +78,8 @@ export default function SupplierPaymentsPage() {
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
   
+  const stableToast = useCallback(toast, []);
+
   const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
     if (!currentPayments || currentPayments.length === 0) {
         return formatPaymentId(1);
@@ -91,9 +92,7 @@ export default function SupplierPaymentsPage() {
     return formatPaymentId(lastPaymentNum + 1);
   }, []);
 
-  const stableToast = useCallback(toast, []);
-
-    useEffect(() => {
+  useEffect(() => {
     setIsClient(true);
     setLoading(true);
 
@@ -251,73 +250,56 @@ export default function SupplierPaymentsPage() {
   
   const processPayment = async () => {
     if (!selectedCustomerKey) {
-      toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
-      return;
+        toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
+        return;
     }
     if (selectedEntryIds.size === 0 || paymentAmount <= 0) {
-      toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries and enter a valid payment amount." });
-      return;
+        toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries and enter a valid payment amount." });
+        return;
     }
     if (paymentType === 'Partial' && paymentAmount > totalOutstandingForSelected) {
-      toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
-      return;
+        toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
+        return;
     }
-  
-    // If editing, first delete the old payment and reverse the amounts
+
     if (editingPaymentId) {
-      const paymentToDelete = paymentHistory.find(p => p.paymentId === editingPaymentId);
-      if (paymentToDelete) {
-        // Reverse the paid amounts on the supplier entries
-        if (paymentToDelete.paidFor && paymentToDelete.paidFor.length > 0) {
-          const supplierUpdatesPromises = paymentToDelete.paidFor.map(async (paidFor) => {
-            const supplierToUpdate = suppliers.find(s => s.srNo === paidFor.srNo);
-            if (supplierToUpdate) {
-              const newNetAmount = parseFloat(String(supplierToUpdate.netAmount)) + paidFor.amount;
-              await updateSupplier(supplierToUpdate.id, { netAmount: newNetAmount });
-            }
-          });
-          await Promise.all(supplierUpdatesPromises);
-        }
-        // Delete the old payment record
-        await deletePayment(editingPaymentId);
-      }
+        await handleDeletePayment(editingPaymentId, true); // Silently delete to reverse amounts
     }
-  
-    // Now, process the new/updated payment
+
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const paidForDetails: PaidFor[] = [];
-  
-    const customerUpdatesPromises = Array.from(selectedEntryIds).map(async (id) => {
-      const c = suppliers.find(s => s.id === id);
-      if (c) {
+
+    const sortedEntries = Array.from(selectedEntryIds)
+        .map(id => suppliers.find(s => s.id === id))
+        .filter((c): c is Customer => !!c)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const customerUpdatesPromises = sortedEntries.map(async (c) => {
         const outstanding = parseFloat(String(c.netAmount));
         if (remainingPayment > 0) {
-          const amountToPay = Math.min(outstanding, remainingPayment);
-          remainingPayment -= amountToPay;
-          const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
-          paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-          await updateSupplier(c.id, { netAmount: outstanding - amountToPay });
+            const amountToPay = Math.min(outstanding, remainingPayment);
+            remainingPayment -= amountToPay;
+            const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
+            paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+            await updateSupplier(c.id, { netAmount: outstanding - amountToPay });
         }
-      }
     });
-  
+
     await Promise.all(customerUpdatesPromises);
-  
+
     const paymentData: Payment = {
-      paymentId: editingPaymentId || paymentId || getNextPaymentId(paymentHistory),
-      customerId: selectedCustomerKey,
-      date: new Date().toISOString().split("T")[0],
-      amount: paymentAmount,
-      cdAmount: calculatedCdAmount,
-      cdApplied: cdEnabled,
-      type: paymentType,
-      receiptType: 'Online',
-      notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
-      paidFor: paidForDetails,
+        paymentId: editingPaymentId || paymentId || getNextPaymentId(paymentHistory),
+        customerId: selectedCustomerKey,
+        date: new Date().toISOString().split("T")[0],
+        amount: paymentAmount,
+        cdAmount: calculatedCdAmount,
+        cdApplied: cdEnabled,
+        type: paymentType,
+        receiptType: 'Online',
+        notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
+        paidFor: paidForDetails,
     };
-  
-    // For edits, we use updatePayment which can handle creating if it was deleted.
-    // For new, we use addPayment.
+    
     const savePromise = editingPaymentId 
       ? updatePayment(editingPaymentId, paymentData)
       : addPayment(paymentData);
@@ -345,7 +327,6 @@ export default function SupplierPaymentsPage() {
     const srNosInPayment = (payment.paidFor || []).map(pf => pf.srNo);
     const entryIdsToSelect = new Set(suppliers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
     
-    // Also add back the partially paid entries that are now fully outstanding again
      if (paymentToEdit.paidFor) {
         paymentToEdit.paidFor.forEach(pf => {
             const supplier = suppliers.find(s => s.srNo === pf.srNo);
@@ -368,7 +349,6 @@ export default function SupplierPaymentsPage() {
     }
 
     try {
-        // Restore amounts for each supplier entry associated with the payment
         if (paymentToDelete.paidFor && paymentToDelete.paidFor.length > 0) {
             const supplierUpdates = paymentToDelete.paidFor.map(async (paidFor) => {
                 const supplierToUpdate = suppliers.find(s => s.srNo === paidFor.srNo);
@@ -380,7 +360,6 @@ export default function SupplierPaymentsPage() {
             await Promise.all(supplierUpdates);
         }
 
-        // Delete the payment document itself
         await deletePayment(paymentIdToDelete);
 
         if (!silent) {
@@ -430,7 +409,15 @@ export default function SupplierPaymentsPage() {
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
   const paidEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) === 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
-  const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [paymentHistory, selectedCustomerKey]);
+  
+  const currentPaymentHistory = useMemo(() => {
+    if (!selectedCustomerKey) return [];
+    
+    const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
+    const uniquePayments = Array.from(new Map(customerPayments.map(p => [p.paymentId, p])).values());
+    
+    return uniquePayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [paymentHistory, selectedCustomerKey]);
   
   const availableCdOptions = useMemo(() => {
     if (paymentType === 'Partial') {
