@@ -263,7 +263,8 @@ export default function SupplierPaymentsPage() {
     }
 
     if (editingPaymentId) {
-        await handleDeletePayment(editingPaymentId, true); // Silently delete to reverse amounts
+        // Silently reverse the old payment to avoid race conditions before applying the new one.
+        await handleDeletePayment(editingPaymentId, true);
     }
 
     let remainingPayment = paymentAmount + calculatedCdAmount;
@@ -362,7 +363,6 @@ export default function SupplierPaymentsPage() {
 
         await deletePayment(paymentIdToDelete);
         
-        setPaymentHistory(prev => prev.filter(p => p.paymentId !== paymentIdToDelete));
         if (editingPaymentId === paymentIdToDelete) {
           clearForm();
         }
