@@ -78,6 +78,17 @@ export default function SupplierPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
+  
+  const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
+    const lastPaymentNum = currentPayments.reduce((max, p) => {
+        const numMatch = p.paymentId.match(/^P(\d+)$/);
+        const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+        return num > max ? num : max;
+    }, 0);
+    return formatPaymentId(lastPaymentNum + 1);
+  }, []);
+
+  const stableToast = useCallback(toast, []);
 
   useEffect(() => {
     setIsClient(true);
@@ -88,7 +99,7 @@ export default function SupplierPaymentsPage() {
       setLoading(false);
     }, (error) => {
         console.error("Error fetching suppliers:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Failed to load supplier data." });
+        stableToast({ variant: 'destructive', title: "Error", description: "Failed to load supplier data." });
         setLoading(false);
     });
 
@@ -99,14 +110,14 @@ export default function SupplierPaymentsPage() {
       }
     }, (error) => {
         console.error("Error fetching payments:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
+        stableToast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
     });
 
     return () => {
       unsubscribeSuppliers();
       unsubscribePayments();
     };
-  }, [editingPaymentId]);
+  }, [editingPaymentId, stableToast, getNextPaymentId]);
   
 
   const customerSummaryMap = useMemo(() => {
@@ -137,14 +148,7 @@ export default function SupplierPaymentsPage() {
     return summary;
   }, [suppliers]);
 
-  const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
-    const lastPaymentNum = currentPayments.reduce((max, p) => {
-        const numMatch = p.paymentId.match(/^P(\d+)$/);
-        const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-        return num > max ? num : max;
-    }, 0);
-    return formatPaymentId(lastPaymentNum + 1);
-  }, []);
+
 
 
   const handleCustomerSelect = (key: string) => {
@@ -272,7 +276,7 @@ export default function SupplierPaymentsPage() {
                  const amountToPay = Math.min(outstanding, remainingPayment);
                  remainingPayment -= amountToPay;
                  const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
-                 paidForDetails.push({ id: c.id, srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                 paidForDetails.push({ srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
                  await updateSupplier(c.id, { netAmount: outstanding - amountToPay });
              }
         }
