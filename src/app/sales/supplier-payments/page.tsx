@@ -198,9 +198,10 @@ export default function SupplierPaymentsPage() {
 
   useEffect(() => {
     if (paymentType === 'Full' && !editingPayment) {
-        setPaymentAmount(totalOutstandingForSelected);
+        const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
+        setPaymentAmount(parseFloat(finalAmount.toFixed(2)));
     }
-  }, [paymentType, totalOutstandingForSelected, editingPayment]);
+  }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
 
   useEffect(() => {
     autoSetCDToggle();
@@ -269,7 +270,6 @@ export default function SupplierPaymentsPage() {
             const tempEditingPayment = editingPayment;
             
             // --- READ PHASE ---
-            // 1. Get all documents that will be involved in the transaction.
             const allInvolvedSrNos = new Set<string>();
             if (tempEditingPayment) {
                 (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
@@ -277,8 +277,6 @@ export default function SupplierPaymentsPage() {
             selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
 
             const involvedSupplierDocs = new Map<string, any>();
-            const outstandingBalances = new Map<string, number>();
-
             for (const srNo of allInvolvedSrNos) {
                 const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
                 if (supplierToUpdate) {
@@ -286,14 +284,16 @@ export default function SupplierPaymentsPage() {
                     const supplierDoc = await transaction.get(docRef);
                     if (supplierDoc.exists()) {
                         involvedSupplierDocs.set(srNo, supplierDoc);
-                        outstandingBalances.set(srNo, Number(supplierDoc.data().netAmount));
                     }
                 }
             }
             
-            // --- WRITE PHASE ---
+            // --- LOGIC & WRITE PHASE ---
+            const outstandingBalances = new Map<string, number>();
+            involvedSupplierDocs.forEach((doc, srNo) => {
+                outstandingBalances.set(srNo, Number(doc.data().netAmount));
+            });
             
-            // 2. If editing, revert the old payment's effect first.
             if (tempEditingPayment) {
                 (tempEditingPayment.paidFor || []).forEach(detail => {
                     if(outstandingBalances.has(detail.srNo)) {
@@ -303,27 +303,21 @@ export default function SupplierPaymentsPage() {
                 });
             }
 
-            // 3. Apply the new/updated payment to the selected entries.
             let remainingPayment = paymentAmount + calculatedCdAmount;
             const paidForDetails: PaidFor[] = [];
-
             const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
             sortedEntries.forEach(entryData => {
                 const currentOutstanding = outstandingBalances.get(entryData.srNo);
-
                 if (remainingPayment > 0 && typeof currentOutstanding !== 'undefined') {
                     const amountToPay = Math.min(currentOutstanding, remainingPayment);
                     remainingPayment -= amountToPay;
                     const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
                     paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-                    
-                    // Update the balance in our temporary map
                     outstandingBalances.set(entryData.srNo, currentOutstanding - amountToPay);
                 }
             });
 
-            // 4. Commit all updates to the actual documents
             for (const [srNo, newBalance] of outstandingBalances.entries()) {
                 const supplierDoc = involvedSupplierDocs.get(srNo);
                 if(supplierDoc){
@@ -331,8 +325,6 @@ export default function SupplierPaymentsPage() {
                 }
             }
 
-
-            // 5. Create or update the payment document.
             const paymentData: Omit<Payment, 'id'> = {
               paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
               customerId: selectedCustomerKey,
@@ -366,12 +358,8 @@ export default function SupplierPaymentsPage() {
 
 
   const handleEditPayment = async (paymentToEdit: Payment) => {
-    // 1. Find all supplier entries associated with this payment
     const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-    
-    // Check both current suppliers and all previously known suppliers if necessary
     const associatedEntries = suppliers.filter(s => srNosInPayment.includes(s.srNo));
-    
     const associatedEntryIds = associatedEntries.map(e => e.id);
 
     if (associatedEntryIds.length !== srNosInPayment.length) {
@@ -380,11 +368,9 @@ export default function SupplierPaymentsPage() {
             title: "Cannot Edit Payment",
             description: "Some original supplier entries for this payment could not be found. They may have been deleted.",
         });
-       // return; // Decide if you want to allow partial editing or block completely
     }
     const entryIdsToSelect = new Set(associatedEntryIds);
 
-    // 2. Set the state to edit mode
     setSelectedCustomerKey(paymentToEdit.customerId);
     setEditingPayment(paymentToEdit);
     setPaymentId(paymentToEdit.paymentId);
@@ -392,7 +378,7 @@ export default function SupplierPaymentsPage() {
     setPaymentType(paymentToEdit.type);
     setCdEnabled(paymentToEdit.cdApplied);
     setCalculatedCdAmount(paymentToEdit.cdAmount);
-    setSelectedEntryIds(entryIdsToSelect); // Pre-select the associated entries
+    setSelectedEntryIds(entryIdsToSelect);
   
     toast({
       title: "Editing Mode",
