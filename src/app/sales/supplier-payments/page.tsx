@@ -361,8 +361,11 @@ export default function SupplierPaymentsPage() {
         }
 
         await deletePayment(paymentIdToDelete);
-
+        
         setPaymentHistory(prev => prev.filter(p => p.paymentId !== paymentIdToDelete));
+        if (editingPaymentId === paymentIdToDelete) {
+          clearForm();
+        }
 
         if (!silent) {
             toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });

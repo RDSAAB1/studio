@@ -129,12 +129,11 @@ export async function updatePayment(id: string, paymentData: Partial<Payment>): 
     }
     try {
         const paymentRef = doc(db, "payments", id);
-        // Using set with merge to handle both update and create-if-not-exist scenarios during editing.
         await setDoc(paymentRef, paymentData, { merge: true });
         return true;
     } catch (error) {
         console.error("Error in updatePayment:", error);
-        return false; // Return false on error
+        return false; 
     }
 }
 
