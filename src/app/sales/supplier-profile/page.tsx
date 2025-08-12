@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { initialCustomers } from "@/lib/data";
-import type { Supplier, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Customer as Supplier, CustomerSummary, Payment, Customer } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
 
 import {
@@ -37,6 +37,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 type ChartType = 'financial' | 'variety';
@@ -69,9 +71,6 @@ const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var
 
 
 export default function SupplierProfilePage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  // NOTE: The Supplier Profile page was using 'customers' state, which seems incorrect.
-  // Renaming to 'suppliers' to match the context of the page.
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
@@ -81,43 +80,42 @@ export default function SupplierProfilePage() {
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
   const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
 
   // Fetch data from Firestore on mount
   useEffect(() => {
+    setIsClient(true);
     setLoading(true);
-    // Assuming getSuppliers and getPayments functions exist in src/lib/firestore.ts
-    // And assuming your supplier data is stored in a 'suppliers' collection
-    // and payment history is stored in a 'payments' collection.
+    
     const unsubscribeSuppliers = onSnapshot(collection(db, "suppliers"), (snapshot) => {
       const fetchedSuppliers: Supplier[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier));
       setSuppliers(fetchedSuppliers);
       setLoading(false);
     }, (error) => {
-        console.error("Failed to load data from localStorage", error);
-        setCustomers(initialCustomers);
-        setPaymentHistory([]);
-      }
-    }
-  }, []);
+        console.error("Failed to load suppliers from Firestore", error);
+        setSuppliers([]); // Set to empty array on error
+        setLoading(false);
+    });
 
     const unsubscribePayments = onSnapshot(collection(db, "payments"), (snapshot) => {
       const fetchedPayments: Payment[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
       setPaymentHistory(fetchedPayments);
-      setLoading(false);
     }, (error) => {
-        console.error("Failed to load data from localStorage", error);
-        setCustomers(initialCustomers);
+        console.error("Failed to load payments from Firestore", error);
         setPaymentHistory([]);
-      });
+    });
 
-    return () => { unsubscribeSuppliers(); unsubscribePayments(); };
+    return () => { 
+        unsubscribeSuppliers(); 
+        unsubscribePayments(); 
+    };
   }, []);
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
     
     // Create summaries for each customer based on their entries
-    customers.forEach(entry => {
+    suppliers.forEach(entry => {
       if(!entry.customerId) return;
       const key = entry.customerId;
       if (!newSummary.has(key)) {
@@ -135,7 +133,7 @@ export default function SupplierProfilePage() {
       const data = newSummary.get(key)!;
       data.totalAmount += parseFloat(String(entry.amount));
       data.totalOutstanding += parseFloat(String(entry.netAmount));
-      data.allTransactions.push(entry);
+      data.allTransactions!.push(entry);
     });
 
     // Add payment history to each summary
@@ -152,14 +150,14 @@ export default function SupplierProfilePage() {
         name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
-        totalOutstandingTransactions: 0, allTransactions: customers, allPayments: paymentHistory,
+        totalOutstandingTransactions: 0, allTransactions: suppliers, allPayments: paymentHistory,
         transactionsByVariety: {}
     };
     
     let totalRate = 0;
     let rateCount = 0;
 
-    customers.forEach(c => {
+    suppliers.forEach(c => {
         millSummary.totalGrossWeight! += c.grossWeight;
         millSummary.totalTeirWeight! += c.teirWeight;
         millSummary.totalNetWeight! += c.netWeight;
@@ -180,8 +178,8 @@ export default function SupplierProfilePage() {
 
     millSummary.totalPaid = paymentHistory.reduce((acc, p) => acc + p.amount, 0);
     millSummary.totalCdAmount = paymentHistory.reduce((acc, p) => acc + p.cdAmount, 0);
-    millSummary.totalTransactions = customers.length;
-    millSummary.totalOutstandingTransactions = customers.filter(c => parseFloat(String(c.netAmount)) > 0).length;
+    millSummary.totalTransactions = suppliers.length;
+    millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) > 0).length;
     millSummary.averageRate = rateCount > 0 ? totalRate / rateCount : 0;
 
 
@@ -201,12 +199,12 @@ export default function SupplierProfilePage() {
     if(!loading) { // Only update summary after data is loaded
       updateCustomerSummary();
     }
-  }, [isClient, updateCustomerSummary]);
+  }, [loading, updateCustomerSummary]);
 
   const selectedCustomerData = selectedCustomerKey ? customerSummary.get(selectedCustomerKey) : null;
   const isMillSelected = selectedCustomerKey === MILL_OVERVIEW_KEY;
   
-  const handleShowDetails = (customer: Customer) => {
+  const handleShowDetails = (customer: Supplier) => {
     setDetailsCustomer(customer);
   }
 
@@ -256,8 +254,8 @@ export default function SupplierProfilePage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {isMillSelected && selectedCustomerData ? (
+      {selectedCustomerData && <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {isMillSelected ? (
              <div className="lg:col-span-12 space-y-6">
                 <Card>
                     <CardHeader>
@@ -327,7 +325,7 @@ export default function SupplierProfilePage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {selectedCustomerData.allTransactions.map(entry => (
+                                        {selectedCustomerData.allTransactions!.map(entry => (
                                             <TableRow key={entry.id}>
                                                 <TableCell className="font-mono">{entry.srNo}</TableCell>
                                                 <TableCell>{toTitleCase(entry.name)}</TableCell>
@@ -362,7 +360,7 @@ export default function SupplierProfilePage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {selectedCustomerData.allPayments.map(payment => (
+                                        {selectedCustomerData.allPayments!.map(payment => (
                                             <TableRow key={payment.paymentId}>
                                                 <TableCell className="font-mono">{payment.paymentId}</TableCell>
                                                 <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
@@ -376,7 +374,7 @@ export default function SupplierProfilePage() {
                     </Card>
                 </div>
             </div>
-        ) : selectedCustomerData && (
+        ) : (
             <>
             <div className="lg:col-span-4 space-y-6">
                  <Card>
@@ -407,7 +405,7 @@ export default function SupplierProfilePage() {
                     <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                         <div className="grid gap-4">
                             <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                            <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} description={`${customers.filter(c => c.customerId === selectedCustomerKey).length} entries`}/>
+                            <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} description={`${suppliers.filter(c => c.customerId === selectedCustomerKey).length} entries`}/>
                             <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
                             <StatCard title="Outstanding Entries" value={selectedCustomerData.outstandingEntryIds.length.toString()} icon={<Hash />} />
                         </div>
@@ -461,7 +459,7 @@ export default function SupplierProfilePage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                {customers.filter(c => c.customerId === selectedCustomerKey).map(entry => (
+                                {suppliers.filter(c => c.customerId === selectedCustomerKey).map(entry => (
                                     <TableRow key={entry.id}>
                                         <TableCell className="font-mono">{entry.srNo}</TableCell>
                                         <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
@@ -487,7 +485,7 @@ export default function SupplierProfilePage() {
             </div>
             </>
         )}
-      </div>
+      </div>}
         <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
           {detailsCustomer && (

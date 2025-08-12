@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from 'lucide-react';
 
 interface Employee {
   id?: string;
@@ -130,7 +131,7 @@ export default function EmployeeDatabasePage() {
   };
 
   if (loading) {
-    return <div>Loading employees...</div>; // Replace with a proper loading spinner/skeleton
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   return (

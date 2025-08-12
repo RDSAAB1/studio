@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { initialCustomers } from "@/lib/data";
 import type { Customer } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId } from "@/lib/utils";
 
@@ -40,8 +39,9 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
-import { DynamicCombobox, type ComboboxOption } from "@/components/ui/dynamic-combobox";
+import { collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 
 
 const formSchema = z.object({
@@ -108,7 +108,7 @@ const initialFormState: FormValues = {
 
 export default function RtgspaymentClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]); // Fetch customers from Firestore
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
@@ -124,13 +124,11 @@ export default function RtgspaymentClient() {
   const [calcMaxRate, setCalcMaxRate] = useState(2400);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
-  // CD State
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
   const [cdAt, setCdAt] = useState('unpaid_amount');
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
-  const db = getFirestore(); // Get Firestore instance
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialFormState,
@@ -155,9 +153,7 @@ export default function RtgspaymentClient() {
   }, [outstandingEntries, selectedOutstandingIds]);
 
   useEffect(() => {
-    setIsClient(true); // Set client flag
-
-    // Listen for real-time updates on RTGS records
+    setIsClient(true);
     const unsubscribeRecords = onSnapshot(collection(db, "rtgs_payments"), (snapshot) => {
       const recordsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAllRecords(recordsData);
@@ -169,7 +165,6 @@ export default function RtgspaymentClient() {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to load RTGS records.' });
     });
 
-    // Listen for real-time updates on Customers
     const unsubscribeCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
       const customersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
       setCustomers(customersData);
@@ -180,10 +175,8 @@ export default function RtgspaymentClient() {
 
     return () => { unsubscribeRecords(); unsubscribeCustomers(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, editingRecordIndex]); // Depend on db and editingRecordIndex
-    }
+  }, [editingRecordIndex]);
 
-  // CD Calculation Effect
   useEffect(() => {
     if (!cdEnabled) {
       setCalculatedCdAmount(0);
@@ -198,7 +191,7 @@ export default function RtgspaymentClient() {
     } else if (cdAt === 'unpaid_amount') {
       base = outstanding;
     } else if (cdAt === 'full_amount') {
-      base = outstanding; // For RTGS, it's usually on the outstanding amount
+      base = outstanding;
     }
     setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
   }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected]);
@@ -212,8 +205,6 @@ export default function RtgspaymentClient() {
       form.reset({
         ...initialFormState,
         srNo: generateSrNo(allRecords),
-        // Prefill details from selected customer
-        // Ensure all fields from FormValues are covered or set to default/optional
         name: customer.name,
         fatherName: customer.so,
         mobileNo: customer.contact,
@@ -225,8 +216,6 @@ export default function RtgspaymentClient() {
         parchiName: customer.parchiName,
         parchiAddress: customer.parchiAddress,
       });
-       // Fetch outstanding entries for the selected customer from Firestore
-      const customerOutstanding = customers.filter(c => c.customerId === customer.customerId && Number(c.netAmount) > 0); // Assuming netAmount is a number
       const customerOutstanding = customers.filter(c => c.customerId === customer.customerId && Number(c.netAmount) > 0);
       setOutstandingEntries(customerOutstanding);
     } else {
@@ -238,39 +227,32 @@ export default function RtgspaymentClient() {
     const finalValues = {
         ...values,
         amount: values.amount + calculatedCdAmount,
-         // Include customerId for linking payment to customer
+        cdAmount: calculatedCdAmount,
+        cdApplied: cdEnabled,
         customerId: selectedCustomerId || null, 
     }
 
     let message = "";
-    if (editingRecordIndex !== null) {
-       const recordToUpdate = allRecords[editingRecordIndex];
-       if (recordToUpdate && recordToUpdate.id) {
-         try {
-           await updateDoc(doc(db, "rtgs_payments", recordToUpdate.id), finalValues);
-           message = "Record updated successfully!";
-           toast({ title: "Success", description: message });
-           handleNew(allRecords); // Reset form and generate new SR No.
-         } catch (error) {
-           console.error("Error updating record:", error);
-           toast({ variant: 'destructive', title: 'Error', description: 'Failed to update record.' });
-         }
+    if (editingRecordIndex !== null && allRecords[editingRecordIndex]?.id) {
+       const recordToUpdateId = allRecords[editingRecordIndex].id;
+       try {
+         await updateDoc(doc(db, "rtgs_payments", recordToUpdateId), finalValues);
+         toast({ title: "Success", description: "Record updated successfully!" });
+         handleNew(allRecords);
+       } catch (error) {
+         console.error("Error updating record:", error);
+         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update record.' });
        }
     } else {
        try {
          await addDoc(collection(db, "rtgs_payments"), finalValues);
-         message = "Record saved successfully!";
-         toast({ title: "Success", description: message });
-         handleNew([...allRecords, { id: 'temp', ...finalValues }]); // Pass potential new record list for SR No generation
+         toast({ title: "Success", description: "Record saved successfully!" });
+         handleNew([...allRecords, { id: 'temp', ...finalValues }]);
        } catch (error) {
          console.error("Error adding record:", error);
          toast({ variant: 'destructive', title: 'Error', description: 'Failed to save record.' });
        }
     }
-  };
-
-    toast({ title: "Success", description: message });
-    handleNew(allRecords);
   };
   
   const handleNew = (records: any[]) => {
@@ -284,38 +266,36 @@ export default function RtgspaymentClient() {
   
   const handleAddNewCustomer = (customerName: string) => {
     const newCustomer: Customer = {
-        id: Date.now().toString(),
+        id: Date.now().toString(), // temporary client-side ID
         name: toTitleCase(customerName),
         contact: '',
-        srNo: '', date: '', term: '', dueDate: '', so: '', address: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0, weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0, labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, barcode: '', receiptType: '', paymentType: '',
+        srNo: '', date: new Date().toISOString(), term: '', dueDate: new Date().toISOString(), so: '', address: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0, weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0, labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '', receiptType: '', paymentType: '',
         customerId: `${toTitleCase(customerName).toLowerCase()}|`
     };
+    // This part should ideally trigger a Firestore write, but for now we update local state
     setCustomers(prev => [...prev, newCustomer]);
     handleCustomerSelect(newCustomer.id);
     toast({ title: "Customer Added", description: `Added "${customerName}". Please fill in other details.` });
   };
 
   const handleEdit = (index: number) => {
-     const record = allRecords[index];
-     if (record) {
+    const record = allRecords[index];
+    if (record) {
        form.reset(record);
        setEditingRecordIndex(index);
-       // Select the customer associated with this record
        setSelectedCustomerId(record.customerId);
-    const record = allRecords[index];
-    form.reset(record);
-    setEditingRecordIndex(index);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
-  const handleDelete = (index: number) => {
+  const handleDelete = async (index: number) => {
      const recordToDelete = allRecords[index];
      if (recordToDelete && recordToDelete.id) {
        try {
          await deleteDoc(doc(db, "rtgs_payments", recordToDelete.id));
          toast({ title: "Success", description: "Record deleted successfully." });
          if(editingRecordIndex === index){
-             handleNew(allRecords.filter((_, i) => i !== index)); // Pass potentially updated list
+             handleNew(allRecords.filter((_, i) => i !== index));
          }
        } catch (error) {
          console.error("Error deleting record:", error);
@@ -323,7 +303,6 @@ export default function RtgspaymentClient() {
        }
      }
   };
-
 
   const handleGeneratePaymentOptions = () => {
     if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate > calcMaxRate) {
@@ -397,8 +376,14 @@ export default function RtgspaymentClient() {
       form.setValue('rate', firstEntry.rate || 0);
       form.setValue('weight', firstEntry.weight || 0);
     }
-    const closeTrigger = document.getElementById('close-outstanding-modal');
-    if (closeTrigger) closeTrigger.click();
+    
+    // Find the dialog close button and click it programmatically
+    // This is a workaround. A better solution would be to control the dialog's open state.
+    const closeTrigger = document.querySelector('[aria-label="Close"]');
+    if (closeTrigger instanceof HTMLElement) {
+      closeTrigger.click();
+    }
+    
     toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} outstanding entries. Total: ${totalAmount.toFixed(2)}. Target amount set.` });
   };
 
@@ -521,7 +506,7 @@ export default function RtgspaymentClient() {
                             <p className="mr-auto text-sm text-muted-foreground">
                               Selected: {selectedOutstandingIds.size} | Total: {totalOutstandingForSelected.toFixed(2)}
                             </p>
-                            <Button id="close-outstanding-modal" variant="ghost">Cancel</Button>
+                            <Button variant="ghost">Cancel</Button>
                             <Button onClick={handlePaySelectedOutstanding} disabled={selectedOutstandingIds.size === 0}>
                               Pay Selected
                             </Button>
@@ -571,7 +556,6 @@ export default function RtgspaymentClient() {
                 <Label htmlFor="srNo">SR No.</Label>
                 <Input id="srNo" {...form.register("srNo")} />
                 {form.formState.errors.srNo && <p className="text-sm text-destructive">{form.formState.errors.srNo.message}</p>}
-                <Button type="button" onClick={() => form.setValue('srNo', generateSrNo(allRecords))} className="mt-2">Generate SR No.</Button>
               </div>
               <div className="space-y-2"><Label htmlFor="date">Payment Date</Label><Input type="date" id="date" {...form.register("date")} /></div>
               <div className="space-y-2"><Label htmlFor="grNo">6R No.</Label><Input id="grNo" {...form.register("grNo")} /></div>
@@ -595,7 +579,6 @@ export default function RtgspaymentClient() {
               <div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input type="number" id="rate" {...form.register("rate")} /></div>
               <div className="space-y-2"><Label htmlFor="weight">Weight</Label><Input type="number" id="weight" {...form.register("weight")} /></div>
               
-              {/* CD Fields */}
               <div className="flex items-center space-x-2 pt-6 md:col-span-2">
                 <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
                 <Label htmlFor="cd-toggle">Apply CD</Label>
@@ -628,10 +611,10 @@ export default function RtgspaymentClient() {
 
         <div className="flex justify-start space-x-4">
           <Button type="submit">
-            {editingRecordIndex !== null ? <><Pen /> Update Record</> : <><Save /> Save Record</>}
+            {editingRecordIndex !== null ? <><Pen className="h-4 w-4 mr-2"/> Update Record</> : <><Save className="h-4 w-4 mr-2"/> Save Record</>}
           </Button>
           <Button type="button" variant="outline" onClick={() => handleNew(allRecords)}>
-            <PlusCircle /> New / Clear
+            <PlusCircle className="h-4 w-4 mr-2"/> New / Clear
           </Button>
         </div>
       </form>
@@ -729,7 +712,7 @@ export default function RtgspaymentClient() {
               </TableHeader>
               <TableBody>
                 {allRecords.map((record, index) => (
-                  <TableRow key={index}>
+                  <TableRow key={record.id || index}>
                     <TableCell>{record.srNo || 'N/A'}</TableCell>
                     <TableCell>{toTitleCase(record.name)}</TableCell>
                     <TableCell>{record.amount}</TableCell>
@@ -748,5 +731,3 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
-
-

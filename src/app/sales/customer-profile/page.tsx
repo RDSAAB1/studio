@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { initialCustomers } from "@/lib/data";
 import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { getCustomerById, getCustomers } from "@/lib/firestore"; // Import firestore functions
+import { getCustomers, getCustomersRealtime } from "@/lib/firestore"; // Import firestore functions
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 type ChartType = 'financial' | 'variety';
@@ -69,50 +69,28 @@ const MILL_OVERVIEW_KEY = 'mill-overview';
 const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function CustomerProfilePage() {
-  const [customers, setCustomers] = useState<Customer[]>([]); // Start with empty array
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   
-  const [loading, setLoading] = useState(true); // Loading state
+  const [loading, setLoading] = useState(true);
 
-  // Fetch initial data and set up real-time listener
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = getCustomers((fetchedCustomers) => {
+    const unsubscribe = getCustomersRealtime((fetchedCustomers) => {
       setCustomers(fetchedCustomers);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching customers: ", error);
       setLoading(false);
-      // Optionally show an error message to the user
     });
-
-    // Cleanup the listener on component unmount
     return () => unsubscribe();
   }, []);
-
-  // Update customer summary whenever customers data changes
-  useEffect(() => {
-    updateCustomerSummary();
-  }, [customers]); // Depend on customers state
-
-  // Simulate some payment history for demonstration (REMOVE THIS AFTER INTEGRATING REAL PAYMENTS)
-  const tempPaymentHistory = useMemo(() => {
-      const history = new Map<string, Payment[]>();
-       // Your simulation logic here... (or remove if you integrate real payments)
-      return history;
-  }, [customers]); // Recalculate if customers change
-
-  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
-  const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
-  const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
 
   const updateCustomerSummary = useCallback(() => {
     const newSummary = new Map<string, CustomerSummary>();
     const tempPaymentHistory = new Map<string, Payment[]>();
-    // This part will need to fetch actual payment data for each customer later.
     
-    // Create summaries for each customer
     customers.forEach(entry => {
       if(!entry.customerId) return;
       const key = entry.customerId;
@@ -139,13 +117,11 @@ export default function CustomerProfilePage() {
       }
     });
 
-    // Calculate totals for each customer
     newSummary.forEach((summary) => {
         summary.totalPaid = summary.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
         summary.totalOutstanding = summary.totalAmount - summary.totalPaid;
     });
 
-    // Create the Mill overview summary
     const millSummary: CustomerSummary = {
         name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
@@ -158,11 +134,11 @@ export default function CustomerProfilePage() {
     let rateCount = 0;
 
     customers.forEach(c => {
-        millSummary.totalGrossWeight += c.grossWeight;
-        millSummary.totalTeirWeight += c.teirWeight;
-        millSummary.totalNetWeight += c.netWeight;
-        millSummary.totalKartaAmount += c.kartaAmount;
-        millSummary.totalLabouryAmount += c.labouryAmount;
+        millSummary.totalGrossWeight! += c.grossWeight;
+        millSummary.totalTeirWeight! += c.teirWeight;
+        millSummary.totalNetWeight! += c.netWeight;
+        millSummary.totalKartaAmount! += c.kartaAmount;
+        millSummary.totalLabouryAmount! += c.labouryAmount;
         if(c.rate > 0) {
             totalRate += c.rate;
             rateCount++;
@@ -174,17 +150,16 @@ export default function CustomerProfilePage() {
     });
 
     newSummary.forEach(summary => {
-        millSummary.totalAmount += summary.totalAmount;
-        millSummary.totalOutstanding += summary.totalOutstanding;
-        millSummary.totalPaid += summary.totalPaid;
-        summary.paymentHistory.forEach(p => millSummary.allPayments.push(p));
+        millSummary.totalAmount! += summary.totalAmount;
+        millSummary.totalOutstanding! += summary.totalOutstanding;
+        millSummary.totalPaid! += summary.totalPaid;
+        summary.paymentHistory.forEach(p => millSummary.allPayments!.push(p));
     });
     
-    millSummary.totalCdAmount = millSummary.allPayments.reduce((acc, p) => acc + p.cdAmount, 0);
+    millSummary.totalCdAmount = millSummary.allPayments!.reduce((acc, p) => acc + p.cdAmount, 0);
     millSummary.totalTransactions = customers.length;
     millSummary.totalOutstandingTransactions = customers.filter(c => parseFloat(String(c.netAmount)) > 0).length;
     millSummary.averageRate = rateCount > 0 ? totalRate / rateCount : 0;
-
 
     const finalSummary = new Map<string, CustomerSummary>();
     finalSummary.set(MILL_OVERVIEW_KEY, millSummary);
@@ -192,12 +167,16 @@ export default function CustomerProfilePage() {
       finalSummary.set(key, value);
     });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setCustomerSummary(finalSummary);
   }, [customers]); 
 
   useEffect(() => {
     updateCustomerSummary();
-  }, [updateCustomerSummary]);
+  }, [customers, updateCustomerSummary]);
+
+  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+  const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
+  const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
 
   const selectedCustomerData = selectedCustomerKey ? customerSummary.get(selectedCustomerKey) : null;
   const isMillSelected = selectedCustomerKey === MILL_OVERVIEW_KEY;
@@ -210,8 +189,8 @@ export default function CustomerProfilePage() {
     if (!selectedCustomerData) return [];
     if(isMillSelected) {
         return [
-            { name: 'Total Paid', value: selectedCustomerData.totalPaid },
-            { name: 'Total Outstanding', value: selectedCustomerData.totalAmount - selectedCustomerData.totalPaid },
+            { name: 'Total Paid', value: selectedCustomerData.totalPaid! },
+            { name: 'Total Outstanding', value: selectedCustomerData.totalAmount! - selectedCustomerData.totalPaid! },
         ]
     }
     return [
@@ -257,9 +236,11 @@ export default function CustomerProfilePage() {
                 </div>
             </CardContent>
         </Card>
+        )}
 
+      {selectedCustomerData && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {isMillSelected && selectedCustomerData ? (
+        {isMillSelected ? (
             <div className="lg:col-span-12 space-y-6">
                 <Card>
                     <CardHeader>
@@ -267,14 +248,14 @@ export default function CustomerProfilePage() {
                         <CardDescription>A complete financial and transactional overview of the entire business.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <StatCard title="Total Gross Weight" value={`${selectedCustomerData.totalGrossWeight.toFixed(2)} kg`} icon={<Box />} />
-                        <StatCard title="Total Net Weight" value={`${selectedCustomerData.totalNetWeight.toFixed(2)} kg`} icon={<Weight />} />
-                        <StatCard title="Average Rate" value={`₹${selectedCustomerData.averageRate.toFixed(2)}`} icon={<Calculator />} />
+                        <StatCard title="Total Gross Weight" value={`${(selectedCustomerData.totalGrossWeight || 0).toFixed(2)} kg`} icon={<Box />} />
+                        <StatCard title="Total Net Weight" value={`${(selectedCustomerData.totalNetWeight || 0).toFixed(2)} kg`} icon={<Weight />} />
+                        <StatCard title="Average Rate" value={`₹${(selectedCustomerData.averageRate || 0).toFixed(2)}`} icon={<Calculator />} />
                         <StatCard title="Total Transactions" value={`${selectedCustomerData.totalTransactions}`} icon={<Briefcase />} />
-                        <StatCard title="Total Outstanding" value={`₹${(selectedCustomerData.totalAmount - selectedCustomerData.totalPaid).toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                        <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-                        <StatCard title="Total Karta" value={`₹${selectedCustomerData.totalKartaAmount.toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
-                        <StatCard title="Total Laboury" value={`₹${selectedCustomerData.totalLabouryAmount.toFixed(2)}`} icon={<Users />} colorClass="text-destructive" />
+                        <StatCard title="Total Outstanding" value={`₹${(selectedCustomerData.totalAmount! - selectedCustomerData.totalPaid!).toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Paid" value={`₹${(selectedCustomerData.totalPaid || 0).toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+                        <StatCard title="Total Karta" value={`₹${(selectedCustomerData.totalKartaAmount || 0).toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
+                        <StatCard title="Total Laboury" value={`₹${(selectedCustomerData.totalLabouryAmount || 0).toFixed(2)}`} icon={<Users />} colorClass="text-destructive" />
                     </CardContent>
                 </Card>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -329,7 +310,7 @@ export default function CustomerProfilePage() {
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                      {selectedCustomerData.allTransactions.map(entry => (
+                                      {selectedCustomerData.allTransactions!.map(entry => (
                                           <TableRow key={entry.id}>
                                               <TableCell className="font-mono">{entry.srNo}</TableCell>
                                               <TableCell>{toTitleCase(entry.name)}</TableCell>
@@ -364,7 +345,7 @@ export default function CustomerProfilePage() {
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                      {selectedCustomerData.allPayments.map(payment => (
+                                      {selectedCustomerData.allPayments!.map(payment => (
                                           <TableRow key={payment.paymentId}>
                                               <TableCell className="font-mono">{payment.paymentId}</TableCell>
                                               <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
@@ -378,7 +359,7 @@ export default function CustomerProfilePage() {
                   </Card>
                 </div>
             </div>
-        ) : selectedCustomerData && (
+        ) : (
             <>
             <div className="lg:col-span-4 space-y-6">
                  <Card>
@@ -523,7 +504,6 @@ export default function CustomerProfilePage() {
             </DialogHeader>
             <ScrollArea className="max-h-[85vh]">
               <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-6">
-                {/* Layout 1: Classic ID Card */}
                 {activeLayout === 'classic' && (
                   <div className="space-y-4">
                     <Card>
@@ -591,167 +571,6 @@ export default function CustomerProfilePage() {
                             </p>
                          </CardContent>
                     </Card>
-                  </div>
-                )}
-                 {/* Layout 2: Compact List */}
-                 {activeLayout === 'compact' && (
-                    <div className="space-y-4">
-                        <Card>
-                            <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Customer</CardTitle></CardHeader>
-                            <CardContent className="p-4 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                                <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
-                                <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
-                                <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
-                                <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
-                                <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} />
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Transaction</CardTitle></CardHeader>
-                            <CardContent className="p-4 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                                <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                                <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
-                                <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                                <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
-                                <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
-                            </CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Financials</CardTitle></CardHeader>
-                             <CardContent className="p-4 pt-2">
-                                <Table className="text-sm">
-                                    <TableBody>
-                                        <TableRow><TableCell className="p-2">Gross Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2">Teir Weight</TableCell><TableCell className="text-right p-2 font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow className="border-t border-dashed"><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2">Net Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2">Rate</TableCell><TableCell className="text-right p-2 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow className="border-t border-dashed"><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="text-right p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2 text-destructive">Laboury (@{detailsCustomer.labouryRate.toFixed(2)})</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="p-2 text-destructive">Kanta</TableCell><TableCell className="text-right p-2 font-semibold text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow className="bg-primary/5"><TableCell className="p-2 font-extrabold text-primary">Net Payable Amount</TableCell><TableCell className="text-right p-2 text-xl font-extrabold text-primary">₹{Number(detailsCustomer.netAmount).toFixed(2)}</TableCell></TableRow>
-                                    </TableBody>
-                                </Table>
-                             </CardContent>
-                        </Card>
-                    </div>
-                )}
-                {/* Layout 3: Grid */}
-                {activeLayout === 'grid' && (
-                     <div className="space-y-4">
-                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-                            <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
-                            <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
-                            <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
-                             <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
-                            <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                            <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
-                            <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                            <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                            <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
-                            <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
-                            <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="md:col-span-3" />
-                         </div>
-                         <Separator />
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                             <Table className="text-sm">
-                                <TableBody>
-                                    <TableRow><TableCell className="p-2">Gross Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                    <TableRow><TableCell className="p-2">Teir Weight</TableCell><TableCell className="text-right p-2 font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                    <TableRow className="border-t border-dashed bg-muted/30"><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
-                                </TableBody>
-                            </Table>
-                             <Table className="text-sm">
-                                <TableBody>
-                                    <TableRow><TableCell className="p-2">Net Weight</TableCell><TableCell className="text-right p-2 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                    <TableRow><TableCell className="p-2">Rate</TableCell><TableCell className="text-right p-2 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                    <TableRow className="border-t border-dashed bg-muted/30"><TableCell className="p-2 font-bold">Total Amount</TableCell><TableCell className="text-right p-2 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                </TableBody>
-                            </Table>
-                         </div>
-                         <Separator />
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
-                             <DetailItem icon={<Percent size={14} />} label={`Karta (${detailsCustomer.kartaPercentage}%)`} value={`- ₹ ${detailsCustomer.kartaAmount.toFixed(2)}`} className="text-destructive" />
-                             <DetailItem icon={<Milestone size={14} />} label={`Laboury (@${detailsCustomer.labouryRate.toFixed(2)})`} value={`- ₹ ${detailsCustomer.labouryAmount.toFixed(2)}`} className="text-destructive" />
-                             <DetailItem icon={<Landmark size={14} />} label="Kanta" value={`- ₹ ${detailsCustomer.kanta.toFixed(2)}`} className="text-destructive" />
-                         </div>
-                        <Card className="border-primary/50 bg-primary/5 text-center mt-4">
-                            <CardContent className="p-3">
-                                <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
-                                <p className="text-3xl font-bold text-primary font-mono">
-                                    ₹{Number(detailsCustomer.netAmount).toFixed(2)}
-                                </p>
-                            </CardContent>
-                        </Card>
-                     </div>
-                )}
-                {/* Layout 4: Step-by-Step */}
-                {activeLayout === 'step-by-step' && (
-                  <div className="flex flex-col md:flex-row items-start justify-center gap-4">
-                      <div className="flex flex-col md:flex-row gap-4 flex-1 w-full">
-                        <div className="flex-1 space-y-4">
-                            <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><User size={16}/>Customer Details</CardTitle></CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-2">
-                                    <DetailItem icon={<Hash size={14} />} label="SR No." value={detailsCustomer.srNo} />
-                                    <DetailItem icon={<UserSquare size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
-                                    <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
-                                    <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} />
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><FileText size={16}/>Transaction Details</CardTitle></CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-2">
-                                    <DetailItem icon={<CalendarIcon size={14} />} label="Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                                    <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
-                                    <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                                    <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                    <DetailItem icon={<Receipt size={14} />} label="Receipt Type" value={detailsCustomer.receiptType} />
-                                    <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
-                                </CardContent>
-                            </Card>
-                        </div>
-                      </div>
-                      <div className="self-center p-2 hidden md:block">
-                          <ArrowRight className="text-muted-foreground"/>
-                      </div>
-                       <div className="flex-1 w-full">
-                          <Card>
-                              <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><Scale size={16}/>Weight Calculation</CardTitle></CardHeader>
-                              <CardContent className="p-4 pt-0">
-                                  <Table className="text-xs">
-                                      <TableBody>
-                                          <TableRow><TableCell className="p-1">Gross Weight</TableCell><TableCell className="text-right p-1 font-semibold">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                          <TableRow><TableCell className="p-1">Teir Weight</TableCell><TableCell className="text-right p-1 font-semibold">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                          <TableRow className="bg-muted/50"><TableCell className="p-2 font-bold">Final Weight</TableCell><TableCell className="text-right p-2 font-bold">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
-                                      </TableBody>
-                                  </Table>
-                              </CardContent>
-                          </Card>
-                      </div>
-                      <div className="self-center p-2 hidden md:block">
-                          <ArrowRight className="text-muted-foreground"/>
-                      </div>
-                       <div className="flex-1 w-full">
-                          <Card>
-                               <CardHeader className="p-4"><CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/>Financial Breakdown</CardTitle></CardHeader>
-                               <CardContent className="p-4 pt-0">
-                                  <Table className="text-xs">
-                                      <TableBody>
-                                          <TableRow><TableCell className="p-1">Net Weight</TableCell><TableCell className="text-right p-1 font-semibold">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                          <TableRow><TableCell className="p-1">Rate</TableCell><TableCell className="text-right p-1 font-semibold">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                          <TableRow className="border-t border-dashed"><TableCell className="p-1 font-bold">Total</TableCell><TableCell className="text-right p-1 font-bold">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                          <TableRow><TableCell className="p-1 text-destructive">Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
-                                          <TableRow><TableCell className="p-1 text-destructive">Laboury (@{detailsCustomer.labouryRate.toFixed(2)})</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
-                                          <TableRow><TableCell className="p-1 text-destructive">Kanta</TableCell><TableCell className="text-right p-1 font-semibold text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
-                                          <TableRow className="bg-primary/5"><TableCell className="p-2 font-extrabold text-primary">Net Payable</TableCell><TableCell className="text-right p-2 text-xl font-extrabold text-primary">₹{Number(detailsCustomer.netAmount).toFixed(2)}</TableCell></TableRow>
-                                      </TableBody>
-                                  </Table>
-                               </CardContent>
-                          </Card>
-                      </div>
                   </div>
                 )}
               </div>

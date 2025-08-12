@@ -3,8 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { initialTransactions, initialFundTransactions } from "@/lib/data";
-import type { FundTransaction, Transaction } from "@/lib/definitions";
+import type { FundTransaction } from "@/lib/definitions";
 import { toTitleCase, cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,7 @@ import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Sc
 import { format } from "date-fns";
 
 import { addFundTransaction, getFundTransactionsRealtime } from "@/lib/firestore";
-import { cashBankFormSchemas, type CapitalInflowValues, type WithdrawalValues, type DepositValues } from "./formSchemas"; // Assuming you will create this file
+import { cashBankFormSchemas, type CapitalInflowValues, type WithdrawalValues, type DepositValues } from "./formSchemas";
 
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
@@ -51,8 +50,6 @@ const TransactionFormCard = ({ title, description, children }: { title: string, 
 
 export default function CashBankClient() {
     const { toast } = useToast();
-    // We will likely fetch transactions from Firestore as well eventually, but for now, focus on fund transactions
-    // const [transactions, setTransactions] = useState<Transaction[]>([]); 
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [isClient, setIsClient] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -70,8 +67,9 @@ export default function CashBankClient() {
         return () => unsubscribe(); // Clean up the listener on component unmount
     }, [toast]);
 
-    const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(withdrawalSchema), defaultValues: { amount: 0, description: "" } });
-    const depositForm = useForm<DepositValues>({ resolver: zodResolver(depositSchema), defaultValues: { amount: 0, description: "" } });
+    const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(cashBankFormSchemas.capitalInflowSchema), defaultValues: { source: undefined, destination: undefined, amount: 0, description: "" } });
+    const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(cashBankFormSchemas.withdrawalSchema), defaultValues: { amount: 0, description: "" } });
+    const depositForm = useForm<DepositValues>({ resolver: zodResolver(cashBankFormSchemas.depositSchema), defaultValues: { amount: 0, description: "" } });
 
     const financialState = useMemo(() => {
         let bankBalance = 0;
@@ -92,48 +90,37 @@ export default function CashBankClient() {
             }
         });
 
-        transactions.forEach(t => {
-            if (t.transactionType === 'Income') {
-                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
-                if (t.paymentMethod === 'Cash') cashInHand += t.amount;
-            } else if (t.transactionType === 'Expense') {
-                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
-            }
-        });
+        // Note: The 'transactions' state is not being fetched. It should be fetched if needed for accurate calculations.
+        // For now, calculations are based only on fundTransactions.
         
-        // Note: Calculating total assets and liabilities based only on fund transactions and non-fund transactions 
-        // available here might not give a complete picture. A true balance sheet would require more data.
-        return { bankBalance, cashInHand, totalAssets: bankBalance + cashInHand, totalLiabilities }; // Simplified calculation
-    }, [fundTransactions]); // transactions dependency removed for now
+        return { bankBalance, cashInHand, totalAssets: bankBalance + cashInHand, totalLiabilities };
+    }, [fundTransactions]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
-        addFundTransaction(transaction)
+        return addFundTransaction(transaction)
             .then(() => {
                 toast({ title: "Success", description: "Transaction recorded successfully." });
             })
             .catch((error) => {
                 console.error("Error adding fund transaction:", error);
                 toast({ title: "Error", description: "Failed to record transaction.", variant: "destructive" });
+                throw error; // Re-throw to handle in the caller
             });
     };
     
     const onCapitalInflowSubmit = (values: CapitalInflowValues) => {
-        handleAddFundTransaction({ type: 'CapitalInflow', source: values.source, destination: values.destination, amount: values.amount, description: values.description });
-        // capitalInflowForm.reset(); // Reset on success handled by promise
+        handleAddFundTransaction({ type: 'CapitalInflow', source: values.source, destination: values.destination, amount: values.amount, description: values.description })
+          .then(() => capitalInflowForm.reset());
     };
 
     const onWithdrawalSubmit = (values: WithdrawalValues) => {
-        handleAddFundTransaction({ type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: values.amount, description: values.description });
-        // withdrawalForm.reset(); // Reset on success handled by promise
-    };
-
-    const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(cashBankFormSchemas.capitalInflowSchema), defaultValues: { source: undefined, destination: undefined, amount: 0, description: "" } });
+        handleAddFundTransaction({ type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: values.amount, description: values.description })
+          .then(() => withdrawalForm.reset());
     };
 
     const onDepositSubmit = (values: DepositValues) => {
-        handleAddFundTransaction({ type: 'BankDeposit', source: 'CashInHand', destination: 'BankAccount', amount: values.amount, description: values.description });
-        depositForm.reset();
+        handleAddFundTransaction({ type: 'BankDeposit', source: 'CashInHand', destination: 'BankAccount', amount: values.amount, description: values.description })
+          .then(() => depositForm.reset());
     };
 
     if (!isClient || loading) return <div>Loading...</div>; // Simple loading state
@@ -262,7 +249,7 @@ export default function CashBankClient() {
                                 ))}
                             </TableBody>
                         </Table>
-                    </div> {/* Added closing div */}
+                    </div>
                 </CardContent>
             </Card>
         </div>

@@ -11,6 +11,8 @@ import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
+
 
 export default function SalesReportsPage() {
   const [salesData, setSalesData] = useState<Customer[]>([]);
@@ -51,7 +53,6 @@ export default function SalesReportsPage() {
           labouryRate: docData.labouryRate,
           labouryAmount: docData.labouryAmount,
           kanta: docData.kanta,
-          otherCharges: docData.otherCharges,
           amount: docData.amount,
           netAmount: docData.netAmount,
           originalNetAmount: docData.originalNetAmount,
@@ -59,7 +60,6 @@ export default function SalesReportsPage() {
           receiptType: docData.receiptType,
           paymentType: docData.paymentType,
           customerId: docData.customerId,
-          searchValue: docData.searchValue,
           payments: docData.payments || [], // Assuming payments might be stored here
         };
         data.push(customer);
@@ -73,14 +73,13 @@ export default function SalesReportsPage() {
     }, (error) => {
       console.error("Error fetching sales data:", error);
       setLoading(false);
-      // Optionally show an error message to the user
     });
 
     return () => unsubscribe();
   }, []);
 
   if (loading) {
-    return <div className="flex justify-center items-center h-64"><Progress value={null} /> Loading Reports...</div>;
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading Reports...</div>;
   }
 
   if (salesData.length === 0) {
@@ -126,7 +125,7 @@ export default function SalesReportsPage() {
                     <TableCell className="font-mono px-3 py-2 text-sm">{sale.srNo}</TableCell>
                     <TableCell className="px-3 py-2 text-sm">{sale.name}</TableCell>
                     <TableCell className="px-3 py-2 text-sm">{sale.variety}</TableCell>
-                    <TableCell className="text-right font-semibold px-3 py-2 text-sm">{formatCurrency(sale.netAmount)}</TableCell>
+                    <TableCell className="text-right font-semibold px-3 py-2 text-sm">{formatCurrency(Number(sale.netAmount))}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 interface Task {
   id: string;
@@ -20,12 +22,12 @@ interface Task {
   updatedAt: Date;
 }
 
-const TasksPage = () => {
+export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [newTask, setNewTask] = useState({ name: "", description: "", status: "todo" });
+  const [newTask, setNewTask] = useState<{name: string; description: string; status: "todo" | "in-progress" | "done"}>({ name: "", description: "", status: "todo" });
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
@@ -103,7 +105,6 @@ const TasksPage = () => {
     return <div>Loading tasks...</div>; // Basic loading state
   }
 
-export default function TasksPage() {
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-2xl font-bold mb-4">Task Management</h1>
@@ -166,16 +167,16 @@ export default function TasksPage() {
               <Label htmlFor="status" className="text-right">
                 Status
               </Label>
-               <select
-                  id="status"
-                  value={newTask.status}
-                  onChange={(e) => setNewTask({ ...newTask, status: e.target.value as "todo" | "in-progress" | "done" })}
-                  className="col-span-3 border rounded-md p-2"
-               >
-                 <option value="todo">Todo</option>
-                 <option value="in-progress">In Progress</option>
-                 <option value="done">Done</option>
-               </select>
+               <Select onValueChange={(value: "todo" | "in-progress" | "done") => setNewTask({ ...newTask, status: value })} value={newTask.status}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todo">Todo</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
             </div>
           </div>
           <DialogFooter>
@@ -218,16 +219,16 @@ export default function TasksPage() {
                 <Label htmlFor="edit-status" className="text-right">
                   Status
                 </Label>
-                 <select
-                    id="edit-status"
-                    value={editingTask.status}
-                    onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value as "todo" | "in-progress" | "done" })}
-                    className="col-span-3 border rounded-md p-2"
-                 >
-                   <option value="todo">Todo</option>
-                   <option value="in-progress">In Progress</option>
-                   <option value="done">Done</option>
-                 </select>
+                 <Select onValueChange={(value: "todo" | "in-progress" | "done") => setEditingTask({ ...editingTask, status: value })} value={editingTask.status}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todo">Todo</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
