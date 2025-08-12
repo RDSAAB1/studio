@@ -38,6 +38,10 @@ export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<C
 }
 
 export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
+  if (!id) {
+    console.error("updateSupplier requires a valid ID.");
+    return false;
+  }
   const supplierRef = doc(db, "suppliers", id);
   const supplierDoc = await getDoc(supplierRef);
 
@@ -57,10 +61,13 @@ export async function deleteSupplier(id: string): Promise<void> {
 
 export function getCustomersRealtime(callback: (customers: Customer[]) => void, onError: (error: Error) => void): () => void {
   const q = query(customersCollection, orderBy("customerId", "asc"));
-  onSnapshot(q, (querySnapshot) => {
+  return onSnapshot(q, (querySnapshot) => {
     const customers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
     callback(customers);
-  }, onError);
+  }, (error) => {
+      console.error("Error fetching customers in real-time:", error);
+      onError(error);
+  });
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<string> {
@@ -86,11 +93,6 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
 export async function deleteCustomer(id: string): Promise<void> {
     await deleteDoc(doc(db, "customers", id));
 }
-
-export const updateCustomerFirestore = async (id: string, data: Partial<Customer>): Promise<void> => {
-    const customerRef = doc(db, "customers", id);
-    await updateDoc(customerRef, data);
-};
 
 // --- Inventory Item Functions ---
 // (These are assumed from inventory page, keeping them for completeness)
@@ -120,20 +122,21 @@ export async function addPayment(paymentData: Omit<Payment, 'id'> & { id?: strin
 }
 
 export async function updatePayment(id: string, paymentData: Partial<Payment>): Promise<boolean> {
-  if (!id) {
-      console.error("updatePayment requires a valid ID.");
-      return false;
-  }
-  try {
-    const paymentRef = doc(db, "payments", id);
-    // Using set with merge to handle both update and create-if-not-exist scenarios during editing.
-    await setDoc(paymentRef, paymentData, { merge: true });
-    return true;
-  } catch (error) {
-    console.error("Error in updatePayment:", error);
-    throw error;
-  }
+    if (!id) {
+        console.error("updatePayment requires a valid ID.");
+        return false;
+    }
+    try {
+        const paymentRef = doc(db, "payments", id);
+        // Using set with merge to handle both update and create-if-not-exist scenarios during editing.
+        await setDoc(paymentRef, paymentData, { merge: true });
+        return true;
+    } catch (error) {
+        console.error("Error in updatePayment:", error);
+        return false; // Return false on error
+    }
 }
+
 
 export async function deletePayment(id: string): Promise<void> {
   await deleteDoc(doc(db, "payments", id));
