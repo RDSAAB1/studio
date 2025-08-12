@@ -26,8 +26,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore";
+import { addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore";
 import { DocumentData, QuerySnapshot, onSnapshot, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -598,7 +599,7 @@ export default function CustomerEntryClient() {
     setIsClient(true);
     setLoading(true);
 
-    const unsubscribe = onSnapshot(collection(getCustomers), (snapshot: QuerySnapshot<DocumentData>) => {
+    const unsubscribe = onSnapshot(collection(db, "customers"), (snapshot: QuerySnapshot<DocumentData>) => {
       const fetchedCustomers: Customer[] = snapshot.docs.map(doc => {
         const data = doc.data();
         // Basic validation and mapping to Customer type
@@ -765,11 +766,10 @@ export default function CustomerEntryClient() {
       term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`, // Keep existing customerId logic or refine
     };
     if (isEditing) {
-      setCustomers(prev => prev.map(c => c.id === completeEntry.id ? completeEntry : c));
+      await updateCustomer(completeEntry.id, completeEntry);
       toast({ title: "Success", description: "Entry updated successfully." });
     } else {
-      const newEntry = { ...completeEntry, id: Date.now().toString() };
-      setCustomers(prev => [newEntry, ...prev]);
+      await addCustomer(completeEntry);
       toast({ title: "Success", description: "New entry saved successfully." });
     }
     handleNew();
@@ -816,7 +816,7 @@ export default function CustomerEntryClient() {
               <Button type="submit" size="sm">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
               </Button>
-              <Button type="button" variant="outline" onClick={handleNew} size="sm">
+              <Button type="button" variant="outline" onClick={() => handleNew()} size="sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
               </Button>
             </div>

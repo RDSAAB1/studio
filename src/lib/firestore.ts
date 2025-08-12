@@ -55,12 +55,6 @@ export function getCustomersRealtime(callback: (customers: Customer[]) => void, 
   }, onError);
 }
 
-
-export async function getCustomers() {
-    const querySnapshot = await getDocs(customersCollection);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-}
-
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<string> {
     const docRef = await addDoc(customersCollection, customerData);
     return docRef.id;
