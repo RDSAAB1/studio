@@ -727,8 +727,12 @@ export default function CustomerEntryClient() {
 
     try {
         if (isEditing && completeEntry.id) {
-            await updateCustomer(completeEntry.id, completeEntry);
-            toast({ title: "Success", description: "Entry updated successfully." });
+            const updateSuccessful = await updateCustomer(completeEntry.id, completeEntry);
+            if (updateSuccessful) {
+                toast({ title: "Success", description: "Entry updated successfully." });
+            } else {
+                toast({ title: "Error", description: "Customer not found. Cannot update.", variant: "destructive" });
+            }
         } else {
             const { id, ...newEntryData } = completeEntry;
             await addCustomer(newEntryData);

@@ -657,16 +657,19 @@ export default function SupplierEntryClient() {
     };
     if (isEditing && completeEntry.id) {
       updateSupplier(completeEntry.id, completeEntry)
-        .then(() => {
-          toast({ title: "Success", description: "Entry updated successfully." });
-          handleNew();
-        })
-        .catch((error) => {
-          console.error("Error updating supplier: ", error);
-          toast({ title: "Error", description: "Failed to update entry.", variant: "destructive" });
-        });
+        .then((success) => {
+          if (success) {
+            toast({ title: "Success", description: "Entry updated successfully." });
+            handleNew();
+          } else {
+            toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
+          }
+        }).catch((error) => {
+             console.error("Error updating supplier: ", error);
+             toast({ title: "Error", description: "Failed to update entry.", variant: "destructive" });
+           });
     } else {
-      const { id, ...newEntryData } = completeEntry;
+      const { id, ...newEntryData } = completeEntry; // Destructure to omit the ID field
       addSupplier(newEntryData)
         .then(() => {
           toast({ title: "Success", description: "New entry saved successfully." });

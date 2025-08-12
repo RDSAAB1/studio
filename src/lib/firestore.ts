@@ -12,6 +12,7 @@ import {
   where,
   onSnapshot,
   limit,
+  setDoc,
 } from "firebase/firestore";
 import type { Customer, FundTransaction, Payment, Transaction } from "@/lib/definitions";
 
@@ -36,9 +37,16 @@ export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<C
   return { id: docRef.id, ...supplierData };
 }
 
-export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<void> {
+export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
   const supplierRef = doc(db, "suppliers", id);
+  const supplierDoc = await getDoc(supplierRef);
+
+  if (!supplierDoc.exists()) {
+    console.error(`FirebaseError: No document to update: suppliers/${id}`);
+    return false;
+  }
   await updateDoc(supplierRef, supplierData);
+  return true;
 }
 
 export async function deleteSupplier(id: string): Promise<void> {
@@ -60,12 +68,19 @@ export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<s
     return docRef.id;
 }
 
-export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<void> {
+export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
     if (!id) {
-        throw new Error("Update failed: Document ID is missing.");
+        console.error("updateCustomer requires a valid ID.");
+        return false;
     }
     const customerRef = doc(db, "customers", id);
-    await updateDoc(customerRef, customerData);
+    const customerDoc = await getDoc(customerRef);
+    if (!customerDoc.exists()) {
+        console.error(`FirebaseError: No document to update: customers/${id}`);
+        return false;
+    }
+    await updateDoc(customerRef, customerData as any);
+    return true;
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
@@ -99,14 +114,25 @@ export async function deleteInventoryItem(id: string) {
 
 // --- Payment Functions ---
 
-export async function addPayment(paymentData: Omit<Payment, 'paymentId'> & { paymentId?: string }): Promise<Payment> {
+export async function addPayment(paymentData: Omit<Payment, 'id'> & { id?: string }): Promise<Payment> {
   const docRef = await addDoc(paymentsCollection, paymentData);
   return { id: docRef.id, ...paymentData } as Payment;
 }
 
-export async function updatePayment(paymentData: Payment): Promise<void> {
-    const paymentRef = doc(db, "payments", paymentData.paymentId);
-    await updateDoc(paymentRef, paymentData);
+export async function updatePayment(id: string, paymentData: Partial<Payment>): Promise<boolean> {
+  if (!id) {
+      console.error("updatePayment requires a valid ID.");
+      return false;
+  }
+  try {
+    const paymentRef = doc(db, "payments", id);
+    // Using set with merge to handle both update and create-if-not-exist scenarios during editing.
+    await setDoc(paymentRef, paymentData, { merge: true });
+    return true;
+  } catch (error) {
+    console.error("Error in updatePayment:", error);
+    throw error;
+  }
 }
 
 export async function deletePayment(id: string): Promise<void> {

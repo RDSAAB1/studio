@@ -95,6 +95,9 @@ export default function SupplierPaymentsPage() {
     const unsubscribePayments = getPaymentsRealtime((fetchedPayments) => {
       setPaymentHistory(fetchedPayments);
       setPaymentId(getNextPaymentId(fetchedPayments));
+    }, (error) => {
+        console.error("Error fetching payments:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
     });
 
     return () => {
@@ -293,12 +296,11 @@ export default function SupplierPaymentsPage() {
       });
   };
 
-  const handleEditPayment = (payment: Payment) => {
+  const handleEditPayment = async (payment: Payment) => {
     const paymentToEdit = paymentHistory.find(p => p.paymentId === payment.paymentId);
     if (!paymentToEdit) return;
 
     // Revert the state change from this payment
-    let tempAmountToRestore = paymentToEdit.amount + paymentToEdit.cdAmount;
     const customerUpdatesPromises = (paymentToEdit.paidFor || []).map(async paidForEntry => {
         const customer = suppliers.find(c => c.srNo === paidForEntry.srNo);
         if (!customer) return; // Should not happen if data is consistent
@@ -306,15 +308,12 @@ export default function SupplierPaymentsPage() {
             const amountToRestoreForThisEntry = paidForEntry.amount;
             const currentNet = Number(customer.netAmount);
             const newNet = currentNet + amountToRestoreForThisEntry;
-             // Update customer's netAmount in Firestore
             await updateCustomer(customer.id!, { netAmount: newNet });
         }
     });
 
-    // Remove the payment from history temporarily
-    // We don't remove from state directly because Firestore listener will handle it.
-    deletePayment(payment.paymentId);
-
+    await Promise.all(customerUpdatesPromises);
+    
     // Set form for editing
     setEditingPaymentId(payment.paymentId);
     setPaymentId(payment.paymentId);
@@ -324,35 +323,38 @@ export default function SupplierPaymentsPage() {
     setCalculatedCdAmount(payment.cdAmount);
 
     const srNosInPayment = (payment.paidFor || []).map(pf => pf.srNo);
-    // Find entry IDs based on srNos
     const entryIdsToSelect = new Set(suppliers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
     setSelectedEntryIds(entryIdsToSelect);
     
     toast({ title: "Editing Payment", description: `Editing payment ${payment.paymentId}. Please make your changes and click 'Update Payment'.`});
   };
 
-  const handleUpdatePayment = () => {
+  const handleUpdatePayment = async () => {
     if (!editingPaymentId || !selectedCustomerKey) return;
-    
+
+    // First delete the old payment to avoid conflicts, then add the new one.
+    await deletePayment(editingPaymentId);
+
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const paidForDetails: PaidFor[] = [];
-    
-     const customerUpdatesPromises = suppliers.map(async c => {
-        if(selectedEntryIds.has(c.id)){
-             const outstanding = parseFloat(String(c.netAmount));
-             if (remainingPayment > 0) {
-                 const amountToPay = Math.min(outstanding, remainingPayment);
-                 remainingPayment -= amountToPay;
-                 const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
-                 paidForDetails.push({ id: c.id, srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-                 // Update customer's netAmount in Firestore
-                 await updateCustomer(c.id!, { netAmount: outstanding - amountToPay });
-             }
-        }
-        return c;
-    });
+
+    const customerUpdatesPromises = suppliers
+        .filter(c => selectedEntryIds.has(c.id))
+        .map(async c => {
+            const outstanding = parseFloat(String(c.netAmount));
+            if (remainingPayment > 0) {
+                const amountToPay = Math.min(outstanding, remainingPayment);
+                remainingPayment -= amountToPay;
+                const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === c.id);
+                paidForDetails.push({ id: c.id, srNo: c.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                await updateCustomer(c.id!, { netAmount: outstanding - amountToPay });
+            }
+        });
+
+    await Promise.all(customerUpdatesPromises);
+
     const updatedPayment: Payment = {
-        paymentId: paymentId || editingPaymentId,
+        paymentId: editingPaymentId, // Use the same ID
         customerId: selectedCustomerKey,
         date: new Date().toISOString().split("T")[0],
         amount: paymentAmount,
@@ -363,12 +365,16 @@ export default function SupplierPaymentsPage() {
         notes: `Paid for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
         paidFor: paidForDetails
     };
-    
-     updatePayment(updatedPayment)
-      .then(() => {
+
+    // Since we deleted, we now add the payment back with the same ID
+    const success = await updatePayment(updatedPayment.paymentId, updatedPayment);
+
+    if (success) {
         clearForm();
         toast({ title: "Success", description: "Payment updated successfully.", duration: 3000 });
-      });
+    } else {
+        toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
+    }
   };
   
   const handleDeletePayment = (paymentIdToDelete: string, silent = false) => {
