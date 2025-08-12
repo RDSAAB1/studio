@@ -575,6 +575,7 @@ export default function SupplierEntryClient() {
     const customerToEdit = safeCustomers.find(c => c.id === id);
     if (customerToEdit) {
       setIsEditing(true);
+      setCurrentCustomer(customerToEdit); // Explicitly set the full customer object with ID
       resetFormToState(customerToEdit);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -589,6 +590,7 @@ export default function SupplierEntryClient() {
     const foundCustomer = safeCustomers.find(c => c.srNo === formattedSrNo);
     if (foundCustomer) {
         setIsEditing(true);
+        setCurrentCustomer(foundCustomer); // Explicitly set the full customer object with ID
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
@@ -657,6 +659,7 @@ export default function SupplierEntryClient() {
       updateSupplier(completeEntry.id, completeEntry)
         .then(() => {
           toast({ title: "Success", description: "Entry updated successfully." });
+          handleNew();
         })
         .catch((error) => {
           console.error("Error updating supplier: ", error);
@@ -667,14 +670,13 @@ export default function SupplierEntryClient() {
       addSupplier(newEntryData)
         .then(() => {
           toast({ title: "Success", description: "New entry saved successfully." });
+          handleNew();
         })
         .catch((error) => {
           console.error("Error adding supplier: ", error);
           toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
         });
     }
-
-    handleNew();
   };
   
   const handleShowDetails = (customer: Customer) => {
