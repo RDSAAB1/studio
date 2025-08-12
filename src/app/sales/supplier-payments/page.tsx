@@ -2,7 +2,6 @@
 
 "use client";
 
-import { initialCustomers } from "@/lib/data";
 import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn } from "@/lib/utils";
 import {
@@ -36,11 +35,11 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { addPayment, deletePayment, updateCustomer, updatePayment, getCustomersRealtime, getPaymentsRealtime } from '@/lib/firestore';
+import { addPayment, deletePayment, updateCustomer, updatePayment, getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -62,7 +61,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 
 export default function SupplierPaymentsPage() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -76,13 +75,21 @@ export default function SupplierPaymentsPage() {
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
     setIsClient(true);
-    const unsubscribeCustomers = getCustomersRealtime((fetchedCustomers) => {
-      setCustomers(fetchedCustomers);
+    setLoading(true);
+
+    const unsubscribeSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
+      setSuppliers(fetchedSuppliers);
+      setLoading(false);
+    }, (error) => {
+        console.error("Error fetching suppliers:", error);
+        toast({ variant: 'destructive', title: "Error", description: "Failed to load supplier data." });
+        setLoading(false);
     });
 
     const unsubscribePayments = getPaymentsRealtime((fetchedPayments) => {
@@ -91,7 +98,7 @@ export default function SupplierPaymentsPage() {
     });
 
     return () => {
-      unsubscribeCustomers();
+      unsubscribeSuppliers();
       unsubscribePayments();
     };
   }, []);
@@ -100,12 +107,12 @@ export default function SupplierPaymentsPage() {
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
     
-    customers.forEach(c => {
-        if (!c.customerId) return;
-        if (!summary.has(c.customerId)) {
-            summary.set(c.customerId, {
-                name: c.name,
-                contact: c.contact,
+    suppliers.forEach(s => {
+        if (!s.customerId) return;
+        if (!summary.has(s.customerId)) {
+            summary.set(s.customerId, {
+                name: s.name,
+                contact: s.contact,
                 totalOutstanding: 0,
                 paymentHistory: [],
                 totalAmount: 0,
@@ -115,15 +122,15 @@ export default function SupplierPaymentsPage() {
         }
     });
 
-    customers.forEach(customer => {
-        if (!customer.customerId) return;
-        const data = summary.get(customer.customerId)!;
-        const netAmount = parseFloat(String(customer.netAmount));
+    suppliers.forEach(supplier => {
+        if (!supplier.customerId) return;
+        const data = summary.get(supplier.customerId)!;
+        const netAmount = parseFloat(String(supplier.netAmount));
         data.totalOutstanding += netAmount;
     });
     
     return summary;
-  }, [customers]);
+  }, [suppliers]);
 
   const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
     const lastPaymentNum = currentPayments.reduce((max, p) => {
@@ -151,8 +158,8 @@ export default function SupplierPaymentsPage() {
   };
 
   const selectedEntries = useMemo(() => {
-    return customers.filter(c => selectedEntryIds.has(c.id));
-  }, [customers, selectedEntryIds]);
+    return suppliers.filter(s => selectedEntryIds.has(s.id));
+  }, [suppliers, selectedEntryIds]);
   
   const totalOutstandingForSelected = useMemo(() => {
     return selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0);
@@ -252,7 +259,7 @@ export default function SupplierPaymentsPage() {
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const paidForDetails: PaidFor[] = [];
 
-    const customerUpdatesPromises = customers.map(async c => {
+    const customerUpdatesPromises = suppliers.map(async c => {
         if(selectedEntryIds.has(c.id)){
              const outstanding = parseFloat(String(c.netAmount));
              if (remainingPayment > 0) {
@@ -293,7 +300,7 @@ export default function SupplierPaymentsPage() {
     // Revert the state change from this payment
     let tempAmountToRestore = paymentToEdit.amount + paymentToEdit.cdAmount;
     const customerUpdatesPromises = (paymentToEdit.paidFor || []).map(async paidForEntry => {
-        const customer = customers.find(c => c.srNo === paidForEntry.srNo);
+        const customer = suppliers.find(c => c.srNo === paidForEntry.srNo);
         if (!customer) return; // Should not happen if data is consistent
         if (paidForEntry) {
             const amountToRestoreForThisEntry = paidForEntry.amount;
@@ -318,7 +325,7 @@ export default function SupplierPaymentsPage() {
 
     const srNosInPayment = (payment.paidFor || []).map(pf => pf.srNo);
     // Find entry IDs based on srNos
-    const entryIdsToSelect = new Set(customers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
+    const entryIdsToSelect = new Set(suppliers.filter(c => srNosInPayment.includes(c.srNo)).map(c => c.id));
     setSelectedEntryIds(entryIdsToSelect);
     
     toast({ title: "Editing Payment", description: `Editing payment ${payment.paymentId}. Please make your changes and click 'Update Payment'.`});
@@ -330,7 +337,7 @@ export default function SupplierPaymentsPage() {
     let remainingPayment = paymentAmount + calculatedCdAmount;
     const paidForDetails: PaidFor[] = [];
     
-     const customerUpdatesPromises = customers.map(async c => {
+     const customerUpdatesPromises = suppliers.map(async c => {
         if(selectedEntryIds.has(c.id)){
              const outstanding = parseFloat(String(c.netAmount));
              if (remainingPayment > 0) {
@@ -372,7 +379,7 @@ export default function SupplierPaymentsPage() {
     
     // Restore outstanding amounts for affected customers
      const customerRestorations = (paymentToDelete.paidFor || []).map(async paidForEntry => {
-        const customer = customers.find(c => c.srNo === paidForEntry.srNo);
+        const customer = suppliers.find(c => c.srNo === paidForEntry.srNo);
         if (!customer) return;
         if (paidForEntry) {
             const amountToRestoreForThisEntry = paidForEntry.amount;
@@ -421,8 +428,8 @@ export default function SupplierPaymentsPage() {
   };
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
-  const outstandingEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) > 0) : [], [customers, selectedCustomerKey, customerIdKey]);
-  const paidEntries = useMemo(() => selectedCustomerKey ? customers.filter(c => c.customerId === customerIdKey && parseFloat(String(c.netAmount)) === 0) : [], [customers, selectedCustomerKey, customerIdKey]);
+  const outstandingEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
+  const paidEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) === 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
   const currentPaymentHistory = useMemo(() => selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [paymentHistory, selectedCustomerKey]);
   
   const availableCdOptions = useMemo(() => {
@@ -437,6 +444,15 @@ export default function SupplierPaymentsPage() {
   if (!isClient) {
     return null;
   }
+  
+  if (loading) {
+      return (
+          <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-4 text-muted-foreground">Loading Supplier Data...</span>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-8">
@@ -447,7 +463,7 @@ export default function SupplierPaymentsPage() {
               <h3 className="text-base font-semibold">Select Supplier</h3>
           </div>
           <div className="w-full sm:w-auto sm:min-w-64">
-            <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || undefined}>
+            <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ""}>
               <SelectTrigger className="w-full h-9 text-sm">
                 <SelectValue placeholder="Select a supplier to process payments" />
               </SelectTrigger>
@@ -463,7 +479,7 @@ export default function SupplierPaymentsPage() {
         </CardContent>
       </Card>
 
-      {selectedCustomerKey && (
+      {selectedCustomerKey ? (
         <>
           <Card>
             <CardHeader><CardTitle>Outstanding Entries</CardTitle></CardHeader>
@@ -654,6 +670,10 @@ export default function SupplierPaymentsPage() {
             </CardContent>
           </Card>
         </>
+      ) : (
+        <div className="text-center py-10 text-muted-foreground">
+            <p>Please select a supplier to view their payment details.</p>
+        </div>
       )}
 
       <Dialog open={!!detailsPayment} onOpenChange={(open) => !open && setDetailsPayment(null)}>
