@@ -277,12 +277,17 @@ export default function SupplierPaymentsPage() {
             selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
 
             const involvedSupplierDocs = new Map<string, any>();
+            const outstandingBalances = new Map<string, number>();
+
             for (const srNo of allInvolvedSrNos) {
                 const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
                 if (supplierToUpdate) {
                     const docRef = doc(db, "suppliers", supplierToUpdate.id);
                     const supplierDoc = await transaction.get(docRef);
-                    involvedSupplierDocs.set(srNo, supplierDoc);
+                    if (supplierDoc.exists()) {
+                        involvedSupplierDocs.set(srNo, supplierDoc);
+                        outstandingBalances.set(srNo, Number(supplierDoc.data().netAmount));
+                    }
                 }
             }
             
@@ -291,13 +296,9 @@ export default function SupplierPaymentsPage() {
             // 2. If editing, revert the old payment's effect first.
             if (tempEditingPayment) {
                 (tempEditingPayment.paidFor || []).forEach(detail => {
-                    const supplierDoc = involvedSupplierDocs.get(detail.srNo);
-                    if (supplierDoc && supplierDoc.exists()) {
-                        const currentNetAmount = Number(supplierDoc.data().netAmount);
-                        const newNetAmount = currentNetAmount + detail.amount;
-                        transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
-                        // Update the in-memory doc for the next step
-                        involvedSupplierDocs.set(detail.srNo, { ...supplierDoc, data: () => ({ ...supplierDoc.data(), netAmount: newNetAmount }) });
+                    if(outstandingBalances.has(detail.srNo)) {
+                       const currentBalance = outstandingBalances.get(detail.srNo)!;
+                       outstandingBalances.set(detail.srNo, currentBalance + detail.amount);
                     }
                 });
             }
@@ -309,21 +310,29 @@ export default function SupplierPaymentsPage() {
             const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
             sortedEntries.forEach(entryData => {
-                const supplierDoc = involvedSupplierDocs.get(entryData.srNo);
-                if (!supplierDoc || !supplierDoc.exists()) throw new Error(`Supplier ${entryData.id} not found.`);
-                
-                let outstanding = Number(supplierDoc.data().netAmount);
+                const currentOutstanding = outstandingBalances.get(entryData.srNo);
 
-                if (remainingPayment > 0) {
-                    const amountToPay = Math.min(outstanding, remainingPayment);
+                if (remainingPayment > 0 && typeof currentOutstanding !== 'undefined') {
+                    const amountToPay = Math.min(currentOutstanding, remainingPayment);
                     remainingPayment -= amountToPay;
                     const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
                     paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
-                    transaction.update(supplierDoc.ref, { netAmount: outstanding - amountToPay });
+                    
+                    // Update the balance in our temporary map
+                    outstandingBalances.set(entryData.srNo, currentOutstanding - amountToPay);
                 }
             });
 
-            // 4. Create or update the payment document.
+            // 4. Commit all updates to the actual documents
+            for (const [srNo, newBalance] of outstandingBalances.entries()) {
+                const supplierDoc = involvedSupplierDocs.get(srNo);
+                if(supplierDoc){
+                    transaction.update(supplierDoc.ref, { netAmount: newBalance });
+                }
+            }
+
+
+            // 5. Create or update the payment document.
             const paymentData: Omit<Payment, 'id'> = {
               paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
               customerId: selectedCustomerKey,
