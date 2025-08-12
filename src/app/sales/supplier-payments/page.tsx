@@ -362,6 +362,8 @@ export default function SupplierPaymentsPage() {
 
         await deletePayment(paymentIdToDelete);
 
+        setPaymentHistory(prev => prev.filter(p => p.paymentId !== paymentIdToDelete));
+
         if (!silent) {
             toast({ title: 'Payment Deleted', description: `Payment ${paymentIdToDelete} has been removed and outstanding amounts updated.`, duration: 3000 });
         }
@@ -408,7 +410,7 @@ export default function SupplierPaymentsPage() {
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
-  const paidEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) === 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
+  const paidEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) === 0 && s.originalNetAmount > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
   
   const currentPaymentHistory = useMemo(() => {
     if (!selectedCustomerKey) return [];

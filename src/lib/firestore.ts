@@ -13,6 +13,7 @@ import {
   onSnapshot,
   limit,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import type { Customer, FundTransaction, Payment, Transaction } from "@/lib/definitions";
 
@@ -143,7 +144,8 @@ export async function deletePayment(id: string): Promise<void> {
         console.error("deletePayment requires a valid ID.");
         return;
     }
-    await deleteDoc(doc(db, "payments", id));
+    const paymentRef = doc(db, "payments", id);
+    await deleteDoc(paymentRef);
 }
 
 export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onError: (error: Error) => void): () => void {
