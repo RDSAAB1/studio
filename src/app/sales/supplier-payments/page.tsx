@@ -198,18 +198,9 @@ export default function SupplierPaymentsPage() {
 
   useEffect(() => {
     if (paymentType === 'Full' && !editingPayment) {
-      if (cdEnabled && cdAt !== 'payment_amount') {
-        setPaymentAmount(totalOutstandingForSelected - calculatedCdAmount);
-      } else {
         setPaymentAmount(totalOutstandingForSelected);
-      }
-    } else if (paymentType === 'Partial' && !editingPayment) {
-      setPaymentAmount(0);
-      if(cdEnabled && cdAt !== 'payment_amount'){
-          setCdAt('payment_amount');
-      }
     }
-  }, [paymentType, totalOutstandingForSelected, cdEnabled, cdAt, calculatedCdAmount, editingPayment]);
+  }, [paymentType, totalOutstandingForSelected, editingPayment]);
 
   useEffect(() => {
     autoSetCDToggle();
@@ -279,39 +270,34 @@ export default function SupplierPaymentsPage() {
             
             // --- READ PHASE ---
             // 1. Get all documents that will be involved in the transaction.
-            
-            // Documents to revert if we are editing
-            const suppliersToRevertRefs = [];
+            const allInvolvedSrNos = new Set<string>();
             if (tempEditingPayment) {
-                for (const detail of tempEditingPayment.paidFor || []) {
-                    const supplierToUpdate = suppliers.find(s => s.srNo === detail.srNo);
-                    if (supplierToUpdate) {
-                        suppliersToRevertRefs.push(doc(db, "suppliers", supplierToUpdate.id));
-                    }
+                (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
+            }
+            selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
+
+            const involvedSupplierDocs = new Map<string, any>();
+            for (const srNo of allInvolvedSrNos) {
+                const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
+                if (supplierToUpdate) {
+                    const docRef = doc(db, "suppliers", supplierToUpdate.id);
+                    const supplierDoc = await transaction.get(docRef);
+                    involvedSupplierDocs.set(srNo, supplierDoc);
                 }
             }
-            const revertedSupplierDocs = await Promise.all(suppliersToRevertRefs.map(ref => transaction.get(ref)));
-
-            // Documents to update with the new payment
-            const sortedEntries = Array.from(selectedEntryIds)
-              .map(id => suppliers.find(s => s.id === id))
-              .filter((c): c is Customer => !!c)
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             
-            const suppliersToUpdateRefs = sortedEntries.map(entry => doc(db, "suppliers", entry.id));
-            const updatedSupplierDocs = await Promise.all(suppliersToUpdateRefs.map(ref => transaction.get(ref)));
-
-
             // --- WRITE PHASE ---
             
             // 2. If editing, revert the old payment's effect first.
             if (tempEditingPayment) {
-                revertedSupplierDocs.forEach((supplierDoc, index) => {
-                    const detail = (tempEditingPayment.paidFor || [])[index];
-                    if (supplierDoc.exists()) {
+                (tempEditingPayment.paidFor || []).forEach(detail => {
+                    const supplierDoc = involvedSupplierDocs.get(detail.srNo);
+                    if (supplierDoc && supplierDoc.exists()) {
                         const currentNetAmount = Number(supplierDoc.data().netAmount);
                         const newNetAmount = currentNetAmount + detail.amount;
                         transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
+                        // Update the in-memory doc for the next step
+                        involvedSupplierDocs.set(detail.srNo, { ...supplierDoc, data: () => ({ ...supplierDoc.data(), netAmount: newNetAmount }) });
                     }
                 });
             }
@@ -320,20 +306,13 @@ export default function SupplierPaymentsPage() {
             let remainingPayment = paymentAmount + calculatedCdAmount;
             const paidForDetails: PaidFor[] = [];
 
-            updatedSupplierDocs.forEach((supplierDoc, index) => {
-                const entryData = sortedEntries[index];
-                if (!supplierDoc.exists()) throw new Error(`Supplier ${entryData.id} not found.`);
-                
-                // Use the live data from the transaction for calculation.
-                let outstanding = Number(supplierDoc.data().netAmount);
+            const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-                // If we are editing, we need to consider the reverted amount for the current transaction run
-                if(tempEditingPayment) {
-                    const revertDetail = tempEditingPayment.paidFor?.find(d => d.srNo === entryData.srNo);
-                    if(revertDetail) {
-                        outstanding += revertDetail.amount;
-                    }
-                }
+            sortedEntries.forEach(entryData => {
+                const supplierDoc = involvedSupplierDocs.get(entryData.srNo);
+                if (!supplierDoc || !supplierDoc.exists()) throw new Error(`Supplier ${entryData.id} not found.`);
+                
+                let outstanding = Number(supplierDoc.data().netAmount);
 
                 if (remainingPayment > 0) {
                     const amountToPay = Math.min(outstanding, remainingPayment);
@@ -590,7 +569,7 @@ export default function SupplierPaymentsPage() {
                       </div>
                       <div className="space-y-2">
                           <Label htmlFor="payment-amount">Payment Amount</Label>
-                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && cdAt !== 'payment_amount' && !editingPayment} />
+                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && !editingPayment} />
                       </div>
                       <TooltipProvider>
                         <Tooltip>
