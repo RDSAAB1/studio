@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -54,7 +54,8 @@ const formSchema = z.object({
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
     receiptType: z.string().min(1, "Receipt type is required"),
-    paymentType: z.string().min(1, "Payment type is required")
+    paymentType: z.string().min(1, "Payment type is required"),
+    detailsCustomer: z.custom<Customer | null>().optional()
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -557,8 +558,8 @@ export default function CustomerEntryClient() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       srNo: currentCustomer.srNo, date: new Date(), term: 0, name: "", so: "", address: "", contact: "",
-      vehicleNo: "", variety: "", grossWeight: 0, teirWeight: 0, rate: 0, kartaPercentage: 0, detailsCustomer:null,
-      labouryRate: 0, kanta: 0, receiptType: "Cash", paymentType: "Full"
+      vehicleNo: "", variety: "", grossWeight: 0, teirWeight: 0, rate: 0, kartaPercentage: 0,
+      labouryRate: 0, kanta: 0, receiptType: "Cash", paymentType: "Full", detailsCustomer:null,
     },
   });
   const detailsCustomer = form.watch("detailsCustomer") as Customer | null;
@@ -655,7 +656,7 @@ export default function CustomerEntryClient() {
 
     // Clean up the listener when the component unmounts
     return () => unsubscribe();
-  }, []);
+  }, [isEditing, currentCustomer.id]);
 
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -680,8 +681,9 @@ export default function CustomerEntryClient() {
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 0,
-      labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 0, detailsCustomer:null,
+      labouryRate: customerState.labouryRate || 0, kanta: customerState.kanta || 0,
       receiptType: customerState.receiptType || 'Cash', paymentType: customerState.paymentType || 'Full',
+      detailsCustomer:null,
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -696,7 +698,7 @@ export default function CustomerEntryClient() {
     newState.date = today.toISOString().split("T")[0];
     newState.dueDate = today.toISOString().split("T")[0];
     resetFormToState({...newState, detailsCustomer: null}); // Clear detailsCustomer state
-  };
+  }, [customers, resetFormToState]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = customers.find(c => c.id === id);
@@ -705,7 +707,7 @@ export default function CustomerEntryClient() {
       resetFormToState(customerToEdit);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [customers, resetFormToState]);
+  };
 
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();

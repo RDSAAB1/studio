@@ -42,15 +42,18 @@ export default function DashboardOverviewClient() {
         const unsubSuppliers = getSuppliersRealtime((data) => {
             setSuppliers(data);
             if(loading) setLoading(false); // Set loading to false on first data fetch
+        }, (error) => {
+            console.error(error);
+            if(loading) setLoading(false);
         });
 
         const unsubTransactions = getTransactionsRealtime((data) => {
             setTransactions(data);
-        });
+        }, (error) => console.error(error));
 
         const unsubFundTransactions = getFundTransactionsRealtime((data) => {
             setFundTransactions(data);
-        });
+        }, (error) => console.error(error));
 
         return () => {
             unsubSuppliers();
