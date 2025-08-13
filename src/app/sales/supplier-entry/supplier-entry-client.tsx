@@ -877,7 +877,10 @@ export default function SupplierEntryClient() {
                                         <TableRow>
                                             <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                             <TableHead className="p-2 text-xs">Date</TableHead>
-                                            <TableHead className="text-right p-2 text-xs">Amount Paid</TableHead>
+                                            <TableHead className="p-2 text-xs">Type</TableHead>
+                                            <TableHead className="p-2 text-xs">CD Applied</TableHead>
+                                            <TableHead className="p-2 text-xs text-right">CD Amount</TableHead>
+                                            <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -887,7 +890,10 @@ export default function SupplierEntryClient() {
                                                 <TableRow key={payment.id || index}>
                                                     <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                     <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                    <TableCell className="text-right p-2 font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
+                                                    <TableCell className="p-2">{payment.type}</TableCell>
+                                                    <TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell>
+                                                    <TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell>
+                                                    <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
                                                 </TableRow>
                                              );
                                         })}
