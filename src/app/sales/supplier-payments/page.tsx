@@ -264,17 +264,18 @@ export default function SupplierPaymentsPage() {
 
   const availableBranches = useMemo(() => {
     if (!bankDetails.bank) return [];
-    const selectedBankName = bankDetails.bank;
-    // Handle cases like "SBI - State Bank of India"
-    const simpleBankName = selectedBankName.split(' - ')[0].toLowerCase();
     
+    const selectedBankName = bankDetails.bank.toLowerCase();
+    const parts = selectedBankName.split(' - ');
+    const shortName = parts[0]?.trim();
+    const longName = parts[1]?.trim();
+
     return combinedBankBranches.filter(branch => {
         const branchBankNameLower = branch.bankName.toLowerCase();
-        // Check if the branch's bank name includes the selected bank's full name or if the selected bank name includes the branch's bank name
-        // This handles cases like "SBI" matching "State Bank of India"
-        return branchBankNameLower.includes(simpleBankName) || simpleBankName.includes(branchBankNameLower);
+        // Check if branch's bank name matches either the short or long form of the selected bank
+        return branchBankNameLower === shortName || (longName && branchBankNameLower === longName);
     });
-  }, [bankDetails.bank, combinedBankBranches]);
+}, [bankDetails.bank, combinedBankBranches]);
 
   useEffect(() => {
     setIsClient(true);
