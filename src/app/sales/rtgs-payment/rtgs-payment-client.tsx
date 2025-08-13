@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Pen, Save, PlusCircle, Trash, ArrowUpDown, Users } from "lucide-react";
+import { Pen, Save, PlusCircle, Trash, ArrowUpDown, Users, Search, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -129,6 +129,8 @@ export default function RtgspaymentClient() {
   const [cdAt, setCdAt] = useState('unpaid_amount');
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialFormState,
@@ -197,9 +199,9 @@ export default function RtgspaymentClient() {
   }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected]);
 
 
-  const handleSupplierSelect = (supplierId: string) => {
-    setSelectedSupplierId(supplierId);
-    const supplier = suppliers.find(c => c.id === supplierId);
+  const handleSupplierSelect = (supplier: Customer) => {
+    setSelectedSupplierId(supplier.id);
+    setSearchQuery(""); // Clear search query after selection
 
     if(supplier) {
       form.reset({
@@ -262,21 +264,8 @@ export default function RtgspaymentClient() {
     setOutstandingEntries([]);
     setSelectedOutstandingIds(new Set());
     setCdEnabled(false);
+    setSearchQuery("");
   }
-  
-  const handleAddNewSupplier = (supplierName: string) => {
-    const newSupplier: Customer = {
-        id: Date.now().toString(), // temporary client-side ID
-        name: toTitleCase(supplierName),
-        contact: '',
-        srNo: '', date: new Date().toISOString(), term: '', dueDate: new Date().toISOString(), so: '', address: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0, weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0, labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '', receiptType: '', paymentType: '',
-        customerId: `${toTitleCase(supplierName).toLowerCase()}|`
-    };
-    // This part should ideally trigger a Firestore write, but for now we update local state
-    setSuppliers(prev => [...prev, newSupplier]);
-    handleSupplierSelect(newSupplier.id);
-    toast({ title: "Supplier Added", description: `Added "${supplierName}". Please fill in other details.` });
-  };
 
   const handleEdit = (index: number) => {
     const record = allRecords[index];
@@ -377,14 +366,12 @@ export default function RtgspaymentClient() {
       form.setValue('weight', firstEntry.weight || 0);
     }
     
-    // Find the dialog close button and click it programmatically
-    // This is a workaround. A better solution would be to control the dialog's open state.
     const closeTrigger = document.querySelector('[aria-label="Close"]');
     if (closeTrigger instanceof HTMLElement) {
       closeTrigger.click();
     }
     
-    toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} outstanding entries. Total: ${totalAmount.toFixed(2)}. Target amount set.` });
+    toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} entries. Total: ${totalAmount.toFixed(2)}. Target amount set.` });
   };
 
 
@@ -420,20 +407,21 @@ export default function RtgspaymentClient() {
     return sortableItems;
   }, [paymentOptions, sortConfig]);
   
-  const supplierComboboxOptions = useMemo(() => {
-    // Creating a map to store unique suppliers by their customerId
+  const searchResults = useMemo(() => {
+    if (!searchQuery) return [];
+    
     const uniqueSuppliers = new Map<string, Customer>();
     suppliers.forEach(s => {
-      if(s.customerId && !uniqueSuppliers.has(s.customerId)) {
-        uniqueSuppliers.set(s.customerId, s);
-      }
+        if (s.customerId && !uniqueSuppliers.has(s.customerId)) {
+            uniqueSuppliers.set(s.customerId, s);
+        }
     });
 
-    return Array.from(uniqueSuppliers.values()).map(s => ({
-        value: s.id, // Use Firestore document ID as the unique value
-        label: `${toTitleCase(s.name)} (${s.contact || 'No Contact'})`
-    }));
-  }, [suppliers]);
+    return Array.from(uniqueSuppliers.values()).filter(supplier =>
+        supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        supplier.contact?.includes(searchQuery)
+    );
+  }, [searchQuery, suppliers]);
 
   if (!isClient) {
     return null; 
@@ -442,23 +430,49 @@ export default function RtgspaymentClient() {
   return (
     <div className="space-y-8">
        <Card>
-        <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-semibold">Select Supplier</h3>
-            </div>
-            <div className="w-full sm:w-auto sm:min-w-64 flex items-end gap-2">
-                 <div className="flex-grow">
-                     <DynamicCombobox
-                        options={supplierComboboxOptions}
-                        value={selectedSupplierId}
-                        onChange={handleSupplierSelect}
-                        onAdd={handleAddNewSupplier}
-                        placeholder="Select or add a supplier..."
-                        searchPlaceholder="Search supplier..."
-                        emptyPlaceholder="No supplier found."
+        <CardContent className="p-3 flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="w-full sm:w-auto sm:min-w-80 space-y-2">
+                 <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5 text-primary" />
+                    <h3 className="text-base font-semibold">Search Supplier</h3>
+                </div>
+                 <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        type="search"
+                        placeholder="Search by name or contact..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
                     />
+                     {searchQuery && (
+                        <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setSearchQuery('')}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    )}
                  </div>
+                 {searchQuery && (
+                    <div className="relative">
+                        <div className="absolute top-full mt-1 w-full bg-background border rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                            {searchResults.length > 0 ? (
+                                searchResults.map(supplier => (
+                                    <div 
+                                        key={supplier.id} 
+                                        className="p-3 hover:bg-accent cursor-pointer"
+                                        onClick={() => handleSupplierSelect(supplier)}
+                                    >
+                                        <p className="font-semibold">{toTitleCase(supplier.name)}</p>
+                                        <p className="text-sm text-muted-foreground">{supplier.contact}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="p-3 text-muted-foreground text-sm">No suppliers found.</p>
+                            )}
+                        </div>
+                    </div>
+                 )}
+            </div>
+             <div className="w-full sm:w-auto flex items-end">
                  {selectedSupplierId && (
                       <Dialog>
                         <DialogTrigger asChild>
