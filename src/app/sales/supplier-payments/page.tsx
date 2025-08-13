@@ -95,7 +95,6 @@ export default function SupplierPaymentsPage() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [paymentMethod, setPaymentMethod] = useState('Cash'); // New state for payment method
-  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   
   // RTGS specific fields
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -307,7 +306,6 @@ export default function SupplierPaymentsPage() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
-    setShowPaymentOptions(false);
     setPaymentId(getNextPaymentId(paymentHistory));
   };
 
@@ -515,36 +513,43 @@ export default function SupplierPaymentsPage() {
 
   const generatePaymentCombinations = () => {
     if (targetAmount <= 0 || minRate <= 0 || maxRate <= 0 || minRate > maxRate) {
-        toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please provide a valid target amount and rate range.' });
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Input',
+        description: 'Please provide a valid target amount and rate range.',
+      });
+      return;
     }
 
     const combinations: PaymentCombination[] = [];
     const seenRemainders = new Set<number>();
 
+    // Iterate through each rate in the given range with a step of 5
     for (let rate = minRate; rate <= maxRate; rate += 5) {
-        const quantity = Math.floor(targetAmount / rate);
+      // Calculate a starting quantity
+      const baseQuantity = Math.floor(targetAmount / rate);
+      
+      // Explore a range of quantities around the base quantity to find good matches
+      for (let i = -25; i <= 25; i++) {
+        const quantity = baseQuantity + i;
+        if (quantity <= 0) continue;
+
         const amount = quantity * rate;
         const remainingAmount = targetAmount - amount;
 
+        // Check if the combination is valid
         if (remainingAmount >= 0 && remainingAmount <= 1000 && !seenRemainders.has(remainingAmount)) {
-            combinations.push({ quantity, rate, amount, remainingAmount });
-            seenRemainders.add(remainingAmount);
+          combinations.push({ quantity, rate, amount, remainingAmount });
+          seenRemainders.add(remainingAmount);
         }
-
-        // Check one quantity lower as well for a potentially closer match
-        if (quantity > 0) {
-            const lowerQuantity = quantity - 1;
-            const lowerAmount = lowerQuantity * rate;
-            const lowerRemaining = targetAmount - lowerAmount;
-            if (lowerRemaining >= 0 && lowerRemaining <= 1000 && !seenRemainders.has(lowerRemaining)) {
-                combinations.push({ quantity: lowerQuantity, rate, amount: lowerAmount, remainingAmount: lowerRemaining });
-                seenRemainders.add(lowerRemaining);
-            }
-        }
+      }
     }
     
-    // Sort by remaining amount to get the best matches first
+    if (combinations.length === 0) {
+        toast({ title: 'No Combinations Found', description: 'Try adjusting the rate range or target amount.'});
+    }
+
+    // Sort by the smallest remaining amount and take the top 50
     const sortedCombinations = combinations.sort((a, b) => a.remainingAmount - b.remainingAmount).slice(0, 50);
     setPaymentCombinations(sortedCombinations);
   };
@@ -657,7 +662,6 @@ export default function SupplierPaymentsPage() {
         return;
     }
     setIsOutstandingModalOpen(false); // Close the modal
-    // The rest of the logic will be handled by the form now visible
 };
 
   return (
@@ -884,14 +888,19 @@ export default function SupplierPaymentsPage() {
                         </div>
                         
                         <Card className="mt-4 bg-muted/30">
-                            <CardHeader><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                     {editingPayment ? `Updating Payment ${paymentId}` : 'New Payment Summary'}
+                                </CardTitle>
+                            </CardHeader>
                             <CardContent className="space-y-2">
                                 <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
                                 <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>
                                 <Separator/>
                                 <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
                             </CardContent>
-                            <CardFooter className="flex justify-end">
+                            <CardFooter className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={clearForm}>Cancel</Button>
                                 <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
                             </CardFooter>
                         </Card>
