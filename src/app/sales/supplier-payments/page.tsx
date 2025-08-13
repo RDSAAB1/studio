@@ -34,7 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -281,29 +281,33 @@ export default function SupplierPaymentsPage() {
                 const tempEditingPayment = editingPayment;
                 
                 // STEP 1: READ ALL NECESSARY DOCS FIRST
+                const involvedSupplierDocs = new Map<string, any>();
+                
+                // Collect all SR numbers involved in this transaction (both new and old if editing)
                 const allInvolvedSrNos = new Set<string>();
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
                 }
                 selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
 
-                const involvedSupplierDocs = new Map<string, any>();
+                // Read all involved supplier documents
                 for (const srNo of allInvolvedSrNos) {
                     const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
                     if (supplierToUpdate) {
                         const docRef = doc(db, "suppliers", supplierToUpdate.id);
                         const supplierDoc = await transaction.get(docRef);
-                        if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
+                         if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
                         involvedSupplierDocs.set(srNo, supplierDoc);
                     }
                 }
 
-                // STEP 2: PERFORM ALL WRITES
+                // STEP 2: CALCULATE NEW BALANCES
                 const outstandingBalances: { [key: string]: number } = {};
                 involvedSupplierDocs.forEach((docSnap, srNo) => {
                     outstandingBalances[srNo] = Number(docSnap.data().netAmount);
                 });
 
+                // If editing, revert the old payment amounts first
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(detail => {
                         if (outstandingBalances[detail.srNo] !== undefined) {
@@ -316,7 +320,7 @@ export default function SupplierPaymentsPage() {
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 
-                // Distribute payment
+                // Distribute new payment
                 sortedEntries.forEach(entryData => {
                     if (remainingPayment > 0.001) {
                         let outstanding = outstandingBalances[entryData.srNo];
@@ -332,16 +336,22 @@ export default function SupplierPaymentsPage() {
                     }
                 });
 
-                // Handle rounding errors by applying remainder to the last entry
+                 // Handle rounding errors by applying remainder to the last entry
                 if (remainingPayment > 0.001 && sortedEntries.length > 0) {
-                    const lastEntry = sortedEntries[sortedEntries.length - 1];
-                    outstandingBalances[lastEntry.srNo] -= remainingPayment;
-                    const detailToUpdate = paidForDetails.find(d => d.srNo === lastEntry.srNo);
-                    if (detailToUpdate) {
-                        detailToUpdate.amount += remainingPayment;
+                    const lastEntrySrNo = sortedEntries[sortedEntries.length - 1].srNo;
+                    // Check if the remainder can be absorbed without making the balance negative
+                    if (outstandingBalances[lastEntrySrNo] >= remainingPayment) {
+                        outstandingBalances[lastEntrySrNo] -= remainingPayment;
+                        const detailToUpdate = paidForDetails.find(d => d.srNo === lastEntrySrNo);
+                        if (detailToUpdate) {
+                            detailToUpdate.amount += remainingPayment;
+                        }
+                        remainingPayment = 0; // Remainder applied
                     }
                 }
 
+
+                // STEP 3: PERFORM ALL WRITES
                 // Write supplier updates
                 for (const srNo in outstandingBalances) {
                     const newBalance = outstandingBalances[srNo];
