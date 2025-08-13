@@ -336,10 +336,7 @@ export default function SupplierPaymentsPage() {
 
    useEffect(() => {
     if (paymentMethod === 'RTGS') {
-        const newTarget = paymentType === 'Full' 
-            ? (rtgsAmount > 0 ? rtgsAmount : Math.round(totalOutstandingForSelected - calculatedCdAmount))
-            : paymentAmount;
-        setTargetAmount(newTarget);
+        setTargetAmount(rtgsAmount > 0 ? rtgsAmount : (paymentType === 'Full' ? Math.round(totalOutstandingForSelected - calculatedCdAmount) : paymentAmount));
     }
   }, [totalOutstandingForSelected, calculatedCdAmount, paymentMethod, paymentAmount, paymentType, rtgsAmount]);
    
@@ -586,13 +583,23 @@ export default function SupplierPaymentsPage() {
         const seenRemainders = new Set<number>();
     
         for (let rate = minRate; rate <= maxRate; rate += 1) {
+            // Condition 1: Rate must be divisible by 5
+            if (rate % 5 !== 0) {
+                continue;
+            }
+
             const baseQuantity = targetAmount / rate;
     
-            for (let i = -50; i <= 50; i += 0.1) { // 50 quintal range with 10kg steps
+            for (let i = -50; i <= 50; i += 0.1) { // 50 quintal range with 10kg steps (0.1 quintal)
                 const quantity = baseQuantity + i;
                 if (quantity <= 0) continue;
     
-                const roundedQuantity = parseFloat(quantity.toFixed(2));
+                // Condition 2: Quantity must be divisible by 10kg (0.1 quintal)
+                const roundedQuantity = parseFloat(quantity.toFixed(1)); 
+                if (Math.round(roundedQuantity * 10) % 1 !== 0) { // Check if it's a multiple of 0.1
+                    continue;
+                }
+                
                 const amount = Math.round(roundedQuantity * rate);
                 const remainingAmount = targetAmount - amount;
     
@@ -612,7 +619,7 @@ export default function SupplierPaymentsPage() {
     
         const sortedCombinations = combinations
             .sort((a, b) => Math.abs(a.remainingAmount) - Math.abs(b.remainingAmount))
-            .slice(0, 100); // Show more options
+            .slice(0, 100); 
     
         setPaymentCombinations(sortedCombinations);
     };
@@ -906,35 +913,24 @@ export default function SupplierPaymentsPage() {
                   <Card>
                     <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-sm">Payment Generator</CardTitle></CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-4">
-                                     <div className="space-y-2">
-                                        <Label htmlFor="targetAmount">Amount to be Paid</Label>
-                                        <Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="minRate">Minimum Rate</Label>
-                                        <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="maxRate">Maximum Rate</Label>
-                                        <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
-                                    </div>
-                                    <Button onClick={() => setIsGeneratorOpen(true)} className="w-full">Generate Payment Options</Button>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-sm">Selected Option</CardTitle></CardHeader>
+                                <CardHeader className="p-4"><CardTitle className="text-sm">Selected RTGS Payment</CardTitle></CardHeader>
                                 <CardContent className="p-4 pt-0 space-y-4">
                                      <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
                                      <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
                                      <div className="space-y-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} /></div>
                                 </CardContent>
                             </Card>
+                             <Card>
+                                <CardHeader className="p-4"><CardTitle className="text-sm">RTGS Details</CardTitle></CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-4">
+                                <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
+                                <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
+                                </CardContent>
+                            </Card>
                         </div>
-                        
+                         <Button onClick={() => setIsGeneratorOpen(true)} className="w-full">Generate Payment Options</Button>
                          <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
                             <DialogContent className="max-w-3xl">
                                 <DialogHeader>
@@ -975,6 +971,20 @@ export default function SupplierPaymentsPage() {
                                   </div>
                                 )}
                                 <DialogFooter>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 w-full">
+                                         <div className="space-y-1">
+                                            <Label htmlFor="targetAmount" className="text-xs">Amount to be Paid</Label>
+                                            <Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} />
+                                        </div>
+                                         <div className="space-y-1">
+                                            <Label htmlFor="minRate" className="text-xs">Min Rate</Label>
+                                            <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} />
+                                        </div>
+                                         <div className="space-y-1">
+                                            <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
+                                            <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
+                                        </div>
+                                    </div>
                                     <Button variant="outline" onClick={() => setIsGeneratorOpen(false)}>Close</Button>
                                     <Button onClick={generatePaymentCombinations}>Generate</Button>
                                 </DialogFooter>
@@ -1000,7 +1010,7 @@ export default function SupplierPaymentsPage() {
                              </CardContent>
                         </Card>
                          <Card>
-                            <CardHeader><CardTitle className="text-sm">RTGS Details</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-sm">Document Details</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2"><Label htmlFor="grNo">GR No.</Label><Input id="grNo" value={grNo} onChange={e => setGrNo(e.target.value)} /></div>
                                 <div className="space-y-2"><Label htmlFor="grDate">GR Date</Label>
@@ -1010,8 +1020,6 @@ export default function SupplierPaymentsPage() {
                                 <div className="space-y-2"><Label htmlFor="parchiDate">Parchi Date</Label>
                                     <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{parchiDate ? format(parchiDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={parchiDate} onSelect={setParchiDate} initialFocus /></PopoverContent></Popover>
                                 </div>
-                                <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
-                                <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
                             </CardContent>
                         </Card>
                         <Card className="mt-6 bg-muted/30">
@@ -1329,8 +1337,5 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
-
-
-    
 
     
