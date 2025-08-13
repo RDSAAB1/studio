@@ -118,7 +118,7 @@ export default function SupplierProfilePage() {
                 transactionsByVariety: {},
                 totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
                 totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
-                averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
+                averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
                 averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
             });
         }
@@ -186,6 +186,12 @@ export default function SupplierProfilePage() {
             data.averageRate = 0;
         }
 
+        if (data.totalNetWeight! > 0) {
+          data.averageOriginalPrice = data.totalOriginalAmount / data.totalNetWeight!;
+        } else {
+          data.averageOriginalPrice = 0;
+        }
+
         const rates = supplierRateSum[key];
         if (rates && rates.count > 0) {
             data.averageKartaPercentage = rates.karta / rates.count;
@@ -213,7 +219,7 @@ export default function SupplierProfilePage() {
         name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-        averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: suppliers, 
+        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: suppliers, 
         allPayments: paymentHistory, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
     });
     
@@ -226,6 +232,12 @@ export default function SupplierProfilePage() {
         millSummary.averageRate = millSummary.totalAmount / millSummary.totalFinalWeight!;
     } else {
         millSummary.averageRate = 0;
+    }
+
+     if (millSummary.totalNetWeight! > 0) {
+        millSummary.averageOriginalPrice = millSummary.totalOriginalAmount / millSummary.totalNetWeight!;
+    } else {
+        millSummary.averageOriginalPrice = 0;
     }
 
     const totalRateData = suppliers.reduce((acc, s) => {
@@ -350,7 +362,7 @@ export default function SupplierProfilePage() {
 
                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
-                             <CardTitle className="text-base flex items-center gap-2"><CircleDollarSign size={16}/> Deduction Summary</CardTitle>
+                             <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
                              <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
@@ -372,7 +384,7 @@ export default function SupplierProfilePage() {
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
-                            <SummaryDetailItem label="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Original Amount" value={formatCurrency(selectedSupplierData.totalOriginalAmount || 0)} subValue={`Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg`} />
                              <Separator className="my-2"/>
                             <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} colorClass="text-green-500" />
                             <SummaryDetailItem label="Total CD Granted" value={`- ${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />

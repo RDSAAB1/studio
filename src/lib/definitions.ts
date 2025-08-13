@@ -7,6 +7,7 @@
 
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -149,6 +150,7 @@ export type CustomerSummary = {
     totalOtherCharges?: number;
     totalCdAmount?: number;
     averageRate?: number;
+    averageOriginalPrice?: number;
     averageKartaPercentage?: number;
     averageLabouryRate?: number;
     totalTransactions?: number;
