@@ -332,12 +332,6 @@ export default function SupplierPaymentsPage() {
       setPaymentAmount(newAmount);
     }
   }, [totalOutstandingForSelected, calculatedCdAmount, paymentType]);
-
-   const targetAmountForGenerator = useMemo(() => {
-    return paymentType === 'Full' 
-      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
-      : paymentAmount;
-  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
    
   const clearForm = () => {
     setSelectedEntryIds(new Set());
@@ -367,7 +361,7 @@ export default function SupplierPaymentsPage() {
             return;
         }
 
-        const finalPaymentAmount = rtgsAmount;
+        const finalPaymentAmount = rtgsAmount || paymentAmount;
 
         if (finalPaymentAmount <= 0 && calculatedCdAmount <= 0) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
@@ -568,55 +562,56 @@ export default function SupplierPaymentsPage() {
         }
     };
 
-    const generatePaymentCombinations = () => {
-        if (targetAmountForGenerator <= 0 || minRate <= 0 || maxRate < minRate) {
-            toast({
-                variant: 'destructive',
-                title: 'Invalid Input',
-                description: 'Please provide a valid target amount and a valid rate range.',
-            });
-            return;
-        }
-    
-        const combinations: PaymentCombination[] = [];
-        const seenRemainders = new Set<number>();
-    
-        for (let rate = minRate; rate <= maxRate; rate += 1) {
-            if (rate % 5 !== 0) continue;
+  const generatePaymentCombinations = () => {
+    if (targetAmountForGenerator <= 0 || minRate <= 0 || maxRate < minRate) {
+        toast({
+            variant: 'destructive',
+            title: 'Invalid Input',
+            description: 'Please provide a valid target amount and a valid rate range.',
+        });
+        return;
+    }
 
-            const baseQuantity = targetAmountForGenerator / rate;
-    
-            for (let i = -50; i <= 50; i += 0.1) {
-                const quantity = baseQuantity + i;
-                if (quantity <= 0) continue;
-    
-                const roundedQuantity = parseFloat(quantity.toFixed(1));
-                if (roundedQuantity * 10 % 1 !== 0) continue;
-                
-                const amount = Math.round(roundedQuantity * rate);
-                const remainingAmount = targetAmountForGenerator - amount;
-    
-                if (remainingAmount >= 0 && remainingAmount <= 500) {
-                     const roundedRemainder = Math.round(remainingAmount);
-                     if (!seenRemainders.has(roundedRemainder)) {
-                        combinations.push({ quantity: roundedQuantity, rate, amount, remainingAmount });
-                        seenRemainders.add(roundedRemainder);
-                    }
+    const combinations: PaymentCombination[] = [];
+    const seenRemainders = new Set<number>();
+
+    for (let rate = minRate; rate <= maxRate; rate += 1) {
+        if (rate % 5 !== 0) continue;
+
+        const baseQuantity = targetAmountForGenerator / rate;
+
+        for (let i = -50; i <= 50; i += 0.1) {
+            const quantity = baseQuantity + i;
+            if (quantity <= 0) continue;
+
+            const roundedQuantity = parseFloat(quantity.toFixed(1));
+            // Check if quantity is divisible by 0.1 (10kg)
+            if (roundedQuantity * 10 % 1 !== 0) continue;
+            
+            const amount = Math.round(roundedQuantity * rate);
+            const remainingAmount = targetAmountForGenerator - amount;
+
+            if (remainingAmount >= 0 && remainingAmount <= 500) {
+                 const roundedRemainder = Math.round(remainingAmount);
+                 if (!seenRemainders.has(roundedRemainder)) {
+                    combinations.push({ quantity: roundedQuantity, rate, amount, remainingAmount });
+                    seenRemainders.add(roundedRemainder);
                 }
             }
         }
-    
-        if (combinations.length === 0) {
-            toast({ title: 'No Combinations Found', description: 'Try adjusting the rate range or target amount.' });
-        }
-    
-        const sortedCombinations = combinations
-            .sort((a, b) => Math.abs(a.remainingAmount) - Math.abs(b.remainingAmount))
-            .slice(0, 100); 
-    
-        setPaymentCombinations(sortedCombinations);
-        setIsGeneratorOpen(true);
-    };
+    }
+
+    if (combinations.length === 0) {
+        toast({ title: 'No Combinations Found', description: 'Try adjusting the rate range or target amount.' });
+    }
+
+    const sortedCombinations = combinations
+        .sort((a, b) => Math.abs(a.remainingAmount) - Math.abs(b.remainingAmount))
+        .slice(0, 100); 
+
+    setPaymentCombinations(sortedCombinations);
+    setIsGeneratorOpen(true);
+  };
   
   const sortedCombinations = useMemo(() => {
     if (!sortConfig) return paymentCombinations;
@@ -728,6 +723,11 @@ export default function SupplierPaymentsPage() {
     }
     setIsOutstandingModalOpen(false); // Close the modal
 };
+const targetAmountForGenerator = useMemo(() => {
+    return paymentType === 'Full' 
+      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
+      : paymentAmount;
+  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
 
   return (
     <div className="space-y-8">
@@ -909,7 +909,7 @@ export default function SupplierPaymentsPage() {
                                         <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
                                         <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
                                     </div>
-                                    <Button onClick={() => setIsGeneratorOpen(true)} className="w-full">
+                                    <Button onClick={generatePaymentCombinations} className="w-full">
                                         <Calculator className="mr-2 h-4 w-4" />
                                         {formatCurrency(targetAmountForGenerator)}
                                     </Button>
@@ -920,7 +920,7 @@ export default function SupplierPaymentsPage() {
                                 <CardContent className="p-4 pt-0 space-y-4">
                                      <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
                                      <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
-                                     <div className="space-y-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} readOnly /></div>
+                                     <div className="space-y-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} /></div>
                                 </CardContent>
                             </Card>
                         </div>
@@ -1005,7 +1005,7 @@ export default function SupplierPaymentsPage() {
                         <Card className="mt-6 bg-muted/30">
                             <CardHeader><CardTitle className="text-base">Finalize RTGS Payment</CardTitle></CardHeader>
                             <CardContent className="space-y-2">
-                                <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount)}</p></div>
+                                <div className="flex justify-between items-center"><p className="text-sm">RTGS Amount:</p><p className="font-bold">{formatCurrency(rtgsAmount)}</p></div>
                                 {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
                                 <Separator/>
                                 <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(rtgsAmount + calculatedCdAmount)}</p></div>
@@ -1325,3 +1325,4 @@ export default function SupplierPaymentsPage() {
     
 
     
+
