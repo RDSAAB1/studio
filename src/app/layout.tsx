@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Metadata } from 'next';
@@ -46,17 +47,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef(null);
 
   // Handle initial sidebar state based on screen size
   useEffect(() => {
     const handleResize = () => {
-      // Close sidebar on small screens
+      // Always close sidebar on small screens
       if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
-      } else { // Open sidebar on large screens
-        setIsSidebarOpen(true);
       }
     };
     handleResize(); // Set initial state
