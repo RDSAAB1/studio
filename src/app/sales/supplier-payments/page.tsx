@@ -96,7 +96,6 @@ export default function SupplierPaymentsPage() {
   const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
   const [targetAmount, setTargetAmount] = useState(0);
-  const [generatedPayments, setGeneratedPayments] = useState<any[]>([]);
   
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
@@ -287,16 +286,6 @@ export default function SupplierPaymentsPage() {
         setTargetAmount(Math.round(totalOutstandingForSelected - calculatedCdAmount));
    }, [totalOutstandingForSelected, calculatedCdAmount]);
    
-   const handleGeneratePayments = () => {
-        if(targetAmount <= 0) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Target amount must be greater than 0.' });
-            return;
-        }
-        // This is a placeholder logic. In a real scenario, this would involve more complex
-        // logic to break down the payment or suggest options.
-        setGeneratedPayments([{ id: 1, amount: targetAmount, description: `Full payment for target ${formatCurrency(targetAmount)}` }]);
-   }
-
   const clearForm = () => {
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
@@ -304,7 +293,6 @@ export default function SupplierPaymentsPage() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
-    setGeneratedPayments([]);
     setPaymentId(getNextPaymentId(paymentHistory));
   };
 
@@ -693,11 +681,9 @@ export default function SupplierPaymentsPage() {
                                 <TabsTrigger value="RTGS">RTGS</TabsTrigger>
                             </TabsList>
                             <TabsContent value="Cash" className="mt-4">
-                                {/* No specific fields for Cash */}
                                 <p className="text-sm text-muted-foreground p-4 text-center">Processing payment via Cash.</p>
                             </TabsContent>
                             <TabsContent value="Online" className="mt-4">
-                                {/* No specific fields for Online */}
                                 <p className="text-sm text-muted-foreground p-4 text-center">Processing payment via Online.</p>
                             </TabsContent>
                             <TabsContent value="RTGS" className="mt-4">
@@ -779,61 +765,11 @@ export default function SupplierPaymentsPage() {
                                 </div>
                             </>}
                         </div>
+                        <div className="flex justify-end pt-4">
+                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                        </div>
                     </CardContent>
                 </Card>
-
-                 {paymentMethod === 'RTGS' ? (
-                     <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Banknote className="h-5 w-5 text-primary"/>
-                                Payment Calculation
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="p-4 border rounded-lg bg-card/30">
-                                    <p className="text-muted-foreground">Total Outstanding</p>
-                                    <p className="text-xl font-bold">{formatCurrency(totalOutstandingForSelected)}</p>
-                                </div>
-                                <div className="p-4 border rounded-lg bg-card/30">
-                                    <p className="text-muted-foreground">CD Amount</p>
-                                    <p className="text-xl font-bold text-green-500">- {formatCurrency(calculatedCdAmount)}</p>
-                                </div>
-                                <div className="p-4 border-2 border-primary rounded-lg bg-primary/10">
-                                    <p className="text-primary font-semibold">Target Amount to Pay</p>
-                                    <p className="text-2xl font-bold text-primary">{formatCurrency(targetAmount)}</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-center gap-4">
-                                <Button onClick={handleGeneratePayments} disabled={targetAmount <= 0}>Generate Payment Options</Button>
-                                {generatedPayments.length > 0 && (
-                                    <div className="w-full">
-                                        <h3 className="mb-2 font-semibold">Generated Payments:</h3>
-                                        <Table>
-                                            <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
-                                            <TableBody>
-                                                {generatedPayments.map(p => (
-                                                    <TableRow key={p.id}>
-                                                        <TableCell>{p.description}</TableCell>
-                                                        <TableCell className="text-right">{formatCurrency(p.amount)}</TableCell>
-                                                        <TableCell className="text-center">
-                                                            <Button size="sm" onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                 ) : (
-                    <div className="flex justify-end">
-                        <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                    </div>
-                 )}
             </div>
           )}
 
