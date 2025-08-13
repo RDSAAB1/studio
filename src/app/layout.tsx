@@ -47,18 +47,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default to open to avoid hydration mismatch
   const sidebarRef = useRef(null);
 
   // Handle initial sidebar state based on screen size
   useEffect(() => {
     const handleResize = () => {
-      // Always close sidebar on small screens
       if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
+      } else {
+        // On large screens, set to collapsed by default on client-side
+        setIsSidebarOpen(false); 
       }
     };
-    handleResize(); // Set initial state
+    handleResize(); // Set initial state on client mount
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
