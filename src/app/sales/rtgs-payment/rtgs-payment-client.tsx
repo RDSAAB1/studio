@@ -43,6 +43,7 @@ import { Switch } from "@/components/ui/switch";
 import { collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
+import { Badge } from "@/components/ui/badge";
 
 
 const formSchema = z.object({
@@ -115,6 +116,8 @@ export default function RtgspaymentClient() {
   const [selectedOutstandingIds, setSelectedOutstandingIds] = useState<Set<string>>(new Set());
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
 
+  const [paidSrNos, setPaidSrNos] = useState<Set<string>>(new Set());
+
 
   const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [isPaymentOptionsModalOpen, setIsPaymentOptionsModalOpen] = useState(false);
@@ -158,6 +161,15 @@ export default function RtgspaymentClient() {
     const unsubscribeRecords = onSnapshot(collection(db, "rtgs_payments"), (snapshot) => {
       const recordsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAllRecords(recordsData);
+
+      const allPaidSrNos = new Set<string>();
+      recordsData.forEach(record => {
+          if (Array.isArray(record.paidForSrNos)) {
+              record.paidForSrNos.forEach((srNo: string) => allPaidSrNos.add(srNo));
+          }
+      });
+      setPaidSrNos(allPaidSrNos);
+
       if (editingRecordIndex === null) {
          form.setValue("srNo", generateSrNo(recordsData));
       }
@@ -228,7 +240,8 @@ export default function RtgspaymentClient() {
         amount: Math.round(values.amount + calculatedCdAmount),
         cdAmount: Math.round(calculatedCdAmount),
         cdApplied: cdEnabled,
-        supplierId: selectedSupplierId || null, 
+        supplierId: selectedSupplierId || null,
+        paidForSrNos: Array.from(selectedOutstandingIds).map(id => outstandingEntries.find(e => e.id === id)?.srNo).filter(Boolean),
     }
 
     let message = "";
@@ -245,7 +258,7 @@ export default function RtgspaymentClient() {
     } else {
        try {
          await addDoc(collection(db, "rtgs_payments"), finalValues);
-         toast({ title: "Success", description: "Record saved successfully!" });
+         toast({ title: "Success", description: "New entry saved successfully!" });
          handleNew([...allRecords, { id: 'temp', ...finalValues }]);
        } catch (error) {
          console.error("Error adding record:", error);
@@ -442,11 +455,15 @@ export default function RtgspaymentClient() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead><Checkbox
-                                    checked={selectedOutstandingIds.size > 0 && selectedOutstandingIds.size === outstandingEntries.length}
+                                    checked={selectedOutstandingIds.size > 0 && selectedOutstandingIds.size === outstandingEntries.filter(e => !paidSrNos.has(e.srNo)).length && outstandingEntries.filter(e => !paidSrNos.has(e.srNo)).length > 0}
                                     onCheckedChange={(checked) => {
                                       const newSet = new Set<string>();
                                       if (checked) {
-                                        outstandingEntries.forEach(e => newSet.add(e.id));
+                                        outstandingEntries.forEach(e => {
+                                            if (!paidSrNos.has(e.srNo)) {
+                                                newSet.add(e.id);
+                                            }
+                                        });
                                       }
                                       setSelectedOutstandingIds(newSet);
                                     }}
@@ -454,12 +471,14 @@ export default function RtgspaymentClient() {
                                   <TableHead>SR No</TableHead>
                                   <TableHead>Date</TableHead>
                                   <TableHead>Net Amount</TableHead>
-                                  <TableHead>Variety</TableHead>
+                                  <TableHead>Status</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {outstandingEntries.map(entry => (
-                                  <TableRow key={entry.id}>
+                                {outstandingEntries.map(entry => {
+                                  const isPaid = paidSrNos.has(entry.srNo);
+                                  return (
+                                  <TableRow key={entry.id} className={isPaid ? "opacity-50" : ""}>
                                     <TableCell><Checkbox 
                                       checked={selectedOutstandingIds.has(entry.id)}
                                       onCheckedChange={() => {
@@ -471,13 +490,14 @@ export default function RtgspaymentClient() {
                                         }
                                         setSelectedOutstandingIds(newSet);
                                       }}
+                                      disabled={isPaid}
                                     /></TableCell>
                                     <TableCell>{entry.srNo}</TableCell>
                                     <TableCell>{entry.date}</TableCell>
                                     <TableCell>{formatCurrency(Number(entry.netAmount))}</TableCell>
-                                    <TableCell>{entry.variety}</TableCell>
+                                    <TableCell>{isPaid && <Badge variant="secondary">Paid</Badge>}</TableCell>
                                   </TableRow>
-                                ))}
+                                )})}
                               </TableBody>
                             </Table>
                           </div>
