@@ -32,7 +32,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart as
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart, CircleDollarSign } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -488,6 +488,7 @@ export default function SupplierProfilePage() {
                                       <TableRow>
                                           <TableHead>ID</TableHead>
                                           <TableHead>Date</TableHead>
+                                          <TableHead>Paid For (SR No.)</TableHead>
                                           <TableHead className="text-right">Amount</TableHead>
                                           <TableHead className="text-right">Actions</TableHead>
                                       </TableRow>
@@ -497,6 +498,7 @@ export default function SupplierProfilePage() {
                                           <TableRow key={payment.id}>
                                               <TableCell className="font-mono">{payment.paymentId}</TableCell>
                                               <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
+                                              <TableCell className="text-xs">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
                                               <TableCell className="font-semibold text-right">{formatCurrency(payment.amount)}</TableCell>
                                                <TableCell className="text-right">
                                                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedPaymentForDetails(payment)}>
@@ -507,7 +509,7 @@ export default function SupplierProfilePage() {
                                       ))}
                                        {currentPaymentHistory.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center text-muted-foreground">No payments found.</TableCell>
+                                            <TableCell colSpan={5} className="text-center text-muted-foreground">No payments found.</TableCell>
                                         </TableRow>
                                     )}
                                   </TableBody>
