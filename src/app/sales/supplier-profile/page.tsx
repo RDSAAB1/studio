@@ -75,7 +75,8 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 date: new Date(t.date),
                 type: 'Purchase',
                 particulars: `SR#${t.srNo} - ${toTitleCase(t.variety)}`,
-                amount: t.originalNetAmount,
+                debit: t.originalNetAmount,
+                credit: 0
             }));
         
         const payments = (data.allPayments || data.paymentHistory || [])
@@ -83,20 +84,21 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 date: new Date(p.date),
                 type: 'Payment',
                 particulars: `ID#${p.paymentId} - ${p.receiptType}`,
-                amount: -(p.amount + (p.cdAmount || 0)),
+                debit: 0,
+                credit: (p.amount + (p.cdAmount || 0))
             }));
 
         const combined = [...transactions, ...payments].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-        let balance = 0;
+        let balance = 0; // Assuming opening balance is 0 for this statement period
         const itemsWithBalance = combined.map(item => {
-            balance += item.amount;
+            balance = balance + item.debit - item.credit;
             return { ...item, balance };
         });
         
-        const openingBalance = 0; // Assuming statement starts from zero balance for simplicity.
-        const totalDebit = transactions.reduce((sum, t) => sum + t.amount, 0);
-        const totalCredit = payments.reduce((sum, p) => sum - p.amount, 0);
+        const openingBalance = 0;
+        const totalDebit = transactions.reduce((sum, t) => sum + t.debit, 0);
+        const totalCredit = payments.reduce((sum, p) => sum + p.credit, 0);
         const closingBalance = totalDebit - totalCredit;
 
         return {
@@ -116,7 +118,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     return (
         <div className="bg-background p-6 rounded-lg font-sans">
-            <header className="mb-6 border-b pb-4">
+             <header className="mb-6 border-b pb-4">
                 <div className="flex justify-between items-start">
                     <div>
                         <h2 className="text-2xl font-bold text-primary">Account Statement</h2>
@@ -134,16 +136,16 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             <Card className="mb-6">
                 <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                     <div>
-                        <p className="text-sm text-muted-foreground">Total Purchases</p>
+                        <p className="text-sm text-muted-foreground">Total Purchases (Debit)</p>
                         <p className="text-2xl font-bold font-mono">{formatCurrency(totalDebit)}</p>
                     </div>
                     <div>
-                        <p className="text-sm text-muted-foreground">Total Payments</p>
+                        <p className="text-sm text-muted-foreground">Total Payments (Credit)</p>
                         <p className="text-2xl font-bold font-mono text-green-600">{formatCurrency(totalCredit)}</p>
                     </div>
                     <div>
                         <p className="text-sm text-muted-foreground">Closing Balance</p>
-                        <p className={cn("text-2xl font-bold font-mono", closingBalance > 0 ? "text-destructive" : "text-green-600")}>
+                        <p className={cn("text-2xl font-bold font-mono", closingBalance >= 0 ? "text-destructive" : "text-green-600")}>
                             {formatCurrency(closingBalance)}
                         </p>
                     </div>
@@ -156,8 +158,8 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         <TableRow>
                             <TableHead className="w-[100px]">Date</TableHead>
                             <TableHead>Particulars</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Debit</TableHead>
+                            <TableHead className="text-right">Credit</TableHead>
                             <TableHead className="text-right w-[120px]">Balance</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -166,18 +168,20 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                             <TableRow key={index} className="[&_td]:py-2">
                                 <TableCell className="text-xs">{format(item.date, "dd-MMM-yy")}</TableCell>
                                 <TableCell>{item.particulars}</TableCell>
-                                <TableCell>
-                                    <Badge variant={item.type === 'Purchase' ? 'destructive' : 'default'} className={cn(item.type === 'Payment' && 'bg-green-600/80')}>
-                                        {item.type}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className={cn("text-right font-mono", item.type === 'Payment' && 'text-green-600')}>
-                                    {formatCurrency(Math.abs(item.amount))}
-                                </TableCell>
-                                <TableCell className="text-right font-mono font-semibold">{formatCurrency(item.balance)}</TableCell>
+                                <TableCell className="text-right font-mono">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                <TableCell className="text-right font-mono text-green-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
+                                <TableCell className={cn("text-right font-mono font-semibold", item.balance < 0 && 'text-green-600')}>{formatCurrency(item.balance)}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
+                     <TableFooter>
+                        <TableRow className="bg-muted font-bold">
+                            <TableCell colSpan={2}>Total</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(totalDebit)}</TableCell>
+                            <TableCell className="text-right font-mono text-green-600">{formatCurrency(totalCredit)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(closingBalance)}</TableCell>
+                        </TableRow>
+                    </TableFooter>
                 </Table>
             </ScrollArea>
         </div>
@@ -839,7 +843,7 @@ export default function SupplierProfilePage() {
       
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
           <DialogContent className="max-w-4xl p-0">
-            <DialogHeader className="p-4 sr-only">
+             <DialogHeader className="p-4 sr-only">
                 <DialogTitle>Account Statement for {selectedSupplierData?.name}</DialogTitle>
                 <DialogDescription>A detailed account statement of all transactions and payments.</DialogDescription>
             </DialogHeader>
@@ -855,5 +859,3 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
-
-    
