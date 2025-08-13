@@ -86,6 +86,7 @@ export default function SupplierPaymentsPage() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [paymentMethod, setPaymentMethod] = useState('Cash'); // New state for payment method
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   
   // RTGS specific fields
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -293,6 +294,7 @@ export default function SupplierPaymentsPage() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
+    setShowPaymentOptions(false);
     setPaymentId(getNextPaymentId(paymentHistory));
   };
 
@@ -681,10 +683,10 @@ export default function SupplierPaymentsPage() {
                                 <TabsTrigger value="RTGS">RTGS</TabsTrigger>
                             </TabsList>
                             <TabsContent value="Cash" className="mt-4">
-                                <p className="text-sm text-muted-foreground p-4 text-center">Processing payment via Cash.</p>
+                                {/* No specific fields for cash */}
                             </TabsContent>
                             <TabsContent value="Online" className="mt-4">
-                                <p className="text-sm text-muted-foreground p-4 text-center">Processing payment via Online.</p>
+                                 {/* No specific fields for online, but could add reference # */}
                             </TabsContent>
                             <TabsContent value="RTGS" className="mt-4">
                                <Card>
@@ -765,9 +767,28 @@ export default function SupplierPaymentsPage() {
                                 </div>
                             </>}
                         </div>
-                        <div className="flex justify-end pt-4">
-                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                        </div>
+                        
+                        {paymentMethod === 'RTGS' && !showPaymentOptions && (
+                            <div className="flex justify-end pt-4">
+                                <Button onClick={() => setShowPaymentOptions(true)}>Generate Payment Options</Button>
+                            </div>
+                        )}
+
+                        {(paymentMethod !== 'RTGS' || showPaymentOptions) && (
+                            <Card className="mt-4 bg-muted/30">
+                                <CardHeader><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>
+                                <CardContent className="space-y-2">
+                                    <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                                    <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>
+                                    <Separator/>
+                                    <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                                </CardContent>
+                                <CardFooter className="flex justify-end">
+                                    <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                                </CardFooter>
+                            </Card>
+                        )}
+
                     </CardContent>
                 </Card>
             </div>
