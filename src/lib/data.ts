@@ -47,17 +47,17 @@ export const appOptionsData = {
     receiptTypes: ['Cash', 'Online'],
     paymentTypes: ['Full', 'Partial'],
     bankNames: [
-        "State Bank of India", "Punjab National Bank", "Bank of Baroda",
-        "Canara Bank", "Union Bank of India", "Bank of India", "Indian Bank",
-        "Central Bank of India", "UCO Bank", "Bank of Maharashtra",
-        "Punjab & Sind Bank", "Allahabad Bank", "HDFC Bank", "ICICI Bank",
-        "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank", "Yes Bank",
-        "IDFC First Bank", "Federal Bank", "South Indian Bank", "RBL Bank",
-        "Andhra Pradesh Grameena Vikas Bank", "Kerala Gramin Bank",
-        "Madhya Pradesh Gramin Bank", "Baroda Uttar Pradesh Gramin Bank",
-        "Uttar Pradesh Gramin Bank", "Saraswat Co-operative Bank",
-        "Bassein Catholic Co-operative Bank", "Cosmos Cooperative Bank",
-        "TJSB Sahakari Bank", "Jila Sahakari Bank"
+        "ARYAVRAT BANK", "Axis Bank", "Bank of Baroda",
+        "Baroda Uttar Pradesh Gramin Bank", "Canara Bank",
+        "Central Bank of India", "HDFC Bank", "ICICI Bank",
+        "IDFC First Bank", "Indian Bank", "IndusInd Bank",
+        "Jila Sahakari Bank", "Kotak Mahindra Bank", "Bank of Maharashtra",
+        "Punjab & Sind Bank", "Punjab National Bank", "RBL Bank",
+        "South Indian Bank", "State Bank of India", "UCO Bank",
+        "Union Bank of India", "Yes Bank", "Federal Bank", "Allahabad Bank",
+        "Andhra Pradesh Grameena Vikas Bank", "Bassein Catholic Co-operative Bank",
+        "Cosmos Cooperative Bank", "Kerala Gramin Bank", "Madhya Pradesh Gramin Bank",
+        "Saraswat Co-operative Bank", "TJSB Sahakari Bank"
     ]
 };
 
@@ -93,12 +93,31 @@ export const transactionCategories = {
 };
 
 export const bankBranches: BankBranch[] = [
-    { bankName: "State Bank of India", branchName: "Main Branch, Delhi", ifscCode: "SBIN0000691" },
-    { bankName: "State Bank of India", branchName: "Commercial Branch, Mumbai", ifscCode: "SBIN0004577" },
-    { bankName: "HDFC Bank", branchName: "Connaught Place, New Delhi", ifscCode: "HDFC0000003" },
-    { bankName: "HDFC Bank", branchName: "Fort, Mumbai", ifscCode: "HDFC0000060" },
-    { bankName: "ICICI Bank", branchName: "Nariman Point, Mumbai", ifscCode: "ICIC0000004" },
-    { bankName: "ICICI Bank", branchName: "Chandni Chowk, Delhi", ifscCode: "ICIC0000007" },
-    { bankName: "Punjab National Bank", branchName: "Parliament Street, New Delhi", ifscCode: "PUNB0307900" },
-    { bankName: "Bank of Baroda", branchName: "Mandvi, Vadodara", ifscCode: "BARB0MANDVI" }
+    { bankName: "ARYAVRAT BANK", branchName: "BENI RAJAPUR", ifscCode: "BKID0ARYAGB" },
+    { bankName: "Axis Bank", branchName: "KHUTAR KHS", ifscCode: "UTIB0002539" },
+    { bankName: "Bank of Baroda", branchName: "BANDA", ifscCode: "BARB0BANDAX" },
+    { bankName: "Bank of Baroda", branchName: "DHAKAGHANSHYAM", ifscCode: "BARB0DHAKAG" },
+    { bankName: "Bank of Baroda", branchName: "MAQSOODAPUR", ifscCode: "BARB0MAQSOO" },
+    { bankName: "Bank of Baroda", branchName: "PILIBHIT", ifscCode: "BARB0PILIBH" },
+    { bankName: "Bank of Baroda", branchName: "PIPARIA", ifscCode: "BARB0PIPSHA" },
+    { bankName: "Baroda Uttar Pradesh Gramin Bank", branchName: "NAVEECHI", ifscCode: "BARB0BUPGBX" },
+    { bankName: "Baroda Uttar Pradesh Gramin Bank", branchName: "DHARMAPUR", ifscCode: "BARB0BUPGBX" },
+    { bankName: "HDFC Bank", branchName: "BANDA", ifscCode: "HDFC0004846" },
+    { bankName: "HDFC Bank", branchName: "Unknown Branch", ifscCode: "HDFC0000283" },
+    { bankName: "Indian Bank", branchName: "BANDA", ifscCode: "IDIB000B598" },
+    { bankName: "Indian Bank", branchName: "CORPORATE OFFICE", ifscCode: "IPOS0000001" },
+    { bankName: "Indian Bank", branchName: "KHANJANPUR", ifscCode: "IDIB000K823" },
+    { bankName: "Indian Bank", branchName: "PILIBHIT", ifscCode: "BKID0007024" }, // As noted, this looks like a Bank of India IFSC
+    { bankName: "Jila Sahakari Bank", branchName: "BANDA (ICICI)", ifscCode: "ICIC00SJDCB" },
+    { bankName: "Jila Sahakari Bank", branchName: "BANDA (UP COOP)", ifscCode: "UPCB00SJDCB" },
+    { bankName: "Punjab National Bank", branchName: "BANDA", ifscCode: "PUNB0162210" },
+    { bankName: "Punjab National Bank", branchName: "DEVKALI", ifscCode: "PUNB0031210" },
+    { bankName: "Punjab National Bank", branchName: "SHAHJAHANPUR", ifscCode: "PUNB0017510" },
+    { bankName: "Punjab & Sind Bank", branchName: "DABORA SEWA", ifscCode: "PSIB0000494" },
+    { bankName: "Punjab & Sind Bank", branchName: "MAJHIGAWA", ifscCode: "PSIB0000671" },
+    { bankName: "Punjab & Sind Bank", branchName: "PIPARIYA", ifscCode: "PSIB0000671" },
+    { bankName: "State Bank of India", branchName: "BANDA (2557)", ifscCode: "SBIN0002557" },
+    { bankName: "State Bank of India", branchName: "BANDA (11186)", ifscCode: "SBIN0011186" },
+    { bankName: "State Bank of India", branchName: "JARWAL ROAD", ifscCode: "SBIN0010878" },
+    { bankName: "Union Bank of India", branchName: "SHAHJAHANPUR", ifscCode: "UBIN0538817" },
 ];
