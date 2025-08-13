@@ -429,50 +429,13 @@ export default function RtgspaymentClient() {
 
   return (
     <div className="space-y-8">
-       <Card>
-        <CardContent className="p-3 flex flex-col sm:flex-row items-start justify-between gap-4">
-            <div className="w-full sm:w-auto sm:min-w-80 space-y-2">
-                 <div className="flex items-center gap-3">
-                    <Users className="h-5 w-5 text-primary" />
-                    <h3 className="text-base font-semibold">Search Supplier</h3>
-                </div>
-                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                        type="search"
-                        placeholder="Search by name or contact..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                    />
-                     {searchQuery && (
-                        <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setSearchQuery('')}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    )}
-                 </div>
-                 {searchQuery && (
-                    <div className="relative">
-                        <div className="absolute top-full mt-1 w-full bg-background border rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
-                            {searchResults.length > 0 ? (
-                                searchResults.map(supplier => (
-                                    <div 
-                                        key={supplier.id} 
-                                        className="p-3 hover:bg-accent cursor-pointer"
-                                        onClick={() => handleSupplierSelect(supplier)}
-                                    >
-                                        <p className="font-semibold">{toTitleCase(supplier.name)}</p>
-                                        <p className="text-sm text-muted-foreground">{supplier.contact}</p>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="p-3 text-muted-foreground text-sm">No suppliers found.</p>
-                            )}
-                        </div>
-                    </div>
-                 )}
-            </div>
-             <div className="w-full sm:w-auto flex items-end">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Customer Details */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                 <CardTitle>Supplier Details</CardTitle>
                  {selectedSupplierId && (
                       <Dialog>
                         <DialogTrigger asChild>
@@ -536,26 +499,58 @@ export default function RtgspaymentClient() {
                         </DialogContent>
                       </Dialog>
                   )}
-            </div>
-        </CardContent>
-      </Card>
-      
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Customer Details */}
-          <Card>
-            <CardHeader><CardTitle>Supplier Details</CardTitle></CardHeader>
+              </div>
+            </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="search">Search Supplier</Label>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        id="search"
+                        type="search"
+                        placeholder="Search by name or contact..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                    />
+                      {searchQuery && (
+                        <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setSearchQuery('')}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    )}
+                 </div>
+                 {searchQuery && (
+                    <div className="relative">
+                        <div className="absolute top-full mt-1 w-full bg-background border rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                            {searchResults.length > 0 ? (
+                                searchResults.map(supplier => (
+                                    <div 
+                                        key={supplier.id} 
+                                        className="p-3 hover:bg-accent cursor-pointer"
+                                        onClick={() => handleSupplierSelect(supplier)}
+                                    >
+                                        <p className="font-semibold">{toTitleCase(supplier.name)}</p>
+                                        <p className="text-sm text-muted-foreground">{supplier.contact}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="p-3 text-muted-foreground text-sm">No suppliers found.</p>
+                            )}
+                        </div>
+                    </div>
+                 )}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" {...form.register("name")} />
+                <Input id="name" {...form.register("name")} readOnly />
                 {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
               </div>
-              <div className="space-y-2"><Label htmlFor="fatherName">Father Name</Label><Input id="fatherName" {...form.register("fatherName")} /></div>
-              <div className="space-y-2"><Label htmlFor="mobileNo">Contact No.</Label><Input id="mobileNo" {...form.register("mobileNo")} /></div>
-              <div className="space-y-2"><Label htmlFor="address">Address</Label><Input id="address" {...form.register("address")} /></div>
-              <div className="space-y-2"><Label htmlFor="parchiName">Parchi Name</Label><Input id="parchiName" {...form.register("parchiName")} /></div>
-              <div className="space-y-2"><Label htmlFor="parchiAddress">Parchi Address</Label><Input id="parchiAddress" {...form.register("parchiAddress")} /></div>
+              <div className="space-y-2"><Label htmlFor="fatherName">Father Name</Label><Input id="fatherName" {...form.register("fatherName")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="mobileNo">Contact No.</Label><Input id="mobileNo" {...form.register("mobileNo")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="address">Address</Label><Input id="address" {...form.register("address")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="parchiName">Parchi Name</Label><Input id="parchiName" {...form.register("parchiName")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="parchiAddress">Parchi Address</Label><Input id="parchiAddress" {...form.register("parchiAddress")} readOnly /></div>
             </CardContent>
           </Card>
 
@@ -563,10 +558,10 @@ export default function RtgspaymentClient() {
           <Card>
             <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" {...form.register("acNo")} /></div>
-              <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" {...form.register("ifscCode")} /></div>
-              <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" {...form.register("bank")} /></div>
-              <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" {...form.register("branch")} /></div>
+              <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" {...form.register("acNo")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" {...form.register("ifscCode")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" {...form.register("bank")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" {...form.register("branch")} readOnly /></div>
             </CardContent>
           </Card>
 
