@@ -53,18 +53,13 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <div className="text-muted-foreground">{icon}</div>
-    </CardHeader>
-    <CardContent>
-      <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
-      {description && <p className="text-xs text-muted-foreground">{description}</p>}
-    </CardContent>
-  </Card>
+const SummaryDetailItem = ({ label, value, colorClass }: { label: string, value: string | number, colorClass?: string }) => (
+    <div className="flex justify-between items-center text-sm">
+        <p className="text-muted-foreground">{label}</p>
+        <p className={cn("font-semibold", colorClass)}>{value}</p>
+    </div>
 );
+
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
@@ -295,24 +290,62 @@ export default function SupplierProfilePage() {
                         {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {/* Operational Stats */}
-                    <StatCard title="Total Gross Weight" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} icon={<Box />} />
-                    <StatCard title="Total Net Weight" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} icon={<Weight />} />
-                    <StatCard title="Average Rate" value={`${formatCurrency(selectedSupplierData.averageRate || 0)}`} icon={<Calculator />} />
-                    <StatCard title="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} icon={<Briefcase />} description={`${selectedSupplierData.totalOutstandingTransactions} outstanding`}/>
+                <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Column 1: Operational */}
+                    <Card className="bg-card/50">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><Briefcase size={16}/> Operational Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2 space-y-2">
+                            <SummaryDetailItem label="Total Gross Weight" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Total Net Weight" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Average Rate" value={`${formatCurrency(selectedSupplierData.averageRate || 0)}`} />
+                            <SummaryDetailItem label="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} />
+                            <SummaryDetailItem label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions}`} />
+                        </CardContent>
+                    </Card>
+
+                    {/* Column 2: Financial */}
+                    <Card className="bg-card/50">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2 space-y-2">
+                            <SummaryDetailItem label="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalAmount)}`} />
+                            <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid)}`} colorClass="text-green-500" />
+                            <SummaryDetailItem label="Total CD Granted" value={`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
+                            <Separator className="my-2"/>
+                             <div className="flex justify-between items-center text-base">
+                                <p className="font-semibold text-muted-foreground">Total Outstanding</p>
+                                <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                     
-                    {/* Financial Stats */}
-                    <StatCard title="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalAmount)}`} icon={<Banknote />} />
-                    <StatCard title="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid)}`} icon={<Wallet />} colorClass="text-green-500" />
-                    <StatCard title="Total Outstanding" value={`${formatCurrency(selectedSupplierData.totalOutstanding)}`} icon={<Banknote />} colorClass="text-destructive" />
-                    <StatCard title="Total CD Granted" value={`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} icon={<Percent />} />
-                    
-                    {/* Deduction Stats */}
-                    <StatCard title="Total Karta" value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} icon={<Percent />} />
-                    <StatCard title="Total Laboury" value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} icon={<Users />} />
-                    <StatCard title="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} icon={<Landmark />} />
-                    <StatCard title="Total Other Charges" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} icon={<CircleDollarSign />} />
+                    {/* Column 3: Deductions */}
+                     <Card className="bg-card/50">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><CircleDollarSign size={16}/> Deductions Analysis</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2 space-y-2">
+                            <SummaryDetailItem label="Total Karta" value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Laboury" value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
+                            <SummaryDetailItem label="Total Other Charges" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
+                             <Separator className="my-2"/>
+                            <div className="flex justify-between items-center text-base">
+                                <p className="font-semibold text-muted-foreground">Total Deductions</p>
+                                <p className="font-bold text-lg text-destructive/80">
+                                    {formatCurrency(
+                                        (selectedSupplierData.totalKartaAmount || 0) +
+                                        (selectedSupplierData.totalLabouryAmount || 0) +
+                                        (selectedSupplierData.totalKanta || 0) +
+                                        (selectedSupplierData.totalOtherCharges || 0)
+                                    )}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </CardContent>
             </Card>
 
