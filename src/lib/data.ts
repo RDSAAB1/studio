@@ -1,4 +1,4 @@
-import type { Customer, Transaction, FundTransaction, BankBranch } from "./definitions";
+import type { Customer, Transaction, FundTransaction, BankBranch, Bank } from "./definitions";
 
 export const initialCustomers: Customer[] = [
     {
@@ -47,6 +47,51 @@ export const appOptionsData = {
     receiptTypes: ['Cash', 'Online'],
     paymentTypes: ['Full', 'Partial'],
 };
+
+export const bankNames = [
+    "SBI - State Bank of India", "PNB - Punjab National Bank", "BoB - Bank of Baroda", "CB - Canara Bank",
+    "UBI - Union Bank of India", "BoI - Bank of India", "IB - Indian Bank", "CBI - Central Bank of India",
+    "UCO - UCO Bank", "BoM - Bank of Maharashtra", "P&S - Punjab & Sind Bank", "AB - Allahabad Bank",
+    "HDFC - HDFC Bank", "ICICI - ICICI Bank", "Axis - Axis Bank", "Kotak - Kotak Mahindra Bank",
+    "IndusInd - IndusInd Bank", "Yes - Yes Bank", "IDFC - IDFC First Bank", "Federal - Federal Bank",
+    "SIB - South Indian Bank", "RBL - RBL Bank", "APGVB - Andhra Pradesh Grameena Vikas Bank",
+    "KGB - Kerala Gramin Bank", "MPGB - Madhya Pradesh Gramin Bank", "BUPGB - Baroda Uttar Pradesh Gramin Bank",
+    "UPGB - Uttar Pradesh Gramin Bank", "Saraswat - Saraswat Co-operative Bank",
+    "BCCB - Bassein Catholic Co-operative Bank", "Cosmos - Cosmos Cooperative Bank",
+    "TJSB - TJSB Sahakari Bank", "Jila - Jila Sahakari Bank", "ARYAVRAT BANK"
+];
+
+
+export const bankBranches: Omit<BankBranch, 'id'>[] = [
+    { bankName: "ARYAVRAT BANK", branchName: "BENI RAJAPUR", ifscCode: "BKID0ARYAGB" },
+    { bankName: "Axis Bank", branchName: "KHUTAR KHS", ifscCode: "UTIB0002539" },
+    { bankName: "Bank of Baroda", branchName: "BANDA", ifscCode: "BARB0BANDAX" },
+    { bankName: "Bank of Baroda", branchName: "DHAKAGHANSHYAM", ifscCode: "BARB0DHAKAG" },
+    { bankName: "Bank of Baroda", branchName: "MAQSOODAPUR", ifscCode: "BARB0MAQSOO" },
+    { bankName: "Bank of Baroda", branchName: "PILIBHIT", ifscCode: "BARB0PILIBH" },
+    { bankName: "Bank of Baroda", branchName: "PIPARIA", ifscCode: "BARB0PIPSHA" },
+    { bankName: "Baroda Uttar Pradesh Gramin Bank", branchName: "NAVEECHI", ifscCode: "BARB0BUPGBX" },
+    { bankName: "Baroda Uttar Pradesh Gramin Bank", branchName: "DHARMAPUR", ifscCode: "BARB0BUPGBX" },
+    { bankName: "HDFC Bank", branchName: "BANDA", ifscCode: "HDFC0004846" },
+    { bankName: "HDFC Bank", branchName: "Unknown", ifscCode: "HDFC0000283" },
+    { bankName: "Indian Bank", branchName: "BANDA", ifscCode: "IDIB000B598" },
+    { bankName: "Indian Bank", branchName: "CORPORATE OFFICE", ifscCode: "IPOS0000001" },
+    { bankName: "Indian Bank", branchName: "KHANJANPUR", ifscCode: "IDIB000K823" },
+    { bankName: "Indian Bank", branchName: "PILIBHIT", ifscCode: "BKID0007024" },
+    { bankName: "Jila Sahakari Bank", branchName: "BANDA (ICICI)", ifscCode: "ICIC00SJDCB" },
+    { bankName: "Jila Sahakari Bank", branchName: "BANDA (UPCB)", ifscCode: "UPCB00SJDCB" },
+    { bankName: "Punjab National Bank", branchName: "BANDA", ifscCode: "PUNB0162210" },
+    { bankName: "Punjab National Bank", branchName: "DEVKALI", ifscCode: "PUNB0031210" },
+    { bankName: "Punjab National Bank", branchName: "SHAHJAHANPUR", ifscCode: "PUNB0017510" },
+    { bankName: "Punjab & Sind Bank", branchName: "DABORA SEWA", ifscCode: "PSIB0000494" },
+    { bankName: "Punjab & Sind Bank", branchName: "MAJHIGAWA", ifscCode: "PSIB0000671" },
+    { bankName: "Punjab & Sind Bank", branchName: "PIPARIYA", ifscCode: "PSIB0000671" },
+    { bankName: "State Bank of India", branchName: "BANDA", ifscCode: "SBIN0002557" },
+    { bankName: "State Bank of India", branchName: "BANDA", ifscCode: "SBIN0011186" },
+    { bankName: "State Bank of India", branchName: "JARWAL ROAD", ifscCode: "SBIN0010878" },
+    { bankName: "Union Bank of India", branchName: "SHAHJAHANPUR", ifscCode: "UBIN0538817" },
+];
+
 
 export const transactionCategories = {
     Income: {

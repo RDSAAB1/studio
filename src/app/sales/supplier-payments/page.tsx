@@ -46,7 +46,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { appOptionsData } from "@/lib/data";
+import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
 
 
 import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
@@ -149,9 +149,9 @@ export default function SupplierPaymentsPage() {
     }, 0);
     return formatPaymentId(lastPaymentNum + 1);
   }, []);
-
+  
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
-
+  
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
     
@@ -251,10 +251,23 @@ export default function SupplierPaymentsPage() {
 
   const isLoadingInitial = loading && suppliers.length === 0;
   
+  const combinedBankBranches = useMemo(() => {
+    const combined = [...staticBankBranches.map(b => ({...b, id: b.ifscCode+b.branchName})), ...bankBranches];
+    const uniqueBranches = Array.from(new Map(combined.map(item => [item.ifscCode + item.branchName, item])).values());
+    return uniqueBranches;
+  }, [bankBranches]);
+
+  const combinedBanks = useMemo(() => {
+      const allBankNames = new Set([...bankNames, ...banks.map(b => b.name)]);
+      return Array.from(allBankNames).sort();
+  }, [banks]);
+
+
   const availableBranches = useMemo(() => {
     if (!bankDetails.bank) return [];
-    return bankBranches.filter(branch => branch.bankName === bankDetails.bank);
-  }, [bankDetails.bank, bankBranches]);
+     const selectedBankName = bankDetails.bank.split(' - ')[0].trim();
+    return combinedBankBranches.filter(branch => branch.bankName.toLowerCase().includes(selectedBankName.toLowerCase()));
+  }, [bankDetails.bank, combinedBankBranches]);
 
   useEffect(() => {
     setIsClient(true);
@@ -1066,16 +1079,16 @@ export default function SupplierPaymentsPage() {
                                                  <CommandInput placeholder="Search bank..." />
                                                  <CommandEmpty>No bank found.</CommandEmpty>
                                                  <CommandList>
-                                                     {banks.map((bank) => (
+                                                     {combinedBanks.map((bank) => (
                                                          <CommandItem
-                                                             key={bank.id}
-                                                             value={bank.name}
+                                                             key={bank}
+                                                             value={bank}
                                                              onSelect={(currentValue) => {
                                                                  setBankDetails(prev => ({...prev, bank: currentValue === prev.bank ? "" : currentValue, branch: '', ifscCode: ''}));
                                                              }}
                                                          >
-                                                             <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank.name ? "opacity-100" : "opacity-0")} />
-                                                             {bank.name}
+                                                             <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />
+                                                             {bank}
                                                          </CommandItem>
                                                      ))}
                                                  </CommandList>
@@ -1099,7 +1112,7 @@ export default function SupplierPaymentsPage() {
                                                 <CommandList>
                                                     {availableBranches.map((branch) => (
                                                         <CommandItem
-                                                            key={branch.id}
+                                                            key={branch.id || branch.ifscCode + branch.branchName}
                                                             value={branch.branchName}
                                                             onSelect={(currentValue) => {
                                                                 handleBranchSelect(currentValue);
@@ -1467,7 +1480,7 @@ export default function SupplierPaymentsPage() {
                             <Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}>
                                 <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
                                 <SelectContent>
-                                    {banks.map(bank => <SelectItem key={bank.id} value={bank.name}>{bank.name}</SelectItem>)}
+                                    {combinedBanks.map(bank => <SelectItem key={bank} value={bank}>{bank}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
