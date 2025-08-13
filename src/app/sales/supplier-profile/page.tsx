@@ -27,13 +27,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart as RechartsAreaChart } from 'recharts';
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart, CircleDollarSign, Download, Printer } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -839,12 +840,10 @@ export default function SupplierProfilePage() {
       
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
           <DialogContent className="max-w-4xl p-0">
-             <DialogHeader className="p-4">
-                <DialogTitle className="sr-only">Account Statement for {selectedSupplierData?.name}</DialogTitle>
-                <DialogDescription className="sr-only">
-                    A detailed account statement of all transactions and payments.
-                </DialogDescription>
-             </DialogHeader>
+            <DialogHeader className="p-4 sr-only">
+                <DialogTitle>Account Statement for {selectedSupplierData?.name}</DialogTitle>
+                <DialogDescription>A detailed account statement of all transactions and payments.</DialogDescription>
+            </DialogHeader>
               <StatementPreview data={selectedSupplierData} />
               <DialogFooter className="p-4 border-t">
                     <Button variant="outline" onClick={() => setIsStatementOpen(false)}>Close</Button>
