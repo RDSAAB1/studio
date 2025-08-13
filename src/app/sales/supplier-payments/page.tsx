@@ -291,7 +291,8 @@ export default function SupplierPaymentsPage() {
         const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
         setPaymentAmount(Math.round(finalAmount));
     } else if (paymentType === 'Partial') {
-        setPaymentAmount(0); // Reset for manual input
+        // For partial, don't auto-set. Let user input.
+        // setPaymentAmount(0); // Reset for manual input
         setCdAt('payment_amount'); // Auto-select the only valid option
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
@@ -331,12 +332,15 @@ export default function SupplierPaymentsPage() {
   }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory, paymentType]);
 
    useEffect(() => {
-        const newAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
-        setPaymentAmount(newAmount);
-        if (paymentMethod === 'RTGS') {
-            setTargetAmount(newAmount);
+        if(paymentType === 'Full') {
+            const newAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
+            setPaymentAmount(newAmount);
         }
-   }, [totalOutstandingForSelected, calculatedCdAmount, paymentMethod]);
+        if (paymentMethod === 'RTGS') {
+            const newTarget = paymentType === 'Full' ? Math.round(totalOutstandingForSelected - calculatedCdAmount) : paymentAmount;
+            setTargetAmount(newTarget);
+        }
+   }, [totalOutstandingForSelected, calculatedCdAmount, paymentMethod, paymentAmount, paymentType]);
    
   const clearForm = () => {
     setSelectedEntryIds(new Set());
@@ -883,35 +887,6 @@ export default function SupplierPaymentsPage() {
                     </div>
                 </div>
 
-                <TabsContent value="Cash" className="mt-4">
-                     <Card className="mt-6 bg-muted/30">
-                        <CardHeader><CardTitle className="text-base">Finalize Cash Payment</CardTitle></CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
-                            {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
-                            <Separator/>
-                            <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
-                        </CardContent>
-                        <CardFooter className="flex justify-end">
-                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                        </CardFooter>
-                    </Card>
-                </TabsContent>
-                <TabsContent value="Online" className="mt-4">
-                     <Card className="mt-6 bg-muted/30">
-                        <CardHeader><CardTitle className="text-base">Finalize Online Payment</CardTitle></CardHeader>
-                        <CardContent className="space-y-2">
-                             <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
-                            {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
-                            <Separator/>
-                            <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
-                        </CardContent>
-                        <CardFooter className="flex justify-end">
-                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                        </CardFooter>
-                    </Card>
-                </TabsContent>
-
                 <TabsContent value="RTGS" className="mt-4">
                   <Card>
                     <CardHeader><CardTitle className="text-base">RTGS Details & Payment Generator</CardTitle></CardHeader>
@@ -1005,6 +980,34 @@ export default function SupplierPaymentsPage() {
                         </Card>
                     </CardContent>
                   </Card>
+                </TabsContent>
+                <TabsContent value="Cash" className="mt-4">
+                     <Card className="mt-6 bg-muted/30">
+                        <CardHeader><CardTitle className="text-base">Finalize Cash Payment</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                            {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                            <Separator/>
+                            <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                        </CardContent>
+                        <CardFooter className="flex justify-end">
+                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="Online" className="mt-4">
+                     <Card className="mt-6 bg-muted/30">
+                        <CardHeader><CardTitle className="text-base">Finalize Online Payment</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                             <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                            {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                            <Separator/>
+                            <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                        </CardContent>
+                        <CardFooter className="flex justify-end">
+                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                        </CardFooter>
+                    </Card>
                 </TabsContent>
               </Tabs>
             </CardContent>
