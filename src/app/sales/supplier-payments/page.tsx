@@ -40,6 +40,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from 'date-fns';
+import { Badge } from "@/components/ui/badge";
 
 
 import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
@@ -170,7 +171,7 @@ export default function SupplierPaymentsPage() {
     suppliers.forEach(supplier => {
         if (!supplier.customerId) return;
         const data = summary.get(supplier.customerId)!;
-        const netAmount = parseFloat(String(supplier.netAmount));
+        const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
         data.totalOutstanding += netAmount;
     });
     
@@ -320,27 +321,27 @@ export default function SupplierPaymentsPage() {
 
                 const outstandingBalances: { [key: string]: number } = {};
                 involvedSupplierDocs.forEach((docSnap, srNo) => {
-                    outstandingBalances[srNo] = Number(docSnap.data().netAmount);
+                    outstandingBalances[srNo] = Math.round(Number(docSnap.data().netAmount));
                 });
 
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(detail => {
                         if (outstandingBalances[detail.srNo] !== undefined) {
-                            outstandingBalances[detail.srNo] += detail.amount;
+                            outstandingBalances[detail.srNo] += Math.round(detail.amount);
                         }
                     });
                 }
                 
-                let remainingPayment = paymentAmount + calculatedCdAmount;
+                let remainingPayment = Math.round(paymentAmount + calculatedCdAmount);
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 
                 sortedEntries.forEach(entryData => {
-                    if (remainingPayment > 0.001) {
+                    if (remainingPayment > 0) {
                         let outstanding = outstandingBalances[entryData.srNo];
                         const amountToPay = Math.min(outstanding, remainingPayment);
 
-                        if (amountToPay > 0.001) {
+                        if (amountToPay > 0) {
                             const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
                             paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
                             
@@ -350,7 +351,7 @@ export default function SupplierPaymentsPage() {
                     }
                 });
 
-                if (remainingPayment > 0.001 && sortedEntries.length > 0) {
+                if (remainingPayment > 0 && sortedEntries.length > 0) {
                     const lastEntrySrNo = sortedEntries[sortedEntries.length - 1].srNo;
                     if (outstandingBalances[lastEntrySrNo] >= remainingPayment) {
                         outstandingBalances[lastEntrySrNo] -= remainingPayment;
@@ -374,8 +375,8 @@ export default function SupplierPaymentsPage() {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
                     customerId: selectedCustomerKey,
                     date: new Date().toISOString().split("T")[0],
-                    amount: paymentAmount,
-                    cdAmount: calculatedCdAmount,
+                    amount: Math.round(paymentAmount),
+                    cdAmount: Math.round(calculatedCdAmount),
                     cdApplied: cdEnabled,
                     type: paymentType,
                     receiptType: paymentMethod, // Use the new state here
@@ -457,7 +458,7 @@ export default function SupplierPaymentsPage() {
                         const supplierDoc = supplierDocsQuery.docs[0];
                         const currentNetAmount = Number(supplierDoc.data().netAmount);
                         const newNetAmount = currentNetAmount + detail.amount;
-                        transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
+                        transaction.update(supplierDoc.ref, { netAmount: Math.round(newNetAmount) });
                     }
                 }
                 
