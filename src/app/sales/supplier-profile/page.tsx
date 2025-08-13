@@ -54,7 +54,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 );
 
 const SummaryDetailItem = ({ label, value, colorClass }: { label: string, value: string | number, colorClass?: string }) => (
-    <div className="flex justify-between items-center text-sm">
+    <div className="flex justify-between items-center text-sm py-1">
         <p className="text-muted-foreground">{label}</p>
         <p className={cn("font-semibold", colorClass)}>{value}</p>
     </div>
@@ -156,7 +156,7 @@ export default function SupplierProfilePage() {
     paymentHistory.forEach(p => {
         if (p.customerId && summary.has(p.customerId)) {
             const data = summary.get(p.customerId)!;
-            data.totalPaid += p.amount;
+            data.totalPaid += p.amount + (p.cdAmount || 0); // Total paid includes CD amount
             data.totalCdAmount! += (p.cdAmount || 0);
             data.paymentHistory.push(p);
         }
