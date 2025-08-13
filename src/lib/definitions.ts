@@ -2,6 +2,7 @@
 
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -102,9 +103,18 @@ export type Payment = {
     grNo?: string;
     grDate?: string;
     parchiNo?: string;
+    utrNo?: string;
+    checkNo?: string;
     quantity?: number;
     rate?: number;
     rtgsAmount?: number;
+    supplierName?: string;
+    supplierFatherName?: string;
+    supplierAddress?: string;
+    bankName?: string;
+    bankBranch?: string;
+    bankAcNo?: string;
+    bankIfsc?: string;
 }
 
 export type CustomerSummary = {

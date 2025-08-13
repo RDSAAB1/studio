@@ -264,12 +264,15 @@ export default function SupplierPaymentsPage() {
 
   const availableBranches = useMemo(() => {
     if (!bankDetails.bank) return [];
-    const selectedBankNameLower = bankDetails.bank.toLowerCase();
+    const selectedBankName = bankDetails.bank;
+    // Handle cases like "SBI - State Bank of India"
+    const simpleBankName = selectedBankName.split(' - ')[0].toLowerCase();
+    
     return combinedBankBranches.filter(branch => {
         const branchBankNameLower = branch.bankName.toLowerCase();
         // Check if the branch's bank name includes the selected bank's full name or if the selected bank name includes the branch's bank name
         // This handles cases like "SBI" matching "State Bank of India"
-        return branchBankNameLower.includes(selectedBankNameLower) || selectedBankNameLower.includes(branchBankNameLower);
+        return branchBankNameLower.includes(simpleBankName) || simpleBankName.includes(branchBankNameLower);
     });
   }, [bankDetails.bank, combinedBankBranches]);
 
@@ -467,6 +470,7 @@ export default function SupplierPaymentsPage() {
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
                 
+                // --- Supplier document handling and outstanding balance calculation ---
                 const involvedSupplierDocs = new Map<string, any>();
                 const allInvolvedSrNos = new Set<string>();
                 if (tempEditingPayment) {
@@ -497,6 +501,7 @@ export default function SupplierPaymentsPage() {
                     });
                 }
                 
+                // --- Payment distribution logic ---
                 let remainingPayment = Math.round(finalPaymentAmount + calculatedCdAmount);
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -528,14 +533,16 @@ export default function SupplierPaymentsPage() {
                     }
                 }
 
+                // --- Update supplier documents in transaction ---
                 for (const srNo in outstandingBalances) {
                     const newBalance = Math.round(outstandingBalances[srNo]);
                     const supplierDocSnap = involvedSupplierDocs.get(srNo);
                      if (supplierDocSnap) {
-                        transaction.update(supplierDocSnap.ref, { netAmount: newBalance });
+                        transaction.update(supplierDocSnap.ref, { netAmount: newBalance, ...bankDetails });
                     }
                 }
                 
+                // --- Prepare and save payment document ---
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
                     customerId: selectedCustomerKey,
@@ -547,11 +554,22 @@ export default function SupplierPaymentsPage() {
                     receiptType: paymentMethod,
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: paidForDetails,
+                    // RTGS Fields
                     grNo,
                     parchiNo,
+                    utrNo,
+                    checkNo,
                     quantity: rtgsQuantity,
                     rate: rtgsRate,
-                    rtgsAmount: rtgsAmount,
+                    rtgsAmount,
+                    // Supplier and Bank details at time of payment
+                    supplierName: supplierDetails.name,
+                    supplierFatherName: supplierDetails.fatherName,
+                    supplierAddress: supplierDetails.address,
+                    bankName: bankDetails.bank,
+                    bankBranch: bankDetails.branch,
+                    bankAcNo: bankDetails.acNo,
+                    bankIfsc: bankDetails.ifscCode,
                 };
 
                 if (tempEditingPayment) {
@@ -601,14 +619,26 @@ export default function SupplierPaymentsPage() {
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
         setSelectedEntryIds(newSelectedEntryIds);
-        setUtrNo(paymentToEdit.notes?.match(/UTR: (.*?)(,|$)/)?.[1].trim() || '');
-        setCheckNo(paymentToEdit.notes?.match(/Check: (.*?)(,|$)/)?.[1].trim() || '');
+        setUtrNo(paymentToEdit.utrNo || '');
+        setCheckNo(paymentToEdit.checkNo || '');
         setGrNo(paymentToEdit.grNo || '');
         setParchiNo(paymentToEdit.parchiNo || '');
         setRtgsQuantity(paymentToEdit.quantity || 0);
         setRtgsRate(paymentToEdit.rate || 0);
         setRtgsAmount(paymentToEdit.rtgsAmount || 0);
-    
+        setSupplierDetails({
+            name: paymentToEdit.supplierName || '',
+            fatherName: paymentToEdit.supplierFatherName || '',
+            address: paymentToEdit.supplierAddress || '',
+            contact: '' // Contact not stored in payment, would need to fetch from supplier if needed
+        });
+        setBankDetails({
+            acNo: paymentToEdit.bankAcNo || '',
+            ifscCode: paymentToEdit.bankIfsc || '',
+            bank: paymentToEdit.bankName || '',
+            branch: paymentToEdit.bankBranch || '',
+        });
+
         toast({
             title: "Editing Mode",
             description: `Editing payment ${paymentToEdit.paymentId}. Associated entries have been selected.`,
