@@ -34,13 +34,15 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 
 import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
@@ -86,8 +88,14 @@ export default function SupplierPaymentsPage() {
   
   // RTGS specific fields
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
+  const [grNo, setGrNo] = useState('');
+  const [grDate, setGrDate] = useState<Date | undefined>(new Date());
+  const [parchiNo, setParchiNo] = useState('');
+  const [parchiDate, setParchiDate] = useState<Date | undefined>(new Date());
   const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
+  const [targetAmount, setTargetAmount] = useState(0);
+  const [generatedPayments, setGeneratedPayments] = useState<any[]>([]);
   
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
@@ -100,6 +108,7 @@ export default function SupplierPaymentsPage() {
   const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
+  const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
   
   const stableToast = useCallback(toast, []);
 
@@ -159,7 +168,6 @@ export default function SupplierPaymentsPage() {
                 totalAmount: 0,
                 totalPaid: 0,
                 outstandingEntryIds: [],
-                // Bank details for RTGS
                 acNo: s.acNo,
                 ifscCode: s.ifscCode,
                 bank: s.bank,
@@ -226,13 +234,16 @@ export default function SupplierPaymentsPage() {
     }
     setCdEnabled(cdEligibleEntries.length > 0);
   }, [selectedEntries.length, cdEligibleEntries.length]);
-
+  
   useEffect(() => {
     if (paymentType === 'Full' && !editingPayment) {
         const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
         setPaymentAmount(Math.round(finalAmount));
+    } else if (paymentType === 'Partial') {
+        setPaymentAmount(0); // Reset for manual input
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
+
 
   useEffect(() => {
     autoSetCDToggle();
@@ -252,23 +263,33 @@ export default function SupplierPaymentsPage() {
           return acc + paymentsForThisEntry.reduce((sum, p) => sum + (p.paidFor?.find(pf => pf.srNo === entry.srNo)?.amount || 0), 0);
       }, 0);
       
-      if (cdAt === 'payment_amount') {
+       if (paymentType === 'Partial') {
           base = currentPaymentAmount;
-      } else if (cdAt === 'unpaid_amount') {
-          base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
-      } else if (cdAt === 'full_amount') {
-          const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
-          base = totalOriginalAmount - amountWithCDAlready;
-      } else if (cdAt === 'paid_amount') {
-            const totalPaidForEligible = cdEligibleEntries.reduce((acc, entry) => {
-              const paidAmount = paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0);
-              return acc + paidAmount;
-          }, 0);
-          base = totalPaidForEligible - amountWithCDAlready;
-      }
+       } else {
+          if (cdAt === 'unpaid_amount') {
+              base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
+          } else if (cdAt === 'full_amount') {
+              const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
+              base = totalOriginalAmount - amountWithCDAlready;
+          }
+       }
       
       setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
-  }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory]);
+  }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory, paymentType]);
+
+   useEffect(() => {
+        setTargetAmount(Math.round(totalOutstandingForSelected - calculatedCdAmount));
+   }, [totalOutstandingForSelected, calculatedCdAmount]);
+   
+   const handleGeneratePayments = () => {
+        if(targetAmount <= 0) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Target amount must be greater than 0.' });
+            return;
+        }
+        // This is a placeholder logic. In a real scenario, this would involve more complex
+        // logic to break down the payment or suggest options.
+        setGeneratedPayments([{ id: 1, amount: targetAmount, description: `Full payment for target ${formatCurrency(targetAmount)}` }]);
+   }
 
   const clearForm = () => {
     setSelectedEntryIds(new Set());
@@ -277,6 +298,7 @@ export default function SupplierPaymentsPage() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
+    setGeneratedPayments([]);
     setPaymentId(getNextPaymentId(paymentHistory));
   };
 
@@ -379,9 +401,13 @@ export default function SupplierPaymentsPage() {
                     cdAmount: Math.round(calculatedCdAmount),
                     cdApplied: cdEnabled,
                     type: paymentType,
-                    receiptType: paymentMethod, // Use the new state here
+                    receiptType: paymentMethod,
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: paidForDetails,
+                    grNo,
+                    grDate: grDate?.toISOString(),
+                    parchiNo,
+                    parchiDate: parchiDate?.toISOString(),
                 };
 
                 if (tempEditingPayment) {
@@ -427,13 +453,16 @@ export default function SupplierPaymentsPage() {
         setPaymentId(paymentToEdit.paymentId);
         setPaymentAmount(paymentToEdit.amount);
         setPaymentType(paymentToEdit.type);
-        setPaymentMethod(paymentToEdit.receiptType); // Set payment method
+        setPaymentMethod(paymentToEdit.receiptType);
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
         setSelectedEntryIds(newSelectedEntryIds);
-        setUtrNo(paymentToEdit.notes.match(/UTR: (.*?)(,|$)/)?.[1].trim() || '');
-        setCheckNo(paymentToEdit.notes.match(/Check: (.*?)(,|$)/)?.[1].trim() || '');
-
+        setUtrNo(paymentToEdit.notes?.match(/UTR: (.*?)(,|$)/)?.[1].trim() || '');
+        setCheckNo(paymentToEdit.notes?.match(/Check: (.*?)(,|$)/)?.[1].trim() || '');
+        setGrNo(paymentToEdit.grNo || '');
+        setGrDate(paymentToEdit.grDate ? new Date(paymentToEdit.grDate) : undefined);
+        setParchiNo(paymentToEdit.parchiNo || '');
+        setParchiDate(paymentToEdit.parchiDate ? new Date(paymentToEdit.parchiDate) : undefined);
     
         toast({
             title: "Editing Mode",
@@ -453,7 +482,7 @@ export default function SupplierPaymentsPage() {
                 
                 for (const detail of paymentToDelete.paidFor || []) {
                     const q = query(suppliersCollection, where('srNo', '==', detail.srNo));
-                    const supplierDocsQuery = await getDocs(q); // Use a different name
+                    const supplierDocsQuery = await getDocs(q); 
                     if (!supplierDocsQuery.empty) {
                         const supplierDoc = supplierDocsQuery.docs[0];
                         const currentNetAmount = Number(supplierDoc.data().netAmount);
@@ -517,8 +546,6 @@ export default function SupplierPaymentsPage() {
   }, [detailsSupplierEntry, paymentHistory]);
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
-  const outstandingEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
-  const paidEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) < 1 && s.originalNetAmount > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
   
   const currentPaymentHistory = useMemo(() => {
     if (!selectedCustomerKey) return [];
@@ -547,6 +574,19 @@ export default function SupplierPaymentsPage() {
           </div>
       );
   }
+  
+  const handlePaySelectedOutstanding = () => {
+    if (selectedEntryIds.size === 0) {
+        toast({
+            variant: "destructive",
+            title: "No Entries Selected",
+            description: "Please select one or more outstanding entries to pay.",
+        });
+        return;
+    }
+    setIsOutstandingModalOpen(false); // Close the modal
+    // The rest of the logic will be handled by the form now visible
+};
 
   return (
     <div className="space-y-8">
@@ -575,192 +615,211 @@ export default function SupplierPaymentsPage() {
 
       {selectedCustomerKey ? (
         <>
-          <Card>
-            <CardHeader><CardTitle>Outstanding Entries</CardTitle></CardHeader>
-            <CardContent>
-                <div className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead><Checkbox onCheckedChange={(checked) => {
-                            const newSet = new Set<string>();
-                            if(checked) {
-                                outstandingEntries.forEach(e => newSet.add(e.id));
-                            }
-                            setSelectedEntryIds(newSet);
-                        }}
-                        checked={selectedEntryIds.size > 0 && selectedEntryIds.size === outstandingEntries.length && outstandingEntries.length > 0}
-                         /></TableHead>
-                        <TableHead>SR No</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-center">Info</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {outstandingEntries.map(entry => (
-                        <TableRow key={entry.id}>
-                        <TableCell><Checkbox checked={selectedEntryIds.has(entry.id)} onCheckedChange={() => handleEntrySelect(entry.id)} /></TableCell>
-                        <TableCell>{entry.srNo}</TableCell>
-                        <TableCell>{entry.date}</TableCell>
-                        <TableCell>{entry.dueDate}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
-                        <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
-                                <Info className="h-4 w-4" />
-                            </Button>
-                        </TableCell>
-                        </TableRow>
-                    ))}
-                    {outstandingEntries.length === 0 && (
+            <Dialog open={isOutstandingModalOpen} onOpenChange={setIsOutstandingModalOpen}>
+                <DialogTrigger asChild>
+                    <Button>View & Select Outstanding</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>Outstanding Entries for {toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '')}</DialogTitle>
+                        <DialogDescription>Select the entries you want to pay for.</DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-y-auto">
+                       <Table>
+                        <TableHeader>
                         <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground">No outstanding entries for this supplier.</TableCell>
+                            <TableHead><Checkbox onCheckedChange={(checked) => {
+                                const newSet = new Set<string>();
+                                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
+                                if(checked) {
+                                    outstandingEntries.forEach(e => newSet.add(e.id));
+                                }
+                                setSelectedEntryIds(newSet);
+                            }}
+                            checked={selectedEntryIds.size > 0 && selectedEntryIds.size === suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).length}
+                             /></TableHead>
+                            <TableHead>SR No</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
                         </TableRow>
-                    )}
-                    </TableBody>
-                </Table>
-                </div>
-            </CardContent>
-          </Card>
+                        </TableHeader>
+                        <TableBody>
+                        {suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).map(entry => (
+                            <TableRow key={entry.id}>
+                            <TableCell><Checkbox checked={selectedEntryIds.has(entry.id)} onCheckedChange={() => handleEntrySelect(entry.id)} /></TableCell>
+                            <TableCell>{entry.srNo}</TableCell>
+                            <TableCell>{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
+                            <TableCell>{format(new Date(entry.dueDate), "dd-MMM-yy")}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsOutstandingModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handlePaySelectedOutstanding}>Pay Selected</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
 
           {selectedEntryIds.size > 0 && (
-            <Card onKeyDown={handleKeyDown}>
-                <CardHeader><CardTitle>{editingPayment ? `Editing Payment` : 'Payment Processing'}</CardTitle></CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="p-4 border rounded-lg bg-card/30">
-                        <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
-                        <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Payment Method</Label>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                            <SelectTrigger className="w-full md:w-1/3"><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Cash">Cash</SelectItem>
-                                <SelectItem value="Online">Online</SelectItem>
-                                <SelectItem value="RTGS">RTGS</SelectItem>
-                            </SelectContent>
-                        </Select>
-                      </div>
-
-                    {paymentMethod === 'RTGS' && (
-                        <Card>
-                            <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
-                                <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    <Separator />
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-                        <div className="space-y-2">
-                            <Label htmlFor="payment-id">Payment ID</Label>
-                            <Input id="payment-id" type="text" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} />
+            <div onKeyDown={handleKeyDown}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                           <ClipboardList className="h-5 w-5 text-primary"/>
+                           {editingPayment ? `Editing Payment` : 'Payment Processing'}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="p-4 border rounded-lg bg-card/30">
+                            <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
+                            <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
                         </div>
-                        <div className="space-y-2">
-                            <Label>Payment Type</Label>
-                            <Select value={paymentType} onValueChange={setPaymentType}>
-                                <SelectTrigger><SelectValue/></SelectTrigger>
+                        
+                         <div className="space-y-2">
+                            <Label>Payment Method</Label>
+                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                <SelectTrigger className="w-full md:w-1/3"><SelectValue/></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Full">Full</SelectItem>
-                                    <SelectItem value="Partial">Partial</SelectItem>
+                                    <SelectItem value="Cash">Cash</SelectItem>
+                                    <SelectItem value="Online">Online</SelectItem>
+                                    <SelectItem value="RTGS">RTGS</SelectItem>
                                 </SelectContent>
                             </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="payment-amount">Payment Amount</Label>
-                            <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && !editingPayment} />
-                        </div>
-                        <div className="flex items-center space-x-2 pt-6">
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="flex items-center space-x-2">
-                                            <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
-                                            <Label htmlFor="cd-toggle" className={cn(isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
-                                        </div>
-                                    </TooltipTrigger>
-                                    {isCdSwitchDisabled && (
-                                        <TooltipContent>
-                                            <p>No selected entries are eligible for CD.</p>
-                                        </TooltipContent>
-                                    )}
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
+                          </div>
 
-                        {cdEnabled && <>
-                            <div className="space-y-2">
-                                <Label htmlFor="cd-percent">CD %</Label>
-                                <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>CD At</Label>
-                                <Select value={cdAt} onValueChange={setCdAt}>
+                        {paymentMethod === 'RTGS' && (
+                            <Card>
+                                <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
+                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2"><Label htmlFor="grNo">GR No.</Label><Input id="grNo" value={grNo} onChange={e => setGrNo(e.target.value)} /></div>
+                                    <div className="space-y-2"><Label htmlFor="grDate">GR Date</Label>
+                                         <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent></Popover>
+                                    </div>
+                                    <div className="space-y-2"><Label htmlFor="parchiNo">Parchi No.</Label><Input id="parchiNo" value={parchiNo} onChange={e => setParchiNo(e.target.value)} /></div>
+                                    <div className="space-y-2"><Label htmlFor="parchiDate">Parchi Date</Label>
+                                         <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{parchiDate ? format(parchiDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={parchiDate} onSelect={setParchiDate} initialFocus /></PopoverContent></Popover>
+                                    </div>
+                                    <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
+                                    <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
+                                    <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
+                                    <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
+                                    <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
+                                    <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        <Separator />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                             <div className="space-y-2">
+                                <Label>Payment Type</Label>
+                                <Select value={paymentType} onValueChange={setPaymentType}>
                                     <SelectTrigger><SelectValue/></SelectTrigger>
                                     <SelectContent>
-                                        {availableCdOptions.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                        ))}
+                                        <SelectItem value="Full">Full</SelectItem>
+                                        <SelectItem value="Partial">Partial</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Calculated CD Amount</Label>
-                                <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
+                             <div className="space-y-2">
+                                <Label htmlFor="payment-amount">Amount</Label>
+                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(Math.round(parseFloat(e.target.value) || 0))} readOnly={paymentType === 'Full' && !editingPayment} />
                             </div>
-                        </>}
-                    </div>
-                    <div className="flex gap-4">
-                        <Button onClick={processPayment}>
-                            {editingPayment ? 'Update Payment' : 'Process Payment'}
-                        </Button>
-                        {editingPayment && (
-                            <Button variant="outline" onClick={clearForm}>Cancel Edit</Button>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-          )}
+                            <div className="flex items-center space-x-2 pt-6">
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="flex items-center space-x-2">
+                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
+                                                <Label htmlFor="cd-toggle" className={cn(isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
+                                            </div>
+                                        </TooltipTrigger>
+                                        {isCdSwitchDisabled && (
+                                            <TooltipContent>
+                                                <p>No selected entries are eligible for CD.</p>
+                                            </TooltipContent>
+                                        )}
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
 
-          <Card>
-            <CardHeader><CardTitle>Paid Entries</CardTitle></CardHeader>
-            <CardContent>
-                <div className="overflow-x-auto">
-                <Table>
-                    <TableHeader><TableRow><TableHead>SR No</TableHead><TableHead>Date</TableHead><TableHead>Original Amount</TableHead><TableHead className="text-center">Info</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                    {paidEntries.map(entry => (
-                        <TableRow key={entry.id}>
-                        <TableCell>{entry.srNo}</TableCell>
-                        <TableCell>{entry.date}</TableCell>
-                        <TableCell>{formatCurrency(entry.originalNetAmount || entry.amount)}</TableCell>
-                        <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
-                                <Info className="h-4 w-4" />
-                            </Button>
-                        </TableCell>
-                        </TableRow>
-                    ))}
-                     {paidEntries.length === 0 && (
-                        <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground">No paid entries for this supplier.</TableCell>
-                        </TableRow>
-                    )}
-                    </TableBody>
-                </Table>
-                </div>
-            </CardContent>
-          </Card>
+                            {cdEnabled && <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cd-percent">CD %</Label>
+                                    <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>CD At</Label>
+                                    <Select value={cdAt} onValueChange={setCdAt}>
+                                        <SelectTrigger><SelectValue/></SelectTrigger>
+                                        <SelectContent>
+                                            {availableCdOptions.map(opt => (
+                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Calculated CD Amount</Label>
+                                    <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
+                                </div>
+                            </>}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                             <Banknote className="h-5 w-5 text-primary"/>
+                            Payment Calculation
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                             <div className="p-4 border rounded-lg bg-card/30">
+                                <p className="text-muted-foreground">Total Outstanding</p>
+                                <p className="text-xl font-bold">{formatCurrency(totalOutstandingForSelected)}</p>
+                            </div>
+                            <div className="p-4 border rounded-lg bg-card/30">
+                                <p className="text-muted-foreground">CD Amount</p>
+                                <p className="text-xl font-bold text-green-500">- {formatCurrency(calculatedCdAmount)}</p>
+                            </div>
+                            <div className="p-4 border-2 border-primary rounded-lg bg-primary/10">
+                                <p className="text-primary font-semibold">Target Amount to Pay</p>
+                                <p className="text-2xl font-bold text-primary">{formatCurrency(targetAmount)}</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-center gap-4">
+                            <Button onClick={handleGeneratePayments} disabled={targetAmount <= 0}>Generate Payment Options</Button>
+                            {generatedPayments.length > 0 && (
+                                <div className="w-full">
+                                    <h3 className="mb-2 font-semibold">Generated Payments:</h3>
+                                    <Table>
+                                        <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
+                                        <TableBody>
+                                            {generatedPayments.map(p => (
+                                                <TableRow key={p.id}>
+                                                    <TableCell>{p.description}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(p.amount)}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button size="sm" onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+          )}
 
           <Card>
             <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
@@ -782,7 +841,7 @@ export default function SupplierPaymentsPage() {
                     {currentPaymentHistory.map(p => (
                         <TableRow key={p.id}>
                         <TableCell>{p.paymentId}</TableCell>
-                        <TableCell>{p.date}</TableCell>
+                        <TableCell>{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
                         <TableCell><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
                         <TableCell>{formatCurrency(p.amount)}</TableCell>
                         <TableCell>{formatCurrency(p.cdAmount)}</TableCell>
@@ -1034,3 +1093,5 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+
+    
