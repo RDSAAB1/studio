@@ -428,6 +428,10 @@ export default function SupplierPaymentsPage() {
     setPaymentId(getNextPaymentId(paymentHistory));
   }, [getNextPaymentId, paymentHistory]);
 
+  const handleFullReset = useCallback(() => {
+    setSelectedCustomerKey(null);
+    resetPaymentForm();
+  }, [resetPaymentForm]);
 
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
@@ -598,24 +602,7 @@ export default function SupplierPaymentsPage() {
             });
 
             toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
-            // Don't reset the whole form, just payment-related fields
-            setSelectedEntryIds(new Set());
-            setPaymentAmount(0);
-            setCdEnabled(false);
-            setUtrNo('');
-            setCheckNo('');
-            setGrNo('');
-            setParchiNo('');
-            setRtgsQuantity(0);
-            setRtgsRate(0);
-            setRtgsAmount(0);
-            setPaymentCombinations([]);
-            if (!editingPayment) {
-                setPaymentId(getNextPaymentId(paymentHistory));
-            } else {
-                setEditingPayment(null);
-            }
-            // Keep selectedCustomerKey to stay on the same supplier's view
+            resetPaymentForm();
         } catch (error) {
             console.error("Error processing payment:", error);
             toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment. Please try again." });
@@ -706,25 +693,6 @@ export default function SupplierPaymentsPage() {
                 transaction.delete(paymentRef);
             });
             
-            // This part is now handled by the realtime listener
-            // setPaymentHistory(prev => prev.filter(p => p.id !== paymentIdToDelete));
-            
-            // const updatedSuppliers = [...suppliers];
-            // originalSupplierStates.forEach((originalState, id) => {
-            //     const paidForDetail = paymentToDelete.paidFor?.find(pf => pf.srNo === originalState.srNo);
-            //     if (paidForDetail) {
-            //         const index = updatedSuppliers.findIndex(s => s.id === id);
-            //         if (index !== -1) {
-            //             updatedSuppliers[index] = {
-            //                 ...updatedSuppliers[index],
-            //                 netAmount: Number(updatedSuppliers[index].netAmount) + paidForDetail.amount,
-            //             };
-            //         }
-            //     }
-            // });
-            // setSuppliers(updatedSuppliers);
-
-
             toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) {
                 resetPaymentForm();
@@ -732,7 +700,6 @@ export default function SupplierPaymentsPage() {
         } catch (error) {
             console.error("Error in batch deletion:", error);
             toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
-            // The UI will revert automatically due to the realtime listener if the transaction fails.
         }
     };
     
@@ -975,8 +942,7 @@ export default function SupplierPaymentsPage() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => {
                             setIsOutstandingModalOpen(false);
-                            setSelectedCustomerKey(null); // Deselect supplier if cancelled
-                            resetPaymentForm();
+                            handleFullReset();
                         }}>Cancel</Button>
                         <Button onClick={handlePaySelectedOutstanding}>Confirm Selection</Button>
                     </DialogFooter>
@@ -985,7 +951,7 @@ export default function SupplierPaymentsPage() {
       )}
 
 
-      {selectedEntryIds.size > 0 && (
+      {selectedCustomerKey && (
         <div onKeyDown={handleKeyDown}>
           <Card>
             <CardHeader>
