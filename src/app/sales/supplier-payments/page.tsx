@@ -588,8 +588,8 @@ export default function SupplierPaymentsPage() {
         for (let rate = minRate; rate <= maxRate; rate += 1) {
             const baseQuantity = targetAmount / rate;
     
-            for (let i = -2.5; i <= 2.5; i += 0.01) {
-                const quantity = parseFloat(baseQuantity.toFixed(2)) + i;
+            for (let i = -50; i <= 50; i += 0.1) { // 50 quintal range with 10kg steps
+                const quantity = baseQuantity + i;
                 if (quantity <= 0) continue;
     
                 const roundedQuantity = parseFloat(quantity.toFixed(2));
@@ -612,7 +612,7 @@ export default function SupplierPaymentsPage() {
     
         const sortedCombinations = combinations
             .sort((a, b) => Math.abs(a.remainingAmount) - Math.abs(b.remainingAmount))
-            .slice(0, 50);
+            .slice(0, 100); // Show more options
     
         setPaymentCombinations(sortedCombinations);
     };
@@ -906,55 +906,80 @@ export default function SupplierPaymentsPage() {
                   <Card>
                     <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
-                         <div className="space-y-4">
-                           <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
-                                <DialogTrigger asChild>
-                                     <Button>Generate Payment Options</Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl">
-                                    <DialogHeader>
-                                        <DialogTitle>RTGS Payment Generator</DialogTitle>
-                                        <DialogDescription>Generate quantity and rate combinations for a target payment amount.</DialogDescription>
-                                    </DialogHeader>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
-                                        <div className="space-y-2"><Label htmlFor="targetAmount">Amount to be Paid</Label><Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} /></div>
-                                        <div className="space-y-2"><Label htmlFor="minRate">Minimum Rate</Label><Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} /></div>
-                                        <div className="space-y-2"><Label htmlFor="maxRate">Maximum Rate</Label><Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} /></div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Card>
+                                <CardHeader className="p-4"><CardTitle className="text-sm">Payment Generator</CardTitle></CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-4">
+                                     <div className="space-y-2">
+                                        <Label htmlFor="targetAmount">Amount to be Paid</Label>
+                                        <Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} />
                                     </div>
-                                    <DialogFooter className="flex-col sm:flex-row gap-2">
-                                        <Button onClick={generatePaymentCombinations}>Generate</Button>
-                                    </DialogFooter>
-
-                                    {paymentCombinations.length > 0 && (
-                                        <div className="mt-4 space-y-4">
-                                            <h4 className="text-md font-semibold">Generated Payment Options</h4>
-                                            <ScrollArea className="h-72">
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('quantity')}>Qty <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('rate')}>Rate <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('remainingAmount')}>Remaining <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {sortedCombinations.map((combo, index) => (
-                                                            <TableRow key={index} onClick={() => handleSelectCombination(combo)} className="cursor-pointer">
-                                                                <TableCell>{combo.quantity.toFixed(2)}</TableCell>
-                                                                <TableCell>{formatCurrency(combo.rate)}</TableCell>
-                                                                <TableCell>{formatCurrency(combo.amount)}</TableCell>
-                                                                <TableCell className="font-semibold text-red-500">{formatCurrency(combo.remainingAmount)}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </ScrollArea>
-                                        </div>
-                                    )}
-                                </DialogContent>
-                           </Dialog>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="minRate">Minimum Rate</Label>
+                                        <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="maxRate">Maximum Rate</Label>
+                                        <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
+                                    </div>
+                                    <Button onClick={() => setIsGeneratorOpen(true)} className="w-full">Generate Payment Options</Button>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="p-4"><CardTitle className="text-sm">Selected Option</CardTitle></CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-4">
+                                     <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
+                                     <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
+                                     <div className="space-y-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} /></div>
+                                </CardContent>
+                            </Card>
                         </div>
+                        
+                         <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
+                            <DialogContent className="max-w-3xl">
+                                <DialogHeader>
+                                    <DialogTitle>RTGS Payment Generator</DialogTitle>
+                                    <DialogDescription>
+                                        Target: {formatCurrency(targetAmount)} | 
+                                        Rate Range: {formatCurrency(minRate)} - {formatCurrency(maxRate)}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                {paymentCombinations.length > 0 ? (
+                                    <div className="mt-4 space-y-4">
+                                        <ScrollArea className="h-72">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('quantity')}>Qty <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('rate')}>Rate <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('remainingAmount')}>Remaining <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {sortedCombinations.map((combo, index) => (
+                                                        <TableRow key={index} onClick={() => handleSelectCombination(combo)} className="cursor-pointer">
+                                                            <TableCell>{combo.quantity.toFixed(2)}</TableCell>
+                                                            <TableCell>{formatCurrency(combo.rate)}</TableCell>
+                                                            <TableCell>{formatCurrency(combo.amount)}</TableCell>
+                                                            <TableCell className="font-semibold text-red-500">{formatCurrency(combo.remainingAmount)}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </ScrollArea>
+                                    </div>
+                                ) : (
+                                  <div className="text-center py-10 text-muted-foreground">
+                                    Click "Generate" to see payment options.
+                                  </div>
+                                )}
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setIsGeneratorOpen(false)}>Close</Button>
+                                    <Button onClick={generatePaymentCombinations}>Generate</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                       </Dialog>
                          <Separator />
                         <Card>
                             <CardHeader><CardTitle className="text-sm">Supplier Details</CardTitle></CardHeader>
@@ -987,9 +1012,6 @@ export default function SupplierPaymentsPage() {
                                 </div>
                                 <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
                                 <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
-                                <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
-                                <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
-                                <div className="space-y-2 md:col-span-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} /></div>
                             </CardContent>
                         </Card>
                         <Card className="mt-6 bg-muted/30">
@@ -1308,5 +1330,7 @@ export default function SupplierPaymentsPage() {
   );
 }
 
+
+    
 
     
