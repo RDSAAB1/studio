@@ -11,6 +11,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Select,
@@ -29,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart as RechartsAreaChart } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart, CircleDollarSign } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart, CircleDollarSign, Download, Printer } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -64,10 +65,118 @@ const SummaryDetailItem = ({ label, value, subValue, colorClass }: { label: stri
 const MILL_OVERVIEW_KEY = 'mill-overview';
 const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
+const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+    const statementItems = useMemo(() => {
+        if (!data) return { items: [], openingBalance: 0, closingBalance: 0, totalDebit: 0, totalCredit: 0 };
+
+        const transactions = (data.allTransactions || [])
+            .map(t => ({
+                date: new Date(t.date),
+                particulars: `Purchase - SR#${t.srNo}`,
+                debit: t.originalNetAmount,
+                credit: 0,
+            }));
+        
+        const payments = (data.allPayments || data.paymentHistory || [])
+            .map(p => ({
+                date: new Date(p.date),
+                particulars: `Payment - ID#${p.paymentId}`,
+                debit: 0,
+                credit: p.amount + (p.cdAmount || 0),
+            }));
+
+        const combined = [...transactions, ...payments].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+        let balance = 0;
+        const itemsWithBalance = combined.map(item => {
+            balance = balance + item.debit - item.credit;
+            return { ...item, balance };
+        });
+
+        const openingBalance = 0; // Assuming statement starts from zero balance. This could be more complex.
+        const totalDebit = transactions.reduce((sum, t) => sum + t.debit, 0);
+        const totalCredit = payments.reduce((sum, p) => sum + p.credit, 0);
+
+        return {
+            items: itemsWithBalance,
+            openingBalance,
+            closingBalance: balance,
+            totalDebit,
+            totalCredit,
+        };
+    }, [data]);
+
+    if (!data) return null;
+    const { items, openingBalance, closingBalance, totalDebit, totalCredit } = statementItems;
+    const startDate = items.length > 0 ? format(items[0].date, "PPP") : 'N/A';
+    const endDate = items.length > 0 ? format(items[items.length - 1].date, "PPP") : 'N/A';
+
+
+    return (
+        <div className="bg-background p-6 rounded-lg shadow-lg">
+            <header className="mb-6 border-b pb-4">
+                <h2 className="text-2xl font-bold text-primary">{toTitleCase(data.name)}</h2>
+                <p className="text-muted-foreground">Account Statement</p>
+                <p className="text-sm text-muted-foreground">For the period from {startDate} to {endDate}</p>
+            </header>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-muted/50 p-3 rounded-md">
+                    <p className="text-xs text-muted-foreground">Opening Balance</p>
+                    <p className="font-bold text-lg">{formatCurrency(openingBalance)}</p>
+                </div>
+                <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-md">
+                    <p className="text-xs text-green-700 dark:text-green-400">Total Credits</p>
+                    <p className="font-bold text-lg text-green-800 dark:text-green-300">{formatCurrency(totalCredit)}</p>
+                </div>
+                 <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-md">
+                    <p className="text-xs text-red-700 dark:text-red-400">Total Debits</p>
+                    <p className="font-bold text-lg text-red-800 dark:text-red-300">{formatCurrency(totalDebit)}</p>
+                </div>
+                <div className="bg-muted/50 p-3 rounded-md">
+                    <p className="text-xs text-muted-foreground">Closing Balance</p>
+                    <p className="font-bold text-lg">{formatCurrency(closingBalance)}</p>
+                </div>
+            </div>
+
+            <ScrollArea className="h-[400px] border rounded-md">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Particulars</TableHead>
+                            <TableHead className="text-right">Debit</TableHead>
+                            <TableHead className="text-right">Credit</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {items.map((item, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{format(item.date, "dd-MMM-yy")}</TableCell>
+                                <TableCell>{item.particulars}</TableCell>
+                                <TableCell className="text-right text-red-600">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                <TableCell className="text-right text-green-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(item.balance)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+             <div className="flex justify-end mt-6 gap-2">
+                <Button variant="outline"><Printer className="mr-2"/> Print</Button>
+                <Button><Download className="mr-2"/> Download PDF</Button>
+            </div>
+        </div>
+    );
+};
+
+
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
+  const [isStatementOpen, setIsStatementOpen] = useState(false);
 
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
@@ -345,10 +454,18 @@ export default function SupplierProfilePage() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>{toTitleCase(selectedSupplierData.name)}</CardTitle>
-                    <CardDescription>
-                        {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
-                    </CardDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle>{toTitleCase(selectedSupplierData.name)}</CardTitle>
+                            <CardDescription>
+                                {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
+                            </CardDescription>
+                        </div>
+                        <Button variant="outline" onClick={() => setIsStatementOpen(true)}>
+                            <FileText className="mr-2 h-4 w-4"/>
+                            Generate Statement
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Operational Summary Card */}
@@ -371,7 +488,7 @@ export default function SupplierProfilePage() {
                     </Card>
 
                     {/* Deduction Summary Card */}
-                    <Card className="bg-card/50">
+                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
                              <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
@@ -705,6 +822,12 @@ export default function SupplierProfilePage() {
             </>
           )}
         </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
+          <DialogContent className="max-w-4xl">
+              <StatementPreview data={selectedSupplierData} />
+          </DialogContent>
       </Dialog>
     </div>
   );
