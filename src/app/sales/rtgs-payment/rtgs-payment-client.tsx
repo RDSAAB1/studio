@@ -103,6 +103,13 @@ const initialFormState: FormValues = {
   weight: 0,
 };
 
+const cdOptions = [
+    { value: 'paid_amount', label: 'CD on Paid Amount' },
+    { value: 'unpaid_amount', label: 'CD on Unpaid Amount (Selected)' },
+    { value: 'payment_amount', label: 'CD on Payment Amount (Manual)' },
+    { value: 'full_amount', label: 'CD on Full Amount (Selected)' },
+];
+
 export default function RtgspaymentClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -194,23 +201,32 @@ export default function RtgspaymentClient() {
   }, [editingRecordIndex]);
 
   useEffect(() => {
-    if (!cdEnabled) {
-      setCalculatedCdAmount(0);
-      return;
+    if(!cdEnabled) {
+        setCalculatedCdAmount(0);
+        return;
     }
     let base = 0;
     const amount = form.getValues('amount') || 0;
     const outstanding = totalOutstandingForSelected;
 
-    if (cdAt === 'paid_amount' || cdAt === 'payment_amount') {
-      base = amount;
+    if (cdAt === 'payment_amount') {
+        base = amount;
     } else if (cdAt === 'unpaid_amount') {
-      base = outstanding;
+        base = outstanding;
     } else if (cdAt === 'full_amount') {
-      base = outstanding;
+        const totalOriginalAmount = selectedEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount)), 0);
+        base = totalOriginalAmount;
     }
     setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
-  }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected]);
+  }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected, selectedEntries]);
+  
+  useEffect(() => {
+      if (paymentType === 'Full') {
+          const finalAmount = totalOutstandingForSelected - calculatedCdAmount;
+          form.setValue('amount', Math.round(finalAmount));
+      }
+  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, form]);
+
 
   useEffect(() => {
       const finalTargetAmount = totalOutstandingForSelected - calculatedCdAmount;
@@ -366,13 +382,11 @@ export default function RtgspaymentClient() {
   }
   
   const handlePaySelectedOutstanding = () => {
-    const totalAmount = Math.round(selectedEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0));
+    const totalAmount = totalOutstandingForSelected;
     const firstEntry = selectedEntries[0];
     
-    const newTargetAmount = totalAmount - calculatedCdAmount;
-    setCalcTargetAmount(newTargetAmount);
-    
     if (paymentType === 'Full') {
+      const newTargetAmount = totalAmount - calculatedCdAmount;
       form.setValue('amount', newTargetAmount);
     }
     
@@ -438,6 +452,23 @@ export default function RtgspaymentClient() {
         supplier.contact?.includes(searchQuery)
     );
   }, [searchQuery, suppliers]);
+
+  const availableCdOptions = useMemo(() => {
+    if (paymentType === 'Partial') {
+      return cdOptions.filter(opt => opt.value === 'payment_amount');
+    }
+    return cdOptions.filter(opt => opt.value !== 'payment_amount');
+  }, [paymentType]);
+
+  useEffect(() => {
+      // If payment type is partial, default cdAt to payment_amount
+      if (paymentType === 'Partial' && cdAt !== 'payment_amount') {
+          setCdAt('payment_amount');
+      } else if (paymentType === 'Full' && cdAt === 'payment_amount') {
+          // If switching to full, default to unpaid_amount
+          setCdAt('unpaid_amount');
+      }
+  }, [paymentType, cdAt]);
 
   if (!isClient) {
     return null; 
@@ -611,11 +642,6 @@ export default function RtgspaymentClient() {
               <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" {...form.register("utrNo")} /></div>
               <div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input type="number" id="rate" {...form.register("rate")} /></div>
               <div className="space-y-2"><Label htmlFor="weight">Weight</Label><Input type="number" id="weight" {...form.register("weight")} /></div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="amount">Amount</Label>
-                <Input type="number" id="amount" {...form.register("amount")} />
-                {form.formState.errors.amount && <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>}
-              </div>
             </CardContent>
           </Card>
         </div>
@@ -628,7 +654,7 @@ export default function RtgspaymentClient() {
                     <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
                     <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
                     <div className="space-y-2">
                       <Label>Payment Type</Label>
                       <Select value={paymentType} onValueChange={setPaymentType}>
@@ -639,7 +665,14 @@ export default function RtgspaymentClient() {
                           </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-center space-x-2">
+
+                     <div className="space-y-2">
+                        <Label htmlFor="amount">Amount</Label>
+                        <Input type="number" id="amount" {...form.register("amount")} readOnly={paymentType === 'Full'}/>
+                        {form.formState.errors.amount && <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>}
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-6">
                       <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
                       <Label htmlFor="cd-toggle">Apply CD</Label>
                     </div>
@@ -654,10 +687,9 @@ export default function RtgspaymentClient() {
                             <Select value={cdAt} onValueChange={setCdAt}>
                               <SelectTrigger><SelectValue/></SelectTrigger>
                               <SelectContent>
-                                  <SelectItem value="paid_amount">CD on Paid Amount</SelectItem>
-                                  <SelectItem value="unpaid_amount">CD on Unpaid Amount (Selected)</SelectItem>
-                                  <SelectItem value="payment_amount">CD on Payment Amount (Manual)</SelectItem>
-                                  <SelectItem value="full_amount">CD on Full Amount (Selected)</SelectItem>
+                                {availableCdOptions.map(opt => (
+                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                ))}
                               </SelectContent>
                           </Select>
                       </div>
