@@ -98,6 +98,7 @@ export default function SupplierPaymentsPage() {
   const [paymentMethod, setPaymentMethod] = useState('Cash'); // New state for payment method
   
   // RTGS specific fields
+  const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
   const [grNo, setGrNo] = useState('');
   const [grDate, setGrDate] = useState<Date | undefined>(new Date());
@@ -127,7 +128,6 @@ export default function SupplierPaymentsPage() {
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
-  const [openSupplierSearch, setOpenSupplierSearch] = useState(false);
   
   const stableToast = useCallback(toast, []);
 
@@ -145,6 +145,10 @@ export default function SupplierPaymentsPage() {
 
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if(!isClient) return;
     setLoading(true);
 
     const unsubscribeSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
@@ -165,18 +169,32 @@ export default function SupplierPaymentsPage() {
         console.error("Error fetching payments:", error);
         stableToast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
     });
+    
+    // Load persisted rates
+    const savedMinRate = localStorage.getItem('minRate');
+    const savedMaxRate = localStorage.getItem('maxRate');
+    if (savedMinRate) setMinRate(Number(savedMinRate));
+    if (savedMaxRate) setMaxRate(Number(savedMaxRate));
+
 
     return () => {
       unsubscribeSuppliers();
       unsubscribePayments();
     };
-  }, [editingPayment, stableToast, getNextPaymentId]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId]);
   
+    // Persist Min/Max Rate
   useEffect(() => {
-    if (selectedCustomerKey) {
-        setIsOutstandingModalOpen(true);
+    if (isClient) {
+        localStorage.setItem('minRate', String(minRate));
     }
-  }, [selectedCustomerKey]);
+  }, [minRate, isClient]);
+
+  useEffect(() => {
+    if (isClient) {
+        localStorage.setItem('maxRate', String(maxRate));
+    }
+  }, [maxRate, isClient]);
 
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
@@ -216,16 +234,22 @@ export default function SupplierPaymentsPage() {
 
 
   const handleCustomerSelect = (key: string) => {
-    setOpenSupplierSearch(false);
     setSelectedCustomerKey(key);
     const customerData = customerSummaryMap.get(key);
     if(customerData) {
+        setSupplierDetails({
+            name: customerData.name || '',
+            fatherName: customerData.so || '',
+            address: customerData.address || '',
+            contact: customerData.contact || ''
+        });
         setBankDetails({
             acNo: customerData.acNo || '',
             ifscCode: customerData.ifscCode || '',
             bank: customerData.bank || '',
             branch: customerData.branch || '',
         });
+        setIsOutstandingModalOpen(true);
     }
     clearForm();
   };
@@ -268,6 +292,7 @@ export default function SupplierPaymentsPage() {
         setPaymentAmount(Math.round(finalAmount));
     } else if (paymentType === 'Partial') {
         setPaymentAmount(0); // Reset for manual input
+        setCdAt('payment_amount'); // Auto-select the only valid option
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
 
@@ -292,6 +317,7 @@ export default function SupplierPaymentsPage() {
       
        if (paymentType === 'Partial') {
           base = currentPaymentAmount;
+          setCdAt('payment_amount');
        } else {
           if (cdAt === 'unpaid_amount') {
               base = cdEligibleEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
@@ -550,7 +576,7 @@ export default function SupplierPaymentsPage() {
         for (let rate = minRate; rate <= maxRate; rate += 5) {
             const baseQuantity = targetAmount / rate;
     
-            for (let i = -2.5; i <= 2.5; i += 0.1) {
+            for (let i = -2.5; i <= 2.5; i += 0.1) { // 10kg increments for quintal
                 const quantity = parseFloat((baseQuantity + i).toFixed(2));
                 if (quantity <= 0) continue;
     
@@ -602,7 +628,6 @@ export default function SupplierPaymentsPage() {
   const handleSelectCombination = (combination: PaymentCombination) => {
     setRtgsQuantity(combination.quantity);
     setRtgsRate(combination.rate);
-    // setPaymentAmount(combination.amount);
     toast({ title: 'Selection Applied', description: `Quantity ${combination.quantity} and Rate ${combination.rate} have been set.` });
   };
 
@@ -663,8 +688,6 @@ export default function SupplierPaymentsPage() {
   
   const isCdSwitchDisabled = cdEligibleEntries.length === 0;
 
-  const currentSupplier = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
-
   if (!isClient) {
     return null;
   }
@@ -699,40 +722,28 @@ export default function SupplierPaymentsPage() {
               <h3 className="text-base font-semibold">Select Supplier</h3>
           </div>
           <div className="w-full sm:w-auto sm:min-w-64">
-            <Popover open={openSupplierSearch} onOpenChange={setOpenSupplierSearch}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={openSupplierSearch}
-                  className="w-full justify-between h-9 text-sm font-normal"
-                >
-                  {selectedCustomerKey
-                    ? `${toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '')} (${customerSummaryMap.get(selectedCustomerKey)?.contact})`
-                    : "Select a supplier..."}
-                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command>
-                  <CommandInput placeholder="Search supplier..." />
-                  <CommandList>
-                    <CommandEmpty>No supplier found.</CommandEmpty>
-                    <CommandGroup>
-                      {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                        <CommandItem
-                          key={key}
-                          value={`${data.name} ${data.contact}`}
-                          onSelect={() => handleCustomerSelect(key)}
-                        >
-                          {toTitleCase(data.name)} ({data.contact})
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+             <Command className="relative">
+              <CommandInput
+                placeholder="Search supplier..."
+                onFocus={() => setIsOutstandingModalOpen(false)} // Prevent modal from opening on focus
+              />
+              <CommandList>
+                 { (
+                  <CommandGroup>
+                    {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
+                      <CommandItem
+                        key={key}
+                        value={`${data.name} ${data.contact}`}
+                        onSelect={() => handleCustomerSelect(key)}
+                        className="cursor-pointer"
+                      >
+                        {toTitleCase(data.name)} ({data.contact})
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+              </CommandList>
+            </Command>
           </div>
         </CardContent>
       </Card>
@@ -778,7 +789,11 @@ export default function SupplierPaymentsPage() {
                     </Table>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsOutstandingModalOpen(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => {
+                            setIsOutstandingModalOpen(false);
+                            setSelectedCustomerKey(null); // Deselect supplier if cancelled
+                            clearForm();
+                        }}>Cancel</Button>
                         <Button onClick={handlePaySelectedOutstanding}>Confirm Selection</Button>
                     </DialogFooter>
                 </DialogContent>
@@ -821,6 +836,12 @@ export default function SupplierPaymentsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        {paymentType === 'Partial' && (
+                             <div className="space-y-2">
+                                <Label htmlFor="payment-amount">Payment Amount</Label>
+                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} />
+                            </div>
+                        )}
                         <div className="flex items-center space-x-2 pt-6">
                             <TooltipProvider>
                                 <Tooltip>
@@ -845,7 +866,7 @@ export default function SupplierPaymentsPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label>CD At</Label>
-                                <Select value={cdAt} onValueChange={setCdAt}>
+                                <Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}>
                                     <SelectTrigger><SelectValue/></SelectTrigger>
                                     <SelectContent>
                                         {availableCdOptions.map(opt => (
@@ -862,30 +883,40 @@ export default function SupplierPaymentsPage() {
                     </div>
                 </div>
 
+                <TabsContent value="Cash" className="mt-4">
+                     <Card className="mt-6 bg-muted/30">
+                        <CardHeader><CardTitle className="text-base">Finalize Cash Payment</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                            {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                            <Separator/>
+                            <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                        </CardContent>
+                        <CardFooter className="flex justify-end">
+                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="Online" className="mt-4">
+                     <Card className="mt-6 bg-muted/30">
+                        <CardHeader><CardTitle className="text-base">Finalize Online Payment</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                             <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                            {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                            <Separator/>
+                            <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                        </CardContent>
+                        <CardFooter className="flex justify-end">
+                            <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+
                 <TabsContent value="RTGS" className="mt-4">
                   <Card>
                     <CardHeader><CardTitle className="text-base">RTGS Details & Payment Generator</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
-                        <Separator />
                         <Card>
-                            <CardHeader><CardTitle className="text-sm">Supplier Details</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Name</Label><Input value={toTitleCase(currentSupplier?.name || '')} readOnly /></div>
-                                <div className="space-y-2"><Label>S/O</Label><Input value={toTitleCase(currentSupplier?.so || '')} readOnly /></div>
-                                <div className="space-y-2"><Label>Address</Label><Input value={toTitleCase(currentSupplier?.address || '')} readOnly /></div>
-                                <div className="space-y-2"><Label>Contact</Label><Input value={currentSupplier?.contact || ''} readOnly /></div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader><CardTitle className="text-sm">Bank Details</CardTitle></CardHeader>
-                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
-                             </CardContent>
-                        </Card>
-                         <Card>
                             <CardHeader><CardTitle className="text-sm">RTGS Generator</CardTitle></CardHeader>
                              <CardContent className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -924,6 +955,25 @@ export default function SupplierPaymentsPage() {
                                 )}
                              </CardContent>
                          </Card>
+                         <Separator />
+                        <Card>
+                            <CardHeader><CardTitle className="text-sm">Supplier Details</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label>Name</Label><Input value={toTitleCase(supplierDetails.name)} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} /></div>
+                                <div className="space-y-2"><Label>Father's Name</Label><Input value={toTitleCase(supplierDetails.fatherName)} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} /></div>
+                                <div className="space-y-2 md:col-span-2"><Label>Address</Label><Input value={toTitleCase(supplierDetails.address)} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} /></div>
+                                <div className="space-y-2"><Label>Contact</Label><Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} /></div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader><CardTitle className="text-sm">Bank Details</CardTitle></CardHeader>
+                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
+                                <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
+                                <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
+                                <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
+                             </CardContent>
+                        </Card>
                          <Card>
                             <CardHeader><CardTitle className="text-sm">RTGS Details</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -941,26 +991,21 @@ export default function SupplierPaymentsPage() {
                                 <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
                             </CardContent>
                         </Card>
+                        <Card className="mt-6 bg-muted/30">
+                            <CardHeader><CardTitle className="text-base">Finalize RTGS Payment</CardTitle></CardHeader>
+                            <CardContent className="space-y-2">
+                                <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                                {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                                <Separator/>
+                                <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                            </CardContent>
+                            <CardFooter className="flex justify-end">
+                                <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                            </CardFooter>
+                        </Card>
                     </CardContent>
                   </Card>
                 </TabsContent>
-                {/* Finalize Section */}
-                <Card className="mt-6 bg-muted/30">
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            {editingPayment ? `Updating Payment ${paymentId}` : 'New Payment Summary'}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
-                        <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>
-                        <Separator/>
-                        <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
-                    </CardContent>
-                    <CardFooter className="flex justify-end">
-                        <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                    </CardFooter>
-                </Card>
               </Tabs>
             </CardContent>
           </Card>
