@@ -298,6 +298,14 @@ export default function SupplierProfilePage() {
     );
   }, [detailsCustomer, paymentHistory]);
 
+  const currentPaymentHistory = useMemo(() => {
+      if (!selectedSupplierData) return [];
+      if (isMillSelected) {
+          return selectedSupplierData.allPayments || [];
+      }
+      return selectedSupplierData.paymentHistory || [];
+  }, [selectedSupplierData, isMillSelected]);
+
 
   if (!isClient || loading) {
     return (
@@ -349,9 +357,9 @@ export default function SupplierProfilePage() {
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
                             <SummaryDetailItem label="Gross Wt" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Teir Wt" value={`- ${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Teir Wt" value={`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`} />
                             <SummaryDetailItem label="Total Wt" value={`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
                             <SummaryDetailItem label="Net Wt" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} colorClass="text-primary font-bold"/>
                             <Separator className="my-2"/>
                             <SummaryDetailItem label="Average Rate" value={formatCurrency(selectedSupplierData.averageRate || 0)} />
@@ -369,10 +377,10 @@ export default function SupplierProfilePage() {
                         <CardContent className="p-4 pt-2 space-y-1">
                             <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
                             <Separator className="my-2"/>
-                            <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
-                            <SummaryDetailItem label="Total Other" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
+                            <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Kanta" value={`${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
+                            <SummaryDetailItem label="Total Other" value={`${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
                              <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Total Original Amount</p>
@@ -484,7 +492,7 @@ export default function SupplierProfilePage() {
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                      {(selectedSupplierData.paymentHistory || selectedSupplierData.allPayments || []).map(payment => (
+                                      {currentPaymentHistory.map(payment => (
                                           <TableRow key={payment.id}>
                                               <TableCell className="font-mono">{payment.paymentId}</TableCell>
                                               <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
@@ -492,7 +500,7 @@ export default function SupplierProfilePage() {
                                               <TableCell className="font-semibold text-right">{formatCurrency(payment.amount)}</TableCell>
                                           </TableRow>
                                       ))}
-                                       {(selectedSupplierData.paymentHistory || selectedSupplierData.allPayments || []).length === 0 && (
+                                       {currentPaymentHistory.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={4} className="text-center text-muted-foreground">No payments found.</TableCell>
                                         </TableRow>
