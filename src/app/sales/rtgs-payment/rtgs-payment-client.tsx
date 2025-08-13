@@ -9,7 +9,7 @@ import type { Customer } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -42,7 +42,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { Badge } from "@/components/ui/badge";
 
 
@@ -125,7 +124,7 @@ export default function RtgspaymentClient() {
   const [calcMinRate, setCalcMinRate] = useState(2300);
   const [calcMaxRate, setCalcMaxRate] = useState(2400);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-
+  const [paymentType, setPaymentType] = useState('Full');
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
   const [cdAt, setCdAt] = useState('unpaid_amount');
@@ -151,9 +150,9 @@ export default function RtgspaymentClient() {
   }, []);
 
   const totalOutstandingForSelected = useMemo(() => {
-    return outstandingEntries
+    return Math.round(outstandingEntries
       .filter(entry => selectedOutstandingIds.has(entry.id))
-      .reduce((acc, entry) => acc + Number(entry.netAmount), 0);
+      .reduce((acc, entry) => acc + Number(entry.netAmount), 0));
   }, [outstandingEntries, selectedOutstandingIds]);
 
   useEffect(() => {
@@ -209,6 +208,10 @@ export default function RtgspaymentClient() {
     setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
   }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected]);
 
+  useEffect(() => {
+      const finalTargetAmount = totalOutstandingForSelected - calculatedCdAmount;
+      setCalcTargetAmount(Math.round(finalTargetAmount));
+  }, [totalOutstandingForSelected, calculatedCdAmount]);
 
   const handleSupplierSelect = (supplier: Customer) => {
     setSelectedSupplierId(supplier.id);
@@ -237,14 +240,13 @@ export default function RtgspaymentClient() {
   const onSubmit = async (values: FormValues) => {
     const finalValues = {
         ...values,
-        amount: Math.round(values.amount + calculatedCdAmount),
+        amount: Math.round(values.amount),
         cdAmount: Math.round(calculatedCdAmount),
         cdApplied: cdEnabled,
         supplierId: selectedSupplierId || null,
         paidForSrNos: Array.from(selectedOutstandingIds).map(id => outstandingEntries.find(e => e.id === id)?.srNo).filter(Boolean),
     }
 
-    let message = "";
     if (editingRecordIndex !== null && allRecords[editingRecordIndex]?.id) {
        const recordToUpdateId = allRecords[editingRecordIndex].id;
        try {
@@ -363,11 +365,15 @@ export default function RtgspaymentClient() {
     const selectedEntries = outstandingEntries.filter(e => selectedOutstandingIds.has(e.id));
     const totalAmount = Math.round(selectedEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0));
     const firstEntry = selectedEntries[0];
-
+    
+    const newTargetAmount = totalAmount - calculatedCdAmount;
+    setCalcTargetAmount(newTargetAmount);
+    
+    if (paymentType === 'Full') {
+      form.setValue('amount', newTargetAmount);
+    }
+    
     if (firstEntry) {
-      form.setValue('amount', totalAmount);
-      setCalcTargetAmount(totalAmount);
-
       form.setValue('grNo', firstEntry.grNo || '');
       form.setValue('grDate', firstEntry.grDate?.split('T')[0] || new Date().toISOString().split("T")[0]);
       form.setValue('parchiNo', firstEntry.parchiNo || '');
@@ -507,7 +513,7 @@ export default function RtgspaymentClient() {
                             </p>
                             <Button variant="ghost" onClick={() => setIsOutstandingModalOpen(false)}>Cancel</Button>
                             <Button onClick={handlePaySelectedOutstanding} disabled={selectedOutstandingIds.size === 0}>
-                              Pay Selected
+                              Load Selected
                             </Button>
                           </DialogFooter>
                         </DialogContent>
@@ -570,10 +576,10 @@ export default function RtgspaymentClient() {
           <Card>
             <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" {...form.register("acNo")} /></div>
-              <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" {...form.register("ifscCode")} /></div>
-              <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" {...form.register("bank")} /></div>
-              <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" {...form.register("branch")} /></div>
+              <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" {...form.register("acNo")}/></div>
+              <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" {...form.register("ifscCode")}/></div>
+              <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" {...form.register("bank")}/></div>
+              <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" {...form.register("branch")}/></div>
             </CardContent>
           </Card>
 
@@ -596,47 +602,95 @@ export default function RtgspaymentClient() {
 
           {/* Payment & Transaction Details */}
           <Card>
-            <CardHeader><CardTitle>Payment & Transaction Details</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Transaction &amp; Amount Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount</Label>
-                <Input type="number" id="amount" {...form.register("amount")} />
-                {form.formState.errors.amount && <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>}
-              </div>
               <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" {...form.register("checkNo")} /></div>
               <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" {...form.register("utrNo")} /></div>
               <div className="space-y-2"><Label htmlFor="rate">Rate</Label><Input type="number" id="rate" {...form.register("rate")} /></div>
               <div className="space-y-2"><Label htmlFor="weight">Weight</Label><Input type="number" id="weight" {...form.register("weight")} /></div>
-              
-              <div className="flex items-center space-x-2 pt-6 md:col-span-2">
-                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
-                <Label htmlFor="cd-toggle">Apply CD</Label>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="amount">Amount</Label>
+                <Input type="number" id="amount" {...form.register("amount")} />
+                {form.formState.errors.amount && <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>}
               </div>
-              {cdEnabled && <>
-                <div className="space-y-2">
-                    <Label htmlFor="cd-percent">CD %</Label>
-                    <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
-                </div>
-                <div className="space-y-2">
-                    <Label>CD At</Label>
-                      <Select value={cdAt} onValueChange={setCdAt}>
-                        <SelectTrigger><SelectValue/></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="paid_amount">CD on Paid Amount</SelectItem>
-                            <SelectItem value="unpaid_amount">CD on Unpaid Amount (Selected)</SelectItem>
-                            <SelectItem value="payment_amount">CD on Payment Amount (Manual)</SelectItem>
-                            <SelectItem value="full_amount">CD on Full Amount (Selected)</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                    <Label>Calculated CD Amount</Label>
-                    <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
-                </div>
-              </>}
             </CardContent>
           </Card>
         </div>
+
+        {selectedOutstandingIds.size > 0 && (
+          <Card>
+            <CardHeader><CardTitle>Payment Processing</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-4 border rounded-lg bg-card/30">
+                    <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
+                    <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                    <div className="space-y-2">
+                      <Label>Payment Type</Label>
+                      <Select value={paymentType} onValueChange={setPaymentType}>
+                          <SelectTrigger><SelectValue/></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="Full">Full</SelectItem>
+                              <SelectItem value="Partial">Partial</SelectItem>
+                          </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
+                      <Label htmlFor="cd-toggle">Apply CD</Label>
+                    </div>
+                     
+                    {cdEnabled && <>
+                      <div className="space-y-2">
+                          <Label htmlFor="cd-percent">CD %</Label>
+                          <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <div className="space-y-2">
+                          <Label>CD At</Label>
+                            <Select value={cdAt} onValueChange={setCdAt}>
+                              <SelectTrigger><SelectValue/></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="paid_amount">CD on Paid Amount</SelectItem>
+                                  <SelectItem value="unpaid_amount">CD on Unpaid Amount (Selected)</SelectItem>
+                                  <SelectItem value="payment_amount">CD on Payment Amount (Manual)</SelectItem>
+                                  <SelectItem value="full_amount">CD on Full Amount (Selected)</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="space-y-2">
+                          <Label>Calculated CD Amount</Label>
+                          <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
+                      </div>
+                    </>}
+                </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Calculation</CardTitle>
+            <CardDescription>Generate payment options based on a target amount and rate range.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                      <Label htmlFor="calcTargetAmount">Target Amount to Pay</Label>
+                      <Input type="number" id="calcTargetAmount" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(parseFloat(e.target.value))} />
+                  </div>
+                  <div>
+                      <Label htmlFor="calcMinRate">Min 6R Rate</Label>
+                      <Input type="number" id="calcMinRate" value={calcMinRate} onChange={(e) => setCalcMinRate(parseFloat(e.target.value))} />
+                  </div>
+                  <div>
+                      <Label htmlFor="calcMaxRate">Max 6R Rate</Label>
+                      <Input type="number" id="calcMaxRate" value={calcMaxRate} onChange={(e) => setCalcMaxRate(parseFloat(e.target.value))} />
+                  </div>
+            </div>
+            <Button type="button" onClick={handleGeneratePaymentOptions}>Generate Payment Options</Button>
+          </CardContent>
+        </Card>
 
         <div className="flex justify-start space-x-4">
           <Button type="submit">
@@ -647,29 +701,6 @@ export default function RtgspaymentClient() {
           </Button>
         </div>
       </form>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Payment Calculation</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <Label htmlFor="calcTargetAmount">Target Amount to Pay</Label>
-                    <Input type="number" id="calcTargetAmount" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(parseFloat(e.target.value))} />
-                </div>
-                <div>
-                    <Label htmlFor="calcMinRate">Min 6R Rate</Label>
-                    <Input type="number" id="calcMinRate" value={calcMinRate} onChange={(e) => setCalcMinRate(parseFloat(e.target.value))} />
-                </div>
-                <div>
-                    <Label htmlFor="calcMaxRate">Max 6R Rate</Label>
-                    <Input type="number" id="calcMaxRate" value={calcMaxRate} onChange={(e) => setCalcMaxRate(parseFloat(e.target.value))} />
-                </div>
-           </div>
-           <Button onClick={handleGeneratePaymentOptions}>Generate Payment Options</Button>
-        </CardContent>
-      </Card>
 
       <Dialog open={isPaymentOptionsModalOpen} onOpenChange={setIsPaymentOptionsModalOpen}>
         <DialogContent className="max-w-4xl">
