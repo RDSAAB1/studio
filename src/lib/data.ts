@@ -45,7 +45,20 @@ export const initialFundTransactions: FundTransaction[] = [
 export const appOptionsData = {
     varieties: ['Wheat', 'Rice', 'Corn', 'Barley'],
     receiptTypes: ['Cash', 'Online'],
-    paymentTypes: ['Full', 'Partial']
+    paymentTypes: ['Full', 'Partial'],
+    bankNames: [
+        "State Bank of India", "Punjab National Bank", "Bank of Baroda",
+        "Canara Bank", "Union Bank of India", "Bank of India", "Indian Bank",
+        "Central Bank of India", "UCO Bank", "Bank of Maharashtra",
+        "Punjab & Sind Bank", "Allahabad Bank", "HDFC Bank", "ICICI Bank",
+        "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank", "Yes Bank",
+        "IDFC First Bank", "Federal Bank", "South Indian Bank", "RBL Bank",
+        "Andhra Pradesh Grameena Vikas Bank", "Kerala Gramin Bank",
+        "Madhya Pradesh Gramin Bank", "Baroda Uttar Pradesh Gramin Bank",
+        "Uttar Pradesh Gramin Bank", "Saraswat Co-operative Bank",
+        "Bassein Catholic Co-operative Bank", "Cosmos Cooperative Bank",
+        "TJSB Sahakari Bank", "Jila Sahakari Bank"
+    ]
 };
 
 export const transactionCategories = {

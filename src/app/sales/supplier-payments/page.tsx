@@ -46,6 +46,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { appOptionsData } from "@/lib/data";
 
 
 import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
@@ -233,12 +234,6 @@ export default function SupplierPaymentsPage() {
   }, [paymentType]);
   
   const isCdSwitchDisabled = cdEligibleEntries.length === 0;
-
-  const targetAmountForGenerator = useMemo(() => {
-    return paymentType === 'Full' 
-      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
-      : paymentAmount;
-  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
 
   useEffect(() => {
     setIsClient(true);
@@ -608,7 +603,11 @@ export default function SupplierPaymentsPage() {
     };
 
   const generatePaymentCombinations = () => {
-    if (targetAmountForGenerator <= 0 || minRate <= 0 || maxRate < minRate) {
+    const targetAmount = paymentType === 'Full' 
+      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
+      : paymentAmount;
+
+    if (targetAmount <= 0 || minRate <= 0 || maxRate < minRate) {
         toast({
             variant: 'destructive',
             title: 'Invalid Input',
@@ -621,21 +620,20 @@ export default function SupplierPaymentsPage() {
     const seenRemainders = new Set<number>();
 
     for (let rate = minRate; rate <= maxRate; rate += 1) {
-        if (rate % 5 !== 0) continue;
+        if (rate === 0 || rate % 5 !== 0) continue;
 
-        const baseQuantity = targetAmountForGenerator / rate;
+        const baseQuantity = targetAmount / rate;
 
-        for (let i = -50; i <= 50; i += 0.1) { // 0.1 represents 10kg
+        for (let i = -50; i <= 50; i += 0.1) {
             const quantity = baseQuantity + i;
             if (quantity <= 0) continue;
 
             const roundedQuantity = parseFloat(quantity.toFixed(1));
-            // Check if quantity is divisible by 0.1 (10kg)
             if (Math.round(roundedQuantity * 10) % 1 !== 0) continue;
             
             const amount = Math.round(roundedQuantity * rate);
-            const remainingAmount = targetAmountForGenerator - amount;
-
+            const remainingAmount = targetAmount - amount;
+            
             if (remainingAmount >= 0 && remainingAmount <= 500) {
                  const roundedRemainder = Math.round(remainingAmount);
                  if (!seenRemainders.has(roundedRemainder)) {
@@ -726,7 +724,9 @@ export default function SupplierPaymentsPage() {
     return null; // Render nothing on the server
   }
   
-  if (loading) {
+  const isLoadingInitial = loading && suppliers.length === 0;
+
+  if (isLoadingInitial) {
       return (
           <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -907,18 +907,22 @@ export default function SupplierPaymentsPage() {
                             <Card>
                                 <CardHeader className="p-4"><CardTitle className="text-sm">RTGS Payment Generator</CardTitle></CardHeader>
                                 <CardContent className="p-4 pt-0 space-y-4">
-                                     <div className="space-y-2">
-                                        <Label htmlFor="minRate" className="text-xs">Min Rate</Label>
-                                        <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} />
+                                     <div className="flex items-end gap-2">
+                                        <div className="space-y-2 flex-1">
+                                            <Label htmlFor="minRate" className="text-xs">Min Rate</Label>
+                                            <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} />
+                                        </div>
+                                        <div className="space-y-2 flex-1">
+                                            <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
+                                            <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
+                                        </div>
+                                         <Button onClick={generatePaymentCombinations} size="icon">
+                                            <Calculator className="h-4 w-4" />
+                                        </Button>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
-                                        <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
-                                    </div>
-                                    <Button onClick={generatePaymentCombinations} className="w-full">
-                                        <Calculator className="mr-2 h-4 w-4" />
-                                        {formatCurrency(targetAmountForGenerator)}
-                                    </Button>
+                                    <p className="text-xs text-center text-muted-foreground">
+                                        Generate options for: <span className="font-bold text-primary">{formatCurrency(paymentType === 'Full' ? totalOutstandingForSelected - calculatedCdAmount : paymentAmount)}</span>
+                                    </p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -935,7 +939,7 @@ export default function SupplierPaymentsPage() {
                                 <DialogHeader>
                                     <DialogTitle>RTGS Payment Generator</DialogTitle>
                                     <DialogDescription>
-                                        Target: {formatCurrency(targetAmountForGenerator)} | 
+                                        Target: {formatCurrency(paymentType === 'Full' ? totalOutstandingForSelected - calculatedCdAmount : paymentAmount)} | 
                                         Rate Range: {formatCurrency(minRate)} - {formatCurrency(maxRate)}
                                     </DialogDescription>
                                 </DialogHeader>
@@ -989,7 +993,37 @@ export default function SupplierPaymentsPage() {
                              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
                                 <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
-                                <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
+                                 <div className="space-y-2">
+                                     <Label htmlFor="bank">Bank</Label>
+                                     <Popover>
+                                         <PopoverTrigger asChild>
+                                             <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                                                 {bankDetails.bank || "Select bank"}
+                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                             </Button>
+                                         </PopoverTrigger>
+                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                             <Command>
+                                                 <CommandInput placeholder="Search bank..." />
+                                                 <CommandEmpty>No bank found.</CommandEmpty>
+                                                 <CommandList>
+                                                     {appOptionsData.bankNames.map((bank) => (
+                                                         <CommandItem
+                                                             key={bank}
+                                                             value={bank}
+                                                             onSelect={(currentValue) => {
+                                                                 setBankDetails({...bankDetails, bank: currentValue === bankDetails.bank ? "" : currentValue});
+                                                             }}
+                                                         >
+                                                             <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />
+                                                             {bank}
+                                                         </CommandItem>
+                                                     ))}
+                                                 </CommandList>
+                                             </Command>
+                                         </PopoverContent>
+                                     </Popover>
+                                 </div>
                                 <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
                              </CardContent>
                         </Card>
@@ -1002,7 +1036,7 @@ export default function SupplierPaymentsPage() {
                                 <div className="space-y-2"><Label htmlFor="grDate">GR Date</Label>
                                     <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent></Popover>
                                 </div>
-                                <div className="space-y-2"><Label htmlFor="parchiNo">Parchi No.</Label><Input id="parchiNo" value={parchiNo} onChange={e => setParchiNo(e.target.value)} readOnly/></div>
+                                <div className="space-y-2 md:col-span-2"><Label htmlFor="parchiNo">Parchi No.</Label><Input id="parchiNo" value={parchiNo} onChange={e => setParchiNo(e.target.value)} readOnly/></div>
                             </CardContent>
                         </Card>
                         <Card className="mt-6 bg-muted/30">
