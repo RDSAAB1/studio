@@ -179,9 +179,16 @@ export default function SupplierProfilePage() {
             .filter(t => parseFloat(String(t.netAmount)) >= 1)
             .map(t => t.id);
         data.totalOutstandingTransactions = data.outstandingEntryIds.length;
+        
+        // Corrected average rate calculation
+        if (data.totalNetWeight! > 0) {
+            data.averageRate = data.totalAmount / data.totalNetWeight!;
+        } else {
+            data.averageRate = 0;
+        }
+
         const rates = supplierRateSum[key];
         if (rates && rates.count > 0) {
-            data.averageRate = rates.rate / rates.count;
             data.averageKartaPercentage = rates.karta / rates.count;
             data.averageLabouryRate = rates.laboury / rates.count;
         }
@@ -216,18 +223,23 @@ export default function SupplierProfilePage() {
     millSummary.totalTransactions = suppliers.length;
     millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
     
+    // Corrected mill average rate calculation
+    if (millSummary.totalNetWeight! > 0) {
+        millSummary.averageRate = millSummary.totalAmount / millSummary.totalNetWeight!;
+    } else {
+        millSummary.averageRate = 0;
+    }
+
     const totalRateData = suppliers.reduce((acc, s) => {
         if(s.rate > 0) {
-            acc.rate += s.rate;
             acc.karta += s.kartaPercentage;
             acc.laboury += s.labouryRate;
             acc.count++;
         }
         return acc;
-    }, { rate: 0, karta: 0, laboury: 0, count: 0 });
+    }, { karta: 0, laboury: 0, count: 0 });
 
     if(totalRateData.count > 0) {
-        millSummary.averageRate = totalRateData.rate / totalRateData.count;
         millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
         millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
     }
@@ -331,6 +343,8 @@ export default function SupplierProfilePage() {
                             <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
                             <SummaryDetailItem label="Net Wt" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} />
                              <Separator className="my-2"/>
+                            <SummaryDetailItem label="Average Rate" value={formatCurrency(selectedSupplierData.averageRate || 0)} />
+                             <Separator className="my-2"/>
                             <SummaryDetailItem label="Total Transactions" value={`${selectedSupplierData.totalTransactions} Entries`} />
                             <SummaryDetailItem label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions} Entries`} colorClass="text-destructive font-bold"/>
                         </CardContent>
@@ -338,7 +352,7 @@ export default function SupplierProfilePage() {
 
                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><CircleDollarSign size={16}/> Deduction Summary</CardTitle>
+                             <CardTitle className="text-base flex items-center gap-2"><CircleDollarSign size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
                              <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
@@ -361,6 +375,7 @@ export default function SupplierProfilePage() {
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
                             <SummaryDetailItem label="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`} />
+                             <Separator className="my-2"/>
                             <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} colorClass="text-green-500" />
                             <SummaryDetailItem label="Total CD Granted" value={`- ${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
                              <Separator className="my-2"/>
