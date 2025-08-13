@@ -367,7 +367,7 @@ export default function SupplierPaymentsPage() {
             return;
         }
 
-        const finalPaymentAmount = paymentMethod === 'RTGS' ? rtgsAmount : paymentAmount;
+        const finalPaymentAmount = rtgsAmount;
 
         if (finalPaymentAmount <= 0 && calculatedCdAmount <= 0) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
@@ -591,11 +591,12 @@ export default function SupplierPaymentsPage() {
                 if (quantity <= 0) continue;
     
                 const roundedQuantity = parseFloat(quantity.toFixed(1));
+                if (roundedQuantity * 10 % 1 !== 0) continue;
                 
                 const amount = Math.round(roundedQuantity * rate);
                 const remainingAmount = targetAmountForGenerator - amount;
     
-                if (remainingAmount >= -500 && remainingAmount <= 500) {
+                if (remainingAmount >= 0 && remainingAmount <= 500) {
                      const roundedRemainder = Math.round(remainingAmount);
                      if (!seenRemainders.has(roundedRemainder)) {
                         combinations.push({ quantity: roundedQuantity, rate, amount, remainingAmount });
@@ -908,8 +909,9 @@ export default function SupplierPaymentsPage() {
                                         <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
                                         <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
                                     </div>
-                                    <Button onClick={generatePaymentCombinations} className="w-full">
-                                        Generate Payment Options for {formatCurrency(targetAmountForGenerator)}
+                                    <Button onClick={() => setIsGeneratorOpen(true)} className="w-full">
+                                        <Calculator className="mr-2 h-4 w-4" />
+                                        {formatCurrency(targetAmountForGenerator)}
                                     </Button>
                                 </CardContent>
                             </Card>
@@ -918,7 +920,7 @@ export default function SupplierPaymentsPage() {
                                 <CardContent className="p-4 pt-0 space-y-4">
                                      <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
                                      <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
-                                     <div className="space-y-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} /></div>
+                                     <div className="space-y-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} readOnly /></div>
                                 </CardContent>
                             </Card>
                         </div>
