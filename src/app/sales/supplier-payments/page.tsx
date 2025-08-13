@@ -153,6 +153,11 @@ export default function SupplierPaymentsPage() {
     };
   }, [editingPayment, stableToast, getNextPaymentId]);
   
+  useEffect(() => {
+    if (selectedCustomerKey) {
+        setIsOutstandingModalOpen(true);
+    }
+  }, [selectedCustomerKey]);
 
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
