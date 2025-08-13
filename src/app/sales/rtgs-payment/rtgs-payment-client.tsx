@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { runTransaction, collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc, writeBatch } from "firebase/firestore";
+import { runTransaction, collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc, writeBatch, getDocs, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Badge } from "@/components/ui/badge";
 import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
@@ -297,7 +297,6 @@ export default function RtgspaymentClient() {
             }
 
             // Apply new/updated payment impact
-            const batch = writeBatch(db);
             for (const entry of selectedEntries) {
                 const newNetAmount = Number(entry.netAmount) - (paymentType === 'Full' ? Number(entry.netAmount) : values.amount / selectedEntries.length);
                 const supplierRef = doc(db, "suppliers", entry.id);
@@ -306,7 +305,7 @@ export default function RtgspaymentClient() {
 
             if (editingPayment && editingPayment.id) {
                 const paymentRef = doc(db, "payments", editingPayment.id);
-                transaction.update(paymentRef, finalPayment);
+                transaction.update(paymentRef, finalPayment as any);
             } else {
                 const newPaymentRef = doc(collection(db, "payments"));
                 transaction.set(newPaymentRef, { ...finalPayment, id: newPaymentRef.id });
@@ -558,15 +557,11 @@ export default function RtgspaymentClient() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead><Checkbox
-                                    checked={selectedOutstandingIds.size > 0 && selectedOutstandingIds.size === outstandingEntries.filter(e => !paidSrNos.has(e.srNo)).length && outstandingEntries.filter(e => !paidSrNos.has(e.srNo)).length > 0}
+                                    checked={selectedOutstandingIds.size > 0 && selectedOutstandingIds.size === outstandingEntries.length && outstandingEntries.length > 0}
                                     onCheckedChange={(checked) => {
                                       const newSet = new Set<string>();
                                       if (checked) {
-                                        outstandingEntries.forEach(e => {
-                                            if (!paidSrNos.has(e.srNo)) {
-                                                newSet.add(e.id);
-                                            }
-                                        });
+                                        outstandingEntries.forEach(e => newSet.add(e.id));
                                       }
                                       setSelectedOutstandingIds(newSet);
                                     }}
@@ -579,7 +574,7 @@ export default function RtgspaymentClient() {
                               </TableHeader>
                               <TableBody>
                                 {outstandingEntries.map(entry => {
-                                  const isPaid = paidSrNos.has(entry.srNo);
+                                  const isPaid = Number(entry.netAmount) < 1;
                                   return (
                                   <TableRow key={entry.id} className={isPaid ? "opacity-50" : ""}>
                                     <TableCell><Checkbox 
@@ -680,7 +675,7 @@ export default function RtgspaymentClient() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Serial & Date Details</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Serial &amp; Date Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="srNo">Payment ID</Label>
@@ -886,3 +881,5 @@ export default function RtgspaymentClient() {
     </div>
   );
 }
+
+    

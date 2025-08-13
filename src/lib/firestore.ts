@@ -124,75 +124,6 @@ export async function deleteInventoryItem(id: string) {
 
 // --- Payment Functions ---
 
-export async function addPayment(paymentData: Omit<Payment, 'id'> & { id?: string }): Promise<Payment> {
-  const docRef = await addDoc(paymentsCollection, paymentData);
-  const finalPaymentData = { id: docRef.id, ...paymentData };
-  await updateDoc(docRef, { id: docRef.id }); // Add the generated ID to the document itself
-  return finalPaymentData as Payment;
-}
-
-export async function updatePayment(id: string, paymentData: Partial<Payment>): Promise<boolean> {
-    if (!id) {
-        console.error("updatePayment requires a valid ID.");
-        return false;
-    }
-    try {
-        const paymentRef = doc(db, "payments", id);
-        // Use setDoc instead of updateDoc to handle cases where the doc might have been temporarily removed
-        await setDoc(paymentRef, paymentData, { merge: true });
-        return true;
-    } catch (error) {
-        console.error("Error in updatePayment:", error);
-        return false; 
-    }
-}
-
-
-export async function deletePayment(id: string): Promise<void> {
-    if (!id) {
-        console.error("deletePayment requires a valid ID.");
-        return;
-    }
-    const paymentRef = doc(db, "payments", id);
-    await deleteDoc(paymentRef);
-}
-
-export async function batchUpdateSuppliersOnPaymentChange(
-  paymentId: string,
-  paidForDetails: PaidFor[],
-  isDeletionOrRevert: boolean
-): Promise<void> {
-  const batch = writeBatch(db);
-
-  for (const detail of paidForDetails) {
-    const supplierQuery = query(suppliersCollection, where("srNo", "==", detail.srNo));
-    const supplierSnapshot = await getDocs(supplierQuery);
-
-    if (!supplierSnapshot.empty) {
-      const supplierDoc = supplierSnapshot.docs[0];
-      const currentNetAmount = Number(supplierDoc.data().netAmount);
-      const paymentAmount = detail.amount;
-      
-      const newNetAmount = isDeletionOrRevert 
-        ? currentNetAmount + paymentAmount // Add back on delete/revert
-        : currentNetAmount - paymentAmount; // Subtract on creation/update
-
-      batch.update(supplierDoc.ref, { netAmount: newNetAmount });
-    } else {
-      console.warn(`Could not find supplier with SR No: ${detail.srNo} to update.`);
-    }
-  }
-
-  // Delete the payment document if it's a deletion operation
-  if (isDeletionOrRevert) {
-      const paymentRef = doc(db, "payments", paymentId);
-      batch.delete(paymentRef);
-  }
-
-  await batch.commit();
-}
-
-
 export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onError: (error: Error) => void): () => void {
   const q = query(paymentsCollection, orderBy("date", "desc"));
   return onSnapshot(q, (snapshot) => {
@@ -226,3 +157,5 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
   const docRef = await addDoc(fundTransactionsCollection, finalData);
   return { id: docRef.id, ...finalData };
 }
+
+    

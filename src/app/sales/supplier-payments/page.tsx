@@ -490,7 +490,7 @@ export default function SupplierPaymentsPage() {
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
-  const paidEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) === 0 && s.originalNetAmount > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
+  const paidEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) < 1 && s.originalNetAmount > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
   
   const currentPaymentHistory = useMemo(() => {
     if (!selectedCustomerKey) return [];
@@ -968,3 +968,5 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+
+    
