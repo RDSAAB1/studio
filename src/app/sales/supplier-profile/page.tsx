@@ -342,12 +342,16 @@ export default function SupplierProfilePage() {
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
                              <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
+                            <Separator className="my-2"/>
                             <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
                             <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
                             <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
                             <SummaryDetailItem label="Total Other" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
                             <Separator className="my-2"/>
-                            <SummaryDetailItem label="Total Deductions" value={`${formatCurrency(selectedSupplierData.totalDeductions || 0)}`} colorClass="text-destructive font-bold"/>
+                            <div className="flex justify-between items-center text-base pt-1">
+                                <p className="font-semibold text-muted-foreground">Total Original Amount</p>
+                                <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
+                            </div>
                         </CardContent>
                     </Card>
 
