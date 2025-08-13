@@ -597,9 +597,25 @@ export default function SupplierPaymentsPage() {
                 }
             });
 
-            resetPaymentForm();
             toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
-
+            // Don't reset the whole form, just payment-related fields
+            setSelectedEntryIds(new Set());
+            setPaymentAmount(0);
+            setCdEnabled(false);
+            setUtrNo('');
+            setCheckNo('');
+            setGrNo('');
+            setParchiNo('');
+            setRtgsQuantity(0);
+            setRtgsRate(0);
+            setRtgsAmount(0);
+            setPaymentCombinations([]);
+            if (!editingPayment) {
+                setPaymentId(getNextPaymentId(paymentHistory));
+            } else {
+                setEditingPayment(null);
+            }
+            // Keep selectedCustomerKey to stay on the same supplier's view
         } catch (error) {
             console.error("Error processing payment:", error);
             toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment. Please try again." });
