@@ -638,22 +638,23 @@ export default function SupplierEntryClient() {
     }
   };
 
-  const handleDelete = (id: string) => {
-     deleteSupplier(id)
-       .then(() => {
-         toast({ title: "Success", description: "Entry deleted successfully." });
-         if (currentCustomer.id === id) {
-           handleNew(); // Clear form if deleting the currently edited customer
-         }
-       })
-       .catch((error) => {
-         console.error("Error deleting supplier: ", error);
-         toast({
-           title: "Error",
-           description: "Failed to delete entry. Please try again.",
-           variant: "destructive",
-         });
-       });
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteSupplier(id);
+      // Optimistic update
+      setCustomers(prevCustomers => prevCustomers.filter(c => c.id !== id));
+      toast({ title: "Success", description: "Entry deleted successfully." });
+      if (currentCustomer.id === id) {
+        handleNew(); // Clear form if deleting the currently edited customer
+      }
+    } catch (error) {
+      console.error("Error deleting supplier: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete entry. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const onSubmit = (values: FormValues) => {
