@@ -699,8 +699,26 @@ export default function SupplierPaymentsPage() {
   
   const isCdSwitchDisabled = cdEligibleEntries.length === 0;
 
+  const targetAmountForGenerator = useMemo(() => {
+    return paymentType === 'Full' 
+      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
+      : paymentAmount;
+  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
+
+  const handlePaySelectedOutstanding = () => {
+    if (selectedEntryIds.size === 0) {
+        toast({
+            variant: "destructive",
+            title: "No Entries Selected",
+            description: "Please select one or more outstanding entries to pay.",
+        });
+        return;
+    }
+    setIsOutstandingModalOpen(false); // Close the modal
+  };
+
   if (!isClient) {
-    return null;
+    return null; // Render nothing on the server
   }
   
   if (loading) {
@@ -712,23 +730,6 @@ export default function SupplierPaymentsPage() {
       );
   }
   
-  const handlePaySelectedOutstanding = () => {
-    if (selectedEntryIds.size === 0) {
-        toast({
-            variant: "destructive",
-            title: "No Entries Selected",
-            description: "Please select one or more outstanding entries to pay.",
-        });
-        return;
-    }
-    setIsOutstandingModalOpen(false); // Close the modal
-};
-const targetAmountForGenerator = useMemo(() => {
-    return paymentType === 'Full' 
-      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
-      : paymentAmount;
-  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
-
   return (
     <div className="space-y-8">
       <Card>
@@ -1321,8 +1322,3 @@ const targetAmountForGenerator = useMemo(() => {
     </div>
   );
 }
-
-    
-
-    
-
