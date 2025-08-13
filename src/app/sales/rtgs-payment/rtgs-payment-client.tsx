@@ -108,12 +108,12 @@ const initialFormState: FormValues = {
 
 export default function RtgspaymentClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
   
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | undefined>(undefined);
   const [outstandingEntries, setOutstandingEntries] = useState<Customer[]>([]);
   const [selectedOutstandingIds, setSelectedOutstandingIds] = useState<Set<string>>(new Set());
 
@@ -165,15 +165,15 @@ export default function RtgspaymentClient() {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to load RTGS records.' });
     });
 
-    const unsubscribeCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
-      const customersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
-      setCustomers(customersData);
+    const unsubscribeSuppliers = onSnapshot(collection(db, "suppliers"), (snapshot) => {
+      const suppliersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
+      setSuppliers(suppliersData);
     }, (error) => {
-      console.error("Error fetching customers:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load customers.' });
+      console.error("Error fetching suppliers:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load suppliers.' });
     });
 
-    return () => { unsubscribeRecords(); unsubscribeCustomers(); };
+    return () => { unsubscribeRecords(); unsubscribeSuppliers(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingRecordIndex]);
 
@@ -197,27 +197,27 @@ export default function RtgspaymentClient() {
   }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected]);
 
 
-  const handleCustomerSelect = (customerId: string) => {
-    setSelectedCustomerId(customerId);
-    const customer = customers.find(c => c.id === customerId);
+  const handleSupplierSelect = (supplierId: string) => {
+    setSelectedSupplierId(supplierId);
+    const supplier = suppliers.find(c => c.id === supplierId);
 
-    if(customer) {
+    if(supplier) {
       form.reset({
         ...initialFormState,
         srNo: generateSrNo(allRecords),
-        name: customer.name,
-        fatherName: customer.so,
-        mobileNo: customer.contact,
-        address: customer.address,
-        acNo: customer.acNo,
-        ifscCode: customer.ifscCode,
-        bank: customer.bank,
-        branch: customer.branch,
-        parchiName: customer.parchiName,
-        parchiAddress: customer.parchiAddress,
+        name: supplier.name,
+        fatherName: supplier.so,
+        mobileNo: supplier.contact,
+        address: supplier.address,
+        acNo: supplier.acNo,
+        ifscCode: supplier.ifscCode,
+        bank: supplier.bank,
+        branch: supplier.branch,
+        parchiName: supplier.parchiName,
+        parchiAddress: supplier.parchiAddress,
       });
-      const customerOutstanding = customers.filter(c => c.customerId === customer.customerId && Number(c.netAmount) > 0);
-      setOutstandingEntries(customerOutstanding);
+      const supplierOutstanding = suppliers.filter(c => c.customerId === supplier.customerId && Number(c.netAmount) > 0);
+      setOutstandingEntries(supplierOutstanding);
     } else {
       setOutstandingEntries([]);
     }
@@ -229,7 +229,7 @@ export default function RtgspaymentClient() {
         amount: values.amount + calculatedCdAmount,
         cdAmount: calculatedCdAmount,
         cdApplied: cdEnabled,
-        customerId: selectedCustomerId || null, 
+        supplierId: selectedSupplierId || null, 
     }
 
     let message = "";
@@ -258,24 +258,24 @@ export default function RtgspaymentClient() {
   const handleNew = (records: any[]) => {
     form.reset({...initialFormState, srNo: generateSrNo(records) });
     setEditingRecordIndex(null);
-    setSelectedCustomerId(undefined);
+    setSelectedSupplierId(undefined);
     setOutstandingEntries([]);
     setSelectedOutstandingIds(new Set());
     setCdEnabled(false);
   }
   
-  const handleAddNewCustomer = (customerName: string) => {
-    const newCustomer: Customer = {
+  const handleAddNewSupplier = (supplierName: string) => {
+    const newSupplier: Customer = {
         id: Date.now().toString(), // temporary client-side ID
-        name: toTitleCase(customerName),
+        name: toTitleCase(supplierName),
         contact: '',
         srNo: '', date: new Date().toISOString(), term: '', dueDate: new Date().toISOString(), so: '', address: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0, weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0, labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '', receiptType: '', paymentType: '',
-        customerId: `${toTitleCase(customerName).toLowerCase()}|`
+        customerId: `${toTitleCase(supplierName).toLowerCase()}|`
     };
     // This part should ideally trigger a Firestore write, but for now we update local state
-    setCustomers(prev => [...prev, newCustomer]);
-    handleCustomerSelect(newCustomer.id);
-    toast({ title: "Customer Added", description: `Added "${customerName}". Please fill in other details.` });
+    setSuppliers(prev => [...prev, newSupplier]);
+    handleSupplierSelect(newSupplier.id);
+    toast({ title: "Supplier Added", description: `Added "${supplierName}". Please fill in other details.` });
   };
 
   const handleEdit = (index: number) => {
@@ -283,7 +283,7 @@ export default function RtgspaymentClient() {
     if (record) {
        form.reset(record);
        setEditingRecordIndex(index);
-       setSelectedCustomerId(record.customerId);
+       setSelectedSupplierId(record.supplierId);
        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -420,12 +420,20 @@ export default function RtgspaymentClient() {
     return sortableItems;
   }, [paymentOptions, sortConfig]);
   
-  const customerComboboxOptions = useMemo(() => {
-    return customers.map(c => ({
-        value: c.id,
-        label: `${toTitleCase(c.name)} (${c.contact || 'No Contact'})`
+  const supplierComboboxOptions = useMemo(() => {
+    // Creating a map to store unique suppliers by their customerId
+    const uniqueSuppliers = new Map<string, Customer>();
+    suppliers.forEach(s => {
+      if(s.customerId && !uniqueSuppliers.has(s.customerId)) {
+        uniqueSuppliers.set(s.customerId, s);
+      }
+    });
+
+    return Array.from(uniqueSuppliers.values()).map(s => ({
+        value: s.id, // Use Firestore document ID as the unique value
+        label: `${toTitleCase(s.name)} (${s.contact || 'No Contact'})`
     }));
-  }, [customers]);
+  }, [suppliers]);
 
   if (!isClient) {
     return null; 
@@ -437,27 +445,27 @@ export default function RtgspaymentClient() {
         <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
                 <Users className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-semibold">Select Customer</h3>
+                <h3 className="text-base font-semibold">Select Supplier</h3>
             </div>
             <div className="w-full sm:w-auto sm:min-w-64 flex items-end gap-2">
                  <div className="flex-grow">
                      <DynamicCombobox
-                        options={customerComboboxOptions}
-                        value={selectedCustomerId}
-                        onChange={handleCustomerSelect}
-                        onAdd={handleAddNewCustomer}
-                        placeholder="Select or add a customer..."
-                        searchPlaceholder="Search customer..."
-                        emptyPlaceholder="No customer found."
+                        options={supplierComboboxOptions}
+                        value={selectedSupplierId}
+                        onChange={handleSupplierSelect}
+                        onAdd={handleAddNewSupplier}
+                        placeholder="Select or add a supplier..."
+                        searchPlaceholder="Search supplier..."
+                        emptyPlaceholder="No supplier found."
                     />
                  </div>
-                 {selectedCustomerId && (
+                 {selectedSupplierId && (
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm">View Outstanding ({outstandingEntries.length})</Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-4xl">
-                          <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(customers.find(c=>c.id === selectedCustomerId)?.name || '')}</DialogTitle></DialogHeader>
+                          <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(suppliers.find(c=>c.id === selectedSupplierId)?.name || '')}</DialogTitle></DialogHeader>
                           <div className="max-h-[60vh] overflow-y-auto">
                             <Table>
                               <TableHeader>
@@ -522,7 +530,7 @@ export default function RtgspaymentClient() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Customer Details */}
           <Card>
-            <CardHeader><CardTitle>Customer Details</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Supplier Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
