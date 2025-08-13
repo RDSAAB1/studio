@@ -113,30 +113,38 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
 
     return (
-        <div className="bg-background p-6 rounded-lg">
-            <header className="mb-6 border-b pb-4 text-center">
-                <h2 className="text-xl font-bold text-foreground">BizSuite DataFlow</h2>
-                <h3 className="text-2xl font-bold text-primary">{toTitleCase(data.name)}</h3>
-                <p className="text-muted-foreground">Account Statement</p>
-                <p className="text-sm text-muted-foreground">For the period from {startDate} to {endDate}</p>
+        <div className="bg-background p-6 rounded-lg font-sans">
+            <header className="mb-6 border-b pb-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h2 className="text-2xl font-bold text-primary">Account Statement</h2>
+                        <p className="text-muted-foreground">BizSuite DataFlow</p>
+                    </div>
+                    <div className="text-right">
+                        <h3 className="text-lg font-semibold">{toTitleCase(data.name)}</h3>
+                        {data.address && <p className="text-sm text-muted-foreground">{toTitleCase(data.address)}</p>}
+                        {data.contact && <p className="text-sm text-muted-foreground">Contact: {data.contact}</p>}
+                    </div>
+                </div>
+                 <p className="text-sm text-muted-foreground mt-2">For the period from {startDate} to {endDate}</p>
             </header>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-muted/50 p-3 rounded-md text-center">
                     <p className="text-xs text-muted-foreground">Opening Balance</p>
-                    <p className="font-bold text-lg">{formatCurrency(openingBalance)}</p>
+                    <p className="font-bold text-lg font-mono">{formatCurrency(openingBalance)}</p>
                 </div>
-                <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-md text-center">
-                    <p className="text-xs text-red-700 dark:text-red-400">Total Debits</p>
-                    <p className="font-bold text-lg text-red-800 dark:text-red-300">{formatCurrency(totalDebit)}</p>
+                <div className="bg-red-500/10 p-3 rounded-md text-center">
+                    <p className="text-xs text-red-600">Total Debits</p>
+                    <p className="font-bold text-lg text-red-700 font-mono">{formatCurrency(totalDebit)}</p>
                 </div>
-                 <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-md text-center">
-                    <p className="text-xs text-green-700 dark:text-green-400">Total Credits</p>
-                    <p className="font-bold text-lg text-green-800 dark:text-green-300">{formatCurrency(totalCredit)}</p>
+                 <div className="bg-green-500/10 p-3 rounded-md text-center">
+                    <p className="text-xs text-green-600">Total Credits</p>
+                    <p className="font-bold text-lg text-green-700 font-mono">{formatCurrency(totalCredit)}</p>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-md text-center">
                     <p className="text-xs text-muted-foreground">Closing Balance</p>
-                    <p className="font-bold text-lg">{formatCurrency(closingBalance)}</p>
+                    <p className="font-bold text-lg font-mono">{formatCurrency(closingBalance)}</p>
                 </div>
             </div>
 
@@ -144,30 +152,34 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Date</TableHead>
+                            <TableHead className="w-[100px]">Date</TableHead>
                             <TableHead>Particulars</TableHead>
                             <TableHead className="text-right">Debit</TableHead>
                             <TableHead className="text-right">Credit</TableHead>
-                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead className="text-right w-[120px]">Balance</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {items.map((item, index) => (
-                            <TableRow key={index}>
-                                <TableCell>{format(item.date, "dd-MMM-yy")}</TableCell>
+                            <TableRow key={index} className="[&_td]:py-2">
+                                <TableCell className="text-xs">{format(item.date, "dd-MMM-yy")}</TableCell>
                                 <TableCell>{item.particulars}</TableCell>
-                                <TableCell className="text-right text-red-600">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
-                                <TableCell className="text-right text-green-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
-                                <TableCell className="text-right font-semibold">{formatCurrency(item.balance)}</TableCell>
+                                <TableCell className="text-right font-mono text-red-600">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                <TableCell className="text-right font-mono text-green-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
+                                <TableCell className="text-right font-mono font-semibold">{formatCurrency(item.balance)}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
+                    <TableFooter>
+                        <TableRow className="bg-muted font-bold">
+                            <TableCell colSpan={2}>Total</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(totalDebit)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(totalCredit)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(closingBalance)}</TableCell>
+                        </TableRow>
+                    </TableFooter>
                 </Table>
             </ScrollArea>
-             <div className="flex justify-end mt-6 gap-2">
-                <Button variant="outline"><Printer className="mr-2"/> Print</Button>
-                <Button><Download className="mr-2"/> Download PDF</Button>
-            </div>
         </div>
     );
 };
@@ -828,14 +840,22 @@ export default function SupplierProfilePage() {
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
           <DialogContent className="max-w-4xl p-0">
              <DialogHeader className="p-4">
-                <DialogTitle className="sr-only">Account Statement</DialogTitle>
+                <DialogTitle className="sr-only">Account Statement for {selectedSupplierData?.name}</DialogTitle>
                 <DialogDescription className="sr-only">
-                    An account statement for {selectedSupplierData?.name}.
+                    A detailed account statement of all transactions and payments.
                 </DialogDescription>
              </DialogHeader>
               <StatementPreview data={selectedSupplierData} />
+              <DialogFooter className="p-4 border-t">
+                    <Button variant="outline" onClick={() => setIsStatementOpen(false)}>Close</Button>
+                    <div className="flex-grow" />
+                    <Button variant="outline"><Printer className="mr-2 h-4 w-4"/> Print</Button>
+                    <Button><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
+                </DialogFooter>
           </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+    
