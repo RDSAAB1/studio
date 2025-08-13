@@ -235,12 +235,7 @@ export default function SupplierPaymentsPage() {
   
   const isCdSwitchDisabled = cdEligibleEntries.length === 0;
 
-  const targetAmountForGenerator = useMemo(() => {
-    return paymentType === 'Full' 
-      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
-      : paymentAmount;
-  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
-
+  
   const isLoadingInitial = loading && suppliers.length === 0;
   
   const availableBranches = useMemo(() => {
@@ -614,6 +609,12 @@ export default function SupplierPaymentsPage() {
             toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
         }
     };
+    
+    const targetAmountForGenerator = useMemo(() => {
+    return paymentType === 'Full' 
+      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
+      : paymentAmount;
+    }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
 
   const generatePaymentCombinations = () => {
     if (targetAmountForGenerator <= 0 || minRate <= 0 || maxRate < minRate) {
@@ -631,10 +632,10 @@ export default function SupplierPaymentsPage() {
     for (let rate = minRate; rate <= maxRate; rate += 1) {
         if (rate === 0 || rate % 5 !== 0) continue;
 
-        const baseQuantity = targetAmountForGenerator / rate;
-
         for (let i = -50; i <= 50; i += 0.1) {
-            const quantity = baseQuantity + i;
+            if (targetAmountForGenerator < rate * (targetAmountForGenerator/rate + i)) continue;
+
+            const quantity = targetAmountForGenerator / rate + i;
             if (quantity <= 0) continue;
 
             const roundedQuantity = parseFloat(quantity.toFixed(1));
