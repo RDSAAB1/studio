@@ -70,6 +70,7 @@ export default function SupplierProfilePage() {
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
 
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
@@ -375,12 +376,12 @@ export default function SupplierProfilePage() {
                              <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
-                            <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
                             <Separator className="my-2"/>
-                            <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Kanta" value={`${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
-                            <SummaryDetailItem label="Total Other" value={`${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
+                            <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
+                            <SummaryDetailItem label="Total Other" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
                              <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Total Original Amount</p>
@@ -485,10 +486,10 @@ export default function SupplierProfilePage() {
                               <Table>
                                   <TableHeader>
                                       <TableRow>
-                                          <TableHead>Payment ID</TableHead>
+                                          <TableHead>ID</TableHead>
                                           <TableHead>Date</TableHead>
-                                          <TableHead>Method</TableHead>
                                           <TableHead className="text-right">Amount</TableHead>
+                                          <TableHead className="text-right">Actions</TableHead>
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
@@ -496,8 +497,12 @@ export default function SupplierProfilePage() {
                                           <TableRow key={payment.id}>
                                               <TableCell className="font-mono">{payment.paymentId}</TableCell>
                                               <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
-                                              <TableCell>{payment.receiptType}</TableCell>
                                               <TableCell className="font-semibold text-right">{formatCurrency(payment.amount)}</TableCell>
+                                               <TableCell className="text-right">
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedPaymentForDetails(payment)}>
+                                                      <Info className="h-4 w-4" />
+                                                  </Button>
+                                              </TableCell>
                                           </TableRow>
                                       ))}
                                        {currentPaymentHistory.length === 0 && (
@@ -636,6 +641,65 @@ export default function SupplierProfilePage() {
                 </Card>     
               </div>
             </ScrollArea>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={!!selectedPaymentForDetails} onOpenChange={(open) => !open && setSelectedPaymentForDetails(null)}>
+        <DialogContent className="max-w-2xl">
+          {selectedPaymentForDetails && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Payment Details: {selectedPaymentForDetails.paymentId}</DialogTitle>
+                <DialogDescription>
+                  Details of the payment made on {format(new Date(selectedPaymentForDetails.date), "PPP")}.
+                </DialogDescription>
+              </DialogHeader>
+              <Separator />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                <DetailItem icon={<Banknote size={14} />} label="Amount Paid" value={formatCurrency(selectedPaymentForDetails.amount)} />
+                <DetailItem icon={<Percent size={14} />} label="CD Amount" value={formatCurrency(selectedPaymentForDetails.cdAmount)} />
+                <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={selectedPaymentForDetails.type} />
+                <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={selectedPaymentForDetails.receiptType} />
+                <DetailItem icon={<Hash size={14} />} label="CD Applied" value={selectedPaymentForDetails.cdApplied ? "Yes" : "No"} />
+              </div>
+              <h4 className="font-semibold text-sm">Entries Paid in this Transaction</h4>
+              <div className="max-h-64 overflow-y-auto border rounded-md">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>SR No</TableHead>
+                            <TableHead>Supplier Name</TableHead>
+                            <TableHead className="text-right">Amount Paid</TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {selectedPaymentForDetails.paidFor?.map((pf, index) => {
+                            const supplier = suppliers.find(s => s.srNo === pf.srNo);
+                            return (
+                                <TableRow key={index}>
+                                    <TableCell>{pf.srNo}</TableCell>
+                                    <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
+                                    <TableCell className="text-center">
+                                       {supplier && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                                           setDetailsCustomer(supplier);
+                                           setSelectedPaymentForDetails(null);
+                                       }}>
+                                            <Info className="h-4 w-4" />
+                                        </Button>}
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })}
+                    </TableBody>
+                </Table>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedPaymentForDetails(null)}>Close</Button>
+              </DialogFooter>
             </>
           )}
         </DialogContent>
