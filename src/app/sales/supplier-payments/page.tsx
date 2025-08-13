@@ -524,20 +524,16 @@ export default function SupplierPaymentsPage() {
     const combinations: PaymentCombination[] = [];
     const seenRemainders = new Set<number>();
 
-    // Iterate through each rate in the given range with a step of 5
     for (let rate = minRate; rate <= maxRate; rate += 5) {
-      // Calculate a starting quantity
       const baseQuantity = Math.floor(targetAmount / rate);
       
-      // Explore a range of quantities around the base quantity to find good matches
-      for (let i = -25; i <= 25; i++) {
-        const quantity = baseQuantity + i;
+      for (let i = -2.5; i <= 2.5; i += 0.1) { // 0.1 quintal = 10kg
+        const quantity = parseFloat((baseQuantity + i).toFixed(2));
         if (quantity <= 0) continue;
 
         const amount = quantity * rate;
         const remainingAmount = targetAmount - amount;
 
-        // Check if the combination is valid
         if (remainingAmount >= 0 && remainingAmount <= 1000 && !seenRemainders.has(remainingAmount)) {
           combinations.push({ quantity, rate, amount, remainingAmount });
           seenRemainders.add(remainingAmount);
@@ -549,7 +545,6 @@ export default function SupplierPaymentsPage() {
         toast({ title: 'No Combinations Found', description: 'Try adjusting the rate range or target amount.'});
     }
 
-    // Sort by the smallest remaining amount and take the top 50
     const sortedCombinations = combinations.sort((a, b) => a.remainingAmount - b.remainingAmount).slice(0, 50);
     setPaymentCombinations(sortedCombinations);
   };
@@ -890,7 +885,7 @@ export default function SupplierPaymentsPage() {
                         <Card className="mt-4 bg-muted/30">
                             <CardHeader>
                                 <CardTitle className="text-base">
-                                     {editingPayment ? `Updating Payment ${paymentId}` : 'New Payment Summary'}
+                                    {editingPayment ? `Updating Payment ${paymentId}` : 'New Payment Summary'}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
@@ -900,8 +895,7 @@ export default function SupplierPaymentsPage() {
                                 <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
                             </CardContent>
                             <CardFooter className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={clearForm}>Cancel</Button>
-                                <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                                 <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
                             </CardFooter>
                         </Card>
                     </CardContent>
