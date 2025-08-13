@@ -652,12 +652,12 @@ export default function SupplierPaymentsPage() {
                         </TableHeader>
                         <TableBody>
                         {suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).map(entry => (
-                            <TableRow key={entry.id}>
-                            <TableCell><Checkbox checked={selectedEntryIds.has(entry.id)} onCheckedChange={() => handleEntrySelect(entry.id)} /></TableCell>
-                            <TableCell>{entry.srNo}</TableCell>
-                            <TableCell>{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
-                            <TableCell>{format(new Date(entry.dueDate), "dd-MMM-yy")}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
+                            <TableRow key={entry.id} onClick={() => handleEntrySelect(entry.id)} className="cursor-pointer">
+                                <TableCell><Checkbox checked={selectedEntryIds.has(entry.id)} onCheckedChange={() => handleEntrySelect(entry.id)} /></TableCell>
+                                <TableCell>{entry.srNo}</TableCell>
+                                <TableCell>{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
+                                <TableCell>{format(new Date(entry.dueDate), "dd-MMM-yy")}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
