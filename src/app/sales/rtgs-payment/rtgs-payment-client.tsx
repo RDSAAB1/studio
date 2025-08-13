@@ -50,8 +50,6 @@ const formSchema = z.object({
   fatherName: z.string().optional(),
   mobileNo: z.string().optional(),
   address: z.string().optional(),
-  parchiName: z.string().optional(),
-  parchiAddress: z.string().optional(),
   acNo: z.string().optional(),
   ifscCode: z.string().optional(),
   bank: z.string().optional(),
@@ -88,8 +86,6 @@ const initialFormState: FormValues = {
   fatherName: "",
   mobileNo: "",
   address: "",
-  parchiName: "",
-  parchiAddress: "",
   acNo: "",
   ifscCode: "",
   bank: "",
@@ -218,8 +214,6 @@ export default function RtgspaymentClient() {
         ifscCode: supplier.ifscCode,
         bank: supplier.bank,
         branch: supplier.branch,
-        parchiName: supplier.parchiName,
-        parchiAddress: supplier.parchiAddress,
       });
       const supplierOutstanding = suppliers.filter(c => c.customerId === supplier.customerId && Number(c.netAmount) > 0);
       setOutstandingEntries(supplierOutstanding);
@@ -231,8 +225,8 @@ export default function RtgspaymentClient() {
   const onSubmit = async (values: FormValues) => {
     const finalValues = {
         ...values,
-        amount: values.amount + calculatedCdAmount,
-        cdAmount: calculatedCdAmount,
+        amount: Math.round(values.amount + calculatedCdAmount),
+        cdAmount: Math.round(calculatedCdAmount),
         cdApplied: cdEnabled,
         supplierId: selectedSupplierId || null, 
     }
@@ -543,14 +537,12 @@ export default function RtgspaymentClient() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" {...form.register("name")} readOnly />
+                <Input id="name" {...form.register("name")} />
                 {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
               </div>
-              <div className="space-y-2"><Label htmlFor="fatherName">Father Name</Label><Input id="fatherName" {...form.register("fatherName")} readOnly /></div>
-              <div className="space-y-2"><Label htmlFor="mobileNo">Contact No.</Label><Input id="mobileNo" {...form.register("mobileNo")} readOnly /></div>
-              <div className="space-y-2"><Label htmlFor="address">Address</Label><Input id="address" {...form.register("address")} readOnly /></div>
-              <div className="space-y-2"><Label htmlFor="parchiName">Parchi Name</Label><Input id="parchiName" {...form.register("parchiName")} readOnly /></div>
-              <div className="space-y-2"><Label htmlFor="parchiAddress">Parchi Address</Label><Input id="parchiAddress" {...form.register("parchiAddress")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="fatherName">Father Name</Label><Input id="fatherName" {...form.register("fatherName")} /></div>
+              <div className="space-y-2"><Label htmlFor="mobileNo">Contact No.</Label><Input id="mobileNo" {...form.register("mobileNo")} /></div>
+              <div className="space-y-2"><Label htmlFor="address">Address</Label><Input id="address" {...form.register("address")} /></div>
             </CardContent>
           </Card>
 
@@ -558,10 +550,10 @@ export default function RtgspaymentClient() {
           <Card>
             <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" {...form.register("acNo")} readOnly /></div>
-              <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" {...form.register("ifscCode")} readOnly /></div>
-              <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" {...form.register("bank")} readOnly /></div>
-              <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" {...form.register("branch")} readOnly /></div>
+              <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" {...form.register("acNo")} /></div>
+              <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" {...form.register("ifscCode")} /></div>
+              <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" {...form.register("bank")} /></div>
+              <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" {...form.register("branch")} /></div>
             </CardContent>
           </Card>
 
