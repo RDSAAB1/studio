@@ -365,13 +365,13 @@ export default function SupplierProfilePage() {
                              <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
-                             <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
                             <Separator className="my-2"/>
                             <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
                             <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
                             <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
                             <SummaryDetailItem label="Total Other" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
-                            <Separator className="my-2"/>
+                             <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Total Original Amount</p>
                                 <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
@@ -387,7 +387,7 @@ export default function SupplierProfilePage() {
                             <SummaryDetailItem label="Total Original Amount" value={formatCurrency(selectedSupplierData.totalOriginalAmount || 0)} subValue={`Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg`} />
                              <Separator className="my-2"/>
                             <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} colorClass="text-green-500" />
-                            <SummaryDetailItem label="Total CD Granted" value={`- ${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
+                            <SummaryDetailItem label="Total CD Granted" value={`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Outstanding</p>
