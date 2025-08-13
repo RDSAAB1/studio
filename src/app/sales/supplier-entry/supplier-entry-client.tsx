@@ -22,7 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns"
@@ -311,9 +311,9 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
         const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
         return [
           { label: "Due Date", value: dueDate }, { label: "Weight", value: currentCustomer.weight },
-          { label: "Karta Weight", value: currentCustomer.kartaWeight }, { label: "Karta Amount", value: currentCustomer.kartaAmount },
-          { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Laboury Amount", value: currentCustomer.labouryAmount },
-          { label: "Amount", value: currentCustomer.amount }, { label: "Net Amount", value: currentCustomer.netAmount, isBold: true },
+          { label: "Karta Weight", value: currentCustomer.kartaWeight }, { label: "Karta Amount", value: formatCurrency(currentCustomer.kartaAmount) },
+          { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Laboury Amount", value: formatCurrency(currentCustomer.labouryAmount) },
+          { label: "Amount", value: formatCurrency(currentCustomer.amount) }, { label: "Net Amount", value: formatCurrency(currentCustomer.netAmount), isBold: true },
         ];
       }, [currentCustomer]);
 
@@ -357,7 +357,7 @@ const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete,
                                         <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right font-semibold px-3 py-1 text-sm">{Number(customer.netAmount).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
                                         <TableCell className="text-center px-3 py-1">
                                             <div className="flex justify-center items-center gap-0">
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(customer)}>
@@ -487,7 +487,7 @@ export default function SupplierEntryClient() {
       unsubscribeSuppliers();
       unsubscribePayments();
     };
-  }, [isClient, form, toast]); // Depend on isClient, form, and toast
+  }, [isClient, form, toast]);
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -798,7 +798,6 @@ export default function SupplierEntryClient() {
             </DialogHeader>
             <ScrollArea className="max-h-[85vh]">
               <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-6">
-                {/* Layout 1: Classic ID Card */}
                 {activeLayout === 'classic' && (
                   <div className="space-y-4">
                     <Card>
@@ -845,12 +844,12 @@ export default function SupplierEntryClient() {
                                 <Table className="text-xs">
                                     <TableBody>
                                         <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsCustomer.rate)}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsCustomer.amount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kartaAmount)}</TableCell></TableRow>
                                         <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsCustomer.labouryRate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.labouryAmount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
                                     </TableBody>
                                 </Table>
                              </CardContent>
@@ -861,7 +860,7 @@ export default function SupplierEntryClient() {
                          <CardContent className="p-3">
                             <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
                             <p className="text-3xl font-bold text-primary font-mono">
-                                ₹{Number(detailsCustomer.netAmount).toFixed(2)}
+                                {formatCurrency(Number(detailsCustomer.netAmount))}
                             </p>
                          </CardContent>
                     </Card>

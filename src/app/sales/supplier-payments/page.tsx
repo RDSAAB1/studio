@@ -34,19 +34,23 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2 } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from 'date-fns';
 
 
-import { collection, runTransaction, doc, getDocs, query, where } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
 
 
 const suppliersCollection = collection(db, "suppliers");
 const paymentsCollection = collection(db, "payments");
+
+type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
 
 const cdOptions = [
@@ -87,6 +91,7 @@ export default function SupplierPaymentsPage() {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
+  const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   
   const stableToast = useCallback(toast, []);
 
@@ -204,6 +209,8 @@ export default function SupplierPaymentsPage() {
     if (paymentType === 'Full' && !editingPayment) {
         const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
         setPaymentAmount(parseFloat(finalAmount.toFixed(2)));
+    } else if (paymentType === 'Partial' && !editingPayment) {
+        // Do not reset paymentAmount on partial. Let user input it.
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
 
@@ -272,8 +279,9 @@ export default function SupplierPaymentsPage() {
         try {
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
+                
+                // STEP 1: READ ALL NECESSARY DOCS FIRST
                 const allInvolvedSrNos = new Set<string>();
-
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
                 }
@@ -285,15 +293,15 @@ export default function SupplierPaymentsPage() {
                     if (supplierToUpdate) {
                         const docRef = doc(db, "suppliers", supplierToUpdate.id);
                         const supplierDoc = await transaction.get(docRef);
+                        if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
                         involvedSupplierDocs.set(srNo, supplierDoc);
                     }
                 }
 
+                // STEP 2: PERFORM ALL WRITES
                 const outstandingBalances: { [key: string]: number } = {};
-                involvedSupplierDocs.forEach((doc, srNo) => {
-                    if (doc.exists()) {
-                        outstandingBalances[srNo] = Number(doc.data().netAmount);
-                    }
+                involvedSupplierDocs.forEach((docSnap, srNo) => {
+                    outstandingBalances[srNo] = Number(docSnap.data().netAmount);
                 });
 
                 if (tempEditingPayment) {
@@ -307,12 +315,10 @@ export default function SupplierPaymentsPage() {
                 let remainingPayment = paymentAmount + calculatedCdAmount;
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
+                
+                // Distribute payment
                 sortedEntries.forEach(entryData => {
                     if (remainingPayment > 0.001) {
-                         const supplierDoc = involvedSupplierDocs.get(entryData.srNo);
-                         if (!supplierDoc || !supplierDoc.exists()) throw new Error(`Supplier ${entryData.id} not found.`);
-                        
                         let outstanding = outstandingBalances[entryData.srNo];
                         const amountToPay = Math.min(outstanding, remainingPayment);
 
@@ -325,7 +331,8 @@ export default function SupplierPaymentsPage() {
                         }
                     }
                 });
-                
+
+                // Handle rounding errors by applying remainder to the last entry
                 if (remainingPayment > 0.001 && sortedEntries.length > 0) {
                     const lastEntry = sortedEntries[sortedEntries.length - 1];
                     outstandingBalances[lastEntry.srNo] -= remainingPayment;
@@ -335,14 +342,16 @@ export default function SupplierPaymentsPage() {
                     }
                 }
 
+                // Write supplier updates
                 for (const srNo in outstandingBalances) {
                     const newBalance = outstandingBalances[srNo];
-                    const supplierDoc = involvedSupplierDocs.get(srNo);
-                    if (supplierDoc && supplierDoc.exists()) {
-                        transaction.update(supplierDoc.ref, { netAmount: parseFloat(newBalance.toFixed(2)) });
+                    const supplierDocSnap = involvedSupplierDocs.get(srNo);
+                     if (supplierDocSnap) {
+                        transaction.update(supplierDocSnap.ref, { netAmount: parseFloat(newBalance.toFixed(2)) });
                     }
                 }
                 
+                // Create or update payment doc
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
                     customerId: selectedCustomerKey,
@@ -421,9 +430,9 @@ export default function SupplierPaymentsPage() {
                 
                 for (const detail of paymentToDelete.paidFor || []) {
                     const q = query(suppliersCollection, where('srNo', '==', detail.srNo));
-                    const supplierDocs = await getDocs(q);
-                    if (!supplierDocs.empty) {
-                        const supplierDoc = supplierDocs.docs[0];
+                    const supplierDocsQuery = await getDocs(q); // Use a different name
+                    if (!supplierDocsQuery.empty) {
+                        const supplierDoc = supplierDocsQuery.docs[0];
                         const currentNetAmount = Number(supplierDoc.data().netAmount);
                         const newNetAmount = currentNetAmount + detail.amount;
                         transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
@@ -765,50 +774,139 @@ export default function SupplierPaymentsPage() {
       )}
 
       <Dialog open={!!detailsSupplierEntry} onOpenChange={(open) => !open && setDetailsSupplierEntry(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl p-0">
           {detailsSupplierEntry && (
             <>
-            <DialogHeader>
-                <DialogTitle>Details for SR No: {detailsSupplierEntry.srNo}</DialogTitle>
-                <DialogDescription>
-                    Showing financial and payment details for this entry.
-                </DialogDescription>
+            <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
+                <div>
+                    <DialogTitle className="text-base font-semibold">Details for SR No: {detailsSupplierEntry.srNo}</DialogTitle>
+                </div>
+                <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8">
+                                <Settings className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}>
+                                <DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="compact"><LayoutList className="mr-2 h-4 w-4" />Compact</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="grid"><LayoutGrid className="mr-2 h-4 w-4" />Grid</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="step-by-step"><StepForward className="mr-2 h-4 w-4" />Step-by-Step</DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DialogClose asChild>
+                         <Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button>
+                    </DialogClose>
+                </div>
             </DialogHeader>
-            <Separator />
-            <div className="space-y-4 py-4">
-                <DetailItem icon={<Banknote size={14} />} label="Original Amount" value={`₹${detailsSupplierEntry.originalNetAmount.toFixed(2)}`} />
-                <DetailItem icon={<Banknote size={14} />} label="Current Outstanding" value={`₹${Number(detailsSupplierEntry.netAmount).toFixed(2)}`} className="text-destructive" />
-                <Separator />
-                <h4 className="font-semibold text-sm">Payment History for this Entry</h4>
-                {paymentsForDetailsEntry.length > 0 ? (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Payment ID</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead className="text-right">Amount Paid</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paymentsForDetailsEntry.map(p => {
-                                const paidForThis = p.paidFor?.find(pf => pf.srNo === detailsSupplierEntry.srNo);
-                                return (
-                                    <TableRow key={p.id}>
-                                        <TableCell>{p.paymentId}</TableCell>
-                                        <TableCell>{p.date}</TableCell>
-                                        <TableCell className="text-right">{paidForThis?.amount.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center">No payments have been applied to this entry yet.</p>
+            <ScrollArea className="max-h-[85vh]">
+              <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-6">
+                {activeLayout === 'classic' && (
+                  <div className="space-y-4">
+                    <Card>
+                        <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
+                            <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full">
+                                <p className="text-xs text-muted-foreground">SR No.</p>
+                                <p className="text-2xl font-bold font-mono text-primary">{detailsSupplierEntry.srNo}</p>
+                            </div>
+                            <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" />
+                            <Separator orientation="horizontal" className="w-full md:hidden" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
+                                <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsSupplierEntry.name)} />
+                                <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsSupplierEntry.contact} />
+                                <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsSupplierEntry.so)} />
+                                <DetailItem icon={<Calendar size={14} />} label="Transaction Date" value={format(new Date(detailsSupplierEntry.date), "PPP")} />
+                                <DetailItem icon={<Calendar size={14} />} label="Due Date" value={format(new Date(detailsSupplierEntry.dueDate), "PPP")} />
+                                <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsSupplierEntry.address)} className="col-span-1 sm:col-span-2" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-0 space-y-3">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                  <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsSupplierEntry.vehicleNo.toUpperCase()} />
+                                  <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsSupplierEntry.variety)} />
+                                  <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsSupplierEntry.paymentType} />
+                                </div>
+                                <Separator />
+                                <Table className="text-xs">
+                                    <TableBody>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsSupplierEntry.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {detailsSupplierEntry.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{detailsSupplierEntry.weight.toFixed(2)} kg</TableCell></TableRow>
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
+                             <CardContent className="p-4 pt-0">
+                                <Table className="text-xs">
+                                    <TableBody>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsSupplierEntry.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsSupplierEntry.rate)}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsSupplierEntry.amount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsSupplierEntry.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.kartaAmount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsSupplierEntry.labouryRate.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.labouryAmount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.kanta)}</TableCell></TableRow>
+                                    </TableBody>
+                                </Table>
+                             </CardContent>
+                        </Card>
+                    </div>
+
+                    <Card className="border-primary/50 bg-primary/5 text-center">
+                         <CardContent className="p-3">
+                            <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
+                            <p className="text-3xl font-bold text-primary font-mono">
+                                {formatCurrency(Number(detailsSupplierEntry.netAmount))}
+                            </p>
+                         </CardContent>
+                    </Card>
+
+                    <Card className="mt-4">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0">
+                            {paymentsForDetailsEntry.length > 0 ? (
+                                <Table className="text-sm">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                            <TableHead className="p-2 text-xs">Date</TableHead>
+                                            <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paymentsForDetailsEntry.map((payment, index) => {
+                                             const paidForThis = payment.paidFor?.find(pf => pf.srNo === detailsSupplierEntry?.srNo);
+                                             return (
+                                                <TableRow key={payment.id || index}>
+                                                    <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
+                                                    <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
+                                                    <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
+                                                </TableRow>
+                                             );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
+                            )}
+                        </CardContent>
+                    </Card>  
+                  </div>
                 )}
-            </div>
-             <DialogFooter>
-                <Button variant="outline" onClick={() => setDetailsSupplierEntry(null)}>Close</Button>
-            </DialogFooter>
+              </div>
+            </ScrollArea>
             </>
           )}
         </DialogContent>
@@ -839,6 +937,7 @@ export default function SupplierPaymentsPage() {
                             <TableHead>SR No</TableHead>
                             <TableHead>Supplier Name</TableHead>
                             <TableHead className="text-right">Amount Paid</TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -849,6 +948,14 @@ export default function SupplierPaymentsPage() {
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
+                                    <TableCell className="text-center">
+                                       {supplier && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                                           setDetailsSupplierEntry(supplier);
+                                           setSelectedPaymentForDetails(null);
+                                       }}>
+                                            <Info className="h-4 w-4" />
+                                        </Button>}
+                                    </TableCell>
                                 </TableRow>
                             )
                         })}
