@@ -32,7 +32,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -130,7 +130,7 @@ export default function SupplierProfilePage() {
         });
       }
       const data = newSummary.get(key)!;
-      data.totalAmount += parseFloat(String(entry.amount));
+      data.totalAmount += parseFloat(String(entry.originalNetAmount || entry.amount));
       data.totalOutstanding += parseFloat(String(entry.netAmount));
       data.allTransactions!.push(entry);
     });
@@ -162,7 +162,7 @@ export default function SupplierProfilePage() {
         millSummary.totalNetWeight! += c.netWeight;
         millSummary.totalKartaAmount! += c.kartaAmount;
         millSummary.totalLabouryAmount! += c.labouryAmount;
-        millSummary.totalAmount! += c.amount;
+        millSummary.totalAmount! += (c.originalNetAmount || c.amount);
         millSummary.totalOutstanding! += Number(c.netAmount);
 
         if(c.rate > 0) {
@@ -206,6 +206,13 @@ export default function SupplierProfilePage() {
   const handleShowDetails = (customer: Supplier) => {
     setDetailsCustomer(customer);
   }
+  
+  const paymentsForDetailsEntry = useMemo(() => {
+    if (!detailsCustomer) return [];
+    return paymentHistory.filter(p => 
+      p.paidFor?.some(pf => pf.srNo === detailsCustomer.srNo)
+    );
+  }, [detailsCustomer, paymentHistory]);
 
   const financialPieChartData = useMemo(() => {
     if (!selectedCustomerData) return [];
@@ -328,10 +335,10 @@ export default function SupplierProfilePage() {
                                             <TableRow key={entry.id}>
                                                 <TableCell className="font-mono">{entry.srNo}</TableCell>
                                                 <TableCell>{toTitleCase(entry.name)}</TableCell>
-                                                <TableCell className="font-semibold">₹{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
+                                                <TableCell className="font-semibold">₹{parseFloat(String(entry.originalNetAmount || entry.amount)).toFixed(2)}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant={parseFloat(String(entry.netAmount)) === 0 ? "secondary" : "destructive"}>
-                                                        {parseFloat(String(entry.netAmount)) === 0 ? "Paid" : "Outstanding"}
+                                                    <Badge variant={parseFloat(String(entry.netAmount)) < 0.01 ? "secondary" : "destructive"}>
+                                                        {parseFloat(String(entry.netAmount)) < 0.01 ? "Paid" : "Outstanding"}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
@@ -406,7 +413,7 @@ export default function SupplierProfilePage() {
                             <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
                             <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} description={`${suppliers.filter(c => c.customerId === selectedCustomerKey).length} entries`}/>
                             <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-                            <StatCard title="Outstanding Entries" value={selectedCustomerData.outstandingEntryIds.length.toString()} icon={<Hash />} />
+                            <StatCard title="Outstanding Entries" value={`${selectedCustomerData.allTransactions?.filter(t => Number(t.netAmount) > 0).length}`} icon={<Hash />} />
                         </div>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
@@ -462,11 +469,11 @@ export default function SupplierProfilePage() {
                                     <TableRow key={entry.id}>
                                         <TableCell className="font-mono">{entry.srNo}</TableCell>
                                         <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                        <TableCell className="font-semibold">₹{parseFloat(String(entry.amount)).toFixed(2)}</TableCell>
+                                        <TableCell className="font-semibold">₹{parseFloat(String(entry.originalNetAmount || entry.amount)).toFixed(2)}</TableCell>
                                         <TableCell className="font-semibold text-destructive">₹{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
                                         <TableCell>
-                                            <Badge variant={parseFloat(String(entry.netAmount)) === 0 ? "secondary" : "destructive"}>
-                                            {parseFloat(String(entry.netAmount)) === 0 ? "Paid" : "Outstanding"}
+                                            <Badge variant={parseFloat(String(entry.netAmount)) < 0.01 ? "secondary" : "destructive"}>
+                                            {parseFloat(String(entry.netAmount)) < 0.01 ? "Paid" : "Outstanding"}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
@@ -516,7 +523,6 @@ export default function SupplierProfilePage() {
             </DialogHeader>
             <ScrollArea className="max-h-[85vh]">
               <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-6">
-                {/* Layout 1: Classic ID Card */}
                 {activeLayout === 'classic' && (
                   <div className="space-y-4">
                     <Card>
@@ -586,7 +592,38 @@ export default function SupplierProfilePage() {
                     </Card>
                   </div>
                 )}
-                 {/* Layout 2: Compact List, etc. */}
+                 <Card className="mt-4">
+                    <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                        {paymentsForDetailsEntry.length > 0 ? (
+                            <Table className="text-sm">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                        <TableHead className="p-2 text-xs">Date</TableHead>
+                                        <TableHead className="text-right p-2 text-xs">Amount Paid</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {paymentsForDetailsEntry.map(p => {
+                                        const paidForThis = p.paidFor?.find(pf => pf.srNo === detailsCustomer?.srNo);
+                                        return (
+                                            <TableRow key={p.id}>
+                                                <TableCell className="p-2">{p.paymentId}</TableCell>
+                                                <TableCell className="p-2">{p.date}</TableCell>
+                                                <TableCell className="text-right p-2 font-semibold">₹{paidForThis?.amount.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
+                        )}
+                    </CardContent>
+                </Card>     
               </div>
             </ScrollArea>
             </>

@@ -39,8 +39,9 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchUpdateSuppliersOnPaymentChange } from '@/lib/firestore';
-import { collection, runTransaction, doc, writeBatch, getDocs, query, where } from "firebase/firestore";
+import { collection, runTransaction, doc, writeBatch, getDocs, query, where, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
 
 const suppliersCollection = collection(db, "suppliers");
 const paymentsCollection = collection(db, "payments");
@@ -82,7 +83,7 @@ export default function SupplierPaymentsPage() {
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
-  const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
+  const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
   
   const stableToast = useCallback(toast, []);
 
@@ -200,6 +201,8 @@ export default function SupplierPaymentsPage() {
     if (paymentType === 'Full' && !editingPayment) {
         const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
         setPaymentAmount(parseFloat(finalAmount.toFixed(2)));
+    } else if (paymentType === 'Partial' && !editingPayment) {
+        setPaymentAmount(0);
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
 
@@ -270,7 +273,6 @@ export default function SupplierPaymentsPage() {
                 const tempEditingPayment = editingPayment;
                 
                 // --- READ PHASE ---
-                // Get all involved supplier documents to ensure we have the latest data
                 const allInvolvedSrNos = new Set<string>();
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
@@ -278,6 +280,8 @@ export default function SupplierPaymentsPage() {
                 selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
                 
                 const involvedSupplierDocs = new Map<string, any>();
+                const outstandingBalances: { [key: string]: number } = {};
+
                 for (const srNo of allInvolvedSrNos) {
                     const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
                     if (supplierToUpdate) {
@@ -285,18 +289,13 @@ export default function SupplierPaymentsPage() {
                         const supplierDoc = await transaction.get(docRef);
                         if(supplierDoc.exists()){
                             involvedSupplierDocs.set(srNo, supplierDoc);
+                            outstandingBalances[srNo] = Number(supplierDoc.data().netAmount);
                         }
                     }
                 }
 
                 // --- LOGIC & WRITE PHASE ---
-                const outstandingBalances: { [key: string]: number } = {};
-                involvedSupplierDocs.forEach((doc, srNo) => {
-                    outstandingBalances[srNo] = Number(doc.data().netAmount);
-                });
-
                 if (tempEditingPayment) {
-                    // Revert the old payment amount to the outstanding balance
                     (tempEditingPayment.paidFor || []).forEach(detail => {
                         if (outstandingBalances[detail.srNo] !== undefined) {
                             outstandingBalances[detail.srNo] += detail.amount;
@@ -309,11 +308,11 @@ export default function SupplierPaymentsPage() {
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
                 sortedEntries.forEach(entryData => {
-                    if (remainingPayment > 0 && outstandingBalances[entryData.srNo] !== undefined) {
+                    if (remainingPayment > 0.001 && outstandingBalances[entryData.srNo] !== undefined) {
                         const currentOutstanding = outstandingBalances[entryData.srNo];
                         const amountToPay = Math.min(currentOutstanding, remainingPayment);
 
-                        if(amountToPay > 0){
+                        if(amountToPay > 0.001){
                             const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
                             paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
                             
@@ -327,7 +326,6 @@ export default function SupplierPaymentsPage() {
                     const newBalance = outstandingBalances[srNo];
                     const supplierDoc = involvedSupplierDocs.get(srNo);
                     if (supplierDoc) {
-                        // Use toFixed to prevent floating point inaccuracies
                         transaction.update(supplierDoc.ref, { netAmount: parseFloat(newBalance.toFixed(2)) });
                     }
                 }
@@ -365,12 +363,10 @@ export default function SupplierPaymentsPage() {
 
 
     const handleEditPayment = async (paymentToEdit: Payment) => {
-        // Find all supplier entries this payment was for
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         const associatedEntries = suppliers.filter(s => srNosInPayment.includes(s.srNo));
         const associatedEntryIds = new Set(associatedEntries.map(e => e.id));
 
-        // Check if all original entries still exist
         if (associatedEntryIds.size !== srNosInPayment.length) {
             toast({
                 variant: "destructive",
@@ -379,8 +375,36 @@ export default function SupplierPaymentsPage() {
             });
             return;
         }
+        
+        const tempOutstanding = { ...totalOutstandingForSelected };
 
-        // Set the form state to match the payment being edited
+        // Temporarily revert the payment to calculate the correct outstanding amount for the form
+        let totalOutstandingBeforeEdit = 0;
+        const newSelectedEntryIds = new Set<string>();
+
+        await runTransaction(db, async (transaction) => {
+            const supplierDocsToRevert = new Map<string, any>();
+            for(const detail of paymentToEdit.paidFor || []) {
+                const supplierToUpdate = suppliers.find(s => s.srNo === detail.srNo);
+                if (supplierToUpdate) {
+                    const docRef = doc(db, "suppliers", supplierToUpdate.id);
+                    const supplierDoc = await transaction.get(docRef);
+                    if (supplierDoc.exists()) {
+                        supplierDocsToRevert.set(supplierToUpdate.id, supplierDoc);
+                    }
+                }
+            }
+            
+            supplierDocsToRevert.forEach((doc, id) => {
+                const paymentDetail = paymentToEdit.paidFor?.find(p => suppliers.find(s=>s.id === id)?.srNo === p.srNo);
+                if(paymentDetail) {
+                    const currentOutstanding = Number(doc.data().netAmount);
+                    totalOutstandingBeforeEdit += currentOutstanding + paymentDetail.amount;
+                    newSelectedEntryIds.add(id);
+                }
+            });
+        });
+        
         setSelectedCustomerKey(paymentToEdit.customerId);
         setEditingPayment(paymentToEdit);
         setPaymentId(paymentToEdit.paymentId);
@@ -388,7 +412,7 @@ export default function SupplierPaymentsPage() {
         setPaymentType(paymentToEdit.type);
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
-        setSelectedEntryIds(associatedEntryIds);
+        setSelectedEntryIds(newSelectedEntryIds);
     
         toast({
             title: "Editing Mode",
@@ -447,6 +471,13 @@ export default function SupplierPaymentsPage() {
        }
     }
   };
+  
+  const paymentsForDetailsEntry = useMemo(() => {
+    if (!detailsSupplierEntry) return [];
+    return paymentHistory.filter(p => 
+      p.paidFor?.some(pf => pf.srNo === detailsSupplierEntry.srNo)
+    );
+  }, [detailsSupplierEntry, paymentHistory]);
 
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   const outstandingEntries = useMemo(() => selectedCustomerKey ? suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0) : [], [suppliers, selectedCustomerKey, customerIdKey]);
@@ -527,6 +558,7 @@ export default function SupplierPaymentsPage() {
                         <TableHead>Date</TableHead>
                         <TableHead>Due Date</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-center">Info</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -537,11 +569,16 @@ export default function SupplierPaymentsPage() {
                         <TableCell>{entry.date}</TableCell>
                         <TableCell>{entry.dueDate}</TableCell>
                         <TableCell className="text-right">{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
+                                <Info className="h-4 w-4" />
+                            </Button>
+                        </TableCell>
                         </TableRow>
                     ))}
                     {outstandingEntries.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground">No outstanding entries for this supplier.</TableCell>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground">No outstanding entries for this supplier.</TableCell>
                         </TableRow>
                     )}
                     </TableBody>
@@ -630,18 +667,23 @@ export default function SupplierPaymentsPage() {
             <CardContent>
                 <div className="overflow-x-auto">
                 <Table>
-                    <TableHeader><TableRow><TableHead>SR No</TableHead><TableHead>Date</TableHead><TableHead>Original Amount</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>SR No</TableHead><TableHead>Date</TableHead><TableHead>Original Amount</TableHead><TableHead className="text-center">Info</TableHead></TableRow></TableHeader>
                     <TableBody>
                     {paidEntries.map(entry => (
                         <TableRow key={entry.id}>
                         <TableCell>{entry.srNo}</TableCell>
                         <TableCell>{entry.date}</TableCell>
                         <TableCell>{(entry.originalNetAmount || entry.amount).toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
+                                <Info className="h-4 w-4" />
+                            </Button>
+                        </TableCell>
                         </TableRow>
                     ))}
                      {paidEntries.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={3} className="text-center text-muted-foreground">No paid entries for this supplier.</TableCell>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">No paid entries for this supplier.</TableCell>
                         </TableRow>
                     )}
                     </TableBody>
@@ -675,9 +717,6 @@ export default function SupplierPaymentsPage() {
                         <TableCell className="max-w-xs truncate">{p.notes}</TableCell>
                         <TableCell className="text-center">
                             <div className="flex justify-center items-center gap-0">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsPayment(p)}>
-                                    <Info className="h-4 w-4" />
-                                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}>
                                     <Pen className="h-4 w-4" />
                                 </Button>
@@ -717,29 +756,50 @@ export default function SupplierPaymentsPage() {
         </div>
       )}
 
-      <Dialog open={!!detailsPayment} onOpenChange={(open) => !open && setDetailsPayment(null)}>
+      <Dialog open={!!detailsSupplierEntry} onOpenChange={(open) => !open && setDetailsSupplierEntry(null)}>
         <DialogContent className="max-w-lg">
-          {detailsPayment && (
+          {detailsSupplierEntry && (
             <>
             <DialogHeader>
-                <DialogTitle>Payment Details: {detailsPayment.paymentId}</DialogTitle>
+                <DialogTitle>Details for SR No: {detailsSupplierEntry.srNo}</DialogTitle>
                 <DialogDescription>
-                    Detailed information for this payment record.
+                    Showing financial and payment details for this entry.
                 </DialogDescription>
             </DialogHeader>
             <Separator />
             <div className="space-y-4 py-4">
-                <DetailItem icon={<Calendar size={14} />} label="Payment Date" value={detailsPayment.date} />
-                <DetailItem icon={<Banknote size={14} />} label="Payment Amount" value={`₹${detailsPayment.amount.toFixed(2)}`} />
-                <DetailItem icon={<Percent size={14} />} label="CD Amount" value={`₹${detailsPayment.cdAmount.toFixed(2)}`} />
-                <DetailItem icon={<Hash size={14} />} label="Payment Type" value={detailsPayment.type} />
-                <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Paid For SR No(s)</Label>
-                    <p className="font-semibold text-sm break-words">{detailsPayment.notes.replace('Paid for SR No(s): ', '')}</p>
-                </div>
+                <DetailItem icon={<Banknote size={14} />} label="Original Amount" value={`₹${detailsSupplierEntry.originalNetAmount.toFixed(2)}`} />
+                <DetailItem icon={<Banknote size={14} />} label="Current Outstanding" value={`₹${Number(detailsSupplierEntry.netAmount).toFixed(2)}`} className="text-destructive" />
+                <Separator />
+                <h4 className="font-semibold text-sm">Payment History for this Entry</h4>
+                {paymentsForDetailsEntry.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Payment ID</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Amount Paid</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {paymentsForDetailsEntry.map(p => {
+                                const paidForThis = p.paidFor?.find(pf => pf.srNo === detailsSupplierEntry.srNo);
+                                return (
+                                    <TableRow key={p.id}>
+                                        <TableCell>{p.paymentId}</TableCell>
+                                        <TableCell>{p.date}</TableCell>
+                                        <TableCell className="text-right">{paidForThis?.amount.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center">No payments have been applied to this entry yet.</p>
+                )}
             </div>
              <DialogFooter>
-                <Button variant="outline" onClick={() => setDetailsPayment(null)}>Close</Button>
+                <Button variant="outline" onClick={() => setDetailsSupplierEntry(null)}>Close</Button>
             </DialogFooter>
             </>
           )}
