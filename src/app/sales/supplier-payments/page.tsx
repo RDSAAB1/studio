@@ -103,7 +103,6 @@ export default function SupplierPaymentsPage() {
   const [grNo, setGrNo] = useState('');
   const [grDate, setGrDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
-  const [parchiDate, setParchiDate] = useState<Date | undefined>(new Date());
   const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
   
@@ -143,6 +142,103 @@ export default function SupplierPaymentsPage() {
     }, 0);
     return formatPaymentId(lastPaymentNum + 1);
   }, []);
+
+  const customerSummaryMap = useMemo(() => {
+    const summary = new Map<string, CustomerSummary>();
+    
+    suppliers.forEach(s => {
+        if (!s.customerId) return;
+        if (!summary.has(s.customerId)) {
+            summary.set(s.customerId, {
+                name: s.name,
+                contact: s.contact,
+                so: s.so,
+                address: s.address,
+                totalOutstanding: 0,
+                paymentHistory: [],
+                totalAmount: 0,
+                totalPaid: 0,
+                outstandingEntryIds: [],
+                acNo: s.acNo,
+                ifscCode: s.ifscCode,
+                bank: s.bank,
+                branch: s.branch
+            });
+        }
+    });
+
+    suppliers.forEach(supplier => {
+        if (!supplier.customerId) return;
+        const data = summary.get(supplier.customerId)!;
+        const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
+        data.totalOutstanding += netAmount;
+    });
+    
+    return summary;
+  }, [suppliers]);
+  
+  const selectedEntries = useMemo(() => {
+    return suppliers.filter(s => selectedEntryIds.has(s.id));
+  }, [suppliers, selectedEntryIds]);
+  
+  const totalOutstandingForSelected = useMemo(() => {
+    return Math.round(selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0));
+  }, [selectedEntries]);
+
+  const cdEligibleEntries = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedEntries.filter(e => new Date(e.dueDate) >= today);
+}, [selectedEntries]);
+
+  const autoSetCDToggle = useCallback(() => {
+    if (selectedEntries.length === 0) {
+        setCdEnabled(false);
+        return;
+    }
+    setCdEnabled(cdEligibleEntries.length > 0);
+  }, [selectedEntries.length, cdEligibleEntries.length]);
+
+    const sortedCombinations = useMemo(() => {
+    if (!sortConfig) return paymentCombinations;
+    return [...paymentCombinations].sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+    });
+  }, [paymentCombinations, sortConfig]);
+
+  const paymentsForDetailsEntry = useMemo(() => {
+    if (!detailsSupplierEntry) return [];
+    return paymentHistory.filter(p => 
+      p.paidFor?.some(pf => pf.srNo === detailsSupplierEntry.srNo)
+    );
+  }, [detailsSupplierEntry, paymentHistory]);
+
+  const currentPaymentHistory = useMemo(() => {
+    if (!selectedCustomerKey) return [];
+    const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
+    return customerPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [paymentHistory, selectedCustomerKey]);
+  
+  const availableCdOptions = useMemo(() => {
+    if (paymentType === 'Partial') {
+      return cdOptions.filter(opt => opt.value === 'payment_amount');
+    }
+    return cdOptions.filter(opt => opt.value !== 'payment_amount');
+  }, [paymentType]);
+  
+  const isCdSwitchDisabled = cdEligibleEntries.length === 0;
+
+  const targetAmountForGenerator = useMemo(() => {
+    return paymentType === 'Full' 
+      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
+      : paymentAmount;
+  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
 
   useEffect(() => {
     setIsClient(true);
@@ -197,96 +293,6 @@ export default function SupplierPaymentsPage() {
     }
   }, [maxRate, isClient]);
 
-  const customerSummaryMap = useMemo(() => {
-    const summary = new Map<string, CustomerSummary>();
-    
-    suppliers.forEach(s => {
-        if (!s.customerId) return;
-        if (!summary.has(s.customerId)) {
-            summary.set(s.customerId, {
-                name: s.name,
-                contact: s.contact,
-                so: s.so,
-                address: s.address,
-                totalOutstanding: 0,
-                paymentHistory: [],
-                totalAmount: 0,
-                totalPaid: 0,
-                outstandingEntryIds: [],
-                acNo: s.acNo,
-                ifscCode: s.ifscCode,
-                bank: s.bank,
-                branch: s.branch
-            });
-        }
-    });
-
-    suppliers.forEach(supplier => {
-        if (!supplier.customerId) return;
-        const data = summary.get(supplier.customerId)!;
-        const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
-        data.totalOutstanding += netAmount;
-    });
-    
-    return summary;
-  }, [suppliers]);
-
-
-
-
-  const handleCustomerSelect = (key: string) => {
-    setSelectedCustomerKey(key);
-    const customerData = customerSummaryMap.get(key);
-    if(customerData) {
-        setSupplierDetails({
-            name: customerData.name || '',
-            fatherName: customerData.so || '',
-            address: customerData.address || '',
-            contact: customerData.contact || ''
-        });
-        setBankDetails({
-            acNo: customerData.acNo || '',
-            ifscCode: customerData.ifscCode || '',
-            bank: customerData.bank || '',
-            branch: customerData.branch || '',
-        });
-        setIsOutstandingModalOpen(true);
-    }
-    clearForm();
-  };
-  
-  const handleEntrySelect = (entryId: string) => {
-    const newSet = new Set(selectedEntryIds);
-    if (newSet.has(entryId)) {
-      newSet.delete(entryId);
-    } else {
-      newSet.add(entryId);
-    }
-    setSelectedEntryIds(newSet);
-  };
-
-  const selectedEntries = useMemo(() => {
-    return suppliers.filter(s => selectedEntryIds.has(s.id));
-  }, [suppliers, selectedEntryIds]);
-  
-  const totalOutstandingForSelected = useMemo(() => {
-    return Math.round(selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0));
-  }, [selectedEntries]);
-
-  const cdEligibleEntries = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return selectedEntries.filter(e => new Date(e.dueDate) >= today);
-}, [selectedEntries]);
-  
-  const autoSetCDToggle = useCallback(() => {
-    if (selectedEntries.length === 0) {
-        setCdEnabled(false);
-        return;
-    }
-    setCdEnabled(cdEligibleEntries.length > 0);
-  }, [selectedEntries.length, cdEligibleEntries.length]);
-  
   useEffect(() => {
     if (paymentType === 'Partial') {
       setCdAt('payment_amount');
@@ -332,6 +338,15 @@ export default function SupplierPaymentsPage() {
       setPaymentAmount(newAmount);
     }
   }, [totalOutstandingForSelected, calculatedCdAmount, paymentType]);
+
+   useEffect(() => {
+    if (selectedEntries.length > 0) {
+      const parchiNumbers = selectedEntries.map(e => e.srNo).join(', ');
+      setParchiNo(parchiNumbers);
+    } else {
+      setParchiNo('');
+    }
+  }, [selectedEntries]);
    
   const clearForm = () => {
     setSelectedEntryIds(new Set());
@@ -343,13 +358,45 @@ export default function SupplierPaymentsPage() {
     setGrNo('');
     setGrDate(new Date());
     setParchiNo('');
-    setParchiDate(new Date());
     setRtgsQuantity(0);
     setRtgsRate(0);
     setRtgsAmount(0);
     setPaymentCombinations([]);
     setPaymentId(getNextPaymentId(paymentHistory));
   };
+
+
+  const handleCustomerSelect = (key: string) => {
+    setSelectedCustomerKey(key);
+    const customerData = customerSummaryMap.get(key);
+    if(customerData) {
+        setSupplierDetails({
+            name: customerData.name || '',
+            fatherName: customerData.so || '',
+            address: customerData.address || '',
+            contact: customerData.contact || ''
+        });
+        setBankDetails({
+            acNo: customerData.acNo || '',
+            ifscCode: customerData.ifscCode || '',
+            bank: customerData.bank || '',
+            branch: customerData.branch || '',
+        });
+        setIsOutstandingModalOpen(true);
+    }
+    clearForm();
+  };
+  
+  const handleEntrySelect = (entryId: string) => {
+    const newSet = new Set(selectedEntryIds);
+    if (newSet.has(entryId)) {
+      newSet.delete(entryId);
+    } else {
+      newSet.add(entryId);
+    }
+    setSelectedEntryIds(newSet);
+  };
+
 
     const processPayment = async () => {
         if (!selectedCustomerKey) {
@@ -459,7 +506,6 @@ export default function SupplierPaymentsPage() {
                     grNo,
                     grDate: grDate?.toISOString(),
                     parchiNo,
-                    parchiDate: parchiDate?.toISOString(),
                     quantity: rtgsQuantity,
                     rate: rtgsRate,
                     rtgsAmount: rtgsAmount,
@@ -517,7 +563,6 @@ export default function SupplierPaymentsPage() {
         setGrNo(paymentToEdit.grNo || '');
         setGrDate(paymentToEdit.grDate ? new Date(paymentToEdit.grDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || '');
-        setParchiDate(paymentToEdit.parchiDate ? new Date(paymentToEdit.parchiDate) : undefined);
         setRtgsQuantity(paymentToEdit.quantity || 0);
         setRtgsRate(paymentToEdit.rate || 0);
         setRtgsAmount(paymentToEdit.rtgsAmount || 0);
@@ -580,13 +625,13 @@ export default function SupplierPaymentsPage() {
 
         const baseQuantity = targetAmountForGenerator / rate;
 
-        for (let i = -50; i <= 50; i += 0.1) {
+        for (let i = -50; i <= 50; i += 0.1) { // 0.1 represents 10kg
             const quantity = baseQuantity + i;
             if (quantity <= 0) continue;
 
             const roundedQuantity = parseFloat(quantity.toFixed(1));
             // Check if quantity is divisible by 0.1 (10kg)
-            if (roundedQuantity * 10 % 1 !== 0) continue;
+            if (Math.round(roundedQuantity * 10) % 1 !== 0) continue;
             
             const amount = Math.round(roundedQuantity * rate);
             const remainingAmount = targetAmountForGenerator - amount;
@@ -600,8 +645,7 @@ export default function SupplierPaymentsPage() {
             }
         }
     }
-
-    if (combinations.length === 0) {
+     if (combinations.length === 0) {
         toast({ title: 'No Combinations Found', description: 'Try adjusting the rate range or target amount.' });
     }
 
@@ -613,18 +657,6 @@ export default function SupplierPaymentsPage() {
     setIsGeneratorOpen(true);
   };
   
-  const sortedCombinations = useMemo(() => {
-    if (!sortConfig) return paymentCombinations;
-    return [...paymentCombinations].sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-            return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-            return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-    });
-  }, [paymentCombinations, sortConfig]);
 
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
@@ -675,36 +707,8 @@ export default function SupplierPaymentsPage() {
     }
   };
   
-  const paymentsForDetailsEntry = useMemo(() => {
-    if (!detailsSupplierEntry) return [];
-    return paymentHistory.filter(p => 
-      p.paidFor?.some(pf => pf.srNo === detailsSupplierEntry.srNo)
-    );
-  }, [detailsSupplierEntry, paymentHistory]);
-
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   
-  const currentPaymentHistory = useMemo(() => {
-    if (!selectedCustomerKey) return [];
-    const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
-    return customerPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [paymentHistory, selectedCustomerKey]);
-  
-  const availableCdOptions = useMemo(() => {
-    if (paymentType === 'Partial') {
-      return cdOptions.filter(opt => opt.value === 'payment_amount');
-    }
-    return cdOptions.filter(opt => opt.value !== 'payment_amount');
-  }, [paymentType]);
-  
-  const isCdSwitchDisabled = cdEligibleEntries.length === 0;
-
-  const targetAmountForGenerator = useMemo(() => {
-    return paymentType === 'Full' 
-      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
-      : paymentAmount;
-  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
-
   const handlePaySelectedOutstanding = () => {
     if (selectedEntryIds.size === 0) {
         toast({
@@ -715,7 +719,8 @@ export default function SupplierPaymentsPage() {
         return;
     }
     setIsOutstandingModalOpen(false); // Close the modal
-  };
+};
+
 
   if (!isClient) {
     return null; // Render nothing on the server
@@ -997,10 +1002,7 @@ export default function SupplierPaymentsPage() {
                                 <div className="space-y-2"><Label htmlFor="grDate">GR Date</Label>
                                     <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent></Popover>
                                 </div>
-                                <div className="space-y-2"><Label htmlFor="parchiNo">Parchi No.</Label><Input id="parchiNo" value={parchiNo} onChange={e => setParchiNo(e.target.value)} /></div>
-                                <div className="space-y-2"><Label htmlFor="parchiDate">Parchi Date</Label>
-                                    <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{parchiDate ? format(parchiDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={parchiDate} onSelect={setParchiDate} initialFocus /></PopoverContent></Popover>
-                                </div>
+                                <div className="space-y-2"><Label htmlFor="parchiNo">Parchi No.</Label><Input id="parchiNo" value={parchiNo} onChange={e => setParchiNo(e.target.value)} readOnly/></div>
                             </CardContent>
                         </Card>
                         <Card className="mt-6 bg-muted/30">
