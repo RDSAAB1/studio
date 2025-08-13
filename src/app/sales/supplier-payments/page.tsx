@@ -283,35 +283,49 @@ export default function SupplierPaymentsPage() {
 
   useEffect(() => {
     if(!isClient) return;
+    
+    let isSubscribed = true;
     setLoading(true);
 
     const unsubscribeSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
-      setSuppliers(fetchedSuppliers);
-      if(loading) setLoading(false);
+      if (isSubscribed) {
+          setSuppliers(fetchedSuppliers);
+          setLoading(false);
+      }
     }, (error) => {
-        console.error("Error fetching suppliers:", error);
-        stableToast({ variant: 'destructive', title: "Error", description: "Failed to load supplier data." });
-        setLoading(false);
+        if(isSubscribed) {
+            console.error("Error fetching suppliers:", error);
+            stableToast({ variant: 'destructive', title: "Error", description: "Failed to load supplier data." });
+            setLoading(false);
+        }
     });
 
     const unsubscribePayments = getPaymentsRealtime((fetchedPayments) => {
-      setPaymentHistory(fetchedPayments);
-      if (!editingPayment) {
-        setPaymentId(getNextPaymentId(fetchedPayments));
+      if(isSubscribed) {
+        setPaymentHistory(fetchedPayments);
+        if (!editingPayment) {
+          setPaymentId(getNextPaymentId(fetchedPayments));
+        }
       }
     }, (error) => {
-        console.error("Error fetching payments:", error);
-        stableToast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
+        if(isSubscribed) {
+            console.error("Error fetching payments:", error);
+            stableToast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
+        }
     });
     
     const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
+      if(isSubscribed) {
         console.error("Error fetching banks:", error);
         stableToast({ variant: 'destructive', title: "Error", description: "Failed to load bank list." });
+      }
     });
 
     const unsubscribeBankBranches = getBankBranchesRealtime(setBankBranches, (error) => {
+      if(isSubscribed) {
         console.error("Error fetching bank branches:", error);
         stableToast({ variant: 'destructive', title: "Error", description: "Failed to load bank branches." });
+      }
     });
 
     // Load persisted rates
@@ -322,12 +336,13 @@ export default function SupplierPaymentsPage() {
 
 
     return () => {
+      isSubscribed = false;
       unsubscribeSuppliers();
       unsubscribePayments();
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId, loading]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId]);
   
     // Persist Min/Max Rate
   useEffect(() => {
@@ -397,7 +412,7 @@ export default function SupplierPaymentsPage() {
     }
   }, [selectedEntries]);
    
-  const resetPaymentForm = () => {
+  const resetPaymentForm = useCallback(() => {
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
@@ -411,7 +426,7 @@ export default function SupplierPaymentsPage() {
     setRtgsAmount(0);
     setPaymentCombinations([]);
     setPaymentId(getNextPaymentId(paymentHistory));
-  };
+  }, [getNextPaymentId, paymentHistory]);
 
 
   const handleCustomerSelect = (key: string) => {
@@ -675,23 +690,23 @@ export default function SupplierPaymentsPage() {
                 transaction.delete(paymentRef);
             });
             
-            // Optimistic UI update
-            setPaymentHistory(prev => prev.filter(p => p.id !== paymentIdToDelete));
+            // This part is now handled by the realtime listener
+            // setPaymentHistory(prev => prev.filter(p => p.id !== paymentIdToDelete));
             
-            const updatedSuppliers = [...suppliers];
-            originalSupplierStates.forEach((originalState, id) => {
-                const paidForDetail = paymentToDelete.paidFor?.find(pf => pf.srNo === originalState.srNo);
-                if (paidForDetail) {
-                    const index = updatedSuppliers.findIndex(s => s.id === id);
-                    if (index !== -1) {
-                        updatedSuppliers[index] = {
-                            ...updatedSuppliers[index],
-                            netAmount: Number(updatedSuppliers[index].netAmount) + paidForDetail.amount,
-                        };
-                    }
-                }
-            });
-            setSuppliers(updatedSuppliers);
+            // const updatedSuppliers = [...suppliers];
+            // originalSupplierStates.forEach((originalState, id) => {
+            //     const paidForDetail = paymentToDelete.paidFor?.find(pf => pf.srNo === originalState.srNo);
+            //     if (paidForDetail) {
+            //         const index = updatedSuppliers.findIndex(s => s.id === id);
+            //         if (index !== -1) {
+            //             updatedSuppliers[index] = {
+            //                 ...updatedSuppliers[index],
+            //                 netAmount: Number(updatedSuppliers[index].netAmount) + paidForDetail.amount,
+            //             };
+            //         }
+            //     }
+            // });
+            // setSuppliers(updatedSuppliers);
 
 
             toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
@@ -701,9 +716,7 @@ export default function SupplierPaymentsPage() {
         } catch (error) {
             console.error("Error in batch deletion:", error);
             toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
-            // Revert optimistic updates on failure
-            setPaymentHistory(prev => [...prev, paymentToDelete].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-            setSuppliers(suppliers); // Revert to original suppliers state before delete
+            // The UI will revert automatically due to the realtime listener if the transaction fails.
         }
     };
     
@@ -1297,7 +1310,7 @@ export default function SupplierPaymentsPage() {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeletePayment(p.id)}>Continue</AlertDialogAction>
+                                    <AlertDialogAction onClick={() => p.id && handleDeletePayment(p.id)}>Continue</AlertDialogAction>
                                 </AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
