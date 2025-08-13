@@ -43,6 +43,7 @@ import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
@@ -685,20 +686,22 @@ export default function SupplierPaymentsPage() {
                             <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
                         </div>
                         
-                         <div className="space-y-2">
-                            <Label>Payment Method</Label>
-                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                <SelectTrigger className="w-full md:w-1/3"><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Cash">Cash</SelectItem>
-                                    <SelectItem value="Online">Online</SelectItem>
-                                    <SelectItem value="RTGS">RTGS</SelectItem>
-                                </SelectContent>
-                            </Select>
-                          </div>
-
-                        {paymentMethod === 'RTGS' && (
-                            <Card>
+                         <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
+                            <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="Cash">Cash</TabsTrigger>
+                                <TabsTrigger value="Online">Online</TabsTrigger>
+                                <TabsTrigger value="RTGS">RTGS</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="Cash" className="mt-4">
+                                {/* No specific fields for Cash */}
+                                <p className="text-sm text-muted-foreground p-4 text-center">Processing payment via Cash.</p>
+                            </TabsContent>
+                            <TabsContent value="Online" className="mt-4">
+                                {/* No specific fields for Online */}
+                                <p className="text-sm text-muted-foreground p-4 text-center">Processing payment via Online.</p>
+                            </TabsContent>
+                            <TabsContent value="RTGS" className="mt-4">
+                               <Card>
                                 <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
                                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2"><Label htmlFor="grNo">GR No.</Label><Input id="grNo" value={grNo} onChange={e => setGrNo(e.target.value)} /></div>
@@ -716,8 +719,10 @@ export default function SupplierPaymentsPage() {
                                     <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
                                     <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
                                 </CardContent>
-                            </Card>
-                        )}
+                               </Card>
+                            </TabsContent>
+                         </Tabs>
+
                         <Separator />
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                              <div className="space-y-2">
