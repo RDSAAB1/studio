@@ -113,27 +113,28 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
 
     return (
-        <div className="bg-background p-6 rounded-lg shadow-lg">
-            <header className="mb-6 border-b pb-4">
-                <h2 className="text-2xl font-bold text-primary">{toTitleCase(data.name)}</h2>
+        <div className="bg-background p-6 rounded-lg">
+            <header className="mb-6 border-b pb-4 text-center">
+                <h2 className="text-xl font-bold text-foreground">BizSuite DataFlow</h2>
+                <h3 className="text-2xl font-bold text-primary">{toTitleCase(data.name)}</h3>
                 <p className="text-muted-foreground">Account Statement</p>
                 <p className="text-sm text-muted-foreground">For the period from {startDate} to {endDate}</p>
             </header>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-muted/50 p-3 rounded-md">
+                <div className="bg-muted/50 p-3 rounded-md text-center">
                     <p className="text-xs text-muted-foreground">Opening Balance</p>
                     <p className="font-bold text-lg">{formatCurrency(openingBalance)}</p>
                 </div>
-                <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-md">
-                    <p className="text-xs text-green-700 dark:text-green-400">Total Credits</p>
-                    <p className="font-bold text-lg text-green-800 dark:text-green-300">{formatCurrency(totalCredit)}</p>
-                </div>
-                 <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-md">
+                <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-md text-center">
                     <p className="text-xs text-red-700 dark:text-red-400">Total Debits</p>
                     <p className="font-bold text-lg text-red-800 dark:text-red-300">{formatCurrency(totalDebit)}</p>
                 </div>
-                <div className="bg-muted/50 p-3 rounded-md">
+                 <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-md text-center">
+                    <p className="text-xs text-green-700 dark:text-green-400">Total Credits</p>
+                    <p className="font-bold text-lg text-green-800 dark:text-green-300">{formatCurrency(totalCredit)}</p>
+                </div>
+                <div className="bg-muted/50 p-3 rounded-md text-center">
                     <p className="text-xs text-muted-foreground">Closing Balance</p>
                     <p className="font-bold text-lg">{formatCurrency(closingBalance)}</p>
                 </div>
@@ -825,7 +826,13 @@ export default function SupplierProfilePage() {
       </Dialog>
       
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-4xl p-0">
+             <DialogHeader className="p-4">
+                <DialogTitle className="sr-only">Account Statement</DialogTitle>
+                <DialogDescription className="sr-only">
+                    An account statement for {selectedSupplierData?.name}.
+                </DialogDescription>
+             </DialogHeader>
               <StatementPreview data={selectedSupplierData} />
           </DialogContent>
       </Dialog>
