@@ -53,9 +53,9 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-const SummaryDetailItem = ({ label, value, colorClass }: { label: string, value: string | number, colorClass?: string }) => (
-    <div className="flex justify-between items-center text-sm py-1">
-        <p className="text-muted-foreground">{label}</p>
+const SummaryDetailItem = ({ label, value, subValue, colorClass }: { label: string, value: string | number, subValue?: string, colorClass?: string }) => (
+    <div className="flex justify-between items-center text-sm py-1.5">
+        <p className="text-muted-foreground">{label} {subValue && <span className="text-xs">({subValue})</span>}</p>
         <p className={cn("font-semibold", colorClass)}>{value}</p>
     </div>
 );
@@ -116,16 +116,16 @@ export default function SupplierProfilePage() {
                 totalOutstanding: 0, totalAmount: 0, totalPaid: 0, 
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [],
                 transactionsByVariety: {},
-                totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
+                totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
                 totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
-                averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0
+                averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
+                averageKartaPercentage: 0, averageLabouryRate: 0
             });
         }
     });
 
     // Step 2: Aggregate transaction data for each supplier
-    let supplierRateSum: { [key: string]: number } = {};
-    let supplierRateCount: { [key: string]: number } = {};
+    let supplierRateSum: { [key: string]: { rate: number, karta: number, laboury: number, count: number } } = {};
 
     suppliers.forEach(s => {
         if (!s.customerId) return;
@@ -135,16 +135,24 @@ export default function SupplierProfilePage() {
         data.totalAmount += originalAmount;
         data.totalGrossWeight! += s.grossWeight;
         data.totalTeirWeight! += s.teirWeight;
+        data.totalFinalWeight! += s.weight;
+        data.totalKartaWeight! += s.kartaWeight;
         data.totalNetWeight! += s.netWeight;
+
         data.totalKartaAmount! += s.kartaAmount;
         data.totalLabouryAmount! += s.labouryAmount;
         data.totalKanta! += s.kanta;
         data.totalOtherCharges! += s.otherCharges || 0;
         data.totalTransactions! += 1;
         
+        if (!supplierRateSum[s.customerId]) {
+            supplierRateSum[s.customerId] = { rate: 0, karta: 0, laboury: 0, count: 0 };
+        }
         if (s.rate > 0) {
-            supplierRateSum[s.customerId] = (supplierRateSum[s.customerId] || 0) + s.rate;
-            supplierRateCount[s.customerId] = (supplierRateCount[s.customerId] || 0) + 1;
+            supplierRateSum[s.customerId].rate += s.rate;
+            supplierRateSum[s.customerId].karta += s.kartaPercentage;
+            supplierRateSum[s.customerId].laboury += s.labouryRate;
+            supplierRateSum[s.customerId].count++;
         }
 
         data.allTransactions!.push(s);
@@ -162,24 +170,29 @@ export default function SupplierProfilePage() {
         }
     });
 
-    // Step 4: Calculate final outstanding and average rate for each supplier
+    // Step 4: Calculate final outstanding and averages for each supplier
     summary.forEach((data, key) => {
         data.totalOutstanding = data.totalAmount - data.totalPaid;
         data.outstandingEntryIds = (data.allTransactions || [])
             .filter(t => parseFloat(String(t.netAmount)) >= 1)
             .map(t => t.id);
         data.totalOutstandingTransactions = data.outstandingEntryIds.length;
-        if (supplierRateCount[key] > 0) {
-            data.averageRate = supplierRateSum[key] / supplierRateCount[key];
+        const rates = supplierRateSum[key];
+        if (rates && rates.count > 0) {
+            data.averageRate = rates.rate / rates.count;
+            data.averageKartaPercentage = rates.karta / rates.count;
+            data.averageLabouryRate = rates.laboury / rates.count;
         }
     });
 
     // Step 5: Create Mill Overview
-    const millSummary = Array.from(summary.values()).reduce((acc, s) => {
+    const millSummary: CustomerSummary = Array.from(summary.values()).reduce((acc, s) => {
         acc.totalAmount += s.totalAmount;
         acc.totalPaid += s.totalPaid;
         acc.totalGrossWeight! += s.totalGrossWeight!;
         acc.totalTeirWeight! += s.totalTeirWeight!;
+        acc.totalFinalWeight! += s.totalFinalWeight!;
+        acc.totalKartaWeight! += s.totalKartaWeight!;
         acc.totalNetWeight! += s.totalNetWeight!;
         acc.totalKartaAmount! += s.totalKartaAmount!;
         acc.totalLabouryAmount! += s.totalLabouryAmount!;
@@ -189,19 +202,31 @@ export default function SupplierProfilePage() {
         return acc;
     }, {
         name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
-        paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
+        paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
         averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: suppliers, 
-        allPayments: paymentHistory, transactionsByVariety: {}
+        allPayments: paymentHistory, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
     });
-
+    
     millSummary.totalOutstanding = millSummary.totalAmount - millSummary.totalPaid;
     millSummary.totalTransactions = suppliers.length;
     millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
+    
+    const totalRateData = suppliers.reduce((acc, s) => {
+        if(s.rate > 0) {
+            acc.rate += s.rate;
+            acc.karta += s.kartaPercentage;
+            acc.laboury += s.labouryRate;
+            acc.count++;
+        }
+        return acc;
+    }, { rate: 0, karta: 0, laboury: 0, count: 0 });
 
-    const totalRate = suppliers.reduce((sum, s) => s.rate > 0 ? sum + s.rate : sum, 0);
-    const rateCount = suppliers.filter(s => s.rate > 0).length;
-    millSummary.averageRate = rateCount > 0 ? totalRate / rateCount : 0;
+    if(totalRateData.count > 0) {
+        millSummary.averageRate = totalRateData.rate / totalRateData.count;
+        millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
+        millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
+    }
     
     millSummary.transactionsByVariety = suppliers.reduce((acc, s) => {
         const variety = toTitleCase(s.variety) || 'Unknown';
@@ -291,58 +316,46 @@ export default function SupplierProfilePage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Column 1: Operational */}
                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Briefcase size={16}/> Operational Summary</CardTitle>
+                            <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-2">
-                            <SummaryDetailItem label="Total Gross Weight" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Total Net Weight" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Average Rate" value={`${formatCurrency(selectedSupplierData.averageRate || 0)}`} />
-                            <SummaryDetailItem label="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} />
-                            <SummaryDetailItem label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions}`} />
+                        <CardContent className="p-4 pt-2 space-y-1">
+                            <SummaryDetailItem label="Gross Wt" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Teir Wt" value={`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Total Wt" value={`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Net Wt" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} />
                         </CardContent>
                     </Card>
 
-                    {/* Column 2: Financial */}
                     <Card className="bg-card/50">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-base flex items-center gap-2"><CircleDollarSign size={16}/> Deduction Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2 space-y-1">
+                             <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
+                            <SummaryDetailItem label="Total Other" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
+                            <Separator className="my-2"/>
+                            <SummaryDetailItem label="Total Deductions" value={`- ${formatCurrency((selectedSupplierData.totalKartaAmount || 0) + (selectedSupplierData.totalLabouryAmount || 0) + (selectedSupplierData.totalKanta || 0) + (selectedSupplierData.totalOtherCharges || 0))}`} colorClass="text-destructive font-bold"/>
+                        </CardContent>
+                    </Card>
+
+                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-2">
-                            <SummaryDetailItem label="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalAmount)}`} />
-                            <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid)}`} colorClass="text-green-500" />
-                            <SummaryDetailItem label="Total CD Granted" value={`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
-                            <Separator className="my-2"/>
-                             <div className="flex justify-between items-center text-base">
-                                <p className="font-semibold text-muted-foreground">Total Outstanding</p>
-                                <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    {/* Column 3: Deductions */}
-                     <Card className="bg-card/50">
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><CircleDollarSign size={16}/> Deductions Analysis</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-2">
-                            <SummaryDetailItem label="Total Karta" value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Laboury" value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
-                            <SummaryDetailItem label="Total Other Charges" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
+                        <CardContent className="p-4 pt-2 space-y-1">
+                            <SummaryDetailItem label="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} colorClass="text-green-500" />
+                            <SummaryDetailItem label="Total CD" value={`- ${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
                              <Separator className="my-2"/>
-                            <div className="flex justify-between items-center text-base">
-                                <p className="font-semibold text-muted-foreground">Total Deductions</p>
-                                <p className="font-bold text-lg text-destructive/80">
-                                    {formatCurrency(
-                                        (selectedSupplierData.totalKartaAmount || 0) +
-                                        (selectedSupplierData.totalLabouryAmount || 0) +
-                                        (selectedSupplierData.totalKanta || 0) +
-                                        (selectedSupplierData.totalOtherCharges || 0)
-                                    )}
-                                </p>
+                             <div className="flex justify-between items-center text-base pt-1">
+                                <p className="font-semibold text-muted-foreground">Outstanding</p>
+                                <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
                             </div>
                         </CardContent>
                     </Card>

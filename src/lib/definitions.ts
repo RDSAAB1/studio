@@ -5,6 +5,7 @@
 
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -136,6 +137,8 @@ export type CustomerSummary = {
     // New fields for Mill Overview
     totalGrossWeight?: number;
     totalTeirWeight?: number;
+    totalFinalWeight?: number;
+    totalKartaWeight?: number;
     totalNetWeight?: number;
     totalKartaAmount?: number;
     totalLabouryAmount?: number;
@@ -143,6 +146,8 @@ export type CustomerSummary = {
     totalOtherCharges?: number;
     totalCdAmount?: number;
     averageRate?: number;
+    averageKartaPercentage?: number;
+    averageLabouryRate?: number;
     totalTransactions?: number;
     totalOutstandingTransactions?: number;
     allTransactions?: Customer[];
