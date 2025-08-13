@@ -72,7 +72,7 @@ const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
-  const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(null);
+  const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
 
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
