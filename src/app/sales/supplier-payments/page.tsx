@@ -209,8 +209,6 @@ export default function SupplierPaymentsPage() {
     if (paymentType === 'Full' && !editingPayment) {
         const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
         setPaymentAmount(parseFloat(finalAmount.toFixed(2)));
-    } else if (paymentType === 'Partial' && !editingPayment) {
-        // Do not reset paymentAmount on partial. Let user input it.
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
 
@@ -280,17 +278,13 @@ export default function SupplierPaymentsPage() {
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
                 
-                // STEP 1: READ ALL NECESSARY DOCS FIRST
                 const involvedSupplierDocs = new Map<string, any>();
-                
-                // Collect all SR numbers involved in this transaction (both new and old if editing)
                 const allInvolvedSrNos = new Set<string>();
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
                 }
                 selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
 
-                // Read all involved supplier documents
                 for (const srNo of allInvolvedSrNos) {
                     const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
                     if (supplierToUpdate) {
@@ -301,13 +295,11 @@ export default function SupplierPaymentsPage() {
                     }
                 }
 
-                // STEP 2: CALCULATE NEW BALANCES
                 const outstandingBalances: { [key: string]: number } = {};
                 involvedSupplierDocs.forEach((docSnap, srNo) => {
                     outstandingBalances[srNo] = Number(docSnap.data().netAmount);
                 });
 
-                // If editing, revert the old payment amounts first
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(detail => {
                         if (outstandingBalances[detail.srNo] !== undefined) {
@@ -320,7 +312,6 @@ export default function SupplierPaymentsPage() {
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 
-                // Distribute new payment
                 sortedEntries.forEach(entryData => {
                     if (remainingPayment > 0.001) {
                         let outstanding = outstandingBalances[entryData.srNo];
@@ -336,23 +327,18 @@ export default function SupplierPaymentsPage() {
                     }
                 });
 
-                 // Handle rounding errors by applying remainder to the last entry
                 if (remainingPayment > 0.001 && sortedEntries.length > 0) {
                     const lastEntrySrNo = sortedEntries[sortedEntries.length - 1].srNo;
-                    // Check if the remainder can be absorbed without making the balance negative
                     if (outstandingBalances[lastEntrySrNo] >= remainingPayment) {
                         outstandingBalances[lastEntrySrNo] -= remainingPayment;
                         const detailToUpdate = paidForDetails.find(d => d.srNo === lastEntrySrNo);
                         if (detailToUpdate) {
                             detailToUpdate.amount += remainingPayment;
                         }
-                        remainingPayment = 0; // Remainder applied
+                        remainingPayment = 0;
                     }
                 }
 
-
-                // STEP 3: PERFORM ALL WRITES
-                // Write supplier updates
                 for (const srNo in outstandingBalances) {
                     const newBalance = outstandingBalances[srNo];
                     const supplierDocSnap = involvedSupplierDocs.get(srNo);
@@ -361,7 +347,6 @@ export default function SupplierPaymentsPage() {
                     }
                 }
                 
-                // Create or update payment doc
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
                     customerId: selectedCustomerKey,
@@ -551,7 +536,7 @@ export default function SupplierPaymentsPage() {
               <SelectContent>
                 {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
                    <SelectItem key={key} value={key} className="text-sm">
-                      {toTitleCase(data.name)} ({data.contact}) - Outstanding: {data.totalOutstanding.toFixed(2)}
+                      {toTitleCase(data.name)} ({data.contact}) - Outstanding: {formatCurrency(data.totalOutstanding)}
                     </SelectItem>
                 ))}
               </SelectContent>
@@ -592,7 +577,7 @@ export default function SupplierPaymentsPage() {
                         <TableCell>{entry.srNo}</TableCell>
                         <TableCell>{entry.date}</TableCell>
                         <TableCell>{entry.dueDate}</TableCell>
-                        <TableCell className="text-right">{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
                         <TableCell className="text-center">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
                                 <Info className="h-4 w-4" />
@@ -616,7 +601,7 @@ export default function SupplierPaymentsPage() {
               <CardContent className="space-y-6">
                   <div className="p-4 border rounded-lg bg-card/30">
                       <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
-                      <p className="text-2xl font-bold text-primary">{totalOutstandingForSelected.toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="space-y-2">
@@ -697,7 +682,7 @@ export default function SupplierPaymentsPage() {
                         <TableRow key={entry.id}>
                         <TableCell>{entry.srNo}</TableCell>
                         <TableCell>{entry.date}</TableCell>
-                        <TableCell>{(entry.originalNetAmount || entry.amount).toFixed(2)}</TableCell>
+                        <TableCell>{formatCurrency(entry.originalNetAmount || entry.amount)}</TableCell>
                         <TableCell className="text-center">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
                                 <Info className="h-4 w-4" />
@@ -736,8 +721,8 @@ export default function SupplierPaymentsPage() {
                         <TableRow key={p.id}>
                         <TableCell>{p.paymentId}</TableCell>
                         <TableCell>{p.date}</TableCell>
-                        <TableCell>{p.amount.toFixed(2)}</TableCell>
-                        <TableCell>{p.cdAmount.toFixed(2)}</TableCell>
+                        <TableCell>{formatCurrency(p.amount)}</TableCell>
+                        <TableCell>{formatCurrency(p.cdAmount)}</TableCell>
                         <TableCell className="max-w-xs truncate">{p.notes}</TableCell>
                         <TableCell className="text-center">
                             <div className="flex justify-center items-center gap-0">
@@ -896,15 +881,15 @@ export default function SupplierPaymentsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {paymentsForDetailsEntry.map((payment, index) => {
-                                             const paidForThis = payment.paidFor?.find(pf => pf.srNo === detailsSupplierEntry?.srNo);
-                                             return (
-                                                <TableRow key={payment.id || index}>
-                                                    <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
-                                                    <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                    <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
+                                        {paymentsForDetailsEntry.map(payment => {
+                                            const paidForThis = payment.paidFor?.find(pf => pf.srNo === detailsSupplierEntry?.srNo);
+                                            return (
+                                                <TableRow key={payment.id}>
+                                                    <TableCell className="p-2">{payment.paymentId}</TableCell>
+                                                    <TableCell className="p-2">{format(new Date(payment.date), "dd-MMM-yy")}</TableCell>
+                                                    <TableCell className="text-right p-2 font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
                                                 </TableRow>
-                                             );
+                                            );
                                         })}
                                     </TableBody>
                                 </Table>

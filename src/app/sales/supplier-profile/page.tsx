@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Customer as Supplier, CustomerSummary, Payment, Customer } from "@/lib/definitions";
-import { toTitleCase, cn } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import {
   Card,
@@ -271,12 +271,12 @@ export default function SupplierProfilePage() {
                      <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <StatCard title="Total Gross Weight" value={`${(selectedCustomerData.totalGrossWeight || 0).toFixed(2)} kg`} icon={<Box />} />
                         <StatCard title="Total Net Weight" value={`${(selectedCustomerData.totalNetWeight || 0).toFixed(2)} kg`} icon={<Weight />} />
-                        <StatCard title="Average Rate" value={`₹${(selectedCustomerData.averageRate || 0).toFixed(2)}`} icon={<Calculator />} />
+                        <StatCard title="Average Rate" value={formatCurrency(selectedCustomerData.averageRate || 0)} icon={<Calculator />} />
                         <StatCard title="Total Transactions" value={`${selectedCustomerData.totalTransactions}`} icon={<Briefcase />} />
-                        <StatCard title="Total Outstanding" value={`₹${(selectedCustomerData.totalOutstanding || 0).toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                        <StatCard title="Total Paid" value={`₹${(selectedCustomerData.totalPaid || 0).toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
-                        <StatCard title="Total Karta" value={`₹${(selectedCustomerData.totalKartaAmount || 0).toFixed(2)}`} icon={<Percent />} colorClass="text-destructive" />
-                        <StatCard title="Total Laboury" value={`₹${(selectedCustomerData.totalLabouryAmount || 0).toFixed(2)}`} icon={<Users />} colorClass="text-destructive" />
+                        <StatCard title="Total Outstanding" value={formatCurrency(selectedCustomerData.totalOutstanding || 0)} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Paid" value={formatCurrency(selectedCustomerData.totalPaid || 0)} icon={<Banknote />} colorClass="text-green-500" />
+                        <StatCard title="Total Karta" value={formatCurrency(selectedCustomerData.totalKartaAmount || 0)} icon={<Percent />} colorClass="text-destructive" />
+                        <StatCard title="Total Laboury" value={formatCurrency(selectedCustomerData.totalLabouryAmount || 0)} icon={<Users />} colorClass="text-destructive" />
                     </CardContent>
                 </Card>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -298,7 +298,7 @@ export default function SupplierProfilePage() {
                         <CardContent className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? `₹${value.toFixed(2)}` : value} />
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? formatCurrency(value) : value} />
                                 <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
                                     {chartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
                                 </Pie>
@@ -335,7 +335,7 @@ export default function SupplierProfilePage() {
                                             <TableRow key={entry.id}>
                                                 <TableCell className="font-mono">{entry.srNo}</TableCell>
                                                 <TableCell>{toTitleCase(entry.name)}</TableCell>
-                                                <TableCell className="font-semibold">₹{parseFloat(String(entry.originalNetAmount || entry.amount)).toFixed(2)}</TableCell>
+                                                <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
                                                 <TableCell>
                                                     <Badge variant={parseFloat(String(entry.netAmount)) < 0.01 ? "secondary" : "destructive"}>
                                                         {parseFloat(String(entry.netAmount)) < 0.01 ? "Paid" : "Outstanding"}
@@ -370,7 +370,7 @@ export default function SupplierProfilePage() {
                                             <TableRow key={payment.paymentId}>
                                                 <TableCell className="font-mono">{payment.paymentId}</TableCell>
                                                 <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
-                                                <TableCell className="font-semibold">₹{payment.amount.toFixed(2)}</TableCell>
+                                                <TableCell className="font-semibold">{formatCurrency(payment.amount)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -410,9 +410,9 @@ export default function SupplierProfilePage() {
                     <CardHeader><CardTitle>Financials</CardTitle></CardHeader>
                     <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                         <div className="grid gap-4">
-                            <StatCard title="Total Outstanding" value={`₹${selectedCustomerData.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
-                            <StatCard title="Total Transactions" value={`₹${selectedCustomerData.totalAmount.toFixed(2)}`} icon={<Briefcase />} description={`${suppliers.filter(c => c.customerId === selectedCustomerKey).length} entries`}/>
-                            <StatCard title="Total Paid" value={`₹${selectedCustomerData.totalPaid.toFixed(2)}`} icon={<Banknote />} colorClass="text-green-500" />
+                            <StatCard title="Total Outstanding" value={formatCurrency(selectedCustomerData.totalOutstanding)} icon={<Banknote />} colorClass="text-destructive" />
+                            <StatCard title="Total Transactions" value={formatCurrency(selectedCustomerData.totalAmount)} icon={<Briefcase />} description={`${suppliers.filter(c => c.customerId === selectedCustomerKey).length} entries`}/>
+                            <StatCard title="Total Paid" value={formatCurrency(selectedCustomerData.totalPaid)} icon={<Banknote />} colorClass="text-green-500" />
                             <StatCard title="Outstanding Entries" value={`${selectedCustomerData.allTransactions?.filter(t => Number(t.netAmount) > 0).length}`} icon={<Hash />} />
                         </div>
                         <div className="h-80">
@@ -425,7 +425,7 @@ export default function SupplierProfilePage() {
                                     fontSize: '12px',
                                     borderRadius: 'var(--radius)'
                                     }}
-                                    formatter={(value: number) => `₹${value.toFixed(2)}`}
+                                    formatter={(value: number) => formatCurrency(value)}
                                 />
                                 <Pie
                                     data={financialPieChartData}
@@ -469,8 +469,8 @@ export default function SupplierProfilePage() {
                                     <TableRow key={entry.id}>
                                         <TableCell className="font-mono">{entry.srNo}</TableCell>
                                         <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                        <TableCell className="font-semibold">₹{parseFloat(String(entry.originalNetAmount || entry.amount)).toFixed(2)}</TableCell>
-                                        <TableCell className="font-semibold text-destructive">₹{parseFloat(String(entry.netAmount)).toFixed(2)}</TableCell>
+                                        <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
+                                        <TableCell className="font-semibold text-destructive">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
                                         <TableCell>
                                             <Badge variant={parseFloat(String(entry.netAmount)) < 0.01 ? "secondary" : "destructive"}>
                                             {parseFloat(String(entry.netAmount)) < 0.01 ? "Paid" : "Outstanding"}
@@ -570,12 +570,12 @@ export default function SupplierProfilePage() {
                                 <Table className="text-xs">
                                     <TableBody>
                                         <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ ₹{detailsCustomer.rate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">₹ {detailsCustomer.amount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kartaAmount.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsCustomer.rate)}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsCustomer.amount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kartaAmount)}</TableCell></TableRow>
                                         <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsCustomer.labouryRate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.labouryAmount.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- ₹ {detailsCustomer.kanta.toFixed(2)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.labouryAmount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
                                     </TableBody>
                                 </Table>
                              </CardContent>
@@ -586,7 +586,7 @@ export default function SupplierProfilePage() {
                          <CardContent className="p-3">
                             <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
                             <p className="text-3xl font-bold text-primary font-mono">
-                                ₹{Number(detailsCustomer.netAmount).toFixed(2)}
+                                {formatCurrency(Number(detailsCustomer.netAmount))}
                             </p>
                          </CardContent>
                     </Card>
@@ -612,8 +612,8 @@ export default function SupplierProfilePage() {
                                         return (
                                             <TableRow key={p.id}>
                                                 <TableCell className="p-2">{p.paymentId}</TableCell>
-                                                <TableCell className="p-2">{p.date}</TableCell>
-                                                <TableCell className="text-right p-2 font-semibold">₹{paidForThis?.amount.toFixed(2)}</TableCell>
+                                                <TableCell className="p-2">{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
+                                                <TableCell className="text-right p-2 font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
                                             </TableRow>
                                         );
                                     })}

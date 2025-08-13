@@ -22,8 +22,12 @@ export function formatPaymentId(num: number | string) {
 }
 
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
+  // Do not show decimals for zero amount
+  const options = {
     style: 'currency',
-    currency: 'USD', // You can change the currency code as needed
-  }).format(amount);
+    currency: 'INR',
+    minimumFractionDigits: amount === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  };
+  return new Intl.NumberFormat('en-IN', options).format(amount);
 }
