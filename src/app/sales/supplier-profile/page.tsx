@@ -120,18 +120,36 @@ export default function SupplierProfilePage() {
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalOutstanding: 0, totalAmount: 0, totalPaid: 0, 
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [],
-                transactionsByVariety: {}
+                transactionsByVariety: {},
+                totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
+                totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0,
+                averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0
             });
         }
     });
 
     // Step 2: Aggregate transaction data for each supplier
+    let supplierRateSum: { [key: string]: number } = {};
+    let supplierRateCount: { [key: string]: number } = {};
+
     suppliers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
         const originalAmount = parseFloat(String(s.originalNetAmount || s.amount || 0));
         
         data.totalAmount += originalAmount;
+        data.totalGrossWeight! += s.grossWeight;
+        data.totalTeirWeight! += s.teirWeight;
+        data.totalNetWeight! += s.netWeight;
+        data.totalKartaAmount! += s.kartaAmount;
+        data.totalLabouryAmount! += s.labouryAmount;
+        data.totalTransactions! += 1;
+        
+        if (s.rate > 0) {
+            supplierRateSum[s.customerId] = (supplierRateSum[s.customerId] || 0) + s.rate;
+            supplierRateCount[s.customerId] = (supplierRateCount[s.customerId] || 0) + 1;
+        }
+
         data.allTransactions!.push(s);
         const variety = toTitleCase(s.variety) || 'Unknown';
         data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
@@ -142,13 +160,21 @@ export default function SupplierProfilePage() {
         if (p.customerId && summary.has(p.customerId)) {
             const data = summary.get(p.customerId)!;
             data.totalPaid += p.amount;
+            data.totalCdAmount! += (p.cdAmount || 0);
             data.paymentHistory.push(p);
         }
     });
 
-    // Step 4: Calculate final outstanding for each supplier
-    summary.forEach(data => {
+    // Step 4: Calculate final outstanding and average rate for each supplier
+    summary.forEach((data, key) => {
         data.totalOutstanding = data.totalAmount - data.totalPaid;
+        data.outstandingEntryIds = (data.allTransactions || [])
+            .filter(t => parseFloat(String(t.netAmount)) >= 1)
+            .map(t => t.id);
+        data.totalOutstandingTransactions = data.outstandingEntryIds.length;
+        if (supplierRateCount[key] > 0) {
+            data.averageRate = supplierRateSum[key] / supplierRateCount[key];
+        }
     });
 
     // Step 5: Create Mill Overview
@@ -408,43 +434,14 @@ export default function SupplierProfilePage() {
 
             <div className="lg:col-span-8 space-y-6">
                  <Card>
-                    <CardHeader><CardTitle>Financials</CardTitle></CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-                        <div className="grid gap-4">
-                            <StatCard title="Total Outstanding" value={formatCurrency(selectedSupplierData.totalOutstanding)} icon={<Banknote />} colorClass="text-destructive" />
-                            <StatCard title="Total Transactions" value={formatCurrency(selectedSupplierData.totalAmount)} icon={<Briefcase />} description={`${(selectedSupplierData.allTransactions || []).length} entries`}/>
-                            <StatCard title="Total Paid" value={formatCurrency(selectedSupplierData.totalPaid)} icon={<Banknote />} colorClass="text-green-500" />
-                            <StatCard title="Outstanding Entries" value={(selectedSupplierData.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).length.toString()} icon={<Hash />} />
-                        </div>
-                        <div className="h-80">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                <Tooltip
-                                    contentStyle={{
-                                    backgroundColor: 'hsl(var(--background))',
-                                    borderColor: 'hsl(var(--border))',
-                                    fontSize: '12px',
-                                    borderRadius: 'var(--radius)'
-                                    }}
-                                    formatter={(value: number) => `${formatCurrency(value)}`}
-                                />
-                                <Pie
-                                    data={financialPieChartData}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    outerRadius={100}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {financialPieChartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Legend wrapperStyle={{ fontSize: '12px' }} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
+                    <CardHeader><CardTitle>Financial Summary</CardTitle></CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <StatCard title="Total Outstanding" value={formatCurrency(selectedSupplierData.totalOutstanding)} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Paid" value={formatCurrency(selectedSupplierData.totalPaid)} icon={<Banknote />} colorClass="text-green-500" />
+                        <StatCard title="Total Transactions" value={String(selectedSupplierData.totalTransactions)} icon={<Briefcase />} />
+                        <StatCard title="Avg. Rate" value={formatCurrency(selectedSupplierData.averageRate || 0)} icon={<Calculator />} />
+                        <StatCard title="Total Net Wt." value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} icon={<Weight />} />
+                        <StatCard title="Total CD" value={formatCurrency(selectedSupplierData.totalCdAmount || 0)} icon={<Percent />} />
                     </CardContent>
                 </Card>
                 <Card>
