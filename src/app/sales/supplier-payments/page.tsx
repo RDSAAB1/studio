@@ -35,7 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList, ArrowUpDown } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,6 +56,14 @@ const suppliersCollection = collection(db, "suppliers");
 const paymentsCollection = collection(db, "payments");
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
+type PaymentCombination = {
+    quantity: number;
+    rate: number;
+    amount: number;
+    remainingAmount: number;
+};
+type SortKey = keyof PaymentCombination;
+type SortDirection = 'asc' | 'desc';
 
 
 const cdOptions = [
@@ -98,6 +106,10 @@ export default function SupplierPaymentsPage() {
   const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
   const [targetAmount, setTargetAmount] = useState(0);
+  const [minRate, setMinRate] = useState(0);
+  const [maxRate, setMaxRate] = useState(0);
+  const [paymentCombinations, setPaymentCombinations] = useState<PaymentCombination[]>([]);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
   
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
@@ -285,7 +297,7 @@ export default function SupplierPaymentsPage() {
   }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory, paymentType]);
 
    useEffect(() => {
-        setTargetAmount(Math.round(totalOutstandingForSelected - calculatedCdAmount));
+        setPaymentAmount(Math.round(totalOutstandingForSelected - calculatedCdAmount));
    }, [totalOutstandingForSelected, calculatedCdAmount]);
    
   const clearForm = () => {
@@ -501,6 +513,69 @@ export default function SupplierPaymentsPage() {
         }
     };
 
+  const generatePaymentCombinations = () => {
+    if (targetAmount <= 0 || minRate <= 0 || maxRate <= 0 || minRate > maxRate) {
+        toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please provide a valid target amount and rate range.' });
+        return;
+    }
+
+    const combinations: PaymentCombination[] = [];
+    const seenRemainders = new Set<number>();
+
+    for (let rate = minRate; rate <= maxRate; rate += 5) {
+        const quantity = Math.floor(targetAmount / rate);
+        const amount = quantity * rate;
+        const remainingAmount = targetAmount - amount;
+
+        if (remainingAmount >= 0 && remainingAmount <= 1000 && !seenRemainders.has(remainingAmount)) {
+            combinations.push({ quantity, rate, amount, remainingAmount });
+            seenRemainders.add(remainingAmount);
+        }
+
+        // Check one quantity lower as well for a potentially closer match
+        if (quantity > 0) {
+            const lowerQuantity = quantity - 1;
+            const lowerAmount = lowerQuantity * rate;
+            const lowerRemaining = targetAmount - lowerAmount;
+            if (lowerRemaining >= 0 && lowerRemaining <= 1000 && !seenRemainders.has(lowerRemaining)) {
+                combinations.push({ quantity: lowerQuantity, rate, amount: lowerAmount, remainingAmount: lowerRemaining });
+                seenRemainders.add(lowerRemaining);
+            }
+        }
+    }
+    
+    // Sort by remaining amount to get the best matches first
+    const sortedCombinations = combinations.sort((a, b) => a.remainingAmount - b.remainingAmount).slice(0, 50);
+    setPaymentCombinations(sortedCombinations);
+  };
+  
+  const sortedCombinations = useMemo(() => {
+    if (!sortConfig) return paymentCombinations;
+    return [...paymentCombinations].sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+    });
+  }, [paymentCombinations, sortConfig]);
+
+  const requestSort = (key: SortKey) => {
+    let direction: SortDirection = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+        direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const handleSelectCombination = (combination: PaymentCombination) => {
+    setGrNo(String(combination.quantity)); // Set Quantity to GR No.
+    setUtrNo(String(combination.rate)); // Set Rate to UTR No.
+    setPaymentAmount(combination.amount);
+    toast({ title: 'Selection Applied', description: `Quantity ${combination.quantity} and Rate ${combination.rate} have been set.` });
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
@@ -691,22 +766,61 @@ export default function SupplierPaymentsPage() {
                             </TabsContent>
                             <TabsContent value="RTGS" className="mt-4">
                                <Card>
-                                <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
-                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2"><Label htmlFor="grNo">GR No.</Label><Input id="grNo" value={grNo} onChange={e => setGrNo(e.target.value)} /></div>
-                                    <div className="space-y-2"><Label htmlFor="grDate">GR Date</Label>
-                                         <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent></Popover>
+                                <CardHeader><CardTitle className="text-base">RTGS Details & Payment Generator</CardTitle></CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2"><Label htmlFor="targetAmount">Amount to be Paid</Label><Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} /></div>
+                                        <div className="space-y-2"><Label htmlFor="minRate">Minimum Rate</Label><Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} /></div>
+                                        <div className="space-y-2"><Label htmlFor="maxRate">Maximum Rate</Label><Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} /></div>
                                     </div>
-                                    <div className="space-y-2"><Label htmlFor="parchiNo">Parchi No.</Label><Input id="parchiNo" value={parchiNo} onChange={e => setParchiNo(e.target.value)} /></div>
-                                    <div className="space-y-2"><Label htmlFor="parchiDate">Parchi Date</Label>
-                                         <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{parchiDate ? format(parchiDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={parchiDate} onSelect={setParchiDate} initialFocus /></PopoverContent></Popover>
+                                    <Button onClick={generatePaymentCombinations}>Generate Options</Button>
+                                    
+                                    {paymentCombinations.length > 0 && (
+                                        <div className="space-y-4">
+                                            <Separator />
+                                            <h4 className="text-md font-semibold">Generated Payment Options</h4>
+                                            <ScrollArea className="h-72">
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('quantity')}>Qty <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('rate')}>Rate <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('remainingAmount')}>Remaining <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {sortedCombinations.map((combo, index) => (
+                                                            <TableRow key={index} onClick={() => handleSelectCombination(combo)} className="cursor-pointer">
+                                                                <TableCell>{combo.quantity}</TableCell>
+                                                                <TableCell>{formatCurrency(combo.rate)}</TableCell>
+                                                                <TableCell>{formatCurrency(combo.amount)}</TableCell>
+                                                                <TableCell className="font-semibold text-red-500">{formatCurrency(combo.remainingAmount)}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </ScrollArea>
+                                        </div>
+                                    )}
+
+                                    <Separator />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2"><Label htmlFor="grNo">GR No. (Quantity)</Label><Input id="grNo" value={grNo} onChange={e => setGrNo(e.target.value)} /></div>
+                                        <div className="space-y-2"><Label htmlFor="utrNo">UTR No. (Rate)</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
+                                        <div className="space-y-2"><Label htmlFor="grDate">GR Date</Label>
+                                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent></Popover>
+                                        </div>
+                                        <div className="space-y-2"><Label htmlFor="parchiNo">Parchi No.</Label><Input id="parchiNo" value={parchiNo} onChange={e => setParchiNo(e.target.value)} /></div>
+                                        <div className="space-y-2"><Label htmlFor="parchiDate">Parchi Date</Label>
+                                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{parchiDate ? format(parchiDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={parchiDate} onSelect={setParchiDate} initialFocus /></PopoverContent></Popover>
+                                        </div>
+                                        <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
+                                        <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
+                                        <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
+                                        <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
+                                        <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
                                     </div>
-                                    <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
-                                    <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
-                                    <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
-                                    <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
-                                    <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
-                                    <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
                                 </CardContent>
                                </Card>
                             </TabsContent>
@@ -769,27 +883,18 @@ export default function SupplierPaymentsPage() {
                             </>}
                         </div>
                         
-                        {paymentMethod === 'RTGS' && !showPaymentOptions && (
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={() => setShowPaymentOptions(true)}>Generate Payment Options</Button>
-                            </div>
-                        )}
-
-                        {(paymentMethod !== 'RTGS' || showPaymentOptions) && (
-                            <Card className="mt-4 bg-muted/30">
-                                <CardHeader><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>
-                                <CardContent className="space-y-2">
-                                    <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
-                                    <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>
-                                    <Separator/>
-                                    <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
-                                </CardContent>
-                                <CardFooter className="flex justify-end">
-                                    <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                                </CardFooter>
-                            </Card>
-                        )}
-
+                        <Card className="mt-4 bg-muted/30">
+                            <CardHeader><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>
+                            <CardContent className="space-y-2">
+                                <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                                <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>
+                                <Separator/>
+                                <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                            </CardContent>
+                            <CardFooter className="flex justify-end">
+                                <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                            </CardFooter>
+                        </Card>
                     </CardContent>
                 </Card>
             </div>
