@@ -287,16 +287,10 @@ export default function SupplierPaymentsPage() {
   }, [selectedEntries.length, cdEligibleEntries.length]);
   
   useEffect(() => {
-    if (paymentType === 'Full' && !editingPayment) {
-        const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
-        setPaymentAmount(Math.round(finalAmount));
-    } else if (paymentType === 'Partial') {
-        // For partial, don't auto-set. Let user input.
-        // setPaymentAmount(0); // Reset for manual input
-        setCdAt('payment_amount'); // Auto-select the only valid option
+    if (paymentType === 'Partial') {
+      setCdAt('payment_amount');
     }
-  }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
-
+  }, [paymentType]);
 
   useEffect(() => {
     autoSetCDToggle();
@@ -336,6 +330,9 @@ export default function SupplierPaymentsPage() {
             const newAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
             setPaymentAmount(newAmount);
         }
+   }, [totalOutstandingForSelected, calculatedCdAmount, paymentType]);
+
+    useEffect(() => {
         if (paymentMethod === 'RTGS') {
             const newTarget = paymentType === 'Full' ? Math.round(totalOutstandingForSelected - calculatedCdAmount) : paymentAmount;
             setTargetAmount(newTarget);
@@ -843,7 +840,7 @@ export default function SupplierPaymentsPage() {
                         {paymentType === 'Partial' && (
                              <div className="space-y-2">
                                 <Label htmlFor="payment-amount">Payment Amount</Label>
-                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} />
+                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} />
                             </div>
                         )}
                         <div className="flex items-center space-x-2 pt-6">
@@ -892,7 +889,7 @@ export default function SupplierPaymentsPage() {
                     <CardHeader><CardTitle className="text-base">RTGS Details & Payment Generator</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
                         <Card>
-                            <CardHeader><CardTitle className="text-sm">RTGS Generator</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-sm">RTGS Payment Generator</CardTitle></CardHeader>
                              <CardContent className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-2"><Label htmlFor="targetAmount">Amount to be Paid</Label><Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} /></div>
@@ -952,8 +949,6 @@ export default function SupplierPaymentsPage() {
                          <Card>
                             <CardHeader><CardTitle className="text-sm">RTGS Details</CardTitle></CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
-                                <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
                                 <div className="space-y-2"><Label htmlFor="grNo">GR No.</Label><Input id="grNo" value={grNo} onChange={e => setGrNo(e.target.value)} /></div>
                                 <div className="space-y-2"><Label htmlFor="grDate">GR Date</Label>
                                     <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4" /></Button></PopoverTrigger><PopoverContent className="w-auto p-0 z-[51]"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent></Popover>
@@ -964,6 +959,8 @@ export default function SupplierPaymentsPage() {
                                 </div>
                                 <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
                                 <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
+                                <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
+                                <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
                             </CardContent>
                         </Card>
                         <Card className="mt-6 bg-muted/30">
@@ -1281,3 +1278,4 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+
