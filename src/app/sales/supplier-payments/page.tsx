@@ -108,6 +108,7 @@ export default function SupplierPaymentsPage() {
   const [checkNo, setCheckNo] = useState('');
   
   // RTGS Generator State
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const [targetAmount, setTargetAmount] = useState(0);
   const [minRate, setMinRate] = useState(0);
   const [maxRate, setMaxRate] = useState(0);
@@ -115,6 +116,7 @@ export default function SupplierPaymentsPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
   const [rtgsQuantity, setRtgsQuantity] = useState(0);
   const [rtgsRate, setRtgsRate] = useState(0);
+  const [rtgsAmount, setRtgsAmount] = useState(0);
 
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
@@ -325,19 +327,21 @@ export default function SupplierPaymentsPage() {
       setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
   }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory, paymentType]);
 
-   useEffect(() => {
-        if(paymentType === 'Full') {
-            const newAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
-            setPaymentAmount(newAmount);
-        }
-   }, [totalOutstandingForSelected, calculatedCdAmount, paymentType]);
+  useEffect(() => {
+    if (paymentType === 'Full') {
+      const newAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
+      setPaymentAmount(newAmount);
+    }
+  }, [totalOutstandingForSelected, calculatedCdAmount, paymentType]);
 
-    useEffect(() => {
-        if (paymentMethod === 'RTGS') {
-            const newTarget = paymentType === 'Full' ? Math.round(totalOutstandingForSelected - calculatedCdAmount) : paymentAmount;
-            setTargetAmount(newTarget);
-        }
-   }, [totalOutstandingForSelected, calculatedCdAmount, paymentMethod, paymentAmount, paymentType]);
+   useEffect(() => {
+    if (paymentMethod === 'RTGS') {
+        const newTarget = paymentType === 'Full' 
+            ? (rtgsAmount > 0 ? rtgsAmount : Math.round(totalOutstandingForSelected - calculatedCdAmount))
+            : paymentAmount;
+        setTargetAmount(newTarget);
+    }
+  }, [totalOutstandingForSelected, calculatedCdAmount, paymentMethod, paymentAmount, paymentType, rtgsAmount]);
    
   const clearForm = () => {
     setSelectedEntryIds(new Set());
@@ -352,6 +356,7 @@ export default function SupplierPaymentsPage() {
     setParchiDate(new Date());
     setRtgsQuantity(0);
     setRtgsRate(0);
+    setRtgsAmount(0);
     setPaymentCombinations([]);
     setPaymentId(getNextPaymentId(paymentHistory));
   };
@@ -365,11 +370,14 @@ export default function SupplierPaymentsPage() {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
             return;
         }
-        if (paymentAmount <= 0 && calculatedCdAmount <= 0) {
+
+        const finalPaymentAmount = paymentMethod === 'RTGS' ? rtgsAmount : paymentAmount;
+
+        if (finalPaymentAmount <= 0 && calculatedCdAmount <= 0) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
             return;
         }
-        if (paymentType === 'Partial' && !editingPayment && paymentAmount > totalOutstandingForSelected) {
+        if (paymentType === 'Partial' && !editingPayment && finalPaymentAmount > totalOutstandingForSelected) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
             return;
         }
@@ -408,7 +416,7 @@ export default function SupplierPaymentsPage() {
                     });
                 }
                 
-                let remainingPayment = Math.round(paymentAmount + calculatedCdAmount);
+                let remainingPayment = Math.round(finalPaymentAmount + calculatedCdAmount);
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 
@@ -451,7 +459,7 @@ export default function SupplierPaymentsPage() {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
                     customerId: selectedCustomerKey,
                     date: new Date().toISOString().split("T")[0],
-                    amount: Math.round(paymentAmount),
+                    amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount),
                     cdApplied: cdEnabled,
                     type: paymentType,
@@ -464,7 +472,7 @@ export default function SupplierPaymentsPage() {
                     parchiDate: parchiDate?.toISOString(),
                     quantity: rtgsQuantity,
                     rate: rtgsRate,
-                    rtgsAmount: rtgsQuantity * rtgsRate,
+                    rtgsAmount: rtgsAmount,
                 };
 
                 if (tempEditingPayment) {
@@ -520,6 +528,9 @@ export default function SupplierPaymentsPage() {
         setGrDate(paymentToEdit.grDate ? new Date(paymentToEdit.grDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || '');
         setParchiDate(paymentToEdit.parchiDate ? new Date(paymentToEdit.parchiDate) : undefined);
+        setRtgsQuantity(paymentToEdit.quantity || 0);
+        setRtgsRate(paymentToEdit.rate || 0);
+        setRtgsAmount(paymentToEdit.rtgsAmount || 0);
     
         toast({
             title: "Editing Mode",
@@ -574,20 +585,21 @@ export default function SupplierPaymentsPage() {
         const combinations: PaymentCombination[] = [];
         const seenRemainders = new Set<number>();
     
-        for (let rate = minRate; rate <= maxRate; rate += 5) {
+        for (let rate = minRate; rate <= maxRate; rate += 1) {
             const baseQuantity = targetAmount / rate;
     
-            for (let i = -2.5; i <= 2.5; i += 0.1) { // 10kg increments for quintal
-                const quantity = parseFloat((baseQuantity + i).toFixed(2));
+            for (let i = -2.5; i <= 2.5; i += 0.01) { // 1kg increments
+                const quantity = parseFloat(baseQuantity.toFixed(2)) + i;
                 if (quantity <= 0) continue;
     
-                const amount = Math.round(quantity * rate);
+                const roundedQuantity = parseFloat(quantity.toFixed(2));
+                const amount = Math.round(roundedQuantity * rate);
                 const remainingAmount = targetAmount - amount;
     
-                if (remainingAmount >= 0 && remainingAmount <= 1000) {
-                    const roundedRemainder = Math.round(remainingAmount);
-                    if (!seenRemainders.has(roundedRemainder)) {
-                        combinations.push({ quantity, rate, amount, remainingAmount });
+                if (remainingAmount >= -500 && remainingAmount <= 500) {
+                     const roundedRemainder = Math.round(remainingAmount);
+                     if (!seenRemainders.has(roundedRemainder)) {
+                        combinations.push({ quantity: roundedQuantity, rate, amount, remainingAmount });
                         seenRemainders.add(roundedRemainder);
                     }
                 }
@@ -599,7 +611,7 @@ export default function SupplierPaymentsPage() {
         }
     
         const sortedCombinations = combinations
-            .sort((a, b) => a.remainingAmount - b.remainingAmount)
+            .sort((a, b) => Math.abs(a.remainingAmount) - Math.abs(b.remainingAmount))
             .slice(0, 50);
     
         setPaymentCombinations(sortedCombinations);
@@ -629,7 +641,9 @@ export default function SupplierPaymentsPage() {
   const handleSelectCombination = (combination: PaymentCombination) => {
     setRtgsQuantity(combination.quantity);
     setRtgsRate(combination.rate);
+    setRtgsAmount(combination.amount);
     toast({ title: 'Selection Applied', description: `Quantity ${combination.quantity} and Rate ${combination.rate} have been set.` });
+    setIsGeneratorOpen(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -819,7 +833,6 @@ export default function SupplierPaymentsPage() {
                   <TabsTrigger value="RTGS">RTGS</TabsTrigger>
                 </TabsList>
 
-                {/* CD and Payment Amount Section - Common to all */}
                 <div className="mt-6 space-y-6">
                     <div className="p-4 border rounded-lg bg-card/30 flex justify-between items-center">
                         <div>
@@ -891,47 +904,57 @@ export default function SupplierPaymentsPage() {
 
                 <TabsContent value="RTGS" className="mt-4">
                   <Card>
-                    <CardHeader><CardTitle className="text-base">RTGS Details & Payment Generator</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
-                        <Card>
-                            <CardHeader><CardTitle className="text-sm">RTGS Payment Generator</CardTitle></CardHeader>
-                             <CardContent className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="space-y-2"><Label htmlFor="targetAmount">Amount to be Paid</Label><Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} /></div>
-                                    <div className="space-y-2"><Label htmlFor="minRate">Minimum Rate</Label><Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} /></div>
-                                    <div className="space-y-2"><Label htmlFor="maxRate">Maximum Rate</Label><Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} /></div>
-                                </div>
-                                <Button onClick={generatePaymentCombinations}>Generate Options</Button>
-                                
-                                {paymentCombinations.length > 0 && (
-                                    <div className="space-y-4">
-                                        <h4 className="text-md font-semibold">Generated Payment Options</h4>
-                                        <ScrollArea className="h-72">
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('quantity')}>Qty <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('rate')}>Rate <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('remainingAmount')}>Remaining <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {sortedCombinations.map((combo, index) => (
-                                                        <TableRow key={index} onClick={() => handleSelectCombination(combo)} className="cursor-pointer">
-                                                            <TableCell>{combo.quantity}</TableCell>
-                                                            <TableCell>{formatCurrency(combo.rate)}</TableCell>
-                                                            <TableCell>{formatCurrency(combo.amount)}</TableCell>
-                                                            <TableCell className="font-semibold text-red-500">{formatCurrency(combo.remainingAmount)}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </ScrollArea>
+                        <div className="space-y-4">
+                           <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
+                                <DialogTrigger asChild>
+                                     <Button>Generate Payment Options</Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl">
+                                    <DialogHeader>
+                                        <DialogTitle>RTGS Payment Generator</DialogTitle>
+                                        <DialogDescription>Generate quantity and rate combinations for a target payment amount.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+                                        <div className="space-y-2"><Label htmlFor="targetAmount">Amount to be Paid</Label><Input id="targetAmount" type="number" value={targetAmount} onChange={e => setTargetAmount(Number(e.target.value))} /></div>
+                                        <div className="space-y-2"><Label htmlFor="minRate">Minimum Rate</Label><Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} /></div>
+                                        <div className="space-y-2"><Label htmlFor="maxRate">Maximum Rate</Label><Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} /></div>
                                     </div>
-                                )}
-                             </CardContent>
-                         </Card>
+                                    <DialogFooter className="flex-col sm:flex-row gap-2">
+                                        <Button onClick={generatePaymentCombinations}>Generate</Button>
+                                    </DialogFooter>
+
+                                    {paymentCombinations.length > 0 && (
+                                        <div className="mt-4 space-y-4">
+                                            <h4 className="text-md font-semibold">Generated Payment Options</h4>
+                                            <ScrollArea className="h-72">
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('quantity')}>Qty <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('rate')}>Rate <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                            <TableHead className="cursor-pointer" onClick={() => requestSort('remainingAmount')}>Remaining <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {sortedCombinations.map((combo, index) => (
+                                                            <TableRow key={index} onClick={() => handleSelectCombination(combo)} className="cursor-pointer">
+                                                                <TableCell>{combo.quantity.toFixed(2)}</TableCell>
+                                                                <TableCell>{formatCurrency(combo.rate)}</TableCell>
+                                                                <TableCell>{formatCurrency(combo.amount)}</TableCell>
+                                                                <TableCell className="font-semibold text-red-500">{formatCurrency(combo.remainingAmount)}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </ScrollArea>
+                                        </div>
+                                    )}
+                                </DialogContent>
+                           </Dialog>
+                        </div>
                          <Separator />
                         <Card>
                             <CardHeader><CardTitle className="text-sm">Supplier Details</CardTitle></CardHeader>
@@ -966,15 +989,16 @@ export default function SupplierPaymentsPage() {
                                 <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
                                 <div className="space-y-2"><Label htmlFor="rtgsQuantity">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} /></div>
                                 <div className="space-y-2"><Label htmlFor="rtgsRate">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} /></div>
+                                <div className="space-y-2 md:col-span-2"><Label htmlFor="rtgsAmount">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} /></div>
                             </CardContent>
                         </Card>
                         <Card className="mt-6 bg-muted/30">
                             <CardHeader><CardTitle className="text-base">Finalize RTGS Payment</CardTitle></CardHeader>
                             <CardContent className="space-y-2">
-                                <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                                <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount)}</p></div>
                                 {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
                                 <Separator/>
-                                <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
+                                <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(rtgsAmount + calculatedCdAmount)}</p></div>
                             </CardContent>
                             <CardFooter className="flex justify-end">
                                 <Button onClick={processPayment}>{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
@@ -1283,3 +1307,4 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+
