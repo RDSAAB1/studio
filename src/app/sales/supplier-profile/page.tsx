@@ -180,9 +180,8 @@ export default function SupplierProfilePage() {
             .map(t => t.id);
         data.totalOutstandingTransactions = data.outstandingEntryIds.length;
         
-        // Corrected average rate calculation
-        if (data.totalNetWeight! > 0) {
-            data.averageRate = data.totalAmount / data.totalNetWeight!;
+        if (data.totalFinalWeight! > 0) {
+            data.averageRate = data.totalAmount / data.totalFinalWeight!;
         } else {
             data.averageRate = 0;
         }
@@ -223,9 +222,8 @@ export default function SupplierProfilePage() {
     millSummary.totalTransactions = suppliers.length;
     millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
     
-    // Corrected mill average rate calculation
-    if (millSummary.totalNetWeight! > 0) {
-        millSummary.averageRate = millSummary.totalAmount / millSummary.totalNetWeight!;
+    if (millSummary.totalFinalWeight! > 0) {
+        millSummary.averageRate = millSummary.totalAmount / millSummary.totalFinalWeight!;
     } else {
         millSummary.averageRate = 0;
     }
