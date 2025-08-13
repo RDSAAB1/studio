@@ -588,7 +588,7 @@ export default function SupplierPaymentsPage() {
         for (let rate = minRate; rate <= maxRate; rate += 1) {
             const baseQuantity = targetAmount / rate;
     
-            for (let i = -2.5; i <= 2.5; i += 0.01) { // 1kg increments
+            for (let i = -2.5; i <= 2.5; i += 0.01) {
                 const quantity = parseFloat(baseQuantity.toFixed(2)) + i;
                 if (quantity <= 0) continue;
     
@@ -906,7 +906,7 @@ export default function SupplierPaymentsPage() {
                   <Card>
                     <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="space-y-4">
+                         <div className="space-y-4">
                            <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
                                 <DialogTrigger asChild>
                                      <Button>Generate Payment Options</Button>
@@ -995,7 +995,7 @@ export default function SupplierPaymentsPage() {
                         <Card className="mt-6 bg-muted/30">
                             <CardHeader><CardTitle className="text-base">Finalize RTGS Payment</CardTitle></CardHeader>
                             <CardContent className="space-y-2">
-                                <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount)}</p></div>
+                                <div className="flex justify-between items-center"><p className="text-sm">RTGS Amount:</p><p className="font-bold">{formatCurrency(rtgsAmount)}</p></div>
                                 {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
                                 <Separator/>
                                 <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(rtgsAmount + calculatedCdAmount)}</p></div>
@@ -1308,3 +1308,5 @@ export default function SupplierPaymentsPage() {
   );
 }
 
+
+    
