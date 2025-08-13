@@ -34,7 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -81,6 +81,13 @@ export default function SupplierPaymentsPage() {
   const [paymentId, setPaymentId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
+  const [paymentMethod, setPaymentMethod] = useState('Cash'); // New state for payment method
+  
+  // RTGS specific fields
+  const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
+  const [utrNo, setUtrNo] = useState('');
+  const [checkNo, setCheckNo] = useState('');
+  
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
   const [cdAt, setCdAt] = useState('unpaid_amount');
@@ -150,7 +157,12 @@ export default function SupplierPaymentsPage() {
                 paymentHistory: [],
                 totalAmount: 0,
                 totalPaid: 0,
-                outstandingEntryIds: []
+                outstandingEntryIds: [],
+                // Bank details for RTGS
+                acNo: s.acNo,
+                ifscCode: s.ifscCode,
+                bank: s.bank,
+                branch: s.branch
             });
         }
     });
@@ -170,6 +182,15 @@ export default function SupplierPaymentsPage() {
 
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
+    const customerData = customerSummaryMap.get(key);
+    if(customerData) {
+        setBankDetails({
+            acNo: customerData.acNo || '',
+            ifscCode: customerData.ifscCode || '',
+            bank: customerData.bank || '',
+            branch: customerData.branch || '',
+        });
+    }
     clearForm();
   };
   
@@ -253,6 +274,8 @@ export default function SupplierPaymentsPage() {
     setPaymentAmount(0);
     setCdEnabled(false);
     setEditingPayment(null);
+    setUtrNo('');
+    setCheckNo('');
     setPaymentId(getNextPaymentId(paymentHistory));
   };
 
@@ -355,8 +378,8 @@ export default function SupplierPaymentsPage() {
                     cdAmount: calculatedCdAmount,
                     cdApplied: cdEnabled,
                     type: paymentType,
-                    receiptType: 'Online',
-                    notes: `Paid for SR No(s): ${sortedEntries.map(e => e.srNo).join(', ')}`,
+                    receiptType: paymentMethod, // Use the new state here
+                    notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: paidForDetails,
                 };
 
@@ -403,9 +426,13 @@ export default function SupplierPaymentsPage() {
         setPaymentId(paymentToEdit.paymentId);
         setPaymentAmount(paymentToEdit.amount);
         setPaymentType(paymentToEdit.type);
+        setPaymentMethod(paymentToEdit.receiptType); // Set payment method
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
         setSelectedEntryIds(newSelectedEntryIds);
+        setUtrNo(paymentToEdit.notes.match(/UTR: (.*?)(,|$)/)?.[1].trim() || '');
+        setCheckNo(paymentToEdit.notes.match(/Check: (.*?)(,|$)/)?.[1].trim() || '');
+
     
         toast({
             title: "Editing Mode",
@@ -596,81 +623,114 @@ export default function SupplierPaymentsPage() {
             </CardContent>
           </Card>
 
-          <Card onKeyDown={handleKeyDown}>
-              <CardHeader><CardTitle>{editingPayment ? `Editing Payment` : 'Payment Processing'}</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
-                  <div className="p-4 border rounded-lg bg-card/30">
-                      <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
-                      <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="payment-id">Payment ID</Label>
-                        <Input id="payment-id" type="text" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Payment Type</Label>
-                        <Select value={paymentType} onValueChange={setPaymentType}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
+          {selectedEntryIds.size > 0 && (
+            <Card onKeyDown={handleKeyDown}>
+                <CardHeader><CardTitle>{editingPayment ? `Editing Payment` : 'Payment Processing'}</CardTitle></CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="p-4 border rounded-lg bg-card/30">
+                        <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
+                        <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Payment Method</Label>
+                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                            <SelectTrigger className="w-full md:w-1/3"><SelectValue/></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Full">Full</SelectItem>
-                                <SelectItem value="Partial">Partial</SelectItem>
+                                <SelectItem value="Cash">Cash</SelectItem>
+                                <SelectItem value="Online">Online</SelectItem>
+                                <SelectItem value="RTGS">RTGS</SelectItem>
                             </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                          <Label htmlFor="payment-amount">Payment Amount</Label>
-                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && !editingPayment} />
-                      </div>
-                      <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div className="flex items-center space-x-2 pt-6">
-                                    <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
-                                    <Label htmlFor="cd-toggle" className={cn(isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
-                                </div>
-                            </TooltipTrigger>
-                            {isCdSwitchDisabled && (
-                                <TooltipContent>
-                                    <p>No selected entries are eligible for CD.</p>
-                                </TooltipContent>
-                            )}
-                        </Tooltip>
-                      </TooltipProvider>
 
-                      {cdEnabled && <>
+                    {paymentMethod === 'RTGS' && (
+                        <Card>
+                            <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label htmlFor="acNo">A/C No.</Label><Input id="acNo" value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} /></div>
+                                <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} /></div>
+                                <div className="space-y-2"><Label htmlFor="bank">Bank</Label><Input id="bank" value={bankDetails.bank} onChange={e => setBankDetails({...bankDetails, bank: e.target.value})} /></div>
+                                <div className="space-y-2"><Label htmlFor="branch">Branch</Label><Input id="branch" value={bankDetails.branch} onChange={e => setBankDetails({...bankDetails, branch: e.target.value})} /></div>
+                                <div className="space-y-2"><Label htmlFor="utrNo">UTR No.</Label><Input id="utrNo" value={utrNo} onChange={e => setUtrNo(e.target.value)} /></div>
+                                <div className="space-y-2"><Label htmlFor="checkNo">Check No.</Label><Input id="checkNo" value={checkNo} onChange={e => setCheckNo(e.target.value)} /></div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <Separator />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                         <div className="space-y-2">
-                            <Label htmlFor="cd-percent">CD %</Label>
-                            <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
+                            <Label htmlFor="payment-id">Payment ID</Label>
+                            <Input id="payment-id" type="text" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} />
                         </div>
                         <div className="space-y-2">
-                            <Label>CD At</Label>
-                             <Select value={cdAt} onValueChange={setCdAt}>
+                            <Label>Payment Type</Label>
+                            <Select value={paymentType} onValueChange={setPaymentType}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>
-                                    {availableCdOptions.map(opt => (
-                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                    ))}
+                                    <SelectItem value="Full">Full</SelectItem>
+                                    <SelectItem value="Partial">Partial</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Calculated CD Amount</Label>
-                            <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
+                            <Label htmlFor="payment-amount">Payment Amount</Label>
+                            <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full' && !editingPayment} />
                         </div>
-                      </>}
-                  </div>
-                  <div className="flex gap-4">
-                    <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>
-                        {editingPayment ? 'Update Payment' : 'Process Payment'}
-                    </Button>
-                    {editingPayment && (
-                        <Button variant="outline" onClick={clearForm}>Cancel Edit</Button>
-                    )}
-                  </div>
-              </CardContent>
-          </Card>
-          
+                        <div className="flex items-center space-x-2 pt-6">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="flex items-center space-x-2">
+                                            <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
+                                            <Label htmlFor="cd-toggle" className={cn(isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
+                                        </div>
+                                    </TooltipTrigger>
+                                    {isCdSwitchDisabled && (
+                                        <TooltipContent>
+                                            <p>No selected entries are eligible for CD.</p>
+                                        </TooltipContent>
+                                    )}
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+
+                        {cdEnabled && <>
+                            <div className="space-y-2">
+                                <Label htmlFor="cd-percent">CD %</Label>
+                                <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>CD At</Label>
+                                <Select value={cdAt} onValueChange={setCdAt}>
+                                    <SelectTrigger><SelectValue/></SelectTrigger>
+                                    <SelectContent>
+                                        {availableCdOptions.map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Calculated CD Amount</Label>
+                                <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
+                            </div>
+                        </>}
+                    </div>
+                    <div className="flex gap-4">
+                        <Button onClick={processPayment}>
+                            {editingPayment ? 'Update Payment' : 'Process Payment'}
+                        </Button>
+                        {editingPayment && (
+                            <Button variant="outline" onClick={clearForm}>Cancel Edit</Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader><CardTitle>Paid Entries</CardTitle></CardHeader>
             <CardContent>
@@ -710,6 +770,7 @@ export default function SupplierPaymentsPage() {
                         <TableRow>
                             <TableHead>ID</TableHead>
                             <TableHead>Date</TableHead>
+                            <TableHead>Method</TableHead>
                             <TableHead>Amount</TableHead>
                             <TableHead>CD Amount</TableHead>
                             <TableHead>Notes</TableHead>
@@ -721,6 +782,7 @@ export default function SupplierPaymentsPage() {
                         <TableRow key={p.id}>
                         <TableCell>{p.paymentId}</TableCell>
                         <TableCell>{p.date}</TableCell>
+                        <TableCell><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
                         <TableCell>{formatCurrency(p.amount)}</TableCell>
                         <TableCell>{formatCurrency(p.cdAmount)}</TableCell>
                         <TableCell className="max-w-xs truncate">{p.notes}</TableCell>
@@ -753,7 +815,7 @@ export default function SupplierPaymentsPage() {
                     ))}
                      {currentPaymentHistory.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground">No payment history for this supplier.</TableCell>
+                            <TableCell colSpan={7} className="text-center text-muted-foreground">No payment history for this supplier.</TableCell>
                         </TableRow>
                     )}
                     </TableBody>
@@ -877,19 +939,21 @@ export default function SupplierPaymentsPage() {
                                         <TableRow>
                                             <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                             <TableHead className="p-2 text-xs">Date</TableHead>
+                                            <TableHead className="p-2 text-xs">Method</TableHead>
                                             <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {paymentsForDetailsEntry.map((payment, index) => {
-                                            const paidForThis = payment.paidFor?.find(pf => pf.srNo === detailsSupplierEntry?.srNo);
-                                            return (
+                                             const paidForThis = payment.paidFor?.find(pf => pf.srNo === detailsSupplierEntry?.srNo);
+                                             return (
                                                 <TableRow key={payment.id || index}>
                                                     <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                     <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
+                                                    <TableCell className="p-2"><Badge variant={payment.receiptType === 'RTGS' ? 'default' : 'secondary'}>{payment.receiptType}</Badge></TableCell>
                                                     <TableCell className="text-right p-2 font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
                                                 </TableRow>
-                                            );
+                                             );
                                         })}
                                     </TableBody>
                                 </Table>
@@ -922,6 +986,7 @@ export default function SupplierPaymentsPage() {
                 <DetailItem icon={<Banknote size={14} />} label="Amount Paid" value={formatCurrency(selectedPaymentForDetails.amount)} />
                 <DetailItem icon={<Percent size={14} />} label="CD Amount" value={formatCurrency(selectedPaymentForDetails.cdAmount)} />
                 <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={selectedPaymentForDetails.type} />
+                <DetailItem icon={<Receipt size={14} />} label="Payment Method" value={selectedPaymentForDetails.receiptType} />
                 <DetailItem icon={<Hash size={14} />} label="CD Applied" value={selectedPaymentForDetails.cdApplied ? "Yes" : "No"} />
               </div>
               <h4 className="font-semibold text-sm">Entries Paid in this Transaction</h4>
@@ -968,5 +1033,3 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
-
-    

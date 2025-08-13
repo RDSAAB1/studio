@@ -61,7 +61,6 @@ const allMenuItems = [
       { id: "sub-sales-1", name: "Product Catalog", href: "/sales/product-catalog", icon: ShoppingCart },
       { id: "sub-sales-2", name: "Order Tracking", href: "/sales/order-tracking", icon: PackageCheck },
       { id: "sub-sales-3", name: "Sales Reports", href: "/sales/sales-reports", icon: BarChart3 },
-      { id: "sub-sales-4", name: "RTGS Payment", href: "/sales/rtgs-payment", icon: Banknote },
     ],
   },
   {

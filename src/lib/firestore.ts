@@ -157,5 +157,3 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
   const docRef = await addDoc(fundTransactionsCollection, finalData);
   return { id: docRef.id, ...finalData };
 }
-
-    
