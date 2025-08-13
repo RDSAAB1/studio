@@ -49,7 +49,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
 
 
-import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, writeBatch, getDoc } from "firebase/firestore";
 import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankBranchesRealtime, addBank, addBankBranch } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
 
@@ -652,15 +652,20 @@ export default function SupplierPaymentsPage() {
             toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
             return;
         }
+        
+        const originalSupplierStates = new Map<string, Customer>();
+
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
                 
                 for (const detail of paymentToDelete.paidFor || []) {
                     const q = query(suppliersCollection, where('srNo', '==', detail.srNo));
-                    const supplierDocsQuery = await getDocs(q); 
-                    if (!supplierDocsQuery.empty) {
-                        const supplierDoc = supplierDocsQuery.docs[0];
+                    const supplierDocsQuerySnapshot = await getDocs(q);
+                    
+                    if (!supplierDocsQuerySnapshot.empty) {
+                        const supplierDoc = supplierDocsQuerySnapshot.docs[0];
+                        originalSupplierStates.set(supplierDoc.id, supplierDoc.data() as Customer);
                         const currentNetAmount = Number(supplierDoc.data().netAmount);
                         const newNetAmount = currentNetAmount + detail.amount;
                         transaction.update(supplierDoc.ref, { netAmount: Math.round(newNetAmount) });
@@ -669,6 +674,25 @@ export default function SupplierPaymentsPage() {
                 
                 transaction.delete(paymentRef);
             });
+            
+            // Optimistic UI update
+            setPaymentHistory(prev => prev.filter(p => p.id !== paymentIdToDelete));
+            
+            const updatedSuppliers = [...suppliers];
+            originalSupplierStates.forEach((originalState, id) => {
+                const paidForDetail = paymentToDelete.paidFor?.find(pf => pf.srNo === originalState.srNo);
+                if (paidForDetail) {
+                    const index = updatedSuppliers.findIndex(s => s.id === id);
+                    if (index !== -1) {
+                        updatedSuppliers[index] = {
+                            ...updatedSuppliers[index],
+                            netAmount: Number(updatedSuppliers[index].netAmount) + paidForDetail.amount,
+                        };
+                    }
+                }
+            });
+            setSuppliers(updatedSuppliers);
+
 
             toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) {
@@ -677,6 +701,9 @@ export default function SupplierPaymentsPage() {
         } catch (error) {
             console.error("Error in batch deletion:", error);
             toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
+            // Revert optimistic updates on failure
+            setPaymentHistory(prev => [...prev, paymentToDelete].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            setSuppliers(suppliers); // Revert to original suppliers state before delete
         }
     };
     
