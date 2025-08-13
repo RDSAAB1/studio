@@ -10,6 +10,7 @@ import type { PageMeta } from '@/app/types';
 import { HeartHandshake, Briefcase } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
+import { Header } from '@/components/layout/header';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -94,7 +95,10 @@ export default function RootLayout({
           setIsSidebarOpen={setIsSidebarOpen}
           sidebarRef={sidebarRef}
         >
-          {children}
+          <Header pageMeta={pageMeta} toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8">
+            {children}
+          </main>
         </MainLayout>
         <Toaster />
       </body>
