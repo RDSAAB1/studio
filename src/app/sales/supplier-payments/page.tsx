@@ -2,7 +2,7 @@
 "use client";
 
 import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
-import { toTitleCase, formatPaymentId, cn } from "@/lib/utils";
+import { toTitleCase, formatPaymentId, cn, formatCurrency } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -37,9 +37,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { format } from 'date-fns';
 
-import { addPayment, deletePayment, updateSupplier, updatePayment, getSuppliersRealtime, getPaymentsRealtime, batchUpdateSuppliersOnPaymentChange } from '@/lib/firestore';
-import { collection, runTransaction, doc, writeBatch, getDocs, query, where, getDoc } from "firebase/firestore";
+
+import { collection, runTransaction, doc, getDocs, query, where } from "firebase/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
 
 
@@ -84,6 +86,7 @@ export default function SupplierPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   
   const stableToast = useCallback(toast, []);
 
@@ -201,8 +204,6 @@ export default function SupplierPaymentsPage() {
     if (paymentType === 'Full' && !editingPayment) {
         const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
         setPaymentAmount(parseFloat(finalAmount.toFixed(2)));
-    } else if (paymentType === 'Partial' && !editingPayment) {
-        setPaymentAmount(0);
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
 
@@ -271,30 +272,30 @@ export default function SupplierPaymentsPage() {
         try {
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
-                
-                // --- READ PHASE ---
                 const allInvolvedSrNos = new Set<string>();
+
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
                 }
                 selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
-                
-                const involvedSupplierDocs = new Map<string, any>();
-                const outstandingBalances: { [key: string]: number } = {};
 
+                const involvedSupplierDocs = new Map<string, any>();
                 for (const srNo of allInvolvedSrNos) {
                     const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
                     if (supplierToUpdate) {
                         const docRef = doc(db, "suppliers", supplierToUpdate.id);
                         const supplierDoc = await transaction.get(docRef);
-                        if(supplierDoc.exists()){
-                            involvedSupplierDocs.set(srNo, supplierDoc);
-                            outstandingBalances[srNo] = Number(supplierDoc.data().netAmount);
-                        }
+                        involvedSupplierDocs.set(srNo, supplierDoc);
                     }
                 }
 
-                // --- LOGIC & WRITE PHASE ---
+                const outstandingBalances: { [key: string]: number } = {};
+                involvedSupplierDocs.forEach((doc, srNo) => {
+                    if (doc.exists()) {
+                        outstandingBalances[srNo] = Number(doc.data().netAmount);
+                    }
+                });
+
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(detail => {
                         if (outstandingBalances[detail.srNo] !== undefined) {
@@ -302,17 +303,20 @@ export default function SupplierPaymentsPage() {
                         }
                     });
                 }
-
+                
                 let remainingPayment = paymentAmount + calculatedCdAmount;
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
                 sortedEntries.forEach(entryData => {
-                    if (remainingPayment > 0.001 && outstandingBalances[entryData.srNo] !== undefined) {
-                        const currentOutstanding = outstandingBalances[entryData.srNo];
-                        const amountToPay = Math.min(currentOutstanding, remainingPayment);
+                    if (remainingPayment > 0.001) {
+                         const supplierDoc = involvedSupplierDocs.get(entryData.srNo);
+                         if (!supplierDoc || !supplierDoc.exists()) throw new Error(`Supplier ${entryData.id} not found.`);
+                        
+                        let outstanding = outstandingBalances[entryData.srNo];
+                        const amountToPay = Math.min(outstanding, remainingPayment);
 
-                        if(amountToPay > 0.001){
+                        if (amountToPay > 0.001) {
                             const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
                             paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
                             
@@ -321,15 +325,24 @@ export default function SupplierPaymentsPage() {
                         }
                     }
                 });
+                
+                if (remainingPayment > 0.001 && sortedEntries.length > 0) {
+                    const lastEntry = sortedEntries[sortedEntries.length - 1];
+                    outstandingBalances[lastEntry.srNo] -= remainingPayment;
+                    const detailToUpdate = paidForDetails.find(d => d.srNo === lastEntry.srNo);
+                    if (detailToUpdate) {
+                        detailToUpdate.amount += remainingPayment;
+                    }
+                }
 
                 for (const srNo in outstandingBalances) {
                     const newBalance = outstandingBalances[srNo];
                     const supplierDoc = involvedSupplierDocs.get(srNo);
-                    if (supplierDoc) {
+                    if (supplierDoc && supplierDoc.exists()) {
                         transaction.update(supplierDoc.ref, { netAmount: parseFloat(newBalance.toFixed(2)) });
                     }
                 }
-
+                
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
                     customerId: selectedCustomerKey,
@@ -364,10 +377,12 @@ export default function SupplierPaymentsPage() {
 
     const handleEditPayment = async (paymentToEdit: Payment) => {
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-        const associatedEntries = suppliers.filter(s => srNosInPayment.includes(s.srNo));
-        const associatedEntryIds = new Set(associatedEntries.map(e => e.id));
-
-        if (associatedEntryIds.size !== srNosInPayment.length) {
+        
+        const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
+        const supplierDocs = await getDocs(q);
+        const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
+        
+        if (foundSrNos.size !== srNosInPayment.length) {
             toast({
                 variant: "destructive",
                 title: "Cannot Edit Payment",
@@ -375,35 +390,9 @@ export default function SupplierPaymentsPage() {
             });
             return;
         }
-        
-        const tempOutstanding = { ...totalOutstandingForSelected };
 
-        // Temporarily revert the payment to calculate the correct outstanding amount for the form
-        let totalOutstandingBeforeEdit = 0;
         const newSelectedEntryIds = new Set<string>();
-
-        await runTransaction(db, async (transaction) => {
-            const supplierDocsToRevert = new Map<string, any>();
-            for(const detail of paymentToEdit.paidFor || []) {
-                const supplierToUpdate = suppliers.find(s => s.srNo === detail.srNo);
-                if (supplierToUpdate) {
-                    const docRef = doc(db, "suppliers", supplierToUpdate.id);
-                    const supplierDoc = await transaction.get(docRef);
-                    if (supplierDoc.exists()) {
-                        supplierDocsToRevert.set(supplierToUpdate.id, supplierDoc);
-                    }
-                }
-            }
-            
-            supplierDocsToRevert.forEach((doc, id) => {
-                const paymentDetail = paymentToEdit.paidFor?.find(p => suppliers.find(s=>s.id === id)?.srNo === p.srNo);
-                if(paymentDetail) {
-                    const currentOutstanding = Number(doc.data().netAmount);
-                    totalOutstandingBeforeEdit += currentOutstanding + paymentDetail.amount;
-                    newSelectedEntryIds.add(id);
-                }
-            });
-        });
+        supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
         
         setSelectedCustomerKey(paymentToEdit.customerId);
         setEditingPayment(paymentToEdit);
@@ -427,7 +416,23 @@ export default function SupplierPaymentsPage() {
             return;
         }
         try {
-            await batchUpdateSuppliersOnPaymentChange(paymentToDelete.id, paymentToDelete.paidFor || [], true);
+            await runTransaction(db, async (transaction) => {
+                const paymentRef = doc(db, "payments", paymentIdToDelete);
+                
+                for (const detail of paymentToDelete.paidFor || []) {
+                    const q = query(suppliersCollection, where('srNo', '==', detail.srNo));
+                    const supplierDocs = await getDocs(q);
+                    if (!supplierDocs.empty) {
+                        const supplierDoc = supplierDocs.docs[0];
+                        const currentNetAmount = Number(supplierDoc.data().netAmount);
+                        const newNetAmount = currentNetAmount + detail.amount;
+                        transaction.update(supplierDoc.ref, { netAmount: newNetAmount });
+                    }
+                }
+                
+                transaction.delete(paymentRef);
+            });
+
             toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) {
                 clearForm();
@@ -717,6 +722,9 @@ export default function SupplierPaymentsPage() {
                         <TableCell className="max-w-xs truncate">{p.notes}</TableCell>
                         <TableCell className="text-center">
                             <div className="flex justify-center items-center gap-0">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedPaymentForDetails(p)}>
+                                    <Info className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}>
                                     <Pen className="h-4 w-4" />
                                 </Button>
@@ -805,6 +813,56 @@ export default function SupplierPaymentsPage() {
           )}
         </DialogContent>
       </Dialog>
+      
+      <Dialog open={!!selectedPaymentForDetails} onOpenChange={(open) => !open && setSelectedPaymentForDetails(null)}>
+        <DialogContent className="max-w-2xl">
+          {selectedPaymentForDetails && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Payment Details: {selectedPaymentForDetails.paymentId}</DialogTitle>
+                <DialogDescription>
+                  Details of the payment made on {format(new Date(selectedPaymentForDetails.date), "PPP")}.
+                </DialogDescription>
+              </DialogHeader>
+              <Separator />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                <DetailItem icon={<Banknote size={14} />} label="Amount Paid" value={formatCurrency(selectedPaymentForDetails.amount)} />
+                <DetailItem icon={<Percent size={14} />} label="CD Amount" value={formatCurrency(selectedPaymentForDetails.cdAmount)} />
+                <DetailItem icon={<Calendar size={14} />} label="Payment Type" value={selectedPaymentForDetails.type} />
+                <DetailItem icon={<Hash size={14} />} label="CD Applied" value={selectedPaymentForDetails.cdApplied ? "Yes" : "No"} />
+              </div>
+              <h4 className="font-semibold text-sm">Entries Paid in this Transaction</h4>
+              <div className="max-h-64 overflow-y-auto border rounded-md">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>SR No</TableHead>
+                            <TableHead>Supplier Name</TableHead>
+                            <TableHead className="text-right">Amount Paid</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {selectedPaymentForDetails.paidFor?.map((pf, index) => {
+                            const supplier = suppliers.find(s => s.srNo === pf.srNo);
+                            return (
+                                <TableRow key={index}>
+                                    <TableCell>{pf.srNo}</TableCell>
+                                    <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
+                                </TableRow>
+                            )
+                        })}
+                    </TableBody>
+                </Table>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedPaymentForDetails(null)}>Close</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
