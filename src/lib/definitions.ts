@@ -98,6 +98,13 @@ export type Payment = {
     receiptType: string;
     notes: string;
     paidFor?: PaidFor[];
+    grNo?: string;
+    grDate?: string;
+    parchiNo?: string;
+    parchiDate?: string;
+    quantity?: number;
+    rate?: number;
+    rtgsAmount?: number;
 }
 
 export type CustomerSummary = {
