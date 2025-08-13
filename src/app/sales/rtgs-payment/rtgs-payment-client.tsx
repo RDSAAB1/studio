@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Customer } from "@/lib/definitions";
+import type { Customer, Payment, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -40,9 +40,10 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { runTransaction, collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Badge } from "@/components/ui/badge";
+import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 
 const formSchema = z.object({
@@ -60,7 +61,7 @@ const formSchema = z.object({
   grDate: z.string().optional(),
   parchiNo: z.string().optional(),
   parchiDate: z.string().optional(),
-  amount: z.coerce.number().min(0.01, "Amount is required"),
+  amount: z.coerce.number().min(0, "Amount must be positive"),
   checkNo: z.string().optional(),
   utrNo: z.string().optional(),
   rate: z.coerce.number().optional(),
@@ -104,18 +105,17 @@ const initialFormState: FormValues = {
 };
 
 const cdOptions = [
-    { value: 'paid_amount', label: 'CD on Paid Amount' },
     { value: 'unpaid_amount', label: 'CD on Unpaid Amount (Selected)' },
-    { value: 'payment_amount', label: 'CD on Payment Amount (Manual)' },
     { value: 'full_amount', label: 'CD on Full Amount (Selected)' },
+    { value: 'payment_amount', label: 'CD on Payment Amount (Manual)' },
 ];
 
 export default function RtgspaymentClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [allRecords, setAllRecords] = useState<any[]>([]);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
   const [isClient, setIsClient] = useState(false);
-  const [editingRecordIndex, setEditingRecordIndex] = useState<number | null>(null);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | undefined>(undefined);
   const [outstandingEntries, setOutstandingEntries] = useState<Customer[]>([]);
@@ -144,17 +144,57 @@ export default function RtgspaymentClient() {
     defaultValues: initialFormState,
   });
 
-  const generateSrNo = useCallback((records: any[]) => {
-      const lastSrNo = records.reduce((max, record) => {
-        const srNumMatch = record.srNo?.match(/^R(\d+)$/);
+  const generatePaymentId = useCallback((payments: Payment[]) => {
+      const lastPaymentNum = payments.reduce((max, record) => {
+        const srNumMatch = record.paymentId?.match(/^P(\d+)$/);
         if (srNumMatch) {
           const currentNum = parseInt(srNumMatch[1], 10);
           return Math.max(max, currentNum);
         }
         return max;
       }, 0);
-      return `R${String(lastSrNo + 1).padStart(5, "0")}`;
+      return `P${String(lastPaymentNum + 1).padStart(5, "0")}`;
   }, []);
+
+  useEffect(() => {
+    setIsClient(true);
+    
+    const unsubscribeSuppliers = getSuppliersRealtime(
+        (data) => setSuppliers(data),
+        (error) => {
+            console.error("Error fetching suppliers:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to load suppliers.' });
+        }
+    );
+    
+    const unsubscribePayments = getPaymentsRealtime(
+        (data) => {
+            setAllPayments(data);
+            const allPaidSrNos = new Set<string>();
+            data.forEach(payment => {
+                if (Array.isArray(payment.paidFor)) {
+                    payment.paidFor.forEach((pf: PaidFor) => allPaidSrNos.add(pf.srNo));
+                }
+            });
+            setPaidSrNos(allPaidSrNos);
+
+            if (!editingPayment) {
+                form.setValue("srNo", generatePaymentId(data));
+            }
+        },
+        (error) => {
+            console.error("Error fetching payments:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to load payments.' });
+        }
+    );
+
+    return () => { 
+        unsubscribeSuppliers();
+        unsubscribePayments();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingPayment]);
+
 
   const totalOutstandingForSelected = useMemo(() => {
     return Math.round(outstandingEntries
@@ -165,40 +205,6 @@ export default function RtgspaymentClient() {
   const selectedEntries = useMemo(() => {
     return outstandingEntries.filter(entry => selectedOutstandingIds.has(entry.id));
   }, [outstandingEntries, selectedOutstandingIds]);
-
-  useEffect(() => {
-    setIsClient(true);
-    const unsubscribeRecords = onSnapshot(collection(db, "rtgs_payments"), (snapshot) => {
-      const recordsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAllRecords(recordsData);
-
-      const allPaidSrNos = new Set<string>();
-      recordsData.forEach(record => {
-          if (Array.isArray(record.paidForSrNos)) {
-              record.paidForSrNos.forEach((srNo: string) => allPaidSrNos.add(srNo));
-          }
-      });
-      setPaidSrNos(allPaidSrNos);
-
-      if (editingRecordIndex === null) {
-         form.setValue("srNo", generateSrNo(recordsData));
-      }
-    }, (error) => {
-      console.error("Error fetching RTGS records:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load RTGS records.' });
-    });
-
-    const unsubscribeSuppliers = onSnapshot(collection(db, "suppliers"), (snapshot) => {
-      const suppliersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Customer[];
-      setSuppliers(suppliersData);
-    }, (error) => {
-      console.error("Error fetching suppliers:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load suppliers.' });
-    });
-
-    return () => { unsubscribeRecords(); unsubscribeSuppliers(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingRecordIndex]);
 
   useEffect(() => {
     if(!cdEnabled) {
@@ -240,7 +246,7 @@ export default function RtgspaymentClient() {
     if(supplier) {
       form.reset({
         ...initialFormState,
-        srNo: generateSrNo(allRecords),
+        srNo: generatePaymentId(allPayments),
         name: supplier.name,
         fatherName: supplier.so,
         mobileNo: supplier.contact,
@@ -258,40 +264,65 @@ export default function RtgspaymentClient() {
   }
 
   const onSubmit = async (values: FormValues) => {
-    const finalValues = {
-        ...values,
+    if (!selectedSupplierId) {
+        toast({ title: 'Error', description: 'Please select a supplier.', variant: 'destructive' });
+        return;
+    }
+    const finalPayment: Omit<Payment, 'id'> = {
+        paymentId: values.srNo,
+        customerId: suppliers.find(s => s.id === selectedSupplierId)?.customerId || '',
+        date: values.date,
         amount: Math.round(values.amount),
         cdAmount: Math.round(calculatedCdAmount),
         cdApplied: cdEnabled,
-        supplierId: selectedSupplierId || null,
-        paidForSrNos: Array.from(selectedOutstandingIds).map(id => outstandingEntries.find(e => e.id === id)?.srNo).filter(Boolean),
-    }
+        type: paymentType,
+        receiptType: 'RTGS',
+        notes: `UTR: ${values.utrNo || ''}, Check: ${values.checkNo || ''}`,
+        paidFor: selectedEntries.map(e => ({ srNo: e.srNo, amount: Number(e.netAmount), cdApplied: cdEnabled })),
+    };
 
-    if (editingRecordIndex !== null && allRecords[editingRecordIndex]?.id) {
-       const recordToUpdateId = allRecords[editingRecordIndex].id;
-       try {
-         await updateDoc(doc(db, "rtgs_payments", recordToUpdateId), finalValues);
-         toast({ title: "Success", description: "Record updated successfully!" });
-         handleNew(allRecords);
-       } catch (error) {
-         console.error("Error updating record:", error);
-         toast({ variant: 'destructive', title: 'Error', description: 'Failed to update record.' });
-       }
-    } else {
-       try {
-         await addDoc(collection(db, "rtgs_payments"), finalValues);
-         toast({ title: "Success", description: "New entry saved successfully!" });
-         handleNew([...allRecords, { id: 'temp', ...finalValues }]);
-       } catch (error) {
-         console.error("Error adding record:", error);
-         toast({ variant: 'destructive', title: 'Error', description: 'Failed to save record.' });
-       }
+    try {
+        await runTransaction(db, async (transaction) => {
+            if (editingPayment && editingPayment.id) {
+                // Revert old payment impact
+                for (const pf of editingPayment.paidFor || []) {
+                    const q = query(collection(db, "suppliers"), where("srNo", "==", pf.srNo));
+                    const supplierDocs = await getDocs(q);
+                    if (!supplierDocs.empty) {
+                        const supDoc = supplierDocs.docs[0];
+                        const oldAmount = Number(supDoc.data().netAmount);
+                        transaction.update(supDoc.ref, { netAmount: oldAmount + pf.amount });
+                    }
+                }
+            }
+
+            // Apply new/updated payment impact
+            const batch = writeBatch(db);
+            for (const entry of selectedEntries) {
+                const newNetAmount = Number(entry.netAmount) - (paymentType === 'Full' ? Number(entry.netAmount) : values.amount / selectedEntries.length);
+                const supplierRef = doc(db, "suppliers", entry.id);
+                transaction.update(supplierRef, { netAmount: Math.round(newNetAmount) });
+            }
+
+            if (editingPayment && editingPayment.id) {
+                const paymentRef = doc(db, "payments", editingPayment.id);
+                transaction.update(paymentRef, finalPayment);
+            } else {
+                const newPaymentRef = doc(collection(db, "payments"));
+                transaction.set(newPaymentRef, { ...finalPayment, id: newPaymentRef.id });
+            }
+        });
+        toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'saved'} successfully!` });
+        handleNew();
+    } catch (error) {
+        console.error("Error saving payment:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to save payment.' });
     }
   };
   
-  const handleNew = (records: any[]) => {
-    form.reset({...initialFormState, srNo: generateSrNo(records) });
-    setEditingRecordIndex(null);
+  const handleNew = () => {
+    form.reset({...initialFormState, srNo: generatePaymentId(allPayments) });
+    setEditingPayment(null);
     setSelectedSupplierId(undefined);
     setOutstandingEntries([]);
     setSelectedOutstandingIds(new Set());
@@ -299,28 +330,63 @@ export default function RtgspaymentClient() {
     setSearchQuery("");
   }
 
-  const handleEdit = (index: number) => {
-    const record = allRecords[index];
-    if (record) {
-       form.reset(record);
-       setEditingRecordIndex(index);
-       setSelectedSupplierId(record.supplierId);
-       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  const handleEdit = (paymentToEdit: Payment) => {
+    setEditingPayment(paymentToEdit);
+    setSelectedSupplierId(suppliers.find(s => s.customerId === paymentToEdit.customerId)?.id);
+    const relatedEntries = suppliers.filter(s => paymentToEdit.paidFor?.some(pf => pf.srNo === s.srNo));
+    setSelectedOutstandingIds(new Set(relatedEntries.map(e => e.id)));
+    const supplierInfo = suppliers.find(s => s.customerId === paymentToEdit.customerId);
+    
+    form.reset({
+        name: supplierInfo?.name || '',
+        fatherName: supplierInfo?.so || '',
+        mobileNo: supplierInfo?.contact || '',
+        address: supplierInfo?.address || '',
+        acNo: supplierInfo?.acNo || '',
+        ifscCode: supplierInfo?.ifscCode || '',
+        bank: supplierInfo?.bank || '',
+        branch: supplierInfo?.branch || '',
+        srNo: paymentToEdit.paymentId,
+        date: paymentToEdit.date,
+        amount: paymentToEdit.amount,
+        checkNo: paymentToEdit.notes.match(/Check: (.*?)(,|$)/)?.[1].trim() || '',
+        utrNo: paymentToEdit.notes.match(/UTR: (.*?)(,|$)/)?.[1].trim() || '',
+        grNo: relatedEntries[0]?.grNo || '',
+        grDate: relatedEntries[0]?.grDate || '',
+        parchiNo: relatedEntries[0]?.parchiNo || '',
+        parchiDate: relatedEntries[0]?.parchiDate || '',
+        rate: relatedEntries[0]?.rate || 0,
+        weight: relatedEntries[0]?.weight || 0,
+    });
+    setPaymentType(paymentToEdit.type);
+    setCdEnabled(paymentToEdit.cdApplied);
+    setCdPercent(paymentToEdit.cdAmount > 0 ? (paymentToEdit.cdAmount / paymentToEdit.amount) * 100 : 2);
   };
 
-  const handleDelete = async (index: number) => {
-     const recordToDelete = allRecords[index];
-     if (recordToDelete && recordToDelete.id) {
+  const handleDelete = async (paymentId: string) => {
+     const paymentToDelete = allPayments.find(p => p.id === paymentId);
+     if (paymentToDelete) {
        try {
-         await deleteDoc(doc(db, "rtgs_payments", recordToDelete.id));
-         toast({ title: "Success", description: "Record deleted successfully." });
-         if(editingRecordIndex === index){
-             handleNew(allRecords.filter((_, i) => i !== index));
+         await runTransaction(db, async (transaction) => {
+            const paymentRef = doc(db, "payments", paymentId);
+            for (const pf of paymentToDelete.paidFor || []) {
+                 const q = query(collection(db, "suppliers"), where("srNo", "==", pf.srNo));
+                 const supplierDocs = await getDocs(q);
+                 if (!supplierDocs.empty) {
+                     const supDoc = supplierDocs.docs[0];
+                     const oldAmount = Number(supDoc.data().netAmount);
+                     transaction.update(supDoc.ref, { netAmount: oldAmount + pf.amount });
+                 }
+            }
+            transaction.delete(paymentRef);
+         });
+         toast({ title: "Success", description: "Payment deleted successfully." });
+         if(editingPayment?.id === paymentId){
+             handleNew();
          }
        } catch (error) {
-         console.error("Error deleting record:", error);
-         toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete record.' });
+         console.error("Error deleting payment:", error);
+         toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete payment.' });
        }
      }
   };
@@ -399,7 +465,7 @@ export default function RtgspaymentClient() {
       form.setValue('weight', firstEntry.weight || 0);
     }
     
-    setIsOutstandingModalOpen(false); // Close the modal
+    setIsOutstandingModalOpen(false);
     
     toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} entries. Total: ${formatCurrency(totalAmount)}. Target amount set.` });
   };
@@ -461,11 +527,9 @@ export default function RtgspaymentClient() {
   }, [paymentType]);
 
   useEffect(() => {
-      // If payment type is partial, default cdAt to payment_amount
       if (paymentType === 'Partial' && cdAt !== 'payment_amount') {
           setCdAt('payment_amount');
       } else if (paymentType === 'Full' && cdAt === 'payment_amount') {
-          // If switching to full, default to unpaid_amount
           setCdAt('unpaid_amount');
       }
   }, [paymentType, cdAt]);
@@ -478,7 +542,6 @@ export default function RtgspaymentClient() {
     <div className="space-y-8">
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Customer Details */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -606,7 +669,6 @@ export default function RtgspaymentClient() {
             </CardContent>
           </Card>
 
-          {/* Bank Details */}
           <Card>
             <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -617,12 +679,11 @@ export default function RtgspaymentClient() {
             </CardContent>
           </Card>
 
-          {/* Serial & Date Details */}
           <Card>
             <CardHeader><CardTitle>Serial & Date Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="srNo">SR No.</Label>
+                <Label htmlFor="srNo">Payment ID</Label>
                 <Input id="srNo" {...form.register("srNo")} />
                 {form.formState.errors.srNo && <p className="text-sm text-destructive">{form.formState.errors.srNo.message}</p>}
               </div>
@@ -634,7 +695,6 @@ export default function RtgspaymentClient() {
             </CardContent>
           </Card>
 
-          {/* Payment & Transaction Details */}
           <Card>
             <CardHeader><CardTitle>Transaction &amp; Amount Details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -729,9 +789,9 @@ export default function RtgspaymentClient() {
 
         <div className="flex justify-start space-x-4">
           <Button type="submit">
-            {editingRecordIndex !== null ? <><Pen className="h-4 w-4 mr-2"/> Update Record</> : <><Save className="h-4 w-4 mr-2"/> Save Record</>}
+            {editingPayment !== null ? <><Pen className="h-4 w-4 mr-2"/> Update Record</> : <><Save className="h-4 w-4 mr-2"/> Save Record</>}
           </Button>
-          <Button type="button" variant="outline" onClick={() => handleNew(allRecords)}>
+          <Button type="button" variant="outline" onClick={handleNew}>
             <PlusCircle className="h-4 w-4 mr-2"/> New / Clear
           </Button>
         </div>
@@ -792,13 +852,13 @@ export default function RtgspaymentClient() {
       </Dialog>
 
       <Card>
-        <CardHeader><CardTitle>Saved Records</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Saved Payments</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>SR No.</TableHead>
+                  <TableHead>Payment ID</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Date</TableHead>
@@ -806,15 +866,15 @@ export default function RtgspaymentClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allRecords.map((record, index) => (
-                  <TableRow key={record.id || index}>
-                    <TableCell>{record.srNo || 'N/A'}</TableCell>
-                    <TableCell>{toTitleCase(record.name)}</TableCell>
+                {allPayments.filter(p => p.receiptType === 'RTGS').map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>{record.paymentId || 'N/A'}</TableCell>
+                    <TableCell>{toTitleCase(suppliers.find(s => s.customerId === record.customerId)?.name || 'N/A')}</TableCell>
                     <TableCell>{formatCurrency(record.amount)}</TableCell>
                     <TableCell>{record.date}</TableCell>
                     <TableCell className="space-x-2">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(index)}><Pen className="h-4 w-4" /></Button>
-                      <Button variant="destructive" size="icon" onClick={() => handleDelete(index)}><Trash className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(record)}><Pen className="h-4 w-4" /></Button>
+                      <Button variant="destructive" size="icon" onClick={() => handleDelete(record.id)}><Trash className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>
                 ))}

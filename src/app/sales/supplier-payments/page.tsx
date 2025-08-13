@@ -34,7 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -813,8 +813,8 @@ export default function SupplierPaymentsPage() {
                                 <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsSupplierEntry.name)} />
                                 <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsSupplierEntry.contact} />
                                 <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsSupplierEntry.so)} />
-                                <DetailItem icon={<Calendar size={14} />} label="Transaction Date" value={format(new Date(detailsSupplierEntry.date), "PPP")} />
-                                <DetailItem icon={<Calendar size={14} />} label="Due Date" value={format(new Date(detailsSupplierEntry.dueDate), "PPP")} />
+                                <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(detailsSupplierEntry.date), "PPP")} />
+                                <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsSupplierEntry.dueDate), "PPP")} />
                                 <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsSupplierEntry.address)} className="col-span-1 sm:col-span-2" />
                             </div>
                         </CardContent>
@@ -877,7 +877,7 @@ export default function SupplierPaymentsPage() {
                                         <TableRow>
                                             <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                             <TableHead className="p-2 text-xs">Date</TableHead>
-                                            <TableHead className="text-right p-2 text-xs">Amount Paid</TableHead>
+                                            <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -921,7 +921,7 @@ export default function SupplierPaymentsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                 <DetailItem icon={<Banknote size={14} />} label="Amount Paid" value={formatCurrency(selectedPaymentForDetails.amount)} />
                 <DetailItem icon={<Percent size={14} />} label="CD Amount" value={formatCurrency(selectedPaymentForDetails.cdAmount)} />
-                <DetailItem icon={<Calendar size={14} />} label="Payment Type" value={selectedPaymentForDetails.type} />
+                <DetailItem icon={<CalendarIcon size={14} />} label="Payment Type" value={selectedPaymentForDetails.type} />
                 <DetailItem icon={<Hash size={14} />} label="CD Applied" value={selectedPaymentForDetails.cdApplied ? "Yes" : "No"} />
               </div>
               <h4 className="font-semibold text-sm">Entries Paid in this Transaction</h4>
