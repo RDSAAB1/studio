@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { Customer, Transaction, FundTransaction, Payment } from "@/lib/definitions";
-import { toTitleCase, cn } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -140,13 +140,13 @@ export default function DashboardOverviewClient() {
                     <CardDescription>A real-time snapshot of your business's financial health.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <StatCard title="Total Income" value={`₹${financialState.totalIncome.toFixed(2)}`} icon={<TrendingUp />} colorClass="text-green-500" />
-                    <StatCard title="Total Expense" value={`₹${financialState.totalExpense.toFixed(2)}`} icon={<TrendingDown />} colorClass="text-red-500" />
-                    <StatCard title="Net Profit/Loss" value={`₹${financialState.netProfitLoss.toFixed(2)}`} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
-                    <StatCard title="Total Bank Balance" value={`₹${financialState.bankBalance.toFixed(2)}`} icon={<Landmark />} colorClass="text-blue-500" />
-                    <StatCard title="Cash in Hand" value={`₹${financialState.cashInHand.toFixed(2)}`} icon={<HandCoins />} colorClass="text-yellow-500" />
-                    <StatCard title="Total Assets" value={`₹${financialState.totalAssets.toFixed(2)}`} icon={<PiggyBank />} colorClass="text-green-500" />
-                    <StatCard title="Total Liabilities" value={`₹${financialState.totalLiabilities.toFixed(2)}`} icon={<DollarSign />} colorClass="text-red-500" />
+                    <StatCard title="Total Income" value={formatCurrency(financialState.totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" />
+                    <StatCard title="Total Expense" value={formatCurrency(financialState.totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" />
+                    <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
+                    <StatCard title="Total Bank Balance" value={formatCurrency(financialState.bankBalance)} icon={<Landmark />} colorClass="text-blue-500" />
+                    <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" />
+                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
             </Card>
 
@@ -156,9 +156,9 @@ export default function DashboardOverviewClient() {
                     <CardDescription>Key metrics from your sales and supplier activities.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <StatCard title="Total Sales Amount" value={`₹${salesState.totalSalesAmount.toFixed(2)}`} icon={<Banknote />} />
-                    <StatCard title="Total Paid" value={`₹${salesState.totalPaid.toFixed(2)}`} icon={<Wallet />} colorClass="text-green-500"/>
-                    <StatCard title="Total Outstanding" value={`₹${salesState.totalOutstanding.toFixed(2)}`} icon={<Banknote />} colorClass="text-destructive" />
+                    <StatCard title="Total Sales Amount" value={formatCurrency(salesState.totalSalesAmount)} icon={<Banknote />} />
+                    <StatCard title="Total Paid" value={formatCurrency(salesState.totalPaid)} icon={<Wallet />} colorClass="text-green-500"/>
+                    <StatCard title="Total Outstanding" value={formatCurrency(salesState.totalOutstanding)} icon={<Banknote />} colorClass="text-destructive" />
                     <StatCard title="Total Suppliers" value={String(salesState.totalCustomers)} icon={<Users />} />
                 </CardContent>
             </Card>
@@ -188,7 +188,7 @@ export default function DashboardOverviewClient() {
                                         <TableCell>{format(new Date(t.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell><Badge variant={t.transactionType === 'Income' ? 'default' : 'destructive'} className={cn(t.transactionType === 'Income' ? 'bg-green-600' : 'bg-red-600', 'text-white')}>{t.transactionType}</Badge></TableCell>
                                         <TableCell>{toTitleCase(t.payee)}</TableCell>
-                                        <TableCell className={cn("text-right font-medium", t.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>₹{t.amount.toFixed(2)}</TableCell>
+                                        <TableCell className={cn("text-right font-medium", t.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(t.amount)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -219,7 +219,7 @@ export default function DashboardOverviewClient() {
                                         <TableCell>{format(new Date(c.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell className="font-mono">{c.srNo}</TableCell>
                                         <TableCell>{toTitleCase(c.name)}</TableCell>
-                                        <TableCell className="text-right font-medium">₹{Number(c.netAmount).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-medium">{formatCurrency(Number(c.netAmount))}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer } from "@/lib/definitions";
-import { toTitleCase, formatPaymentId } from "@/lib/utils";
+import { toTitleCase, formatPaymentId, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -116,6 +117,8 @@ export default function RtgspaymentClient() {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | undefined>(undefined);
   const [outstandingEntries, setOutstandingEntries] = useState<Customer[]>([]);
   const [selectedOutstandingIds, setSelectedOutstandingIds] = useState<Set<string>>(new Set());
+  const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
+
 
   const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [isPaymentOptionsModalOpen, setIsPaymentOptionsModalOpen] = useState(false);
@@ -195,7 +198,7 @@ export default function RtgspaymentClient() {
     } else if (cdAt === 'full_amount') {
       base = outstanding;
     }
-    setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
+    setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
   }, [cdEnabled, cdPercent, cdAt, form, totalOutstandingForSelected]);
 
 
@@ -320,7 +323,7 @@ export default function RtgspaymentClient() {
 
                 if (finalAmount > calcTargetAmount) continue;
 
-                const amountRemaining = parseFloat((calcTargetAmount - finalAmount).toFixed(2));
+                const amountRemaining = Math.round(calcTargetAmount - finalAmount);
 
                  if (!generatedUniqueRemainingAmounts.has(amountRemaining)) {
                     rawOptions.push({
@@ -351,7 +354,7 @@ export default function RtgspaymentClient() {
   
   const handlePaySelectedOutstanding = () => {
     const selectedEntries = outstandingEntries.filter(e => selectedOutstandingIds.has(e.id));
-    const totalAmount = selectedEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0);
+    const totalAmount = Math.round(selectedEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0));
     const firstEntry = selectedEntries[0];
 
     if (firstEntry) {
@@ -366,12 +369,9 @@ export default function RtgspaymentClient() {
       form.setValue('weight', firstEntry.weight || 0);
     }
     
-    const closeTrigger = document.querySelector('[aria-label="Close"]');
-    if (closeTrigger instanceof HTMLElement) {
-      closeTrigger.click();
-    }
+    setIsOutstandingModalOpen(false); // Close the modal
     
-    toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} entries. Total: ${totalAmount.toFixed(2)}. Target amount set.` });
+    toast({ title: 'Entries Loaded', description: `Loaded ${selectedEntries.length} entries. Total: ${formatCurrency(totalAmount)}. Target amount set.` });
   };
 
 
@@ -380,7 +380,7 @@ export default function RtgspaymentClient() {
     form.setValue('rate', option.rate);
     form.setValue('weight', option.quantity);
     setIsPaymentOptionsModalOpen(false);
-    toast({ title: 'Selected', description: `Amount ${option.calculatedAmount} selected.` });
+    toast({ title: 'Selected', description: `Amount ${formatCurrency(option.calculatedAmount)} selected.` });
   }
 
   const requestSort = (key: keyof PaymentOption) => {
@@ -437,9 +437,9 @@ export default function RtgspaymentClient() {
               <div className="flex justify-between items-center">
                  <CardTitle>Supplier Details</CardTitle>
                  {selectedSupplierId && (
-                      <Dialog>
+                      <Dialog open={isOutstandingModalOpen} onOpenChange={setIsOutstandingModalOpen}>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">View Outstanding ({outstandingEntries.length})</Button>
+                          <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}>View Outstanding ({outstandingEntries.length})</Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-4xl">
                           <DialogHeader><DialogTitle>Outstanding Entries for {toTitleCase(suppliers.find(c=>c.id === selectedSupplierId)?.name || '')}</DialogTitle></DialogHeader>
@@ -480,7 +480,7 @@ export default function RtgspaymentClient() {
                                     /></TableCell>
                                     <TableCell>{entry.srNo}</TableCell>
                                     <TableCell>{entry.date}</TableCell>
-                                    <TableCell>{Number(entry.netAmount).toFixed(2)}</TableCell>
+                                    <TableCell>{formatCurrency(Number(entry.netAmount))}</TableCell>
                                     <TableCell>{entry.variety}</TableCell>
                                   </TableRow>
                                 ))}
@@ -489,9 +489,9 @@ export default function RtgspaymentClient() {
                           </div>
                            <DialogFooter>
                             <p className="mr-auto text-sm text-muted-foreground">
-                              Selected: {selectedOutstandingIds.size} | Total: {totalOutstandingForSelected.toFixed(2)}
+                              Selected: {selectedOutstandingIds.size} | Total: {formatCurrency(totalOutstandingForSelected)}
                             </p>
-                            <Button variant="ghost">Cancel</Button>
+                            <Button variant="ghost" onClick={() => setIsOutstandingModalOpen(false)}>Cancel</Button>
                             <Button onClick={handlePaySelectedOutstanding} disabled={selectedOutstandingIds.size === 0}>
                               Pay Selected
                             </Button>
@@ -619,7 +619,7 @@ export default function RtgspaymentClient() {
                 </div>
                 <div className="space-y-2 md:col-span-2">
                     <Label>Calculated CD Amount</Label>
-                    <Input value={calculatedCdAmount.toFixed(2)} readOnly className="font-bold text-primary" />
+                    <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
                 </div>
               </>}
             </CardContent>
@@ -696,8 +696,8 @@ export default function RtgspaymentClient() {
                     <TableRow key={index}>
                       <TableCell>{option.quantity.toFixed(2)}</TableCell>
                       <TableCell>{option.rate}</TableCell>
-                      <TableCell>{option.calculatedAmount}</TableCell>
-                      <TableCell>{option.amountRemaining}</TableCell>
+                      <TableCell>{formatCurrency(option.calculatedAmount)}</TableCell>
+                      <TableCell>{formatCurrency(option.amountRemaining)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={() => selectPaymentAmount(option)}>Select</Button>
                       </TableCell>
@@ -732,7 +732,7 @@ export default function RtgspaymentClient() {
                   <TableRow key={record.id || index}>
                     <TableCell>{record.srNo || 'N/A'}</TableCell>
                     <TableCell>{toTitleCase(record.name)}</TableCell>
-                    <TableCell>{record.amount}</TableCell>
+                    <TableCell>{formatCurrency(record.amount)}</TableCell>
                     <TableCell>{record.date}</TableCell>
                     <TableCell className="space-x-2">
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(index)}><Pen className="h-4 w-4" /></Button>

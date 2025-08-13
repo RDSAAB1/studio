@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { FundTransaction, Transaction } from "@/lib/definitions";
-import { toTitleCase, cn } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -152,10 +152,10 @@ export default function CashBankClient() {
                     <CardDescription>A real-time overview of your business's financial health.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <StatCard title="Total Bank Balance" value={`₹${financialState.bankBalance.toFixed(2)}`} icon={<Landmark />} colorClass="text-blue-500" />
-                    <StatCard title="Cash in Hand" value={`₹${financialState.cashInHand.toFixed(2)}`} icon={<HandCoins />} colorClass="text-yellow-500" />
-                    <StatCard title="Total Assets" value={`₹${financialState.totalAssets.toFixed(2)}`} icon={<PiggyBank />} colorClass="text-green-500" />
-                    <StatCard title="Total Liabilities" value={`₹${financialState.totalLiabilities.toFixed(2)}`} icon={<DollarSign />} colorClass="text-red-500" />
+                    <StatCard title="Total Bank Balance" value={formatCurrency(financialState.bankBalance)} icon={<Landmark />} colorClass="text-blue-500" />
+                    <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" />
+                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
             </Card>
 
@@ -262,7 +262,7 @@ export default function CashBankClient() {
                                             </div>
                                             <p className="text-xs text-muted-foreground">{t.source && toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {t.destination && toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
                                         </TableCell>
-                                        <TableCell className="text-right font-mono">₹{t.amount.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
                                         <TableCell>{t.description}</TableCell>
                                     </TableRow>
                                 ))}

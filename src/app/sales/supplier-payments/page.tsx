@@ -188,7 +188,7 @@ export default function SupplierPaymentsPage() {
   }, [suppliers, selectedEntryIds]);
   
   const totalOutstandingForSelected = useMemo(() => {
-    return selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0);
+    return Math.round(selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0));
   }, [selectedEntries]);
 
   const cdEligibleEntries = useMemo(() => {
@@ -208,7 +208,7 @@ export default function SupplierPaymentsPage() {
   useEffect(() => {
     if (paymentType === 'Full' && !editingPayment) {
         const finalAmount = totalOutstandingForSelected - (cdEnabled ? calculatedCdAmount : 0);
-        setPaymentAmount(parseFloat(finalAmount.toFixed(2)));
+        setPaymentAmount(Math.round(finalAmount));
     }
   }, [paymentType, totalOutstandingForSelected, editingPayment, calculatedCdAmount, cdEnabled]);
 
@@ -245,7 +245,7 @@ export default function SupplierPaymentsPage() {
           base = totalPaidForEligible - amountWithCDAlready;
       }
       
-      setCalculatedCdAmount(parseFloat(((base * cdPercent) / 100).toFixed(2)));
+      setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
   }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory]);
 
   const clearForm = () => {
@@ -340,10 +340,10 @@ export default function SupplierPaymentsPage() {
                 }
 
                 for (const srNo in outstandingBalances) {
-                    const newBalance = outstandingBalances[srNo];
+                    const newBalance = Math.round(outstandingBalances[srNo]);
                     const supplierDocSnap = involvedSupplierDocs.get(srNo);
                      if (supplierDocSnap) {
-                        transaction.update(supplierDocSnap.ref, { netAmount: parseFloat(newBalance.toFixed(2)) });
+                        transaction.update(supplierDocSnap.ref, { netAmount: newBalance });
                     }
                 }
                 
@@ -656,7 +656,7 @@ export default function SupplierPaymentsPage() {
                         </div>
                         <div className="space-y-2">
                             <Label>Calculated CD Amount</Label>
-                            <Input value={calculatedCdAmount.toFixed(2)} readOnly className="font-bold text-primary" />
+                            <Input value={formatCurrency(calculatedCdAmount)} readOnly className="font-bold text-primary" />
                         </div>
                       </>}
                   </div>
@@ -877,16 +877,16 @@ export default function SupplierPaymentsPage() {
                                         <TableRow>
                                             <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                             <TableHead className="p-2 text-xs">Date</TableHead>
-                                            <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
+                                            <TableHead className="text-right p-2 text-xs">Amount Paid</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {paymentsForDetailsEntry.map(payment => {
+                                        {paymentsForDetailsEntry.map((payment, index) => {
                                             const paidForThis = payment.paidFor?.find(pf => pf.srNo === detailsSupplierEntry?.srNo);
                                             return (
-                                                <TableRow key={payment.id}>
-                                                    <TableCell className="p-2">{payment.paymentId}</TableCell>
-                                                    <TableCell className="p-2">{format(new Date(payment.date), "dd-MMM-yy")}</TableCell>
+                                                <TableRow key={payment.id || index}>
+                                                    <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
+                                                    <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                                     <TableCell className="text-right p-2 font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
                                                 </TableRow>
                                             );
