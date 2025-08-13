@@ -342,24 +342,26 @@ export default function SupplierProfilePage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Operational Summary Card */}
                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
                             <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
                             <SummaryDetailItem label="Gross Wt" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Teir Wt" value={`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Teir Wt" value={`- ${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`} />
                             <SummaryDetailItem label="Total Wt" value={`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Net Wt" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} />
-                             <Separator className="my-2"/>
+                            <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
+                            <SummaryDetailItem label="Net Wt" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} colorClass="text-primary font-bold"/>
+                            <Separator className="my-2"/>
                             <SummaryDetailItem label="Average Rate" value={formatCurrency(selectedSupplierData.averageRate || 0)} />
-                             <Separator className="my-2"/>
+                            <Separator className="my-2"/>
                             <SummaryDetailItem label="Total Transactions" value={`${selectedSupplierData.totalTransactions} Entries`} />
                             <SummaryDetailItem label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions} Entries`} colorClass="text-destructive font-bold"/>
                         </CardContent>
                     </Card>
 
+                    {/* Deduction Summary Card */}
                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
                              <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
@@ -379,6 +381,7 @@ export default function SupplierProfilePage() {
                         </CardContent>
                     </Card>
 
+                    {/* Financial Summary Card */}
                      <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
@@ -426,48 +429,80 @@ export default function SupplierProfilePage() {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
-                    <CardContent>
-                        <ScrollArea className="h-[21.5rem]">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>SR No</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Amount</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {(selectedSupplierData.allTransactions || []).map(entry => (
-                                        <TableRow key={entry.id}>
-                                            <TableCell className="font-mono">{entry.srNo}</TableCell>
-                                            <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                                            <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
-                                                {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(entry)}>
-                                                    <Info className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {(selectedSupplierData.allTransactions || []).length === 0 && (
+                 <div className="grid grid-cols-1 gap-6">
+                  <Card>
+                      <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
+                      <CardContent>
+                          <ScrollArea className="h-[14rem]">
+                              <Table>
+                                  <TableHeader>
+                                      <TableRow>
+                                          <TableHead>SR No</TableHead>
+                                          <TableHead>Amount</TableHead>
+                                          <TableHead>Status</TableHead>
+                                          <TableHead className="text-right">Actions</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {(selectedSupplierData.allTransactions || []).map(entry => (
+                                          <TableRow key={entry.id}>
+                                              <TableCell className="font-mono">{entry.srNo}</TableCell>
+                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
+                                              <TableCell>
+                                                  <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
+                                                  {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
+                                                  </Badge>
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(entry)}>
+                                                      <Info className="h-4 w-4" />
+                                                  </Button>
+                                              </TableCell>
+                                          </TableRow>
+                                      ))}
+                                      {(selectedSupplierData.allTransactions || []).length === 0 && (
+                                          <TableRow>
+                                              <TableCell colSpan={4} className="text-center text-muted-foreground">No transactions found.</TableCell>
+                                          </TableRow>
+                                      )}
+                                  </TableBody>
+                              </Table>
+                          </ScrollArea>
+                      </CardContent>
+                  </Card>
+                   <Card>
+                      <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+                      <CardContent>
+                          <ScrollArea className="h-[14rem]">
+                              <Table>
+                                  <TableHeader>
+                                      <TableRow>
+                                          <TableHead>Payment ID</TableHead>
+                                          <TableHead>Date</TableHead>
+                                          <TableHead>Method</TableHead>
+                                          <TableHead className="text-right">Amount</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {(selectedSupplierData.paymentHistory || selectedSupplierData.allPayments || []).map(payment => (
+                                          <TableRow key={payment.id}>
+                                              <TableCell className="font-mono">{payment.paymentId}</TableCell>
+                                              <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
+                                              <TableCell>{payment.receiptType}</TableCell>
+                                              <TableCell className="font-semibold text-right">{formatCurrency(payment.amount)}</TableCell>
+                                          </TableRow>
+                                      ))}
+                                       {(selectedSupplierData.paymentHistory || selectedSupplierData.allPayments || []).length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center text-muted-foreground">No transactions found.</TableCell>
+                                            <TableCell colSpan={4} className="text-center text-muted-foreground">No payments found.</TableCell>
                                         </TableRow>
                                     )}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
+                                  </TableBody>
+                              </Table>
+                          </ScrollArea>
+                      </CardContent>
+                  </Card>
+                </div>
             </div>
         </div>
       )}
@@ -570,7 +605,7 @@ export default function SupplierProfilePage() {
                                     <TableRow>
                                         <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                         <TableHead className="p-2 text-xs">Date</TableHead>
-                                        <TableHead className="text-right p-2 text-xs">Amount Paid</TableHead>
+                                        <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
