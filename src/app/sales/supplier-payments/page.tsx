@@ -397,7 +397,7 @@ export default function SupplierPaymentsPage() {
     }
   }, [selectedEntries]);
    
-  const clearForm = () => {
+  const resetPaymentForm = () => {
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setCdEnabled(false);
@@ -432,7 +432,7 @@ export default function SupplierPaymentsPage() {
         });
         setIsOutstandingModalOpen(true);
     }
-    clearForm();
+    resetPaymentForm();
   };
   
   const handleEntrySelect = (entryId: string) => {
@@ -582,7 +582,7 @@ export default function SupplierPaymentsPage() {
                 }
             });
 
-            clearForm();
+            resetPaymentForm();
             toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
 
         } catch (error) {
@@ -672,7 +672,7 @@ export default function SupplierPaymentsPage() {
 
             toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) {
-                clearForm();
+                resetPaymentForm();
             }
         } catch (error) {
             console.error("Error in batch deletion:", error);
@@ -920,7 +920,7 @@ export default function SupplierPaymentsPage() {
                         <Button variant="outline" onClick={() => {
                             setIsOutstandingModalOpen(false);
                             setSelectedCustomerKey(null); // Deselect supplier if cancelled
-                            clearForm();
+                            resetPaymentForm();
                         }}>Cancel</Button>
                         <Button onClick={handlePaySelectedOutstanding}>Confirm Selection</Button>
                     </DialogFooter>
@@ -1160,7 +1160,7 @@ export default function SupplierPaymentsPage() {
                                                             {branch.branchName}
                                                         </CommandItem>
                                                     ))}
-                                                </CommandList>
+                                                 </CommandList>
                                             </Command>
                                         </PopoverContent>
                                     </Popover>
