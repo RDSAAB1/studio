@@ -154,6 +154,10 @@ export default function RtgspaymentClient() {
       .filter(entry => selectedOutstandingIds.has(entry.id))
       .reduce((acc, entry) => acc + Number(entry.netAmount), 0));
   }, [outstandingEntries, selectedOutstandingIds]);
+  
+  const selectedEntries = useMemo(() => {
+    return outstandingEntries.filter(entry => selectedOutstandingIds.has(entry.id));
+  }, [outstandingEntries, selectedOutstandingIds]);
 
   useEffect(() => {
     setIsClient(true);
@@ -362,7 +366,6 @@ export default function RtgspaymentClient() {
   }
   
   const handlePaySelectedOutstanding = () => {
-    const selectedEntries = outstandingEntries.filter(e => selectedOutstandingIds.has(e.id));
     const totalAmount = Math.round(selectedEntries.reduce((acc, entry) => acc + Number(entry.netAmount), 0));
     const firstEntry = selectedEntries[0];
     
