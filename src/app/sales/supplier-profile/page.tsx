@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart as RechartsAreaChart } from 'recharts';
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,8 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
+type ChartType = 'financial' | 'variety';
+
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: string | number | null | undefined, className?: string }) => (
     <div className={cn("flex items-start gap-3", className)}>
@@ -50,6 +53,21 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
+const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <div className="text-muted-foreground">{icon}</div>
+    </CardHeader>
+    <CardContent>
+      <div className={`text-2xl font-bold ${colorClass}`}>{value}</div>
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    </CardContent>
+  </Card>
+);
+
+const MILL_OVERVIEW_KEY = 'mill-overview';
+const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -60,6 +78,7 @@ export default function SupplierProfilePage() {
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
+  const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
 
   // Fetch data from Firestore on mount
   useEffect(() => {
@@ -90,32 +109,109 @@ export default function SupplierProfilePage() {
     };
   }, []);
 
-  const supplierSummary = useMemo(() => {
-    const summary = new Map<string, {name: string, contact: string, so?: string, address?: string, acNo?: string, ifscCode?: string, bank?:string, branch?: string}>();
+  const supplierSummaryMap = useMemo(() => {
+    const summary = new Map<string, CustomerSummary>();
+
+    // Step 1: Initialize summary for each unique supplier
     suppliers.forEach(s => {
         if (s.customerId && !summary.has(s.customerId)) {
             summary.set(s.customerId, {
-                name: s.name,
-                contact: s.contact,
-                so: s.so,
-                address: s.address,
-                acNo: s.acNo,
-                ifscCode: s.ifscCode,
-                bank: s.bank,
-                branch: s.branch
+                name: s.name, contact: s.contact, so: s.so, address: s.address,
+                acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
+                totalOutstanding: 0, totalAmount: 0, totalPaid: 0, 
+                paymentHistory: [], outstandingEntryIds: [], allTransactions: [],
+                transactionsByVariety: {}
             });
         }
     });
-    return summary;
-  }, [suppliers]);
 
-  const selectedSupplierData = selectedSupplierKey ? supplierSummary.get(selectedSupplierKey) : null;
-  const selectedSupplierTransactions = useMemo(() => {
-      if (!selectedSupplierKey) return [];
-      return suppliers
-        .filter(s => s.customerId === selectedSupplierKey)
-        .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [selectedSupplierKey, suppliers]);
+    // Step 2: Aggregate transaction data for each supplier
+    suppliers.forEach(s => {
+        if (!s.customerId) return;
+        const data = summary.get(s.customerId)!;
+        const originalAmount = parseFloat(String(s.originalNetAmount || s.amount || 0));
+        
+        data.totalAmount += originalAmount;
+        data.allTransactions!.push(s);
+        const variety = toTitleCase(s.variety) || 'Unknown';
+        data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
+    });
+
+    // Step 3: Aggregate payment data for each supplier
+    paymentHistory.forEach(p => {
+        if (p.customerId && summary.has(p.customerId)) {
+            const data = summary.get(p.customerId)!;
+            data.totalPaid += p.amount;
+            data.paymentHistory.push(p);
+        }
+    });
+
+    // Step 4: Calculate final outstanding for each supplier
+    summary.forEach(data => {
+        data.totalOutstanding = data.totalAmount - data.totalPaid;
+    });
+
+    // Step 5: Create Mill Overview
+    const millSummary: CustomerSummary = {
+        name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
+        paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
+        totalOutstandingTransactions: 0, allTransactions: suppliers, allPayments: paymentHistory,
+        transactionsByVariety: {}
+    };
+
+    let totalRate = 0;
+    let rateCount = 0;
+
+    suppliers.forEach(c => {
+        millSummary.totalGrossWeight! += c.grossWeight;
+        millSummary.totalTeirWeight! += c.teirWeight;
+        millSummary.totalNetWeight! += c.netWeight;
+        millSummary.totalKartaAmount! += c.kartaAmount;
+        millSummary.totalLabouryAmount! += c.labouryAmount;
+        if(c.rate > 0) {
+            totalRate += c.rate;
+            rateCount++;
+        }
+        const variety = toTitleCase(c.variety) || 'Unknown';
+        millSummary.transactionsByVariety![variety] = (millSummary.transactionsByVariety![variety] || 0) + 1;
+    });
+
+    millSummary.totalAmount = Array.from(summary.values()).reduce((acc, s) => acc + s.totalAmount, 0);
+    millSummary.totalPaid = Array.from(summary.values()).reduce((acc, s) => acc + s.totalPaid, 0);
+    millSummary.totalOutstanding = millSummary.totalAmount - millSummary.totalPaid;
+    
+    millSummary.totalCdAmount = paymentHistory.reduce((acc, p) => acc + (p.cdAmount || 0), 0);
+    millSummary.totalTransactions = suppliers.length;
+    millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
+    millSummary.averageRate = rateCount > 0 ? totalRate / rateCount : 0;
+    
+    const finalSummaryMap = new Map<string, CustomerSummary>();
+    finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
+    summary.forEach((value, key) => finalSummaryMap.set(key, value));
+
+    return finalSummaryMap;
+  }, [suppliers, paymentHistory]);
+
+  const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
+  const isMillSelected = selectedSupplierKey === MILL_OVERVIEW_KEY;
+
+  const financialPieChartData = useMemo(() => {
+    if (!selectedSupplierData) return [];
+    return [
+      { name: 'Total Paid', value: selectedSupplierData.totalPaid },
+      { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
+    ];
+  }, [selectedSupplierData]);
+
+  const varietyPieChartData = useMemo(() => {
+    if (!selectedSupplierData?.transactionsByVariety) return [];
+    return Object.entries(selectedSupplierData.transactionsByVariety).map(([name, value]) => ({ name, value }));
+  }, [selectedSupplierData]);
+
+  const chartData = useMemo(() => {
+    return selectedChart === 'financial' ? financialPieChartData : varietyPieChartData;
+  }, [selectedChart, financialPieChartData, varietyPieChartData]);
 
   const handleShowDetails = (customer: Supplier) => {
     setDetailsCustomer(customer);
@@ -143,15 +239,15 @@ export default function SupplierProfilePage() {
         <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
                 <Users className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-semibold">Select Supplier</h3>
+                <h3 className="text-base font-semibold">Select Profile</h3>
             </div>
             <div className="w-full sm:w-auto sm:min-w-64">
                 <Select onValueChange={setSelectedSupplierKey} value={selectedSupplierKey || ""}>
                     <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select a supplier..." />
+                        <SelectValue placeholder="Select a profile to view..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from(supplierSummary.entries()).map(([key, data]) => (
+                      {Array.from(supplierSummaryMap.entries()).map(([key, data]) => (
                         <SelectItem key={key} value={key} className="text-sm">
                           {toTitleCase(data.name)} {data.contact && `(${data.contact})`}
                         </SelectItem>
@@ -164,81 +260,245 @@ export default function SupplierProfilePage() {
 
       {selectedSupplierData && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <UserCircle size={24} className="text-primary"/>
-                  {toTitleCase(selectedSupplierData.name)}
-                </CardTitle>
-                <CardDescription>S/O: {toTitleCase(selectedSupplierData.so || '')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <DetailItem icon={<Phone size={14} />} label="Contact" value={selectedSupplierData.contact} />
-                <DetailItem icon={<Home size={14} />} label="Address" value={selectedSupplierData.address} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <DetailItem icon={<Landmark size={14} />} label="Bank Name" value={selectedSupplierData.bank} />
-                <DetailItem icon={<Hash size={14} />} label="Account No." value={selectedSupplierData.acNo} />
-                <DetailItem icon={<Building size={14} />} label="IFSC Code" value={selectedSupplierData.ifscCode} />
-                <DetailItem icon={<Building size={14} />} label="Branch" value={selectedSupplierData.branch} />
-              </CardContent>
-            </Card>
-          </div>
+        {isMillSelected ? (
+            <div className="lg:col-span-12 space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Mill Overview (All Suppliers)</CardTitle>
+                        <CardDescription>A complete financial and transactional overview of the entire business.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <StatCard title="Total Gross Weight" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} icon={<Box />} />
+                        <StatCard title="Total Net Weight" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} icon={<Weight />} />
+                        <StatCard title="Average Rate" value={`₹${(selectedSupplierData.averageRate || 0).toFixed(2)}`} icon={<Calculator />} />
+                        <StatCard title="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} icon={<Briefcase />} />
+                        <StatCard title="Total Outstanding" value={`${formatCurrency(selectedSupplierData.totalOutstanding)}`} icon={<Banknote />} colorClass="text-destructive" />
+                        <StatCard title="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} icon={<Banknote />} colorClass="text-green-500" />
+                        <StatCard title="Total Karta" value={`${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} icon={<Percent />} colorClass="text-destructive" />
+                        <StatCard title="Total Laboury" value={`${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} icon={<Users />} colorClass="text-destructive" />
+                    </CardContent>
+                </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                         <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Visual Overview</CardTitle>
+                            <div className="w-48">
+                                <Select value={selectedChart} onValueChange={(val: ChartType) => setSelectedChart(val)}>
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Select chart" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="financial">Financial Overview</SelectItem>
+                                        <SelectItem value="variety">Transactions by Variety</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? `${formatCurrency(value)}` : value} />
+                                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
+                                    {chartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
+                                </Pie>
+                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader><CardTitle>Dummy Chart</CardTitle></CardHeader>
+                        <CardContent className="h-80 flex items-center justify-center text-muted-foreground">
+                            <RechartsAreaChart className="h-24 w-24" />
+                            <p>Another chart can go here.</p>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                      <CardHeader><CardTitle>All Transactions</CardTitle></CardHeader>
+                      <CardContent>
+                          <ScrollArea className="h-96">
+                              <Table>
+                                  <TableHeader>
+                                      <TableRow>
+                                          <TableHead>SR No</TableHead>
+                                          <TableHead>Supplier</TableHead>
+                                          <TableHead>Amount</TableHead>
+                                          <TableHead>Status</TableHead>
+                                          <TableHead>Actions</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {selectedSupplierData.allTransactions!.map(entry => (
+                                          <TableRow key={entry.id}>
+                                              <TableCell className="font-mono">{entry.srNo}</TableCell>
+                                              <TableCell>{toTitleCase(entry.name)}</TableCell>
+                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
+                                              <TableCell>
+                                                  <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
+                                                      {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
+                                                  </Badge>
+                                              </TableCell>
+                                              <TableCell>
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(entry)}>
+                                                      <Info className="h-4 w-4" />
+                                                  </Button>
+                                              </TableCell>
+                                          </TableRow>
+                                      ))}
+                                  </TableBody>
+                              </Table>
+                          </ScrollArea>
+                      </CardContent>
+                  </Card>
+                  <Card>
+                      <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+                      <CardContent>
+                          <ScrollArea className="h-96">
+                              <Table>
+                                  <TableHeader>
+                                      <TableRow>
+                                          <TableHead>Payment ID</TableHead>
+                                          <TableHead>Date</TableHead>
+                                          <TableHead>Amount</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {selectedSupplierData.allPayments!.map((payment, idx) => (
+                                          <TableRow key={payment.id || idx}>
+                                              <TableCell className="font-mono">{payment.paymentId}</TableCell>
+                                              <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
+                                              <TableCell className="font-semibold">{formatCurrency(payment.amount)}</TableCell>
+                                          </TableRow>
+                                      ))}
+                                  </TableBody>
+                              </Table>
+                          </ScrollArea>
+                      </CardContent>
+                  </Card>
+                </div>
+            </div>
+        ) : (
+            <>
+            <div className="lg:col-span-4 space-y-6">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-3">
+                            <UserCircle size={24} className="text-primary"/>
+                            {toTitleCase(selectedSupplierData.name)}
+                        </CardTitle>
+                        <CardDescription>S/O: {toTitleCase(selectedSupplierData.so || '')}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <DetailItem icon={<Phone size={14} />} label="Contact" value={selectedSupplierData.contact} />
+                        <DetailItem icon={<Home size={14} />} label="Address" value={selectedSupplierData.address} />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        <DetailItem icon={<Landmark size={14} />} label="Bank Name" value={selectedSupplierData.bank} />
+                        <DetailItem icon={<Hash size={14} />} label="Account No." value={selectedSupplierData.acNo} />
+                        <DetailItem icon={<Building size={14} />} label="IFSC Code" value={selectedSupplierData.ifscCode} />
+                        <DetailItem icon={<Building size={14} />} label="Branch" value={selectedSupplierData.branch} />
+                    </CardContent>
+                </Card>
+            </div>
 
-          <div className="lg:col-span-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Transaction History</CardTitle>
-                <CardDescription>List of all transactions for this supplier.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[60vh]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>SR No</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedSupplierTransactions.map(entry => (
-                        <TableRow key={entry.id}>
-                          <TableCell className="font-mono">{entry.srNo}</TableCell>
-                          <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                          <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
-                          <TableCell>
-                            <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
-                              {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : `Outstanding: ${formatCurrency(Number(entry.netAmount))}`}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(entry)}>
-                              <Info className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {selectedSupplierTransactions.length === 0 && (
-                          <TableRow>
-                              <TableCell colSpan={5} className="text-center text-muted-foreground">No transactions found for this supplier.</TableCell>
-                          </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+            <div className="lg:col-span-8 space-y-6">
+                 <Card>
+                    <CardHeader><CardTitle>Financials</CardTitle></CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                        <div className="grid gap-4">
+                            <StatCard title="Total Outstanding" value={formatCurrency(selectedSupplierData.totalOutstanding)} icon={<Banknote />} colorClass="text-destructive" />
+                            <StatCard title="Total Transactions" value={formatCurrency(selectedSupplierData.totalAmount)} icon={<Briefcase />} description={`${(selectedSupplierData.allTransactions || []).length} entries`}/>
+                            <StatCard title="Total Paid" value={formatCurrency(selectedSupplierData.totalPaid)} icon={<Banknote />} colorClass="text-green-500" />
+                            <StatCard title="Outstanding Entries" value={(selectedSupplierData.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).length.toString()} icon={<Hash />} />
+                        </div>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                <Tooltip
+                                    contentStyle={{
+                                    backgroundColor: 'hsl(var(--background))',
+                                    borderColor: 'hsl(var(--border))',
+                                    fontSize: '12px',
+                                    borderRadius: 'var(--radius)'
+                                    }}
+                                    formatter={(value: number) => `${formatCurrency(value)}`}
+                                />
+                                <Pie
+                                    data={financialPieChartData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    outerRadius={100}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                >
+                                    {financialPieChartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Transaction History</CardTitle>
+                        <CardDescription>List of all transactions for this supplier.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <ScrollArea className="h-96">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>SR No</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                    {(selectedSupplierData.allTransactions || []).map(entry => (
+                                        <TableRow key={entry.id}>
+                                            <TableCell className="font-mono">{entry.srNo}</TableCell>
+                                            <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                                            <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
+                                                {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : `Outstanding: ${formatCurrency(Number(entry.netAmount))}`}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(entry)}>
+                                                    <Info className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {(selectedSupplierData.allTransactions || []).length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-center text-muted-foreground">No transactions found for this supplier.</TableCell>
+                                        </TableRow>
+                                    )}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+            </>
+        )}
+      </div>
       )}
-
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
           {detailsCustomer && (
