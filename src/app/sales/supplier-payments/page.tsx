@@ -821,9 +821,14 @@ export default function SupplierPaymentsPage() {
 
                 {/* CD and Payment Amount Section - Common to all */}
                 <div className="mt-6 space-y-6">
-                    <div className="p-4 border rounded-lg bg-card/30">
-                        <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
-                        <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
+                    <div className="p-4 border rounded-lg bg-card/30 flex justify-between items-center">
+                        <div>
+                            <p className="text-muted-foreground">Total Outstanding for Selected Entries:</p>
+                            <p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}>
+                           Change Selection
+                        </Button>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
@@ -1278,4 +1283,3 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
-
