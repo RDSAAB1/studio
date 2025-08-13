@@ -4,6 +4,7 @@
 
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -138,6 +139,8 @@ export type CustomerSummary = {
     totalNetWeight?: number;
     totalKartaAmount?: number;
     totalLabouryAmount?: number;
+    totalKanta?: number;
+    totalOtherCharges?: number;
     totalCdAmount?: number;
     averageRate?: number;
     totalTransactions?: number;

@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart as RechartsAreaChart } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart, CircleDollarSign } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
@@ -122,7 +122,7 @@ export default function SupplierProfilePage() {
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [],
                 transactionsByVariety: {},
                 totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
-                totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0,
+                totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
                 averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0
             });
         }
@@ -143,6 +143,8 @@ export default function SupplierProfilePage() {
         data.totalNetWeight! += s.netWeight;
         data.totalKartaAmount! += s.kartaAmount;
         data.totalLabouryAmount! += s.labouryAmount;
+        data.totalKanta! += s.kanta;
+        data.totalOtherCharges! += s.otherCharges || 0;
         data.totalTransactions! += 1;
         
         if (s.rate > 0) {
@@ -178,39 +180,39 @@ export default function SupplierProfilePage() {
     });
 
     // Step 5: Create Mill Overview
-    const millSummary: CustomerSummary = {
+    const millSummary = Array.from(summary.values()).reduce((acc, s) => {
+        acc.totalAmount += s.totalAmount;
+        acc.totalPaid += s.totalPaid;
+        acc.totalGrossWeight! += s.totalGrossWeight!;
+        acc.totalTeirWeight! += s.totalTeirWeight!;
+        acc.totalNetWeight! += s.totalNetWeight!;
+        acc.totalKartaAmount! += s.totalKartaAmount!;
+        acc.totalLabouryAmount! += s.totalLabouryAmount!;
+        acc.totalKanta! += s.totalKanta!;
+        acc.totalOtherCharges! += s.totalOtherCharges!;
+        acc.totalCdAmount! += s.totalCdAmount!;
+        return acc;
+    }, {
         name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalNetWeight: 0,
-        totalKartaAmount: 0, totalLabouryAmount: 0, totalCdAmount: 0, averageRate: 0, totalTransactions: 0,
-        totalOutstandingTransactions: 0, allTransactions: suppliers, allPayments: paymentHistory,
-        transactionsByVariety: {}
-    };
-
-    let totalRate = 0;
-    let rateCount = 0;
-
-    suppliers.forEach(c => {
-        millSummary.totalGrossWeight! += c.grossWeight;
-        millSummary.totalTeirWeight! += c.teirWeight;
-        millSummary.totalNetWeight! += c.netWeight;
-        millSummary.totalKartaAmount! += c.kartaAmount;
-        millSummary.totalLabouryAmount! += c.labouryAmount;
-        if(c.rate > 0) {
-            totalRate += c.rate;
-            rateCount++;
-        }
-        const variety = toTitleCase(c.variety) || 'Unknown';
-        millSummary.transactionsByVariety![variety] = (millSummary.transactionsByVariety![variety] || 0) + 1;
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
+        averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: suppliers, 
+        allPayments: paymentHistory, transactionsByVariety: {}
     });
 
-    millSummary.totalAmount = Array.from(summary.values()).reduce((acc, s) => acc + s.totalAmount, 0);
-    millSummary.totalPaid = Array.from(summary.values()).reduce((acc, s) => acc + s.totalPaid, 0);
     millSummary.totalOutstanding = millSummary.totalAmount - millSummary.totalPaid;
-    
-    millSummary.totalCdAmount = paymentHistory.reduce((acc, p) => acc + (p.cdAmount || 0), 0);
     millSummary.totalTransactions = suppliers.length;
     millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
+
+    const totalRate = suppliers.reduce((sum, s) => s.rate > 0 ? sum + s.rate : sum, 0);
+    const rateCount = suppliers.filter(s => s.rate > 0).length;
     millSummary.averageRate = rateCount > 0 ? totalRate / rateCount : 0;
+    
+    millSummary.transactionsByVariety = suppliers.reduce((acc, s) => {
+        const variety = toTitleCase(s.variety) || 'Unknown';
+        acc[variety] = (acc[variety] || 0) + 1;
+        return acc;
+    }, {} as {[key: string]: number});
     
     const finalSummaryMap = new Map<string, CustomerSummary>();
     finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
@@ -296,12 +298,18 @@ export default function SupplierProfilePage() {
                     <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <StatCard title="Total Gross Weight" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} icon={<Box />} />
                         <StatCard title="Total Net Weight" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} icon={<Weight />} />
-                        <StatCard title="Average Rate" value={`₹${(selectedSupplierData.averageRate || 0).toFixed(2)}`} icon={<Calculator />} />
-                        <StatCard title="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} icon={<Briefcase />} />
+                        <StatCard title="Average Rate" value={`${formatCurrency(selectedSupplierData.averageRate || 0)}`} icon={<Calculator />} />
+                        <StatCard title="Total Transactions" value={`${selectedSupplierData.totalTransactions}`} icon={<Briefcase />} description={`${selectedSupplierData.totalOutstandingTransactions} outstanding`}/>
+
+                        <StatCard title="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalAmount)}`} icon={<Banknote />} />
+                        <StatCard title="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid)}`} icon={<Wallet />} colorClass="text-green-500" />
                         <StatCard title="Total Outstanding" value={`${formatCurrency(selectedSupplierData.totalOutstanding)}`} icon={<Banknote />} colorClass="text-destructive" />
-                        <StatCard title="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} icon={<Banknote />} colorClass="text-green-500" />
-                        <StatCard title="Total Karta" value={`${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} icon={<Percent />} colorClass="text-destructive" />
-                        <StatCard title="Total Laboury" value={`${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} icon={<Users />} colorClass="text-destructive" />
+                        <StatCard title="Total CD Granted" value={`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} icon={<Percent />} />
+                        
+                        <StatCard title="Total Karta" value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} icon={<Percent />} />
+                        <StatCard title="Total Laboury" value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} icon={<Users />} />
+                        <StatCard title="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} icon={<Landmark />} />
+                        <StatCard title="Total Other Charges" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} icon={<CircleDollarSign />} />
                     </CardContent>
                 </Card>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -562,6 +570,7 @@ export default function SupplierProfilePage() {
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsCustomer.labouryRate.toFixed(2)}</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.labouryAmount)}</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />Other Charges</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.otherCharges || 0)}</TableCell></TableRow>
                                 </TableBody>
                             </Table>
                             </CardContent>
