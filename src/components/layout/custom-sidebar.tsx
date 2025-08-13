@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -149,16 +150,14 @@ interface SubMenuProps {
   setHoveredMenuItemId: (id: string | null) => void;
   activePath: string;
   onLinkClick: (path: string) => void;
-  setIsSidebarOpen: (isOpen: boolean) => void;
   isDesktop: boolean;
 }
 
-const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, hoveredMenuItemId, setHoveredMenuItemId, activePath, onLinkClick, setIsSidebarOpen, isDesktop }) => {
+const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, hoveredMenuItemId, setHoveredMenuItemId, activePath, onLinkClick, isDesktop }) => {
   const isActiveParent = item.subMenus && item.subMenus.some(sub => activePath.startsWith(sub.href || ''));
   const [isOpen, setIsOpen] = useState(isActiveParent);
   const Icon = item.icon;
   
-  // Updated logic: Parent item glows if hovered OR if it's the active parent in a minimized state.
   const isCurrentlyHovered = hoveredMenuItemId === item.id;
   const shouldParentGlow = isCurrentlyHovered || (!isSidebarOpen && isActiveParent);
   
@@ -175,7 +174,6 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, hoveredMenuItemI
       setIsOpen(!isOpen);
     } else if (item.href) {
       onLinkClick(item.href);
-      setIsSidebarOpen(false);
     }
   };
 
@@ -234,10 +232,7 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, hoveredMenuItemI
               >
                 <Link
                   href={subItem.href || '#'}
-                  onClick={() => {
-                    onLinkClick(subItem.href || '#');
-                    setIsSidebarOpen(false);
-                  }}
+                  onClick={() => onLinkClick(subItem.href || '#')}
                   className={cn(
                     "flex items-center p-2 rounded-md relative overflow-visible group transition-all duration-300 ease-in-out",
                     "text-sm text-[#E5D4CD] transform-gpu",
@@ -285,27 +280,31 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) setIsSidebarOpen(false);
       setIsDesktop(window.innerWidth >= 768);
     };
-
     window.addEventListener('resize', handleResize);
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
-  }, [setIsSidebarOpen]);
+  }, []);
 
   const handleToggleSidebar = () => {
     const newState = !isSidebarOpen;
     setIsSidebarOpen(newState);
-    setIsExplicitlyOpen(newState);
+    if (isDesktop) {
+      setIsExplicitlyOpen(newState);
+    }
   };
 
   const handleMouseEnterSidebar = () => {
-    if (!isSidebarOpen && isDesktop && !isExplicitlyOpen) setIsSidebarOpen(true);
+    if (!isSidebarOpen && isDesktop && !isExplicitlyOpen) {
+      setIsSidebarOpen(true);
+    }
   };
 
   const handleMouseLeaveSidebar = () => {
-    if (!isExplicitlyOpen && isDesktop) setIsSidebarOpen(false);
+    if (!isExplicitlyOpen && isDesktop) {
+      setIsSidebarOpen(false);
+    }
   };
 
   const filteredMenuItems = menuItems.filter(item => {
@@ -336,7 +335,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
         {isSidebarOpen ? (
           <h1 className="text-2xl font-bold whitespace-nowrap overflow-hidden text-[#E5D4CD]">BizSuite</h1>
         ) : (
-          <div className="flex items-center justify-center w-full h-8 bg-[#E5D4CD] rounded-full"></div>
+          <div className="flex items-center justify-center w-full h-8">
+             <LayoutDashboard className="h-6 w-6 text-[#E5D4CD]" />
+          </div>
         )}
         <button
           onClick={handleToggleSidebar}
@@ -374,7 +375,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
                 isSidebarOpen={isSidebarOpen}
                 activePath={activePath}
                 onLinkClick={onLinkClick}
-                setIsSidebarOpen={setIsSidebarOpen}
                 isDesktop={isDesktop}
                 hoveredMenuItemId={hoveredMenuItemId}
                 setHoveredMenuItemId={setHoveredMenuItemId}
@@ -387,11 +387,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
               >
                 <Link
                   href={item.href || '#'}
-                  onClick={() => {
-                    setHoveredMenuItemId(null);
-                    onLinkClick(item.href || '#');
-                    setIsSidebarOpen(false);
-                  }}
+                  onClick={() => onLinkClick(item.href || '#')}
                   className={cn(
                     "flex items-center p-2 rounded-md h-12 group relative transition-all duration-300 ease-in-out",
                     "text-[#E5D4CD] transform-gpu",

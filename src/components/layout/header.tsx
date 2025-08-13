@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -39,7 +40,6 @@ import {
 } from "lucide-react";
 
 interface HeaderProps {
-  pageMeta?: PageMeta;
   toggleSidebar: () => void;
   isSidebarOpen: boolean;
 }
@@ -141,46 +141,37 @@ const allMenuItems = [
   },
 ];
 
-export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) {
+export function Header({ toggleSidebar, isSidebarOpen }: HeaderProps) {
   const pathname = usePathname();
 
   // Determine current page details based on pathname from the consolidated menuItems
   const currentPage =
-    allMenuItems.flatMap(m => m.subMenus || []).find(s => pathname.startsWith(s.href || '')) ||
-    allMenuItems.find(m => pathname.startsWith(m.href || ''));
+    allMenuItems.flatMap(m => m.subMenus || [m]).find(s => pathname.startsWith(s.href || '###')) ||
+    allMenuItems.find(m => pathname.startsWith(m.href || '###'));
 
-  const DisplayIconComponent = currentPage?.icon || pageMeta?.icon;
-  const displayIcon = DisplayIconComponent ? <DisplayIconComponent className="h-5 w-5" /> : null;
-  const displayTitle = currentPage?.name || pageMeta?.title || 'BizSuite';
+
+  const DisplayIconComponent = currentPage?.icon || LayoutDashboard;
+  const displayIcon = <DisplayIconComponent className="h-5 w-5" />;
+  const displayTitle = currentPage?.name || 'BizSuite';
 
   return (
-    <header className="sticky top-0 z-30 w-full">
+    <header className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
       <div className="container flex h-14 max-w-screen-2xl items-center justify-between px-4">
         {/* Left section: Toggle button, Page Icon, Page Title */}
         <div className="flex items-center space-x-4">
-          {/* Mobile menu toggle button (visible on small screens) */}
-          <button
-            onClick={toggleSidebar}
-            className={cn(
-              "p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-ring] transition-colors",
-              "lg:hidden"
-            )}
-            aria-label={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-
-          {displayIcon && <div className="">{displayIcon}</div>}
-          <span className="text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis">
-            {displayTitle}
-          </span>
+          <div className="flex items-center gap-2">
+            {displayIcon}
+            <span className="text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis">
+              {displayTitle}
+            </span>
+          </div>
         </div>
 
         {/* Right section: Profile Icon, Settings Icon */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2">
           {/* Profile Icon */}
           <button
-            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-ring] transition-colors"
+            className="p-2 rounded-full hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
             aria-label="User Profile"
           >
             <UserCircle className="h-6 w-6" />
@@ -188,7 +179,7 @@ export function Header({ pageMeta, toggleSidebar, isSidebarOpen }: HeaderProps) 
 
           {/* Settings Icon */}
           <button
-            className="p-2 rounded-full hover:bg-[--sidebar-hover-bg] focus:outline-none focus:ring-2 focus:ring-[--sidebar-ring] transition-colors"
+            className="p-2 rounded-full hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
             aria-label="Settings"
           >
             <SettingsIcon className="h-6 w-6" />
