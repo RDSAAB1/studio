@@ -264,8 +264,13 @@ export default function SupplierPaymentsPage() {
 
   const availableBranches = useMemo(() => {
     if (!bankDetails.bank) return [];
-     const selectedBankName = bankDetails.bank.split(' - ')[0].trim();
-    return combinedBankBranches.filter(branch => branch.bankName.toLowerCase().includes(selectedBankName.toLowerCase()));
+    const selectedBankNameLower = bankDetails.bank.toLowerCase();
+    return combinedBankBranches.filter(branch => {
+        const branchBankNameLower = branch.bankName.toLowerCase();
+        // Check if the branch's bank name includes the selected bank's full name or if the selected bank name includes the branch's bank name
+        // This handles cases like "SBI" matching "State Bank of India"
+        return branchBankNameLower.includes(selectedBankNameLower) || selectedBankNameLower.includes(branchBankNameLower);
+    });
   }, [bankDetails.bank, combinedBankBranches]);
 
   useEffect(() => {
@@ -799,8 +804,6 @@ export default function SupplierPaymentsPage() {
   const customFilter = (value: string, search: string) => {
     const searchTerm = search.toLowerCase();
     const valueParts = value.toLowerCase().split(' - ');
-
-    // Check if any part (short name, long name, or the whole string) starts with the search term
     return valueParts.some(part => part.trim().startsWith(searchTerm)) || value.toLowerCase().startsWith(searchTerm) ? 1 : 0;
   };
 
@@ -1162,7 +1165,7 @@ export default function SupplierPaymentsPage() {
                      <Card className="mt-6 bg-muted/30">
                         <CardHeader><CardTitle className="text-base">Finalize Cash Payment</CardTitle></CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
+                             <div className="flex justify-between items-center"><p className="text-sm">Amount to be Paid:</p><p className="font-bold">{formatCurrency(paymentAmount)}</p></div>
                             {cdEnabled && <div className="flex justify-between items-center"><p className="text-sm">CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
                             <Separator/>
                             <div className="flex justify-between items-center"><p className="text-lg font-bold">Total (Outstanding Reduction):</p><p className="text-lg font-bold text-green-600">{formatCurrency(paymentAmount + calculatedCdAmount)}</p></div>
