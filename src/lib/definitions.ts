@@ -1,6 +1,7 @@
 
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -45,7 +46,6 @@ export type Customer = {
   grNo?: string;
   grDate?: string;
   parchiNo?: string;
-  parchiDate?: string;
   checkNo?: string;
   utrNo?: string;
   rtgsAmount?: number;
@@ -102,7 +102,6 @@ export type Payment = {
     grNo?: string;
     grDate?: string;
     parchiNo?: string;
-    parchiDate?: string;
     quantity?: number;
     rate?: number;
     rtgsAmount?: number;
@@ -143,7 +142,13 @@ export type AppOptions = {
     paymentTypes: string[];
 }
 
+export type Bank = {
+    id: string;
+    name: string;
+}
+
 export type BankBranch = {
+    id: string;
     bankName: string;
     branchName: string;
     ifscCode: string;

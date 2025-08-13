@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Customer, CustomerSummary, Payment, PaidFor, BankBranch } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, Bank, BankBranch } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency } from "@/lib/utils";
 import {
   Card,
@@ -35,7 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList, ArrowUpDown, Search, ChevronsUpDown, Check } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList, ArrowUpDown, Search, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -46,11 +46,11 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { appOptionsData, bankBranches } from "@/lib/data";
+import { appOptionsData } from "@/lib/data";
 
 
 import { collection, runTransaction, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
-import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankBranchesRealtime, addBank, addBankBranch } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
 
 
@@ -90,6 +90,9 @@ export default function SupplierPaymentsPage() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
+
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   
@@ -129,7 +132,10 @@ export default function SupplierPaymentsPage() {
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
-  
+  const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
+  const [newBankName, setNewBankName] = useState('');
+  const [newBranchData, setNewBranchData] = useState({ bankName: '', branchName: '', ifscCode: '' });
+
   const stableToast = useCallback(toast, []);
 
   const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
@@ -143,6 +149,8 @@ export default function SupplierPaymentsPage() {
     }, 0);
     return formatPaymentId(lastPaymentNum + 1);
   }, []);
+
+  const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
 
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
@@ -191,7 +199,7 @@ export default function SupplierPaymentsPage() {
     today.setHours(0, 0, 0, 0);
     return selectedEntries.filter(e => new Date(e.dueDate) >= today);
 }, [selectedEntries]);
-
+  
   const autoSetCDToggle = useCallback(() => {
     if (selectedEntries.length === 0) {
         setCdEnabled(false);
@@ -200,7 +208,7 @@ export default function SupplierPaymentsPage() {
     setCdEnabled(cdEligibleEntries.length > 0);
   }, [selectedEntries.length, cdEligibleEntries.length]);
 
-    const sortedCombinations = useMemo(() => {
+  const sortedCombinations = useMemo(() => {
     if (!sortConfig) return paymentCombinations;
     return [...paymentCombinations].sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -235,13 +243,18 @@ export default function SupplierPaymentsPage() {
   
   const isCdSwitchDisabled = cdEligibleEntries.length === 0;
 
-  
+  const targetAmountForGenerator = useMemo(() => {
+    return paymentType === 'Full' 
+      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
+      : paymentAmount;
+  }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
+
   const isLoadingInitial = loading && suppliers.length === 0;
   
   const availableBranches = useMemo(() => {
     if (!bankDetails.bank) return [];
     return bankBranches.filter(branch => branch.bankName === bankDetails.bank);
-  }, [bankDetails.bank]);
+  }, [bankDetails.bank, bankBranches]);
 
   useEffect(() => {
     setIsClient(true);
@@ -253,7 +266,7 @@ export default function SupplierPaymentsPage() {
 
     const unsubscribeSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
       setSuppliers(fetchedSuppliers);
-      setLoading(false);
+      if(loading) setLoading(false);
     }, (error) => {
         console.error("Error fetching suppliers:", error);
         stableToast({ variant: 'destructive', title: "Error", description: "Failed to load supplier data." });
@@ -270,6 +283,16 @@ export default function SupplierPaymentsPage() {
         stableToast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
     });
     
+    const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
+        console.error("Error fetching banks:", error);
+        stableToast({ variant: 'destructive', title: "Error", description: "Failed to load bank list." });
+    });
+
+    const unsubscribeBankBranches = getBankBranchesRealtime(setBankBranches, (error) => {
+        console.error("Error fetching bank branches:", error);
+        stableToast({ variant: 'destructive', title: "Error", description: "Failed to load bank branches." });
+    });
+
     // Load persisted rates
     const savedMinRate = localStorage.getItem('minRate');
     const savedMaxRate = localStorage.getItem('maxRate');
@@ -280,8 +303,10 @@ export default function SupplierPaymentsPage() {
     return () => {
       unsubscribeSuppliers();
       unsubscribePayments();
+      unsubscribeBanks();
+      unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId, loading]);
   
     // Persist Min/Max Rate
   useEffect(() => {
@@ -610,12 +635,6 @@ export default function SupplierPaymentsPage() {
         }
     };
     
-    const targetAmountForGenerator = useMemo(() => {
-    return paymentType === 'Full' 
-      ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
-      : paymentAmount;
-    }, [paymentType, totalOutstandingForSelected, calculatedCdAmount, paymentAmount]);
-
   const generatePaymentCombinations = () => {
     if (targetAmountForGenerator <= 0 || minRate <= 0 || maxRate < minRate) {
         toast({
@@ -715,8 +734,6 @@ export default function SupplierPaymentsPage() {
     }
   };
   
-  const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
-  
   const handlePaySelectedOutstanding = () => {
     if (selectedEntryIds.size === 0) {
         toast({
@@ -736,6 +753,39 @@ export default function SupplierPaymentsPage() {
     }
   };
 
+  const handleAddNewBank = async () => {
+    if(!newBankName.trim()) {
+        toast({variant: 'destructive', title: 'Error', description: 'Bank name cannot be empty.'});
+        return;
+    }
+    try {
+        await addBank(toTitleCase(newBankName));
+        toast({title: 'Success', description: 'New bank added successfully.'});
+        setNewBankName('');
+    } catch(error) {
+        console.error("Error adding new bank:", error);
+        toast({variant: 'destructive', title: 'Error', description: 'Failed to add new bank.'});
+    }
+  };
+
+  const handleAddNewBranch = async () => {
+    if(!newBranchData.bankName || !newBranchData.branchName || !newBranchData.ifscCode) {
+        toast({variant: 'destructive', title: 'Error', description: 'Please fill all branch details.'});
+        return;
+    }
+    try {
+        await addBankBranch({
+            bankName: newBranchData.bankName,
+            branchName: toTitleCase(newBranchData.branchName),
+            ifscCode: newBranchData.ifscCode.toUpperCase(),
+        });
+        toast({title: 'Success', description: 'New branch added successfully.'});
+        setNewBranchData({ bankName: '', branchName: '', ifscCode: '' });
+    } catch(error) {
+        console.error("Error adding new branch:", error);
+        toast({variant: 'destructive', title: 'Error', description: 'Failed to add new branch.'});
+    }
+  };
 
   if (!isClient) {
     return null; // Render nothing on the server
@@ -918,16 +968,16 @@ export default function SupplierPaymentsPage() {
                   <Card>
                     <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
-                         <div className="flex items-end gap-2">
-                            <div className="space-y-2 flex-1">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                            <div className="space-y-2">
                                 <Label htmlFor="minRate" className="text-xs">Min Rate</Label>
                                 <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} />
                             </div>
-                            <div className="space-y-2 flex-1">
+                            <div className="space-y-2">
                                 <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
                                 <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
                             </div>
-                            <Button onClick={generatePaymentCombinations}>
+                            <Button onClick={generatePaymentCombinations} className="w-full md:w-auto">
                                 <Calculator className="h-4 w-4 mr-2"/>
                                 {formatCurrency(targetAmountForGenerator)}
                             </Button>
@@ -995,7 +1045,12 @@ export default function SupplierPaymentsPage() {
                             </CardContent>
                         </Card>
                         <Card>
-                             <CardHeader><CardTitle className="text-sm">Bank Details</CardTitle></CardHeader>
+                             <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+                                <CardTitle className="text-sm">Bank Details</CardTitle>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
+                                    <Settings className="h-4 w-4"/>
+                                </Button>
+                             </CardHeader>
                              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                      <Label htmlFor="bank">Bank</Label>
@@ -1011,16 +1066,16 @@ export default function SupplierPaymentsPage() {
                                                  <CommandInput placeholder="Search bank..." />
                                                  <CommandEmpty>No bank found.</CommandEmpty>
                                                  <CommandList>
-                                                     {appOptionsData.bankNames.map((bank) => (
+                                                     {banks.map((bank) => (
                                                          <CommandItem
-                                                             key={bank}
-                                                             value={bank}
+                                                             key={bank.id}
+                                                             value={bank.name}
                                                              onSelect={(currentValue) => {
                                                                  setBankDetails(prev => ({...prev, bank: currentValue === prev.bank ? "" : currentValue, branch: '', ifscCode: ''}));
                                                              }}
                                                          >
-                                                             <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />
-                                                             {bank}
+                                                             <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank.name ? "opacity-100" : "opacity-0")} />
+                                                             {bank.name}
                                                          </CommandItem>
                                                      ))}
                                                  </CommandList>
@@ -1044,7 +1099,7 @@ export default function SupplierPaymentsPage() {
                                                 <CommandList>
                                                     {availableBranches.map((branch) => (
                                                         <CommandItem
-                                                            key={branch.ifscCode}
+                                                            key={branch.id}
                                                             value={branch.branchName}
                                                             onSelect={(currentValue) => {
                                                                 handleBranchSelect(currentValue);
@@ -1390,6 +1445,49 @@ export default function SupplierPaymentsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isBankSettingsOpen} onOpenChange={setIsBankSettingsOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Bank Management</DialogTitle>
+                <DialogDescription>Add new banks and branches to the system.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
+                    <CardContent className="flex gap-2">
+                        <Input placeholder="Enter new bank name" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} />
+                        <Button onClick={handleAddNewBank}><Plus className="mr-2 h-4 w-4" /> Add Bank</Button>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Add New Branch</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-1">
+                            <Label>Select Bank</Label>
+                            <Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}>
+                                <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
+                                <SelectContent>
+                                    {banks.map(bank => <SelectItem key={bank.id} value={bank.name}>{bank.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Branch Name</Label>
+                            <Input placeholder="Enter branch name" value={newBranchData.branchName} onChange={(e) => setNewBranchData(prev => ({...prev, branchName: e.target.value}))}/>
+                        </div>
+                        <div className="space-y-1">
+                            <Label>IFSC Code</Label>
+                            <Input placeholder="Enter IFSC code" value={newBranchData.ifscCode} onChange={(e) => setNewBranchData(prev => ({...prev, ifscCode: e.target.value}))}/>
+                        </div>
+                        <Button onClick={handleAddNewBranch}><Plus className="mr-2 h-4 w-4" /> Add Branch</Button>
+                    </CardContent>
+                </Card>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsBankSettingsOpen(false)}>Done</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

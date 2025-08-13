@@ -18,13 +18,43 @@ import {
   writeBatch,
   runTransaction,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
 const paymentsCollection = collection(db, "payments");
 const transactionsCollection = collection(db, "transactions");
 const fundTransactionsCollection = collection(db, "fund_transactions");
+const banksCollection = collection(db, "banks");
+const bankBranchesCollection = collection(db, "bankBranches");
+
+
+// --- Bank & Branch Functions ---
+export function getBanksRealtime(callback: (banks: Bank[]) => void, onError: (error: Error) => void): () => void {
+  const q = query(banksCollection, orderBy("name", "asc"));
+  return onSnapshot(q, (snapshot) => {
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bank));
+    callback(data);
+  }, onError);
+}
+
+export function getBankBranchesRealtime(callback: (branches: BankBranch[]) => void, onError: (error: Error) => void): () => void {
+  const q = query(bankBranchesCollection, orderBy("bankName", "asc"));
+  return onSnapshot(q, (snapshot) => {
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
+    callback(data);
+  }, onError);
+}
+
+export async function addBank(bankName: string): Promise<Bank> {
+  const docRef = await addDoc(banksCollection, { name: bankName });
+  return { id: docRef.id, name: bankName };
+}
+
+export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
+    const docRef = await addDoc(bankBranchesCollection, branchData);
+    return { id: docRef.id, ...branchData };
+}
 
 // --- Supplier Functions ---
 
