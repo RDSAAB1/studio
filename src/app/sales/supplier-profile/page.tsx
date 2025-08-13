@@ -113,13 +113,13 @@ export default function SupplierProfilePage() {
             summary.set(s.customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
-                totalOutstanding: 0, totalAmount: 0, totalPaid: 0, 
+                totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
                 paymentHistory: [], outstandingEntryIds: [], allTransactions: [],
                 transactionsByVariety: {},
                 totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
                 totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
                 averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
-                averageKartaPercentage: 0, averageLabouryRate: 0
+                averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
             });
         }
     });
@@ -130,9 +130,10 @@ export default function SupplierProfilePage() {
     suppliers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
-        const originalAmount = parseFloat(String(s.originalNetAmount || s.amount || 0));
         
-        data.totalAmount += originalAmount;
+        data.totalAmount += s.amount || 0;
+        data.totalOriginalAmount += s.originalNetAmount || 0;
+
         data.totalGrossWeight! += s.grossWeight;
         data.totalTeirWeight! += s.teirWeight;
         data.totalFinalWeight! += s.weight;
@@ -164,15 +165,16 @@ export default function SupplierProfilePage() {
     paymentHistory.forEach(p => {
         if (p.customerId && summary.has(p.customerId)) {
             const data = summary.get(p.customerId)!;
-            data.totalPaid += p.amount + (p.cdAmount || 0); // Total paid includes CD amount
+            data.totalPaid += p.amount;
             data.totalCdAmount! += (p.cdAmount || 0);
             data.paymentHistory.push(p);
         }
     });
 
-    // Step 4: Calculate final outstanding and averages for each supplier
+    // Step 4: Calculate final outstanding, averages and total deductions for each supplier
     summary.forEach((data, key) => {
-        data.totalOutstanding = data.totalAmount - data.totalPaid;
+        data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
         data.outstandingEntryIds = (data.allTransactions || [])
             .filter(t => parseFloat(String(t.netAmount)) >= 1)
             .map(t => t.id);
@@ -188,6 +190,7 @@ export default function SupplierProfilePage() {
     // Step 5: Create Mill Overview
     const millSummary: CustomerSummary = Array.from(summary.values()).reduce((acc, s) => {
         acc.totalAmount += s.totalAmount;
+        acc.totalOriginalAmount += s.totalOriginalAmount;
         acc.totalPaid += s.totalPaid;
         acc.totalGrossWeight! += s.totalGrossWeight!;
         acc.totalTeirWeight! += s.totalTeirWeight!;
@@ -201,14 +204,15 @@ export default function SupplierProfilePage() {
         acc.totalCdAmount! += s.totalCdAmount!;
         return acc;
     }, {
-        name: 'Mill (Total Overview)', contact: '', totalOutstanding: 0, totalAmount: 0, totalPaid: 0,
+        name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
-        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
+        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
         averageRate: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: suppliers, 
         allPayments: paymentHistory, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
     });
     
-    millSummary.totalOutstanding = millSummary.totalAmount - millSummary.totalPaid;
+    millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
+    millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
     millSummary.totalTransactions = suppliers.length;
     millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
     
@@ -247,7 +251,7 @@ export default function SupplierProfilePage() {
   const financialPieChartData = useMemo(() => {
     if (!selectedSupplierData) return [];
     return [
-      { name: 'Total Paid', value: selectedSupplierData.totalPaid },
+      { name: 'Total Paid', value: selectedSupplierData.totalPaid + selectedSupplierData.totalCdAmount! },
       { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
     ];
   }, [selectedSupplierData]);
@@ -326,6 +330,9 @@ export default function SupplierProfilePage() {
                             <SummaryDetailItem label="Total Wt" value={`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`} />
                             <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
                             <SummaryDetailItem label="Net Wt" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} />
+                             <Separator className="my-2"/>
+                            <SummaryDetailItem label="Total Transactions" value={`${selectedSupplierData.totalTransactions} Entries`} />
+                            <SummaryDetailItem label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions} Entries`} colorClass="text-destructive font-bold"/>
                         </CardContent>
                     </Card>
 
@@ -340,7 +347,7 @@ export default function SupplierProfilePage() {
                             <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
                             <SummaryDetailItem label="Total Other" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
                             <Separator className="my-2"/>
-                            <SummaryDetailItem label="Total Deductions" value={`- ${formatCurrency((selectedSupplierData.totalKartaAmount || 0) + (selectedSupplierData.totalLabouryAmount || 0) + (selectedSupplierData.totalKanta || 0) + (selectedSupplierData.totalOtherCharges || 0))}`} colorClass="text-destructive font-bold"/>
+                            <SummaryDetailItem label="Total Deductions" value={`${formatCurrency(selectedSupplierData.totalDeductions || 0)}`} colorClass="text-destructive font-bold"/>
                         </CardContent>
                     </Card>
 
@@ -349,9 +356,9 @@ export default function SupplierProfilePage() {
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1">
-                            <SummaryDetailItem label="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
+                            <SummaryDetailItem label="Total Original Amount" value={`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`} />
                             <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} colorClass="text-green-500" />
-                            <SummaryDetailItem label="Total CD" value={`- ${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
+                            <SummaryDetailItem label="Total CD Granted" value={`- ${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Outstanding</p>

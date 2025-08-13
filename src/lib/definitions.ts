@@ -6,6 +6,7 @@
 
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -129,9 +130,11 @@ export type CustomerSummary = {
     ifscCode?: string;
     bank?: string;
     branch?: string;
-    totalOutstanding: number;
     totalAmount: number;
+    totalOriginalAmount: number;
     totalPaid: number;
+    totalOutstanding: number;
+    totalDeductions?: number;
     paymentHistory: Payment[];
     outstandingEntryIds: string[];
     // New fields for Mill Overview
