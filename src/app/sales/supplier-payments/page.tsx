@@ -105,7 +105,6 @@ export default function SupplierPaymentsPage() {
   const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
   const [grNo, setGrNo] = useState('');
-  const [grDate, setGrDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
@@ -397,7 +396,6 @@ export default function SupplierPaymentsPage() {
     setUtrNo('');
     setCheckNo('');
     setGrNo('');
-    setGrDate(new Date());
     setParchiNo('');
     setRtgsQuantity(0);
     setRtgsRate(0);
@@ -545,7 +543,6 @@ export default function SupplierPaymentsPage() {
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: paidForDetails,
                     grNo,
-                    grDate: grDate?.toISOString(),
                     parchiNo,
                     quantity: rtgsQuantity,
                     rate: rtgsRate,
@@ -602,7 +599,6 @@ export default function SupplierPaymentsPage() {
         setUtrNo(paymentToEdit.notes?.match(/UTR: (.*?)(,|$)/)?.[1].trim() || '');
         setCheckNo(paymentToEdit.notes?.match(/Check: (.*?)(,|$)/)?.[1].trim() || '');
         setGrNo(paymentToEdit.grNo || '');
-        setGrDate(paymentToEdit.grDate ? new Date(paymentToEdit.grDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || '');
         setRtgsQuantity(paymentToEdit.quantity || 0);
         setRtgsRate(paymentToEdit.rate || 0);
@@ -801,7 +797,11 @@ export default function SupplierPaymentsPage() {
   };
 
   const customFilter = (value: string, search: string) => {
-    return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+    const searchTerm = search.toLowerCase();
+    const valueParts = value.toLowerCase().split(' - ');
+
+    // Check if any part (short name, long name, or the whole string) starts with the search term
+    return valueParts.some(part => part.trim().startsWith(searchTerm)) || value.toLowerCase().startsWith(searchTerm) ? 1 : 0;
   };
 
   if (!isClient) {
