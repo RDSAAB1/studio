@@ -1,5 +1,6 @@
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -141,3 +142,9 @@ export type AppOptions = {
     receiptTypes: string[];
     paymentTypes: string[];
 }
+
+export type BankBranch = {
+    bankName: string;
+    branchName: string;
+    ifscCode: string;
+};

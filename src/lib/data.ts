@@ -1,4 +1,4 @@
-import type { Customer, Transaction, FundTransaction } from "./definitions";
+import type { Customer, Transaction, FundTransaction, BankBranch } from "./definitions";
 
 export const initialCustomers: Customer[] = [
     {
@@ -91,3 +91,14 @@ export const transactionCategories = {
         }
     }
 };
+
+export const bankBranches: BankBranch[] = [
+    { bankName: "State Bank of India", branchName: "Main Branch, Delhi", ifscCode: "SBIN0000691" },
+    { bankName: "State Bank of India", branchName: "Commercial Branch, Mumbai", ifscCode: "SBIN0004577" },
+    { bankName: "HDFC Bank", branchName: "Connaught Place, New Delhi", ifscCode: "HDFC0000003" },
+    { bankName: "HDFC Bank", branchName: "Fort, Mumbai", ifscCode: "HDFC0000060" },
+    { bankName: "ICICI Bank", branchName: "Nariman Point, Mumbai", ifscCode: "ICIC0000004" },
+    { bankName: "ICICI Bank", branchName: "Chandni Chowk, Delhi", ifscCode: "ICIC0000007" },
+    { bankName: "Punjab National Bank", branchName: "Parliament Street, New Delhi", ifscCode: "PUNB0307900" },
+    { bankName: "Bank of Baroda", branchName: "Mandvi, Vadodara", ifscCode: "BARB0MANDVI" }
+];
