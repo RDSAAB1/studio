@@ -862,35 +862,57 @@ export default function SupplierEntryClient() {
   };
   
   const handleActualPrint = () => {
-    const printableContent = document.getElementById('receipt-content');
-    if (printableContent) {
-        const printWindow = window.open('', '', 'height=800,width=600');
-        printWindow?.document.write('<html><head><title>Print Receipt</title>');
-        // Inject styles
-        const styles = Array.from(document.styleSheets)
-          .map(styleSheet => {
-            try {
-              return Array.from(styleSheet.cssRules)
-                .map(rule => rule.cssText)
-                .join('');
-            } catch (e) {
-              console.warn('Could not read stylesheet rules', e);
-              return '';
-            }
-          })
-          .join('\n');
-        printWindow?.document.write(`<style>${styles}</style>`);
-
-        printWindow?.document.write('</head><body>');
-        printWindow?.document.write(printableContent.innerHTML);
-        printWindow?.document.write('</body></html>');
-        printWindow?.document.close();
-        printWindow?.focus();
-        setTimeout(() => { // Timeout to ensure content is loaded
-            printWindow?.print();
-            printWindow?.close();
-        }, 250);
-    }
+    const node = document.getElementById('receipt-content');
+    if (!node) return;
+  
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+  
+    document.body.appendChild(iframe);
+  
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) return;
+  
+    iframeDoc.open();
+    iframeDoc.write('<html><head><title>Print Receipt</title>');
+  
+    // Copy all style links from the main document
+    Array.from(document.styleSheets).forEach(styleSheet => {
+      if (styleSheet.href) {
+        const link = iframeDoc.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = styleSheet.href;
+        iframeDoc.head.appendChild(link);
+      } else {
+        // For inline styles, copy the rules
+        try {
+          const style = iframeDoc.createElement('style');
+          style.textContent = Array.from(styleSheet.cssRules)
+            .map(rule => rule.cssText)
+            .join('\n');
+          iframeDoc.head.appendChild(style);
+        } catch (e) {
+          console.warn('Could not read stylesheet rules', e);
+        }
+      }
+    });
+  
+    iframeDoc.write('</head><body>');
+    iframeDoc.write(node.innerHTML);
+    iframeDoc.write('</body></html>');
+    iframeDoc.close();
+  
+    // Wait for styles to load before printing
+    iframe.onload = function() {
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        document.body.removeChild(iframe);
+      }, 500); // 500ms delay to be safe
+    };
   };
 
   if (!isClient) {
@@ -1101,5 +1123,6 @@ export default function SupplierEntryClient() {
     
 
     
+
 
 
