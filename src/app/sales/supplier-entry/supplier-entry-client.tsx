@@ -427,7 +427,7 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
                           @media print {
                             @page {
                               size: A6 landscape;
-                              margin: 0;
+                              margin: 5mm;
                             }
                             body {
                               -webkit-print-color-adjust: exact;
