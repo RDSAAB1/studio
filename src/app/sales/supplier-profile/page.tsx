@@ -101,6 +101,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 @media print {
                     body {
                         font-family: sans-serif;
+                        background-color: #fff;
                     }
                     .printable-statement {
                         width: 100%;
@@ -108,9 +109,26 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         padding: 0;
                         box-shadow: none;
                         border: none;
+                        background-color: #fff;
+                        color: #000;
                     }
+                     .printable-statement * {
+                        color: #000 !important;
+                     }
                     .no-print {
                         display: none !important;
+                    }
+                    .print-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    .print-table th, .print-table td {
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        text-align: left;
+                    }
+                    .print-table th {
+                        background-color: #f2f2f2;
                     }
                 }
             `;
@@ -119,7 +137,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             styleSheet.innerText = printStyles;
             document.head.appendChild(styleSheet);
             
-            document.body.innerHTML = printContents;
+            document.body.innerHTML = `<div class="printable-statement">${printContents}</div>`;
             window.print();
             document.body.innerHTML = originalContents;
             window.location.reload(); 
@@ -130,119 +148,131 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     return (
     <>
         <DialogHeader className="sr-only">
-            <DialogTitle>Account Statement for {data.name}</DialogTitle>
+             <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription>
                 A detailed summary and transaction history for {data.name}.
              </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[85vh]">
-            <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 rounded-lg w-full max-w-5xl mx-auto font-sans text-gray-800">
+            <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
+                {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                     <div className="mb-4 sm:mb-0">
-                        <h1 className="text-2xl font-bold text-primary">BizSuite DataFlow</h1>
-                        <p className="text-gray-500 text-sm">Account Statement</p>
+                        <div className="bg-muted w-28 h-14 flex items-center justify-center rounded">
+                           <p className="text-sm text-muted-foreground">LOGO</p>
+                        </div>
+                         <div className="mt-4 text-sm">
+                            <p className="font-semibold text-lg">{toTitleCase(data.name)}</p>
+                            {data.so && <p>S/O: {toTitleCase(data.so)}</p>}
+                            <p>{data.address}</p>
+                            <p>Contact: {data.contact}</p>
+                        </div>
                     </div>
-                    <div className="text-left sm:text-right text-sm">
-                        <p className="font-semibold text-lg">{toTitleCase(data.name)}</p>
-                        {data.so && <p className="text-gray-600">S/O: {toTitleCase(data.so)}</p>}
-                        <p className="text-gray-600">{data.address}</p>
-                        <p className="text-gray-600">Contact: {data.contact}</p>
+                    <div className="text-left sm:text-right">
+                         <h1 className="text-2xl font-bold text-primary">Statement of Account</h1>
+                         <div className="mt-4 text-sm w-full sm:w-80">
+                            <div className="flex justify-between border-t pt-1">
+                                <span className="font-semibold">Statement Date:</span>
+                                <span>{format(new Date(), 'MM/dd/yyyy')}</span>
+                            </div>
+                            <div className="flex justify-between border-t pt-1">
+                                <span className="font-semibold">Total Amount Due:</span>
+                                <span className="font-bold">{formatCurrency(data.totalOutstanding)}</span>
+                            </div>
+                         </div>
                     </div>
                 </div>
 
-                 <Card className="mb-6">
-                    <CardContent className="p-4">
-                        <div className="flex flex-col md:flex-row flex-wrap gap-4 justify-around">
-                            {/* Operational Summary */}
-                            <div className="flex-1 min-w-[280px] p-2">
-                                <h3 className="font-semibold text-primary border-b pb-1 mb-2">Operational Summary</h3>
+                {/* Summary Section */}
+                <div className="mb-6">
+                    <h2 className="text-lg font-semibold border-b pb-1 mb-2">SUMMARY</h2>
+                    <div className="border rounded-lg p-4">
+                         <div className="flex flex-col md:flex-row md:flex-wrap gap-4 justify-around">
+                            <div className="flex-1 min-w-[200px]">
+                                 <h3 className="font-semibold text-primary mb-2">Operational</h3>
+                                 <div className="text-xs space-y-1">
+                                     <div className="flex justify-between"><span>Gross Wt:</span><span className="font-medium">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                                     <div className="flex justify-between"><span>Teir Wt:</span><span className="font-medium">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                                     <div className="flex justify-between font-bold border-t pt-1"><span>Final Wt:</span><span>{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                                     <div className="flex justify-between"><span>Karta Wt:</span><span className="font-medium">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                                     <div className="flex justify-between font-bold border-t pt-1"><span>Net Wt:</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                                 </div>
+                            </div>
+                            <div className="flex-1 min-w-[200px] md:border-l md:pl-4">
+                                <h3 className="font-semibold text-primary mb-2">Deductions</h3>
                                 <div className="text-xs space-y-1">
-                                    <div className="flex justify-between"><span>Gross Wt:</span><span className="font-medium">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                                    <div className="flex justify-between"><span>Teir Wt:</span><span className="font-medium">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                                    <div className="flex justify-between font-bold border-t pt-1"><span>Final Wt:</span><span>{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
-                                    <div className="flex justify-between"><span>Karta Wt (@{(data.averageKartaPercentage || 0).toFixed(2)}%):</span><span className="font-medium">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                                    <div className="flex justify-between font-bold border-t pt-1"><span>Net Wt:</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
-                                    <Separator className="my-2" />
-                                    <div className="flex justify-between"><span>Avg Rate:</span><span className="font-medium">{formatCurrency(data.averageRate || 0)}</span></div>
-                                    <div className="flex justify-between"><span>Total Entries:</span><span className="font-medium">{data.totalTransactions}</span></div>
-                                    <div className="flex justify-between font-bold text-red-600"><span>Outstanding Entries:</span><span>{data.totalOutstandingTransactions}</span></div>
+                                     <div className="flex justify-between"><span>Total Amount:</span><span className="font-medium">{formatCurrency(data.totalAmount)}</span></div>
+                                     <Separator className="my-1"/>
+                                     <div className="flex justify-between"><span>Karta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
+                                     <div className="flex justify-between"><span>Laboury:</span><span className="font-medium">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
+                                     <div className="flex justify-between"><span>Kanta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
+                                     <div className="flex justify-between"><span>Other:</span><span className="font-medium">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
+                                     <div className="flex justify-between font-bold border-t pt-1"><span>Original Amount:</span><span>{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
                                 </div>
                             </div>
-
-                             {/* Deduction Summary */}
-                            <div className="flex-1 min-w-[280px] p-2 md:border-l md:border-r">
-                                <h3 className="font-semibold text-primary border-b pb-1 mb-2">Deduction Summary</h3>
-                                <div className="text-xs space-y-1">
-                                    <div className="flex justify-between"><span>Total Amount:</span><span className="font-medium">{formatCurrency(data.totalAmount)}</span></div>
-                                    <Separator className="my-2" />
-                                    <div className="flex justify-between"><span>Total Karta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span>Total Laboury:</span><span className="font-medium">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span>Total Kanta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span>Total Other:</span><span className="font-medium">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
-                                    <Separator className="my-2" />
-                                    <div className="flex justify-between items-center pt-1">
-                                        <p className="font-semibold">Original Amount</p>
-                                        <p className="font-bold text-base">{formatCurrency(data.totalOriginalAmount || 0)}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                             {/* Financial Summary */}
-                            <div className="flex-1 min-w-[280px] p-2">
-                                <h3 className="font-semibold text-primary border-b pb-1 mb-2">Financial Summary</h3>
-                                <div className="text-xs space-y-1">
-                                     <div className="flex justify-between"><span>Original Amt (Avg: {formatCurrency(data.averageOriginalPrice || 0)}/kg):</span><span className="font-medium">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
-                                    <Separator className="my-2"/>
-                                    <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">{formatCurrency(data.totalPaid || 0)}</span></div>
-                                    <div className="flex justify-between"><span>Total CD Granted:</span><span className="font-medium">{formatCurrency(data.totalCdAmount || 0)}</span></div>
-                                    <Separator className="my-2"/>
-                                    <div className="flex justify-between items-center pt-1">
-                                        <p className="font-semibold text-sm">Outstanding</p>
-                                        <p className="font-bold text-lg text-red-600">{formatCurrency(data.totalOutstanding)}</p>
-                                    </div>
+                            <div className="flex-1 min-w-[200px] md:border-l md:pl-4">
+                                 <h3 className="font-semibold text-primary mb-2">Financial</h3>
+                                  <div className="text-xs space-y-1">
+                                     <div className="flex justify-between"><span>Previous Balance:</span><span className="font-medium">{formatCurrency(0)}</span></div>
+                                     <div className="flex justify-between"><span>Purchases:</span><span className="font-medium">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                                     <div className="flex justify-between"><span>Payments/Credits:</span><span className="font-medium text-green-600">{formatCurrency(data.totalPaid || 0)}</span></div>
+                                     <div className="flex justify-between"><span>CD Granted:</span><span className="font-medium">{formatCurrency(data.totalCdAmount || 0)}</span></div>
+                                      <div className="flex justify-between font-bold border-t pt-1"><span>Outstanding Balance:</span><span className="text-red-600">{formatCurrency(data.totalOutstanding)}</span></div>
                                 </div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
-
-                <div className="overflow-x-auto">
-                    <h3 className="text-lg font-semibold mb-2 text-gray-700">Transaction Details</h3>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Particulars</TableHead>
-                                <TableHead className="text-right">Debit</TableHead>
-                                <TableHead className="text-right">Credit</TableHead>
-                                <TableHead className="text-right">Balance</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell colSpan={4} className="font-semibold">Opening Balance</TableCell>
-                                <TableCell className="text-right font-semibold font-mono">{formatCurrency(0)}</TableCell>
-                            </TableRow>
-                            {transactions.map((item, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>{format(new Date(item.date), "dd-MMM-yy")}</TableCell>
-                                    <TableCell>{item.particulars}</TableCell>
-                                    <TableCell className="text-right font-mono text-red-600">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
-                                    <TableCell className="text-right font-mono text-green-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
-                                    <TableCell className="text-right font-mono">{formatCurrency(item.balance)}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFooter>
-                            <TableRow className="bg-slate-100 font-bold">
-                                <TableCell colSpan={2}>Closing Balance</TableCell>
-                                <TableCell className="text-right font-mono">{formatCurrency(totalDebit)}</TableCell>
-                                <TableCell className="text-right font-mono">{formatCurrency(totalCredit)}</TableCell>
-                                <TableCell className="text-right font-mono">{formatCurrency(closingBalance)}</TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
+                    </div>
                 </div>
+
+                {/* Transaction Table */}
+                <div>
+                    <h2 className="text-lg font-semibold border-b pb-1 mb-2">TRANSACTIONS</h2>
+                    <div className="overflow-x-auto border rounded-lg">
+                        <Table className="print-table min-w-full">
+                            <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                    <TableHead className="py-2 px-3">Date</TableHead>
+                                    <TableHead className="py-2 px-3">Particulars</TableHead>
+                                    <TableHead className="text-right py-2 px-3">Debit</TableHead>
+                                    <TableHead className="text-right py-2 px-3">Credit</TableHead>
+                                    <TableHead className="text-right py-2 px-3">Balance</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow>
+                                    <TableCell colSpan={4} className="font-semibold py-2 px-3">Opening Balance</TableCell>
+                                    <TableCell className="text-right font-semibold font-mono py-2 px-3">{formatCurrency(0)}</TableCell>
+                                </TableRow>
+                                {transactions.map((item, index) => (
+                                    <TableRow key={index} className="[&_td]:py-2 [&_td]:px-3">
+                                        <TableCell>{format(new Date(item.date), "dd-MMM-yy")}</TableCell>
+                                        <TableCell>{item.particulars}</TableCell>
+                                        <TableCell className="text-right font-mono">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                        <TableCell className="text-right font-mono">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatCurrency(item.balance)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFooter>
+                                <TableRow className="bg-muted/50 font-bold">
+                                    <TableCell colSpan={2} className="py-2 px-3">Closing Balance</TableCell>
+                                    <TableCell className="text-right font-mono py-2 px-3">{formatCurrency(totalDebit)}</TableCell>
+                                    <TableCell className="text-right font-mono py-2 px-3">{formatCurrency(totalCredit)}</TableCell>
+                                    <TableCell className="text-right font-mono py-2 px-3">{formatCurrency(closingBalance)}</TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
+                    </div>
+                </div>
+
+                 {/* Reminder Section */}
+                <div className="mt-6">
+                     <h2 className="text-lg font-semibold border-b pb-1 mb-2">REMINDER</h2>
+                     <div className="border rounded-lg p-4 min-h-[80px] text-sm text-muted-foreground">
+                        Payment is due by the date specified.
+                     </div>
+                </div>
+
             </div>
         </ScrollArea>
          <DialogFooter className="p-4 border-t no-print">
@@ -718,7 +748,7 @@ export default function SupplierProfilePage() {
       )}
 
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-        <DialogContent className="max-w-4xl p-0">
+        <DialogContent className="max-w-5xl p-0">
              <StatementPreview data={selectedSupplierData} />
         </DialogContent>
       </Dialog>
