@@ -201,37 +201,39 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                     <CardTitle className="text-lg">Account Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
                         {/* Operational Summary */}
-                        <div className="space-y-1 text-sm border-b md:border-b-0 md:border-r md:pr-4 pb-4 md:pb-0">
-                            <h3 className="font-semibold text-primary mb-2 text-base">Operational</h3>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt</span><span className="font-semibold">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Operational</h3>
+                             <table className="w-full"><tbody>
+                                <tr><td className="py-0.5 text-muted-foreground">Gross Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-muted-foreground">Teir Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr className="font-bold border-t"><td className="py-1">Final Wt</td><td className="py-1 text-right font-semibold">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-muted-foreground">Karta Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr className="font-bold text-primary border-t"><td className="py-1">Net Wt</td><td className="py-1 text-right">{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</td></tr>
+                            </tbody></table>
                         </div>
                         {/* Deduction Summary */}
-                        <div className="space-y-1 text-sm border-b md:border-b-0 md:border-r md:pr-4 pb-4 md:pb-0">
-                             <h3 className="font-semibold text-primary mb-2 text-base">Deductions</h3>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount</span><span className="font-semibold">{`${formatCurrency(data.totalAmount || 0)}`}</span></div>
-                            <Separator className="my-1"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Karta</span><span className="font-semibold">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Laboury</span><span className="font-semibold">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Kanta</span><span className="font-semibold">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Other</span><span className="font-semibold">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
-                            <Separator className="my-1"/>
-                            <div className="flex justify-between font-bold text-primary"><span>Original Amount</span><span>{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Deductions</h3>
+                            <table className="w-full"><tbody>
+                                <tr><td className="py-0.5 text-muted-foreground">Total Amount</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalAmount || 0)}`}</td></tr>
+                                <tr className="border-t"><td className="py-0.5 text-muted-foreground">Karta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-muted-foreground">Laboury</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-muted-foreground">Kanta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKanta || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-muted-foreground">Other</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</td></tr>
+                                <tr className="font-bold text-primary border-t"><td className="py-1">Original Amount</td><td className="py-1 text-right">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
+                            </tbody></table>
                         </div>
                         {/* Financial Summary */}
-                        <div className="space-y-1 text-sm">
-                            <h3 className="font-semibold text-primary mb-2 text-base">Financial</h3>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Original Purchases</span><span className="font-semibold">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
-                            <Separator className="my-1"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(data.totalCdAmount || 0)}`}</span></div>
-                            <Separator className="my-1"/>
-                            <div className="flex justify-between font-bold text-destructive"><span>Outstanding Balance</span><span>{`${formatCurrency(data.totalOutstanding)}`}</span></div>
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Financial</h3>
+                            <table className="w-full"><tbody>
+                                <tr><td className="py-0.5 text-muted-foreground">Original Purchases</td><td className="py-0.5 text-right font-semibold">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
+                                <tr className="border-t"><td className="py-0.5 text-muted-foreground">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-muted-foreground">Total CD Granted</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
+                                <tr className="font-bold text-destructive border-t"><td className="py-1">Outstanding Balance</td><td className="py-1 text-right">{`${formatCurrency(data.totalOutstanding)}`}</td></tr>
+                            </tbody></table>
                         </div>
                     </div>
                 </CardContent>
