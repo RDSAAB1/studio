@@ -121,7 +121,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         .summary-grid {
                             display: grid;
                             grid-template-columns: repeat(3, minmax(0, 1fr));
-                            gap: 1.5rem;
+                            gap: 1rem; /* Reduced gap for print */
                         }
                         @media print {
                             body { -webkit-print-color-adjust: exact; }
@@ -149,7 +149,6 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
         const printableContent = node.cloneNode(true) as HTMLElement;
         iframeDoc.body.appendChild(printableContent);
         
-        // Find the summary section and apply the grid style for printing
         const summaryGrid = iframeDoc.querySelector('.summary-grid-container');
         if(summaryGrid) {
             summaryGrid.className = 'summary-grid';
@@ -202,10 +201,10 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                     <CardTitle className="text-lg">Account Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Operational Summary */}
                         <div className="space-y-1 text-sm border-b md:border-b-0 md:border-r md:pr-4 pb-4 md:pb-0">
-                            <h3 className="font-semibold text-primary mb-2">Operational</h3>
+                            <h3 className="font-semibold text-primary mb-2 text-base">Operational</h3>
                             <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
                             <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
@@ -214,7 +213,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         </div>
                         {/* Deduction Summary */}
                         <div className="space-y-1 text-sm border-b md:border-b-0 md:border-r md:pr-4 pb-4 md:pb-0">
-                             <h3 className="font-semibold text-primary mb-2">Deductions</h3>
+                             <h3 className="font-semibold text-primary mb-2 text-base">Deductions</h3>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Amount</span><span className="font-semibold">{`${formatCurrency(data.totalAmount || 0)}`}</span></div>
                             <Separator className="my-1"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Karta</span><span className="font-semibold">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
@@ -226,7 +225,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         </div>
                         {/* Financial Summary */}
                         <div className="space-y-1 text-sm">
-                            <h3 className="font-semibold text-primary mb-2">Financial</h3>
+                            <h3 className="font-semibold text-primary mb-2 text-base">Financial</h3>
                             <div className="flex justify-between"><span className="text-muted-foreground">Original Purchases</span><span className="font-semibold">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
                             <Separator className="my-1"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</span></div>
