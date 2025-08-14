@@ -414,93 +414,62 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void; }) => {
     return (
         <>
-            <DialogHeader>
+            <DialogHeader className="p-4 pb-2">
                 <DialogTitle>Print Receipt</DialogTitle>
                 <DialogDescription>
                     Review the receipt for SR No: {data.srNo} before printing.
                 </DialogDescription>
             </DialogHeader>
-            <div id="receipt-content" className="space-y-4 text-sm">
-                <div className="text-center">
-                    <h3 className="text-lg font-bold">BIZSUITE DATAFLOW</h3>
-                    <p className="text-xs">Agricultural Commission Agent</p>
+            <ScrollArea className="max-h-[70vh] p-4 pt-0">
+                <div id="receipt-content" className="space-y-3 text-xs">
+                    <div className="text-center">
+                        <h3 className="font-bold text-sm">BIZSUITE DATAFLOW</h3>
+                        <p className="text-xs">Agricultural Commission Agent</p>
+                    </div>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                        <p><span className="font-semibold">SR No:</span> {data.srNo}</p>
+                        <p><span className="font-semibold">Date:</span> {format(new Date(data.date), "dd-MMM-yy")}</p>
+                        <p className="col-span-2"><span className="font-semibold">Supplier:</span> {toTitleCase(data.name)} S/O {toTitleCase(data.so)}</p>
+                        <p className="col-span-2"><span className="font-semibold">Address:</span> {toTitleCase(data.address)}</p>
+                        <p><span className="font-semibold">Contact:</span> {data.contact}</p>
+                        <p><span className="font-semibold">Vehicle No:</span> {data.vehicleNo.toUpperCase()}</p>
+                    </div>
+                    <Separator />
+                    <Table className="text-xs">
+                        <TableBody>
+                            <TableRow><TableCell className="p-1">Variety</TableCell><TableCell className="text-right p-1 font-semibold">{toTitleCase(data.variety)}</TableCell></TableRow>
+                            <TableRow><TableCell className="p-1">Gross Weight</TableCell><TableCell className="text-right p-1 font-semibold">{data.grossWeight.toFixed(2)} kg</TableCell></TableRow>
+                            <TableRow><TableCell className="p-1">Teir Weight</TableCell><TableCell className="text-right p-1 font-semibold">- {data.teirWeight.toFixed(2)} kg</TableCell></TableRow>
+                            <TableRow className="font-bold border-t"><TableCell className="p-1">Final Weight</TableCell><TableCell className="text-right p-1">{data.weight.toFixed(2)} kg</TableCell></TableRow>
+                        </TableBody>
+                    </Table>
+                    <Separator />
+                     <Table className="text-xs">
+                        <TableBody>
+                            <TableRow><TableCell className="p-1">Rate</TableCell><TableCell className="text-right p-1 font-semibold">{formatCurrency(data.rate)} / kg</TableCell></TableRow>
+                            <TableRow><TableCell className="p-1">Net Weight</TableCell><TableCell className="text-right p-1 font-semibold">{data.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                            <TableRow className="font-bold border-t"><TableCell className="p-1">Total Amount</TableCell><TableCell className="text-right p-1">{formatCurrency(data.amount)}</TableCell></TableRow>
+                        </TableBody>
+                    </Table>
+                     <Separator />
+                     <p className="font-semibold">Deductions:</p>
+                     <Table className="text-xs">
+                        <TableBody>
+                            <TableRow><TableCell className="p-1">Karta ({data.kartaPercentage}%)</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.kartaAmount)}</TableCell></TableRow>
+                            <TableRow><TableCell className="p-1">Laboury (@{data.labouryRate.toFixed(2)})</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.labouryAmount)}</TableCell></TableRow>
+                             <TableRow><TableCell className="p-1">Kanta</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.kanta)}</TableCell></TableRow>
+                            <TableRow><TableCell className="p-1">Other Charges</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.otherCharges || 0)}</TableCell></TableRow>
+                        </TableBody>
+                    </Table>
+                    <Separator />
+                     <div className="text-right font-bold text-base p-2 bg-muted rounded-md">
+                        Net Payable: {formatCurrency(data.netAmount)}
+                    </div>
                 </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                    <p><span className="font-semibold">SR No:</span> {data.srNo}</p>
-                    <p><span className="font-semibold">Date:</span> {format(new Date(data.date), "dd-MMM-yyyy")}</p>
-                    <p className="col-span-2"><span className="font-semibold">Supplier:</span> {toTitleCase(data.name)} S/O {toTitleCase(data.so)}</p>
-                    <p className="col-span-2"><span className="font-semibold">Address:</span> {toTitleCase(data.address)}</p>
-                    <p><span className="font-semibold">Contact:</span> {data.contact}</p>
-                    <p><span className="font-semibold">Vehicle No:</span> {data.vehicleNo.toUpperCase()}</p>
-                </div>
-                <Separator />
-                <Table>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell>Variety</TableCell>
-                            <TableCell className="text-right font-semibold">{toTitleCase(data.variety)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell>Gross Weight</TableCell>
-                            <TableCell className="text-right font-semibold">{data.grossWeight.toFixed(2)} kg</TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell>Teir Weight</TableCell>
-                            <TableCell className="text-right font-semibold">- {data.teirWeight.toFixed(2)} kg</TableCell>
-                        </TableRow>
-                         <TableRow className="font-bold border-t">
-                            <TableCell>Final Weight</TableCell>
-                            <TableCell className="text-right">{data.weight.toFixed(2)} kg</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-                <Separator />
-                 <Table>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell>Rate</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(data.rate)} / kg</TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell>Net Weight</TableCell>
-                            <TableCell className="text-right font-semibold">{data.netWeight.toFixed(2)} kg</TableCell>
-                        </TableRow>
-                        <TableRow className="font-bold border-t">
-                            <TableCell>Total Amount</TableCell>
-                            <TableCell className="text-right">{formatCurrency(data.amount)}</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-                 <Separator />
-                 <p className="font-semibold">Deductions:</p>
-                 <Table>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell>Karta ({data.kartaPercentage}%)</TableCell>
-                            <TableCell className="text-right font-semibold">- {formatCurrency(data.kartaAmount)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell>Laboury (@{data.labouryRate.toFixed(2)})</TableCell>
-                            <TableCell className="text-right font-semibold">- {formatCurrency(data.labouryAmount)}</TableCell>
-                        </TableRow>
-                         <TableRow>
-                            <TableCell>Kanta</TableCell>
-                            <TableCell className="text-right font-semibold">- {formatCurrency(data.kanta)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell>Other Charges</TableCell>
-                            <TableCell className="text-right font-semibold">- {formatCurrency(data.otherCharges || 0)}</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-                <Separator />
-                 <div className="text-right font-bold text-lg p-2 bg-muted rounded-md">
-                    Net Payable Amount: {formatCurrency(data.netAmount)}
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => onPrint()}>
+            </ScrollArea>
+            <DialogFooter className="p-4 pt-0">
+                <Button variant="outline" onClick={onPrint}>
                     <Printer className="mr-2 h-4 w-4" /> Print
                 </Button>
             </DialogFooter>
@@ -826,12 +795,37 @@ export default function SupplierEntryClient() {
   const handleActualPrint = () => {
     const printableContent = document.getElementById('receipt-content');
     if (printableContent) {
-        const printWindow = window.open('', '', 'height=600,width=800');
+        const printWindow = window.open('', '', 'height=800,width=600');
         printWindow?.document.write('<html><head><title>Print Receipt</title>');
-        // You might want to link to your stylesheet for better formatting
-        printWindow?.document.write('<link rel="stylesheet" href="/path/to/your/tailwind.css" type="text/css" />');
-        printWindow?.document.write('<style>@media print{body{font-family:sans-serif; padding: 20px;}}</style>');
-        printWindow?.document.write('</head><body >');
+        printWindow?.document.write(`
+            <style>
+                @page { size: A6; margin: 0; }
+                body { font-family: sans-serif; margin: 10px; font-size: 10px; }
+                table { width: 100%; border-collapse: collapse; }
+                td, th { padding: 2px 4px; }
+                .text-center { text-align: center; }
+                .font-bold { font-weight: bold; }
+                .text-sm { font-size: 11px; }
+                .text-xs { font-size: 9px; }
+                .grid { display: grid; }
+                .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                .col-span-2 { grid-column: span 2 / span 2; }
+                .gap-x-2 { column-gap: 0.5rem; }
+                .gap-y-0_5 { row-gap: 0.125rem; }
+                .space-y-3 > * + * { margin-top: 0.75rem; }
+                .font-semibold { font-weight: 600; }
+                .text-right { text-align: right; }
+                .border-t { border-top: 1px solid #e5e7eb; }
+                .bg-muted { background-color: #f1f5f9; }
+                .p-2 { padding: 0.5rem; }
+                .rounded-md { border-radius: 0.375rem; }
+                .text-base { font-size: 13px; }
+                .text-lg { font-size: 14px; }
+                .sr-only { display: none; }
+                hr { border: 0; border-top: 1px dashed #ccc; margin: 4px 0; }
+            </style>
+        `);
+        printWindow?.document.write('</head><body>');
         printWindow?.document.write(printableContent.innerHTML);
         printWindow?.document.write('</body></html>');
         printWindow?.document.close();
@@ -1038,10 +1032,12 @@ export default function SupplierEntryClient() {
       </Dialog>
 
       <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-[350px]">
             {receiptData && <ReceiptPreview data={receiptData} onPrint={handleActualPrint}/>}
         </DialogContent>
       </Dialog>
     </>
   );
 }
+
+    
