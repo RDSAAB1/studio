@@ -121,7 +121,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         .summary-grid {
                             display: grid;
                             grid-template-columns: repeat(3, minmax(0, 1fr));
-                            gap: 1rem; /* Reduced gap for print */
+                            gap: 1.5rem;
                         }
                         @media print {
                             body { -webkit-print-color-adjust: exact; }
@@ -197,10 +197,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
             {/* Summary Section */}
              <Card className="mb-6">
-                <CardHeader className="p-4">
-                    <CardTitle className="text-lg">Account Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
+                <CardContent className="p-4">
                     <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
                         {/* Operational Summary */}
                         <div className="text-sm">
