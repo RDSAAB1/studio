@@ -150,8 +150,8 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             </div>
 
             {/* Summary Section */}
-             <div className="mb-6 flex flex-wrap gap-4 justify-center">
-                <Card className="flex-grow min-w-[280px] max-w-full md:max-w-xs">
+            <div className="mb-6 flex flex-col md:flex-row flex-wrap gap-4 justify-center">
+                <Card className="flex-1 min-w-[280px]">
                     <CardHeader className="p-4 pb-2">
                         <CardTitle className="text-sm font-semibold text-primary border-b pb-1">Operational Summary</CardTitle>
                     </CardHeader>
@@ -167,7 +167,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         <div className="flex justify-between font-bold text-red-600"><span>Outstanding Entries:</span><span>{data.totalOutstandingTransactions}</span></div>
                     </CardContent>
                 </Card>
-                 <Card className="flex-grow min-w-[280px] max-w-full md:max-w-xs">
+                 <Card className="flex-1 min-w-[280px]">
                      <CardHeader className="p-4 pb-2">
                         <CardTitle className="text-sm font-semibold text-primary border-b pb-1">Deduction Summary</CardTitle>
                     </CardHeader>
@@ -185,7 +185,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card className="flex-grow min-w-[280px] max-w-full md:max-w-xs">
+                 <Card className="flex-1 min-w-[280px]">
                     <CardHeader className="p-4 pb-2">
                         <CardTitle className="text-sm font-semibold text-primary border-b pb-1">Financial Summary</CardTitle>
                     </CardHeader>
