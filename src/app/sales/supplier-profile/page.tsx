@@ -107,8 +107,8 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     return (
     <>
-        <div ref={statementRef} className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-4xl mx-auto font-sans text-gray-800">
-            {/* Header */}
+        <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 rounded-lg w-full max-w-5xl mx-auto font-sans text-gray-800">
+             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
                     <h1 className="text-2xl font-bold text-primary">BizSuite DataFlow</h1>
@@ -157,7 +157,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                  <Card>
                     <CardHeader className="p-3 pb-2"><CardTitle className="text-sm font-semibold">Financial Summary</CardTitle></CardHeader>
                     <CardContent className="p-3 text-xs space-y-1">
-                        <div className="flex justify-between"><span>Original Amt (Avg: {formatCurrency(data.averageOriginalPrice || 0)}):</span><span className="font-medium">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                        <div className="flex justify-between"><span>Original Amt (Avg: {formatCurrency(data.averageOriginalPrice || 0)}/kg):</span><span className="font-medium">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
                         <Separator className="my-1"/>
                         <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">{formatCurrency(data.totalPaid || 0)}</span></div>
                         <div className="flex justify-between"><span>Total CD Granted:</span><span className="font-medium">{formatCurrency(data.totalCdAmount || 0)}</span></div>
@@ -704,7 +704,10 @@ export default function SupplierProfilePage() {
       )}
 
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-            <DialogContent className="max-w-4xl p-0">
+            <DialogContent className="max-w-5xl p-0">
+                <DialogHeader className="sr-only">
+                    <DialogTitle>Account Statement</DialogTitle>
+                </DialogHeader>
                 <ScrollArea className="max-h-[90vh]">
                      <StatementPreview data={selectedSupplierData} />
                 </ScrollArea>
