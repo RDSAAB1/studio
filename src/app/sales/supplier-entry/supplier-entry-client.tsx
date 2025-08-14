@@ -1090,7 +1090,7 @@ export default function SupplierEntryClient() {
       </Dialog>
 
       <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl">
             {receiptData && <ReceiptPreview data={receiptData} onPrint={handleActualPrint}/>}
         </DialogContent>
       </Dialog>
@@ -1101,4 +1101,5 @@ export default function SupplierEntryClient() {
     
 
     
+
 
