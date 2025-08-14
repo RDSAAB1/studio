@@ -112,13 +112,10 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     if (!data) return null;
     const { items, openingBalance, closingBalance, totalDebit, totalCredit } = statementItems;
-    const startDate = items.length > 0 ? format(items[0].date, "PPP") : 'N/A';
-    const endDate = items.length > 0 ? format(items[items.length - 1].date, "PPP") : 'N/A';
-
 
     return (
         <div className="bg-background p-4 sm:p-6 rounded-lg font-sans">
-             <header className="mb-6 border-b pb-4 flex flex-col md:flex-row justify-between items-start gap-4">
+             <header className="mb-6 pb-4 flex flex-col md:flex-row justify-between items-start gap-4">
                 <div className="flex-1">
                     <h2 className="text-2xl font-bold text-primary">Account Statement</h2>
                     <p className="text-muted-foreground">BizSuite DataFlow</p>
@@ -132,7 +129,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             
             <Card className="mb-6">
                  <CardHeader className="p-4 pb-2">
-                    <CardDescription>Statement for period from {startDate} to {endDate}</CardDescription>
+                    <CardTitle className="text-base">Statement Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                     <div>
@@ -174,7 +171,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                             </TableRow>
                         ))}
                     </TableBody>
-                     <TableFooter>
+                    <TableFooter>
                         <TableRow className="bg-muted font-bold">
                             <TableCell colSpan={2}>Total</TableCell>
                             <TableCell className="text-right font-mono">{formatCurrency(totalDebit)}</TableCell>
@@ -471,7 +468,7 @@ export default function SupplierProfilePage() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                         <div>
                             <CardTitle>{toTitleCase(selectedSupplierData.name)}</CardTitle>
                             <CardDescription>
@@ -484,7 +481,7 @@ export default function SupplierProfilePage() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {/* Operational Summary Card */}
                     <Card className="bg-card/50">
                         <CardHeader className="p-4 pb-2">
