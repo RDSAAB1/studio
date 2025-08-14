@@ -414,57 +414,126 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void; }) => {
     return (
         <>
-            <DialogHeader className="p-4 pb-2">
-                <DialogTitle>Print Receipt</DialogTitle>
-                <DialogDescription>
-                    Review the receipt for SR No: {data.srNo} before printing.
+            <DialogHeader className="p-4 pb-0">
+                <DialogTitle className="sr-only">Print Receipt</DialogTitle>
+                <DialogDescription className="sr-only">
+                    Preview of the receipt for SR No: {data.srNo}.
                 </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="max-h-[70vh] p-4 pt-0">
-                <div id="receipt-content" className="space-y-3 text-xs">
-                    <div className="text-center">
-                        <h3 className="font-bold text-sm">BIZSUITE DATAFLOW</h3>
-                        <p className="text-xs">Agricultural Commission Agent</p>
+            <ScrollArea className="max-h-[70vh]">
+                <div id="receipt-content" className="p-4 text-black bg-white font-sans">
+                    <style>
+                        {`
+                          @media print {
+                            body * {
+                              visibility: hidden;
+                            }
+                            #receipt-content, #receipt-content * {
+                              visibility: visible;
+                            }
+                            #receipt-content {
+                              position: absolute;
+                              left: 0;
+                              top: 0;
+                              width: 100%;
+                            }
+                            @page {
+                                size: A4;
+                                margin: 1cm;
+                            }
+                          }
+                        `}
+                    </style>
+                    <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">INVOICE</div>
+                    
+                    <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
+                        {/* Left Column: Mill Details */}
+                        <div>
+                            <div className="bg-red-200 text-center font-bold text-xl p-1 border border-black">
+                                JAGDAMBE RICE <span className="italic">MILL</span>
+                            </div>
+                            <div className="border-x border-b border-black p-1 text-sm">
+                                <p>Devkali Road, Banda, Shajahanpur</p>
+                                <p>Near Devkali, Uttar Pradesh</p>
+                                <p>CONTACT NO:- 9555130735</p>
+                                <p>EMAIL:- JRMDofficial@gmail.com</p>
+                                {/* Placeholder for barcode */}
+                                <div className="h-10 mt-1 bg-gray-200 flex items-center justify-center">
+                                    <p className="text-xs text-gray-500">Barcode Placeholder</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Customer Details */}
+                        <div>
+                            <div className="text-center font-bold text-xl p-1 border-t border-r border-black">JRM</div>
+                            <div className="border-x border-b border-t border-black p-1">
+                                <div className="text-center font-bold underline mb-2">CUSTOMER DETAIL</div>
+                                <table className="w-full text-sm">
+                                    <tbody>
+                                        <tr><td className="font-bold pr-2">DATE</td><td>{format(new Date(data.date), "dd-MMM-yy")}</td></tr>
+                                        <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.name)}</td></tr>
+                                        <tr><td className="font-bold pr-2">CONTACT</td><td>{data.contact}</td></tr>
+                                        <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.address)}</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                    <Separator />
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                        <p><span className="font-semibold">SR No:</span> {data.srNo}</p>
-                        <p><span className="font-semibold">Date:</span> {format(new Date(data.date), "dd-MMM-yy")}</p>
-                        <p className="col-span-2"><span className="font-semibold">Supplier:</span> {toTitleCase(data.name)} S/O {toTitleCase(data.so)}</p>
-                        <p className="col-span-2"><span className="font-semibold">Address:</span> {toTitleCase(data.address)}</p>
-                        <p><span className="font-semibold">Contact:</span> {data.contact}</p>
-                        <p><span className="font-semibold">Vehicle No:</span> {data.vehicleNo.toUpperCase()}</p>
-                    </div>
-                    <Separator />
-                    <Table className="text-xs">
-                        <TableBody>
-                            <TableRow><TableCell className="p-1">Variety</TableCell><TableCell className="text-right p-1 font-semibold">{toTitleCase(data.variety)}</TableCell></TableRow>
-                            <TableRow><TableCell className="p-1">Gross Weight</TableCell><TableCell className="text-right p-1 font-semibold">{data.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                            <TableRow><TableCell className="p-1">Teir Weight</TableCell><TableCell className="text-right p-1 font-semibold">- {data.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                            <TableRow className="font-bold border-t"><TableCell className="p-1">Final Weight</TableCell><TableCell className="text-right p-1">{data.weight.toFixed(2)} kg</TableCell></TableRow>
-                        </TableBody>
-                    </Table>
-                    <Separator />
-                     <Table className="text-xs">
-                        <TableBody>
-                            <TableRow><TableCell className="p-1">Rate</TableCell><TableCell className="text-right p-1 font-semibold">{formatCurrency(data.rate)} / kg</TableCell></TableRow>
-                            <TableRow><TableCell className="p-1">Net Weight</TableCell><TableCell className="text-right p-1 font-semibold">{data.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                            <TableRow className="font-bold border-t"><TableCell className="p-1">Total Amount</TableCell><TableCell className="text-right p-1">{formatCurrency(data.amount)}</TableCell></TableRow>
-                        </TableBody>
-                    </Table>
-                     <Separator />
-                     <p className="font-semibold">Deductions:</p>
-                     <Table className="text-xs">
-                        <TableBody>
-                            <TableRow><TableCell className="p-1">Karta ({data.kartaPercentage}%)</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.kartaAmount)}</TableCell></TableRow>
-                            <TableRow><TableCell className="p-1">Laboury (@{data.labouryRate.toFixed(2)})</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.labouryAmount)}</TableCell></TableRow>
-                             <TableRow><TableCell className="p-1">Kanta</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.kanta)}</TableCell></TableRow>
-                            <TableRow><TableCell className="p-1">Other Charges</TableCell><TableCell className="text-right p-1 font-semibold">- {formatCurrency(data.otherCharges || 0)}</TableCell></TableRow>
-                        </TableBody>
-                    </Table>
-                    <Separator />
-                     <div className="text-right font-bold text-base p-2 bg-muted rounded-md">
-                        Net Payable: {formatCurrency(data.netAmount)}
+
+                    {/* Transaction Table */}
+                    <table className="w-full border-collapse border border-black text-sm">
+                        <thead>
+                            <tr className="bg-orange-300 text-black font-bold">
+                                <td className="border border-black p-1 text-center">VEHICLE</td>
+                                <td className="border border-black p-1 text-center">TERM</td>
+                                <td className="border border-black p-1 text-center">RATE</td>
+                                <td className="border border-black p-1 text-center">LOAD</td>
+                                <td className="border border-black p-1 text-center">UNLOAD</td>
+                                <td className="border border-black p-1 text-center">QTY</td>
+                                <td className="border border-black p-1 text-center">AMOUNT</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="border border-black p-1">{data.vehicleNo.toUpperCase()}</td>
+                                <td className="border border-black p-1 text-center">{data.term}</td>
+                                <td className="border border-black p-1 text-right">{data.rate.toFixed(2)}</td>
+                                <td className="border border-black p-1 text-right">{data.grossWeight.toFixed(2)}</td>
+                                <td className="border border-black p-1 text-right">{data.teirWeight.toFixed(2)}</td>
+                                <td className="border border-black p-1 text-right">{data.weight.toFixed(2)}</td>
+                                <td className="border border-black p-1 text-right">{formatCurrency(data.amount)}</td>
+                            </tr>
+                            {/* Empty rows for appearance */}
+                            <tr><td className="border border-black p-2 h-6"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td></tr>
+                            <tr><td className="border border-black p-2 h-6"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td></tr>
+                            <tr><td className="border border-black p-2 h-6"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td></tr>
+                        </tbody>
+                    </table>
+
+                     {/* Footer */}
+                    <div className="flex justify-between items-end mt-2">
+                        <div className="text-sm">
+                            <p className="mt-8 border-t border-black pt-1">Authorized Sign</p>
+                        </div>
+                        <div className="text-sm">
+                            <table className="w-full border-collapse">
+                                <tbody>
+                                    <tr>
+                                        <td className="font-bold border border-black p-1">DUE DATE</td>
+                                        <td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold border border-black p-1">KARTA</td>
+                                        <td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold border border-black p-1">NET AMOUNT</td>
+                                        <td className="border border-black p-1 text-right font-bold">{formatCurrency(data.netAmount)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </ScrollArea>
@@ -797,41 +866,30 @@ export default function SupplierEntryClient() {
     if (printableContent) {
         const printWindow = window.open('', '', 'height=800,width=600');
         printWindow?.document.write('<html><head><title>Print Receipt</title>');
-        printWindow?.document.write(`
-            <style>
-                @page { size: A6; margin: 0; }
-                body { font-family: sans-serif; margin: 10px; font-size: 10px; }
-                table { width: 100%; border-collapse: collapse; }
-                td, th { padding: 2px 4px; }
-                .text-center { text-align: center; }
-                .font-bold { font-weight: bold; }
-                .text-sm { font-size: 11px; }
-                .text-xs { font-size: 9px; }
-                .grid { display: grid; }
-                .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-                .col-span-2 { grid-column: span 2 / span 2; }
-                .gap-x-2 { column-gap: 0.5rem; }
-                .gap-y-0_5 { row-gap: 0.125rem; }
-                .space-y-3 > * + * { margin-top: 0.75rem; }
-                .font-semibold { font-weight: 600; }
-                .text-right { text-align: right; }
-                .border-t { border-top: 1px solid #e5e7eb; }
-                .bg-muted { background-color: #f1f5f9; }
-                .p-2 { padding: 0.5rem; }
-                .rounded-md { border-radius: 0.375rem; }
-                .text-base { font-size: 13px; }
-                .text-lg { font-size: 14px; }
-                .sr-only { display: none; }
-                hr { border: 0; border-top: 1px dashed #ccc; margin: 4px 0; }
-            </style>
-        `);
+        // Inject styles
+        const styles = Array.from(document.styleSheets)
+          .map(styleSheet => {
+            try {
+              return Array.from(styleSheet.cssRules)
+                .map(rule => rule.cssText)
+                .join('');
+            } catch (e) {
+              console.warn('Could not read stylesheet rules', e);
+              return '';
+            }
+          })
+          .join('\n');
+        printWindow?.document.write(`<style>${styles}</style>`);
+
         printWindow?.document.write('</head><body>');
         printWindow?.document.write(printableContent.innerHTML);
         printWindow?.document.write('</body></html>');
         printWindow?.document.close();
         printWindow?.focus();
-        printWindow?.print();
-        printWindow?.close();
+        setTimeout(() => { // Timeout to ensure content is loaded
+            printWindow?.print();
+            printWindow?.close();
+        }, 250);
     }
   };
 
