@@ -840,36 +840,44 @@ export default function SupplierEntryClient() {
   };
   
   const handleActualPrint = () => {
-    const receiptContent = document.getElementById('receipt-content');
-    if (!receiptContent) return;
+    const receiptNode = document.getElementById('receipt-content');
+    if (!receiptNode) return;
 
-    const printWindow = window.open('', '', 'height=600,width=800');
-    if (printWindow) {
-        printWindow.document.write('<html><head><title>Print Receipt</title>');
-        printWindow.document.write('<style>');
-        printWindow.document.write(`
-            @media print {
-                @page {
-                    size: A6 landscape;
-                    margin: 0.5cm;
-                }
-                body {
-                    margin: 0;
-                    -webkit-print-color-adjust: exact;
-                }
-            }
-        `);
-        printWindow.document.write('</style></head><body>');
-        printWindow.document.write(receiptContent.innerHTML);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        
-        // Use a timeout to ensure content is loaded before printing
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 250);
-    }
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+
+    document.body.appendChild(iframe);
+    
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) return;
+
+    iframeDoc.open();
+    iframeDoc.write('<html><head><title>Print Receipt</title>');
+
+    // Copy all stylesheets from the main document to the iframe
+    Array.from(document.styleSheets).forEach(styleSheet => {
+        try {
+            const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+            const style = iframeDoc.createElement('style');
+            style.appendChild(iframeDoc.createTextNode(cssText));
+            iframeDoc.head.appendChild(style);
+        } catch (e) {
+            console.warn("Could not copy stylesheet:", e);
+        }
+    });
+
+    iframeDoc.write('</head><body></body></html>');
+    iframeDoc.body.innerHTML = receiptNode.innerHTML;
+    iframeDoc.close();
+
+    setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        document.body.removeChild(iframe);
+    }, 500); // A small delay to ensure content and styles are fully loaded
   };
 
 
