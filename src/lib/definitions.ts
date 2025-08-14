@@ -11,6 +11,7 @@
 
 
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -138,29 +139,29 @@ export type CustomerSummary = {
     totalOriginalAmount: number;
     totalPaid: number;
     totalOutstanding: number;
-    totalDeductions?: number;
+    totalDeductions: number;
     paymentHistory: Payment[];
     outstandingEntryIds: string[];
     // New fields for Mill Overview
-    totalGrossWeight?: number;
-    totalTeirWeight?: number;
-    totalFinalWeight?: number;
-    totalKartaWeight?: number;
-    totalNetWeight?: number;
-    totalKartaAmount?: number;
-    totalLabouryAmount?: number;
-    totalKanta?: number;
-    totalOtherCharges?: number;
-    totalCdAmount?: number;
-    averageRate?: number;
-    averageOriginalPrice?: number;
-    averageKartaPercentage?: number;
-    averageLabouryRate?: number;
-    totalTransactions?: number;
-    totalOutstandingTransactions?: number;
-    allTransactions?: Customer[];
-    allPayments?: Payment[];
-    transactionsByVariety?: { [key: string]: number };
+    totalGrossWeight: number;
+    totalTeirWeight: number;
+    totalFinalWeight: number;
+    totalKartaWeight: number;
+    totalNetWeight: number;
+    totalKartaAmount: number;
+    totalLabouryAmount: number;
+    totalKanta: number;
+    totalOtherCharges: number;
+    totalCdAmount: number;
+    averageRate: number;
+    averageOriginalPrice: number;
+    averageKartaPercentage: number;
+    averageLabouryRate: number;
+    totalTransactions: number;
+    totalOutstandingTransactions: number;
+    allTransactions: Customer[];
+    allPayments: Payment[];
+    transactionsByVariety: { [key: string]: number };
 }
 
 export type AppOptions = {

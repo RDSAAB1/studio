@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Customer as Supplier, CustomerSummary, Payment, Customer } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
@@ -59,6 +59,7 @@ const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl
 
 
 const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+    const statementRef = useRef<HTMLDivElement>(null);
     if (!data) return null;
 
     const transactions = useMemo(() => {
@@ -68,7 +69,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
         const mappedTransactions = allTransactions.map(t => ({
             date: t.date,
             particulars: `Purchase (SR# ${t.srNo})`,
-            debit: t.originalNetAmount,
+            debit: t.originalNetAmount || 0,
             credit: 0,
         }));
         
@@ -92,15 +93,21 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
     const closingBalance = totalDebit - totalCredit;
 
-    const getStatementPeriod = () => {
-        if (transactions.length === 0) return "N/A";
-        const firstDate = format(new Date(transactions[0].date), "dd MMM yyyy");
-        const lastDate = format(new Date(transactions[transactions.length - 1].date), "dd MMM yyyy");
-        return `${firstDate} to ${lastDate}`;
+    const handlePrint = () => {
+        const printContents = statementRef.current?.innerHTML;
+        if (printContents) {
+            const originalContents = document.body.innerHTML;
+            document.body.innerHTML = printContents;
+            window.print();
+            document.body.innerHTML = originalContents;
+            window.location.reload(); // Reload to restore styles and event listeners
+        }
     };
 
+
     return (
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-4xl mx-auto font-sans text-gray-800">
+    <>
+        <div ref={statementRef} className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-4xl mx-auto font-sans text-gray-800">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
@@ -115,27 +122,52 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 </div>
             </div>
 
-            {/* Account Summary */}
-            <div className="border rounded-lg p-4 mb-6 bg-slate-50">
-                <h2 className="text-lg font-semibold mb-2 text-gray-700">Account Summary</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                        <p className="text-gray-500">Statement Period</p>
-                        <p className="font-semibold">{getStatementPeriod()}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500">Total Purchases</p>
-                        <p className="font-semibold font-mono">{formatCurrency(totalDebit)}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500">Total Payments</p>
-                        <p className="font-semibold font-mono">{formatCurrency(totalCredit)}</p>
-                    </div>
-                    <div className="text-primary">
-                        <p className="font-semibold">Closing Balance</p>
-                        <p className="font-bold text-xl font-mono">{formatCurrency(closingBalance)}</p>
-                    </div>
-                </div>
+             {/* Detailed Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <Card>
+                    <CardHeader className="p-3 pb-2"><CardTitle className="text-sm font-semibold">Operational Summary</CardTitle></CardHeader>
+                    <CardContent className="p-3 text-xs space-y-1">
+                        <div className="flex justify-between"><span>Gross Wt:</span><span className="font-medium">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between"><span>Teir Wt:</span><span className="font-medium">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold border-t pt-1"><span>Final Wt:</span><span>{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between"><span>Karta Wt (@{(data.averageKartaPercentage || 0).toFixed(2)}%):</span><span className="font-medium">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold text-primary border-t pt-1"><span>Net Wt:</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                        <Separator className="my-1" />
+                        <div className="flex justify-between"><span>Avg Rate:</span><span className="font-medium">{formatCurrency(data.averageRate || 0)}</span></div>
+                        <div className="flex justify-between"><span>Total Entries:</span><span className="font-medium">{data.totalTransactions}</span></div>
+                        <div className="flex justify-between font-bold text-destructive"><span>Outstanding Entries:</span><span>{data.totalOutstandingTransactions}</span></div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="p-3 pb-2"><CardTitle className="text-sm font-semibold">Deduction Summary</CardTitle></CardHeader>
+                    <CardContent className="p-3 text-xs space-y-1">
+                        <div className="flex justify-between"><span>Total Amount:</span><span className="font-medium">{formatCurrency(data.totalAmount)}</span></div>
+                        <Separator className="my-1" />
+                        <div className="flex justify-between"><span>Total Karta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
+                        <div className="flex justify-between"><span>Total Laboury:</span><span className="font-medium">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
+                        <div className="flex justify-between"><span>Total Kanta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
+                        <div className="flex justify-between"><span>Total Other:</span><span className="font-medium">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
+                        <Separator className="my-1" />
+                        <div className="flex justify-between items-center pt-1">
+                            <p className="font-semibold">Original Amount</p>
+                            <p className="font-bold text-lg text-primary">{formatCurrency(data.totalOriginalAmount || 0)}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="p-3 pb-2"><CardTitle className="text-sm font-semibold">Financial Summary</CardTitle></CardHeader>
+                    <CardContent className="p-3 text-xs space-y-1">
+                        <div className="flex justify-between"><span>Original Amt (Avg: {formatCurrency(data.averageOriginalPrice || 0)}):</span><span className="font-medium">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                        <Separator className="my-1"/>
+                        <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">{formatCurrency(data.totalPaid || 0)}</span></div>
+                        <div className="flex justify-between"><span>Total CD Granted:</span><span className="font-medium">{formatCurrency(data.totalCdAmount || 0)}</span></div>
+                        <Separator className="my-1"/>
+                         <div className="flex justify-between items-center pt-1">
+                            <p className="font-semibold">Outstanding</p>
+                            <p className="font-bold text-lg text-destructive">{formatCurrency(data.totalOutstanding)}</p>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Transactions Table */}
@@ -177,6 +209,32 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 </Table>
             </div>
         </div>
+        <style jsx global>{`
+            @media print {
+                body * {
+                    visibility: hidden;
+                }
+                .printable-statement, .printable-statement * {
+                    visibility: visible;
+                }
+                .printable-statement {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                }
+                .no-print {
+                    display: none;
+                }
+            }
+        `}</style>
+         <DialogFooter className="p-4 border-t no-print">
+            <Button variant="outline" onClick={() => (document.querySelector('[data-state="open"] [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
+            <div className="flex-grow" />
+            <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
+            <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
+        </DialogFooter>
+    </>
     );
 };
 
@@ -232,7 +290,7 @@ export default function SupplierProfilePage() {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
-                paymentHistory: [], outstandingEntryIds: [], allTransactions: [],
+                paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
                 transactionsByVariety: {},
                 totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
                 totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0,
@@ -286,6 +344,7 @@ export default function SupplierProfilePage() {
             data.totalPaid += p.amount;
             data.totalCdAmount! += (p.cdAmount || 0);
             data.paymentHistory.push(p);
+            data.allPayments!.push(p);
         }
     });
 
@@ -520,7 +579,7 @@ export default function SupplierProfilePage() {
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Original Amount <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-500">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
@@ -646,19 +705,9 @@ export default function SupplierProfilePage() {
 
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
             <DialogContent className="max-w-4xl p-0">
-                <DialogHeader className="p-4 pb-0">
-                    <DialogTitle className="sr-only">Supplier Statement</DialogTitle>
-                    <DialogDescription className="sr-only">A detailed statement of account for {selectedSupplierData?.name}.</DialogDescription>
-                </DialogHeader>
-                 <ScrollArea className="max-h-[85vh]">
-                    <StatementPreview data={selectedSupplierData} />
-                 </ScrollArea>
-                <DialogFooter className="p-4 border-t">
-                    <Button variant="outline" onClick={() => setIsStatementOpen(false)}>Close</Button>
-                    <div className="flex-grow" />
-                    <Button variant="outline"><Printer className="mr-2 h-4 w-4"/> Print</Button>
-                    <Button><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
-                </DialogFooter>
+                <ScrollArea className="max-h-[90vh]">
+                     <StatementPreview data={selectedSupplierData} />
+                </ScrollArea>
             </DialogContent>
       </Dialog>
 
