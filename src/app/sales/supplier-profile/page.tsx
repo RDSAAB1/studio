@@ -41,7 +41,6 @@ import { format } from "date-fns";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
-type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 type ChartType = 'financial' | 'variety';
 
 
@@ -115,51 +114,44 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                     <p className="text-gray-600">Contact: {data.contact}</p>
                 </div>
             </div>
-            
-            {/* Summary */}
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4">
-                 <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                     <Card>
-                        <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Operational Summary</CardTitle></CardHeader>
-                        <CardContent className="p-3 text-xs space-y-1">
-                            <div className="flex justify-between"><span>Gross Wt</span><span className="font-mono">{totalGrossWeight.toFixed(2)} kg</span></div>
-                            <div className="flex justify-between"><span>Teir Wt</span><span className="font-mono">{totalTeirWeight.toFixed(2)} kg</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-mono">{totalFinalWeight.toFixed(2)} kg</span></div>
-                            <div className="flex justify-between"><span>Karta Wt <span className="text-xs">{`(@${averageKartaPercentage.toFixed(2)}%)`}</span></span><span className="font-mono">{totalKartaWeight.toFixed(2)} kg</span></div>
-                            <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span className="font-mono">{totalNetWeight.toFixed(2)} kg</span></div>
-                            <Separator className="my-1"/>
-                            <div className="flex justify-between"><span>Avg Rate</span><span className="font-mono">{formatCurrency(averageRate)}</span></div>
-                        </CardContent>
-                    </Card>
-                     <Card>
-                        <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Deduction Summary</CardTitle></CardHeader>
-                        <CardContent className="p-3 text-xs space-y-1">
-                            <div className="flex justify-between"><span>Total Amount</span><span className="font-mono">{formatCurrency(totalAmount)}</span></div>
-                            <Separator className="my-1"/>
-                            <div className="flex justify-between text-red-600"><span>Total Karta</span><span className="font-mono">- {formatCurrency(totalKartaAmount)}</span></div>
-                            <div className="flex justify-between text-red-600"><span>Total Laboury</span><span className="font-mono">- {formatCurrency(totalLabouryAmount)}</span></div>
-                            <div className="flex justify-between text-red-600"><span>Total Kanta</span><span className="font-mono">- {formatCurrency(totalKanta)}</span></div>
-                            <div className="flex justify-between text-red-600"><span>Total Other</span><span className="font-mono">- {formatCurrency(totalOtherCharges)}</span></div>
-                            <Separator className="my-1"/>
-                            <div className="flex justify-between font-bold text-primary"><span>Payable</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Transaction Summary</CardTitle></CardHeader>
-                        <CardContent className="p-3 text-xs space-y-1">
-                           <div className="flex justify-between"><span>Total Purchases</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
-                           <Separator className="my-1"/>
-                           <div className="flex justify-between text-green-600"><span>Total Paid</span><span className="font-mono">{formatCurrency(totalPaid)}</span></div>
-                           <div className="flex justify-between text-green-600"><span>Total CD</span><span className="font-mono">{formatCurrency(totalCdAmount)}</span></div>
-                           <Separator className="my-1"/>
-                           <div className="flex justify-between font-bold text-destructive"><span>Balance Due</span><span className="font-mono">{formatCurrency(totalOutstanding)}</span></div>
-                        </CardContent>
-                    </Card>
-                 </div>
-                 <div className="bg-gray-100 p-4 rounded-lg flex flex-col items-center justify-center text-center">
-                    <p className="text-sm text-gray-500">Closing Balance</p>
-                    <p className="text-3xl font-bold text-red-600 font-mono">{formatCurrency(totalOutstanding)}</p>
-                 </div>
+
+            {/* Summaries */}
+            <div className="py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                 <Card className="lg:col-span-2">
+                    <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Operational Summary</CardTitle></CardHeader>
+                    <CardContent className="p-3 text-xs grid grid-cols-2 gap-x-4 gap-y-1">
+                        <div className="flex justify-between"><span>Gross Wt</span><span className="font-mono">{totalGrossWeight.toFixed(2)} kg</span></div>
+                        <div className="flex justify-between"><span>Teir Wt</span><span className="font-mono">{totalTeirWeight.toFixed(2)} kg</span></div>
+                        <div className="flex justify-between font-bold col-span-2"><span>Final Wt</span><span className="font-mono">{totalFinalWeight.toFixed(2)} kg</span></div>
+                        <div className="flex justify-between"><span>Karta Wt <span className="text-xs">{`(@${averageKartaPercentage.toFixed(2)}%)`}</span></span><span className="font-mono">{totalKartaWeight.toFixed(2)} kg</span></div>
+                        <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span className="font-mono">{totalNetWeight.toFixed(2)} kg</span></div>
+                        <div className="flex justify-between col-span-2"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold font-mono">{formatCurrency(averageRate)}</span></div>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Deduction Summary</CardTitle></CardHeader>
+                    <CardContent className="p-3 text-xs space-y-1">
+                        <div className="flex justify-between"><span>Total Amount</span><span className="font-mono">{formatCurrency(totalAmount)}</span></div>
+                        <Separator className="my-1"/>
+                        <div className="flex justify-between text-red-600"><span>Total Karta</span><span className="font-mono">- {formatCurrency(totalKartaAmount)}</span></div>
+                        <div className="flex justify-between text-red-600"><span>Total Laboury</span><span className="font-mono">- {formatCurrency(totalLabouryAmount)}</span></div>
+                        <div className="flex justify-between text-red-600"><span>Total Kanta</span><span className="font-mono">- {formatCurrency(totalKanta)}</span></div>
+                        <div className="flex justify-between text-red-600"><span>Total Other</span><span className="font-mono">- {formatCurrency(totalOtherCharges)}</span></div>
+                        <Separator className="my-1"/>
+                        <div className="flex justify-between font-bold text-primary"><span>Payable</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Financial Summary</CardTitle></CardHeader>
+                    <CardContent className="p-3 text-xs space-y-1">
+                       <div className="flex justify-between"><span>Total Purchases</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
+                       <Separator className="my-1"/>
+                       <div className="flex justify-between text-green-600"><span>Total Paid</span><span className="font-mono">{formatCurrency(totalPaid)}</span></div>
+                       <div className="flex justify-between text-green-600"><span>Total CD</span><span className="font-mono">{formatCurrency(totalCdAmount)}</span></div>
+                       <Separator className="my-1"/>
+                       <div className="flex justify-between font-bold text-destructive"><span>Balance Due</span><span className="font-mono">{formatCurrency(totalOutstanding)}</span></div>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Transactions Table */}
@@ -202,6 +194,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
         </div>
     );
 };
+
 
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -672,7 +665,9 @@ export default function SupplierProfilePage() {
                     <DialogTitle className="sr-only">Supplier Statement</DialogTitle>
                     <DialogDescription className="sr-only">A detailed statement of account for {selectedSupplierData?.name}.</DialogDescription>
                 </DialogHeader>
-                <StatementPreview data={selectedSupplierData} />
+                 <ScrollArea className="max-h-[85vh]">
+                    <StatementPreview data={selectedSupplierData} />
+                 </ScrollArea>
                 <DialogFooter className="p-4 border-t">
                     <Button variant="outline" onClick={() => setIsStatementOpen(false)}>Close</Button>
                     <div className="flex-grow" />
