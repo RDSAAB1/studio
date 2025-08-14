@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodError } from "zod";
@@ -22,7 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns"
@@ -331,7 +331,7 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
     );
 });
 
-const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete, onShowDetails }: any) {
+const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete, onShowDetails, onPrint }: any) {
     return (
         <div className="mt-6 min-h-[200px]"> {/* Added min-height to avoid layout shift */}
             <Card>
@@ -360,6 +360,9 @@ const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete,
                                         <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
                                         <TableCell className="text-center px-3 py-1">
                                             <div className="flex justify-center items-center gap-0">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint(customer)}>
+                                                    <Printer className="h-4 w-4" />
+                                                </Button>
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(customer)}>
                                                     <Info className="h-4 w-4" />
                                                 </Button>
@@ -408,6 +411,103 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
+const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void; }) => {
+    return (
+        <>
+            <DialogHeader>
+                <DialogTitle>Print Receipt</DialogTitle>
+                <DialogDescription>
+                    Review the receipt for SR No: {data.srNo} before printing.
+                </DialogDescription>
+            </DialogHeader>
+            <div id="receipt-content" className="space-y-4 text-sm">
+                <div className="text-center">
+                    <h3 className="text-lg font-bold">BIZSUITE DATAFLOW</h3>
+                    <p className="text-xs">Agricultural Commission Agent</p>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <p><span className="font-semibold">SR No:</span> {data.srNo}</p>
+                    <p><span className="font-semibold">Date:</span> {format(new Date(data.date), "dd-MMM-yyyy")}</p>
+                    <p className="col-span-2"><span className="font-semibold">Supplier:</span> {toTitleCase(data.name)} S/O {toTitleCase(data.so)}</p>
+                    <p className="col-span-2"><span className="font-semibold">Address:</span> {toTitleCase(data.address)}</p>
+                    <p><span className="font-semibold">Contact:</span> {data.contact}</p>
+                    <p><span className="font-semibold">Vehicle No:</span> {data.vehicleNo.toUpperCase()}</p>
+                </div>
+                <Separator />
+                <Table>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell>Variety</TableCell>
+                            <TableCell className="text-right font-semibold">{toTitleCase(data.variety)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Gross Weight</TableCell>
+                            <TableCell className="text-right font-semibold">{data.grossWeight.toFixed(2)} kg</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Teir Weight</TableCell>
+                            <TableCell className="text-right font-semibold">- {data.teirWeight.toFixed(2)} kg</TableCell>
+                        </TableRow>
+                         <TableRow className="font-bold border-t">
+                            <TableCell>Final Weight</TableCell>
+                            <TableCell className="text-right">{data.weight.toFixed(2)} kg</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+                <Separator />
+                 <Table>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell>Rate</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(data.rate)} / kg</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Net Weight</TableCell>
+                            <TableCell className="text-right font-semibold">{data.netWeight.toFixed(2)} kg</TableCell>
+                        </TableRow>
+                        <TableRow className="font-bold border-t">
+                            <TableCell>Total Amount</TableCell>
+                            <TableCell className="text-right">{formatCurrency(data.amount)}</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+                 <Separator />
+                 <p className="font-semibold">Deductions:</p>
+                 <Table>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell>Karta ({data.kartaPercentage}%)</TableCell>
+                            <TableCell className="text-right font-semibold">- {formatCurrency(data.kartaAmount)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Laboury (@{data.labouryRate.toFixed(2)})</TableCell>
+                            <TableCell className="text-right font-semibold">- {formatCurrency(data.labouryAmount)}</TableCell>
+                        </TableRow>
+                         <TableRow>
+                            <TableCell>Kanta</TableCell>
+                            <TableCell className="text-right font-semibold">- {formatCurrency(data.kanta)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell>Other Charges</TableCell>
+                            <TableCell className="text-right font-semibold">- {formatCurrency(data.otherCharges || 0)}</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+                <Separator />
+                 <div className="text-right font-bold text-lg p-2 bg-muted rounded-md">
+                    Net Payable Amount: {formatCurrency(data.netAmount)}
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => onPrint()}>
+                    <Printer className="mr-2 h-4 w-4" /> Print
+                </Button>
+            </DialogFooter>
+        </>
+    );
+};
+
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
@@ -419,6 +519,8 @@ export default function SupplierEntryClient() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+  const [receiptData, setReceiptData] = useState<Customer | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
 
 
@@ -717,6 +819,28 @@ export default function SupplierEntryClient() {
     );
   }, [detailsCustomer, paymentHistory]);
 
+  const handlePrintReceipt = (customer: Customer) => {
+    setReceiptData(customer);
+  };
+  
+  const handleActualPrint = () => {
+    const printableContent = document.getElementById('receipt-content');
+    if (printableContent) {
+        const printWindow = window.open('', '', 'height=600,width=800');
+        printWindow?.document.write('<html><head><title>Print Receipt</title>');
+        // You might want to link to your stylesheet for better formatting
+        printWindow?.document.write('<link rel="stylesheet" href="/path/to/your/tailwind.css" type="text/css" />');
+        printWindow?.document.write('<style>@media print{body{font-family:sans-serif; padding: 20px;}}</style>');
+        printWindow?.document.write('</head><body >');
+        printWindow?.document.write(printableContent.innerHTML);
+        printWindow?.document.write('</body></html>');
+        printWindow?.document.close();
+        printWindow?.focus();
+        printWindow?.print();
+        printWindow?.close();
+    }
+  };
+
   if (!isClient) {
     return null; // Render nothing on the server
   }
@@ -766,7 +890,7 @@ export default function SupplierEntryClient() {
         </form>
       </FormProvider>      
       
-      <SupplierTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} />
+      <SupplierTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} onPrint={handlePrintReceipt} />
         
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
@@ -910,6 +1034,12 @@ export default function SupplierEntryClient() {
             </ScrollArea>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
+        <DialogContent className="sm:max-w-md">
+            {receiptData && <ReceiptPreview data={receiptData} onPrint={handleActualPrint}/>}
         </DialogContent>
       </Dialog>
     </>
