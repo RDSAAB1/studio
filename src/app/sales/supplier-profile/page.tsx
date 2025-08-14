@@ -118,7 +118,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     return (
         <div className="bg-background p-6 rounded-lg font-sans">
-             <header className="mb-6 border-b pb-4">
+            <header className="mb-6 border-b pb-4">
                 <div className="flex justify-between items-start">
                     <div>
                         <h2 className="text-2xl font-bold text-primary">Account Statement</h2>
