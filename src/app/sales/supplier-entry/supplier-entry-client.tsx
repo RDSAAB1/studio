@@ -422,6 +422,20 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
                 <div id="receipt-content" className="p-4 text-black bg-white font-sans">
+                    <style>
+                        {`
+                          @media print {
+                            @page {
+                              size: A6 landscape;
+                              margin: 0;
+                            }
+                            body {
+                              -webkit-print-color-adjust: exact;
+                              print-color-adjust: exact;
+                            }
+                          }
+                        `}
+                    </style>
                     <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">INVOICE</div>
                     
                     <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
@@ -860,9 +874,11 @@ export default function SupplierEntryClient() {
     // Copy all stylesheets from the main document to the iframe
     Array.from(document.styleSheets).forEach(styleSheet => {
         try {
-            const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
             const style = iframeDoc.createElement('style');
+            const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
             style.appendChild(iframeDoc.createTextNode(cssText));
+            // Add a style to force color printing
+            style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
             iframeDoc.head.appendChild(style);
         } catch (e) {
             console.warn("Could not copy stylesheet:", e);
