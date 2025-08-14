@@ -422,29 +422,6 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
                 <div id="receipt-content" className="p-4 text-black bg-white font-sans">
-                    {/* Styles for printing are defined here */}
-                    <style>
-                        {`
-                          @media print {
-                            body * {
-                              visibility: hidden;
-                            }
-                            #receipt-content, #receipt-content * {
-                              visibility: visible;
-                            }
-                            #receipt-content {
-                              position: absolute;
-                              left: 0;
-                              top: 0;
-                              width: 100%;
-                            }
-                            @page {
-                                size: A6 landscape;
-                                margin: 0.5cm;
-                            }
-                          }
-                        `}
-                    </style>
                     <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">INVOICE</div>
                     
                     <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
@@ -863,8 +840,38 @@ export default function SupplierEntryClient() {
   };
   
   const handleActualPrint = () => {
-    window.print();
+    const receiptContent = document.getElementById('receipt-content');
+    if (!receiptContent) return;
+
+    const printWindow = window.open('', '', 'height=600,width=800');
+    if (printWindow) {
+        printWindow.document.write('<html><head><title>Print Receipt</title>');
+        printWindow.document.write('<style>');
+        printWindow.document.write(`
+            @media print {
+                @page {
+                    size: A6 landscape;
+                    margin: 0.5cm;
+                }
+                body {
+                    margin: 0;
+                    -webkit-print-color-adjust: exact;
+                }
+            }
+        `);
+        printWindow.document.write('</style></head><body>');
+        printWindow.document.write(receiptContent.innerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        
+        // Use a timeout to ensure content is loaded before printing
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 250);
+    }
   };
+
 
   if (!isClient) {
     return null; // Render nothing on the server
