@@ -877,7 +877,6 @@ export default function SupplierEntryClient() {
             const style = iframeDoc.createElement('style');
             const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
             style.appendChild(iframeDoc.createTextNode(cssText));
-            // Add a style to force color printing
             style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
             iframeDoc.head.appendChild(style);
         } catch (e) {
