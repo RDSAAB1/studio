@@ -108,7 +108,10 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     return (
     <>
         <DialogHeader className="sr-only">
-            <DialogTitle>Account Statement</DialogTitle>
+            <DialogTitle>Account Statement for {data.name}</DialogTitle>
+             <DialogDescription>
+                A detailed summary and transaction history for {data.name}.
+             </DialogDescription>
         </DialogHeader>
         <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 rounded-lg w-full max-w-5xl mx-auto font-sans text-gray-800">
              {/* Header */}
@@ -126,7 +129,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             </div>
 
             <Card className="mb-6">
-                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Operational Summary */}
                     <div className="space-y-2">
                         <h4 className="text-sm font-semibold text-primary border-b pb-1 mb-2">Operational Summary</h4>
@@ -707,11 +710,11 @@ export default function SupplierProfilePage() {
       )}
 
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-            <DialogContent className="max-w-4xl p-0">
-                 <StatementPreview data={selectedSupplierData} />
-            </DialogContent>
+        <DialogContent className="max-w-4xl p-0">
+             <StatementPreview data={selectedSupplierData} />
+        </DialogContent>
       </Dialog>
-
+      
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
           {detailsCustomer && (
