@@ -438,8 +438,8 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
                               width: 100%;
                             }
                             @page {
-                                size: A4;
-                                margin: 1cm;
+                                size: A6 landscape;
+                                margin: 0.5cm;
                             }
                           }
                         `}
@@ -1101,3 +1101,4 @@ export default function SupplierEntryClient() {
     
 
     
+
