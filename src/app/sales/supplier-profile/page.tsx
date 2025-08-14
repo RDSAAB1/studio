@@ -113,6 +113,16 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 <head>
                     <title>Print Statement</title>
                     <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                        body { 
+                            font-family: 'Inter', sans-serif;
+                            margin: 0;
+                        }
+                        .summary-grid {
+                            display: grid;
+                            grid-template-columns: repeat(3, minmax(0, 1fr));
+                            gap: 1.5rem;
+                        }
                         @media print {
                             body { -webkit-print-color-adjust: exact; }
                             .no-print { display: none !important; }
@@ -138,6 +148,13 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
         const printableContent = node.cloneNode(true) as HTMLElement;
         iframeDoc.body.appendChild(printableContent);
+        
+        // Find the summary section and apply the grid style for printing
+        const summaryGrid = iframeDoc.querySelector('.summary-grid-container');
+        if(summaryGrid) {
+            summaryGrid.className = 'summary-grid';
+        }
+
         iframeDoc.close();
 
         setTimeout(() => {
@@ -149,11 +166,11 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     return (
     <>
-        <DialogHeader>
-            <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
-            <DialogDescription className="sr-only">
-            A detailed summary and transaction history for {data.name}.
-            </DialogDescription>
+        <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
+             <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
+             <DialogDescription className="sr-only">
+             A detailed summary and transaction history for {data.name}.
+             </DialogDescription>
         </DialogHeader>
         <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
             {/* Header */}
@@ -185,7 +202,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                     <CardTitle className="text-lg">Account Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* Operational Summary */}
                         <div className="space-y-1 text-sm border-b md:border-b-0 md:border-r md:pr-4 pb-4 md:pb-0">
                             <h3 className="font-semibold text-primary mb-2">Operational</h3>
