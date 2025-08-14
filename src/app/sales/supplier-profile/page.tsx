@@ -27,13 +27,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart as RechartsAreaChart } from 'recharts';
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart, CircleDollarSign, Download, Printer } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -58,6 +59,150 @@ const MILL_OVERVIEW_KEY = 'mill-overview';
 const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 
+const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+    if (!data) return null;
+
+    const {
+        totalGrossWeight = 0, totalTeirWeight = 0, totalFinalWeight = 0, totalKartaWeight = 0, totalNetWeight = 0,
+        averageRate = 0, totalTransactions = 0, totalOutstandingTransactions = 0,
+        totalAmount = 0, averageKartaPercentage = 0, totalKartaAmount = 0, averageLabouryRate = 0, totalLabouryAmount = 0,
+        totalKanta = 0, totalOtherCharges = 0, totalOriginalAmount = 0, averageOriginalPrice = 0,
+        totalPaid = 0, totalCdAmount = 0, totalOutstanding = 0
+    } = data;
+
+    const transactions = useMemo(() => {
+        const allTransactions = data.allTransactions || [];
+        const allPayments = data.allPayments || [];
+        
+        const mappedTransactions = allTransactions.map(t => ({
+            date: t.date,
+            particulars: `Purchase (SR# ${t.srNo})`,
+            debit: t.originalNetAmount,
+            credit: 0,
+        }));
+        
+        const mappedPayments = allPayments.map(p => ({
+            date: p.date,
+            particulars: `Payment (ID# ${p.paymentId})`,
+            debit: 0,
+            credit: p.amount + (p.cdAmount || 0),
+        }));
+
+        const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        let runningBalance = 0;
+        return combined.map(item => {
+            runningBalance += item.debit - item.credit;
+            return { ...item, balance: runningBalance };
+        });
+    }, [data]);
+
+    const totalDebit = transactions.reduce((sum, item) => sum + item.debit, 0);
+    const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-auto font-sans">
+             {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b">
+                <div className="mb-4 sm:mb-0">
+                    <h1 className="text-2xl font-bold text-gray-800">BizSuite DataFlow</h1>
+                    <p className="text-gray-500 text-sm">Supplier Account Statement</p>
+                </div>
+                <div className="text-left sm:text-right text-sm">
+                    <p className="font-semibold text-gray-700">{toTitleCase(data.name)}</p>
+                    {data.so && <p className="text-gray-600">S/O: {toTitleCase(data.so)}</p>}
+                    <p className="text-gray-600">{data.address}</p>
+                    <p className="text-gray-600">Contact: {data.contact}</p>
+                </div>
+            </div>
+            
+            {/* Summary */}
+             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4">
+                 <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                     <Card>
+                        <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Operational Summary</CardTitle></CardHeader>
+                        <CardContent className="p-3 text-xs space-y-1">
+                            <div className="flex justify-between"><span>Gross Wt</span><span className="font-mono">{totalGrossWeight.toFixed(2)} kg</span></div>
+                            <div className="flex justify-between"><span>Teir Wt</span><span className="font-mono">{totalTeirWeight.toFixed(2)} kg</span></div>
+                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-mono">{totalFinalWeight.toFixed(2)} kg</span></div>
+                            <div className="flex justify-between"><span>Karta Wt (@{averageKartaPercentage.toFixed(2)}%)</span><span className="font-mono">{totalKartaWeight.toFixed(2)} kg</span></div>
+                            <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span className="font-mono">{totalNetWeight.toFixed(2)} kg</span></div>
+                            <Separator className="my-1"/>
+                            <div className="flex justify-between"><span>Avg Rate</span><span className="font-mono">{formatCurrency(averageRate)}</span></div>
+                        </CardContent>
+                    </Card>
+                     <Card>
+                        <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Deduction Summary</CardTitle></CardHeader>
+                        <CardContent className="p-3 text-xs space-y-1">
+                            <div className="flex justify-between"><span>Total Amount</span><span className="font-mono">{formatCurrency(totalAmount)}</span></div>
+                            <Separator className="my-1"/>
+                            <div className="flex justify-between"><span>Total Karta</span><span className="font-mono text-red-600">- {formatCurrency(totalKartaAmount)}</span></div>
+                            <div className="flex justify-between"><span>Total Laboury</span><span className="font-mono text-red-600">- {formatCurrency(totalLabouryAmount)}</span></div>
+                            <div className="flex justify-between"><span>Total Kanta</span><span className="font-mono text-red-600">- {formatCurrency(totalKanta)}</span></div>
+                            <div className="flex justify-between"><span>Total Other</span><span className="font-mono text-red-600">- {formatCurrency(totalOtherCharges)}</span></div>
+                            <Separator className="my-1"/>
+                            <div className="flex justify-between font-bold text-primary"><span>Payable</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Transaction Summary</CardTitle></CardHeader>
+                        <CardContent className="p-3 text-xs space-y-1">
+                           <div className="flex justify-between"><span>Total Purchases</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
+                           <Separator className="my-1"/>
+                           <div className="flex justify-between"><span>Total Paid</span><span className="font-mono text-green-600">{formatCurrency(totalPaid)}</span></div>
+                           <div className="flex justify-between"><span>Total CD</span><span className="font-mono text-green-600">{formatCurrency(totalCdAmount)}</span></div>
+                           <Separator className="my-1"/>
+                           <div className="flex justify-between font-bold text-destructive"><span>Balance Due</span><span className="font-mono">{formatCurrency(totalOutstanding)}</span></div>
+                        </CardContent>
+                    </Card>
+                 </div>
+                 <div className="bg-gray-100 p-4 rounded-lg flex flex-col items-center justify-center text-center">
+                    <p className="text-sm text-gray-500">Closing Balance</p>
+                    <p className="text-3xl font-bold text-red-600 font-mono">{formatCurrency(totalOutstanding)}</p>
+                 </div>
+            </div>
+
+            {/* Transactions Table */}
+            <div className="mt-4">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Particulars</TableHead>
+                            <TableHead className="text-right">Debit</TableHead>
+                            <TableHead className="text-right">Credit</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell colSpan={4} className="font-semibold">Opening Balance</TableCell>
+                            <TableCell className="text-right font-semibold font-mono">{formatCurrency(0)}</TableCell>
+                        </TableRow>
+                        {transactions.map((item, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{format(new Date(item.date), "dd-MMM-yy")}</TableCell>
+                                <TableCell>{item.particulars}</TableCell>
+                                <TableCell className="text-right font-mono text-red-600">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                <TableCell className="text-right font-mono text-green-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
+                                <TableCell className="text-right font-mono">{formatCurrency(item.balance)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                    <TableFooter>
+                        <TableRow className="bg-gray-100 font-bold">
+                            <TableCell colSpan={2}>Total</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(totalDebit)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(totalCredit)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(totalDebit - totalCredit)}</TableCell>
+                        </TableRow>
+                    </TableFooter>
+                </Table>
+            </div>
+        </div>
+    );
+};
+
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
@@ -65,6 +210,7 @@ export default function SupplierProfilePage() {
 
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
+  const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
@@ -346,6 +492,9 @@ export default function SupplierProfilePage() {
                                 {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
                             </CardDescription>
                         </div>
+                         {!isMillSelected && (
+                            <Button onClick={() => setIsStatementOpen(true)}>Generate Statement</Button>
+                         )}
                     </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -357,9 +506,9 @@ export default function SupplierProfilePage() {
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                             <div className="flex justify-between font-bold text-primary"><span >Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                             <Separator className="my-2"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
                             <Separator className="my-2"/>
@@ -519,6 +668,22 @@ export default function SupplierProfilePage() {
             </div>
         </div>
       )}
+
+      <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
+            <DialogContent className="max-w-4xl p-0">
+                <DialogHeader className="p-4 pb-0">
+                    <DialogTitle className="sr-only">Supplier Statement</DialogTitle>
+                    <DialogDescription className="sr-only">A detailed statement of account for {selectedSupplierData?.name}.</DialogDescription>
+                </DialogHeader>
+                <StatementPreview data={selectedSupplierData} />
+                <DialogFooter className="p-4 border-t">
+                    <Button variant="outline" onClick={() => setIsStatementOpen(false)}>Close</Button>
+                    <div className="flex-grow" />
+                    <Button variant="outline"><Printer className="mr-2 h-4 w-4"/> Print</Button>
+                    <Button><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
+                </DialogFooter>
+            </DialogContent>
+      </Dialog>
 
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
