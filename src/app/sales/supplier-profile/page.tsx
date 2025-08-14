@@ -124,7 +124,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                             gap: 1.5rem;
                         }
                         @media print {
-                            body { -webkit-print-color-adjust: exact; }
+                            body { -webkit-print-color-adjust: economy; }
                             .no-print { display: none !important; }
                         }
                     </style>
