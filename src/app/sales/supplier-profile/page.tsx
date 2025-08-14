@@ -117,35 +117,35 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
 
     return (
-        <div className="bg-background p-6 rounded-lg font-sans">
-            <header className="mb-6 border-b pb-4">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h2 className="text-2xl font-bold text-primary">Account Statement</h2>
-                        <p className="text-muted-foreground">BizSuite DataFlow</p>
-                    </div>
-                    <div className="text-right">
-                        <h3 className="text-lg font-semibold">{toTitleCase(data.name)}</h3>
-                        {data.address && <p className="text-sm text-muted-foreground">{toTitleCase(data.address)}</p>}
-                        {data.contact && <p className="text-sm text-muted-foreground">Contact: {data.contact}</p>}
-                    </div>
+        <div className="bg-background p-4 sm:p-6 rounded-lg font-sans">
+             <header className="mb-6 border-b pb-4 flex flex-col md:flex-row justify-between items-start gap-4">
+                <div className="flex-1">
+                    <h2 className="text-2xl font-bold text-primary">Account Statement</h2>
+                    <p className="text-muted-foreground">BizSuite DataFlow</p>
                 </div>
-                 <p className="text-sm text-muted-foreground mt-2">For the period from {startDate} to {endDate}</p>
+                <div className="text-left md:text-right flex-1 space-y-1">
+                    <h3 className="text-lg font-semibold">{toTitleCase(data.name)}</h3>
+                    {data.address && <p className="text-sm text-muted-foreground">{toTitleCase(data.address)}</p>}
+                    {data.contact && <p className="text-sm text-muted-foreground">Contact: {data.contact}</p>}
+                </div>
             </header>
             
             <Card className="mb-6">
-                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                 <CardHeader className="p-4 pb-2">
+                    <CardDescription>Statement for period from {startDate} to {endDate}</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                     <div>
                         <p className="text-sm text-muted-foreground">Total Purchases (Debit)</p>
-                        <p className="text-2xl font-bold font-mono">{formatCurrency(totalDebit)}</p>
+                        <p className="text-xl font-bold font-mono">{formatCurrency(totalDebit)}</p>
                     </div>
                     <div>
                         <p className="text-sm text-muted-foreground">Total Payments (Credit)</p>
-                        <p className="text-2xl font-bold font-mono text-green-600">{formatCurrency(totalCredit)}</p>
+                        <p className="text-xl font-bold font-mono text-green-600">{formatCurrency(totalCredit)}</p>
                     </div>
                     <div>
                         <p className="text-sm text-muted-foreground">Closing Balance</p>
-                        <p className={cn("text-2xl font-bold font-mono", closingBalance >= 0 ? "text-destructive" : "text-green-600")}>
+                        <p className={cn("text-xl font-bold font-mono", closingBalance >= 0 ? "text-destructive" : "text-green-600")}>
                             {formatCurrency(closingBalance)}
                         </p>
                     </div>
