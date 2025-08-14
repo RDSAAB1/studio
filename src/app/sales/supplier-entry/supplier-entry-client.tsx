@@ -208,7 +208,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
             <div className="space-y-6">
                 <SectionCard>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg"><PackageSearch className="h-5 w-5" />Transaction & Weight</CardTitle>
+                        <CardTitle className="flex items-center gap-2 text-lg"><PackageSearch className="h-5 w-5" />Transaction &amp; Weight</CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div className="space-y-1">
@@ -784,7 +784,7 @@ export default function SupplierEntryClient() {
   const paymentsForDetailsEntry = useMemo(() => {
     if (!detailsCustomer) return [];
     return paymentHistory.filter(p => 
-      p.paidFor?.some(pf => pf.srNo === detailsCustomer.srNo)
+      p.paidFor?.some(pf => pf.srNo === detailsCustomer?.srNo)
     );
   }, [detailsCustomer, paymentHistory]);
 
@@ -1032,12 +1032,14 @@ export default function SupplierEntryClient() {
       </Dialog>
 
       <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
-        <DialogContent className="sm:max-w-[350px]">
+        <DialogContent className="sm:max-w-md">
             {receiptData && <ReceiptPreview data={receiptData} onPrint={handleActualPrint}/>}
         </DialogContent>
       </Dialog>
     </>
   );
 }
+
+    
 
     
