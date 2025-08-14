@@ -112,13 +112,18 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             <html>
                 <head>
                     <title>Print Statement</title>
+                    <style>
+                        @media print {
+                            body { -webkit-print-color-adjust: exact; }
+                            .no-print { display: none !important; }
+                        }
+                    </style>
                 </head>
                 <body>
                 </body>
             </html>
         `);
         
-        // Clone stylesheets from the main document
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
@@ -131,10 +136,8 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             }
         });
 
-        // Add the printable content
         const printableContent = node.cloneNode(true) as HTMLElement;
         iframeDoc.body.appendChild(printableContent);
-
         iframeDoc.close();
 
         setTimeout(() => {
@@ -146,11 +149,11 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     return (
     <>
-        <DialogHeader className="sr-only">
-             <DialogTitle>Account Statement for {data.name}</DialogTitle>
-             <DialogDescription>
-                A detailed summary and transaction history for {data.name}.
-             </DialogDescription>
+        <DialogHeader>
+            <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
+            <DialogDescription className="sr-only">
+            A detailed summary and transaction history for {data.name}.
+            </DialogDescription>
         </DialogHeader>
         <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
             {/* Header */}
@@ -741,7 +744,9 @@ export default function SupplierProfilePage() {
 
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
         <DialogContent className="max-w-5xl p-0">
-             <StatementPreview data={selectedSupplierData} />
+          <ScrollArea className="max-h-[90vh]">
+            <StatementPreview data={selectedSupplierData} />
+          </ScrollArea>
         </DialogContent>
       </Dialog>
       
