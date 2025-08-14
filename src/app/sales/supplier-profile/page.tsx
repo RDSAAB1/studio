@@ -94,56 +94,53 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const closingBalance = totalDebit - totalCredit;
 
     const handlePrint = () => {
-        const printContents = statementRef.current?.innerHTML;
-        if (printContents) {
-            const originalContents = document.body.innerHTML;
-            const printStyles = `
-                @media print {
-                    body {
-                        font-family: sans-serif;
-                        background-color: #fff;
-                    }
-                    .printable-statement {
-                        width: 100%;
-                        margin: 0;
-                        padding: 0;
-                        box-shadow: none;
-                        border: none;
-                        background-color: #fff;
-                        color: #000;
-                    }
-                     .printable-statement * {
-                        color: #000 !important;
-                     }
-                    .no-print {
-                        display: none !important;
-                    }
-                    .print-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    .print-table th, .print-table td {
-                        border: 1px solid #ddd;
-                        padding: 8px;
-                        text-align: left;
-                    }
-                    .print-table th {
-                        background-color: #f2f2f2;
-                    }
-                }
-            `;
-            const styleSheet = document.createElement("style");
-            styleSheet.type = "text/css";
-            styleSheet.innerText = printStyles;
-            document.head.appendChild(styleSheet);
-            
-            document.body.innerHTML = `<div class="printable-statement">${printContents}</div>`;
-            window.print();
-            document.body.innerHTML = originalContents;
-            window.location.reload(); 
-        }
-    };
+        const node = statementRef.current;
+        if (!node) return;
 
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) return;
+        
+        iframeDoc.open();
+        iframeDoc.write('<html><head><title>Print Statement</title>');
+        
+        // Clone stylesheets from the main document
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                if (styleSheet.cssRules) {
+                    const style = iframeDoc.createElement('style');
+                    style.textContent = Array.from(styleSheet.cssRules)
+                        .map(rule => rule.cssText)
+                        .join('');
+                    iframeDoc.head.appendChild(style);
+                } else if (styleSheet.href) {
+                    const link = iframeDoc.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = styleSheet.href;
+                    iframeDoc.head.appendChild(link);
+                }
+            } catch (e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+
+        iframeDoc.write('</head><body>');
+        iframeDoc.write(node.innerHTML);
+        iframeDoc.write('</body></html>');
+        iframeDoc.close();
+
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+        }, 500); // Wait for styles to load
+    };
 
     return (
     <>
@@ -158,26 +155,20 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                     <div className="mb-4 sm:mb-0">
-                        <div className="bg-muted w-28 h-14 flex items-center justify-center rounded">
-                           <p className="text-sm text-muted-foreground">LOGO</p>
-                        </div>
-                         <div className="mt-4 text-sm">
-                            <p className="font-semibold text-lg">{toTitleCase(data.name)}</p>
-                            {data.so && <p>S/O: {toTitleCase(data.so)}</p>}
-                            <p>{data.address}</p>
-                            <p>Contact: {data.contact}</p>
+                        <div className="bg-muted text-muted-foreground w-28 h-14 flex items-center justify-center rounded text-sm">
+                           LOGO HERE
                         </div>
                     </div>
                     <div className="text-left sm:text-right">
                          <h1 className="text-2xl font-bold text-primary">Statement of Account</h1>
                          <div className="mt-4 text-sm w-full sm:w-80">
-                            <div className="flex justify-between border-t pt-1">
+                           <div className="flex justify-between border-t pt-1">
                                 <span className="font-semibold">Statement Date:</span>
                                 <span>{format(new Date(), 'MM/dd/yyyy')}</span>
                             </div>
                             <div className="flex justify-between border-t pt-1">
-                                <span className="font-semibold">Total Amount Due:</span>
-                                <span className="font-bold">{formatCurrency(data.totalOutstanding)}</span>
+                                <span className="font-semibold">Account Holder:</span>
+                                <span>{toTitleCase(data.name)}</span>
                             </div>
                          </div>
                     </div>
@@ -272,7 +263,6 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         Payment is due by the date specified.
                      </div>
                 </div>
-
             </div>
         </ScrollArea>
          <DialogFooter className="p-4 border-t no-print">
@@ -603,7 +593,7 @@ export default function SupplierProfilePage() {
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
-                            <Separator className="my-2"/>
+                             <Separator className="my-2"/>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total Karta <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
