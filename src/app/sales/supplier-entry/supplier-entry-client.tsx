@@ -422,6 +422,7 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
                 <div id="receipt-content" className="p-4 text-black bg-white font-sans">
+                    {/* Styles for printing are defined here */}
                     <style>
                         {`
                           @media print {
@@ -862,57 +863,7 @@ export default function SupplierEntryClient() {
   };
   
   const handleActualPrint = () => {
-    const node = document.getElementById('receipt-content');
-    if (!node) return;
-  
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-  
-    document.body.appendChild(iframe);
-  
-    const iframeDoc = iframe.contentWindow?.document;
-    if (!iframeDoc) return;
-  
-    iframeDoc.open();
-    iframeDoc.write('<html><head><title>Print Receipt</title>');
-  
-    // Copy all style links from the main document
-    Array.from(document.styleSheets).forEach(styleSheet => {
-      if (styleSheet.href) {
-        const link = iframeDoc.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = styleSheet.href;
-        iframeDoc.head.appendChild(link);
-      } else {
-        // For inline styles, copy the rules
-        try {
-          const style = iframeDoc.createElement('style');
-          style.textContent = Array.from(styleSheet.cssRules)
-            .map(rule => rule.cssText)
-            .join('\n');
-          iframeDoc.head.appendChild(style);
-        } catch (e) {
-          console.warn('Could not read stylesheet rules', e);
-        }
-      }
-    });
-  
-    iframeDoc.write('</head><body>');
-    iframeDoc.write(node.innerHTML);
-    iframeDoc.write('</body></html>');
-    iframeDoc.close();
-  
-    // Wait for styles to load before printing
-    iframe.onload = function() {
-      setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        document.body.removeChild(iframe);
-      }, 500); // 500ms delay to be safe
-    };
+    window.print();
   };
 
   if (!isClient) {
@@ -1119,10 +1070,3 @@ export default function SupplierEntryClient() {
     </>
   );
 }
-
-    
-
-    
-
-
-
