@@ -27,14 +27,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart as RechartsAreaChart } from 'recharts';
 import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, UserSquare, Calendar as CalendarIcon, Truck, Wheat, Receipt, Wallet, Scale, Calculator, Percent, Server, Milestone, ArrowRight, FileText, Weight, Box, Users, AreaChart, CircleDollarSign, Download, Printer } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -55,142 +54,14 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-const SummaryDetailItem = ({ label, value, subValue, colorClass }: { label: string, value: string | number, subValue?: string, colorClass?: string }) => (
-    <div className="flex justify-between items-center text-sm py-1.5">
-        <p className="text-muted-foreground">{label} {subValue && <span className="text-xs">({subValue})</span>}</p>
-        <p className={cn("font-semibold", colorClass)}>{value}</p>
-    </div>
-);
-
-
 const MILL_OVERVIEW_KEY = 'mill-overview';
 const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
-
-const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
-    const statementItems = useMemo(() => {
-        if (!data) return { items: [], openingBalance: 0, closingBalance: 0, totalDebit: 0, totalCredit: 0 };
-
-        const transactions = (data.allTransactions || [])
-            .map(t => ({
-                date: new Date(t.date),
-                type: 'Purchase',
-                particulars: `SR#${t.srNo} - ${toTitleCase(t.variety)}`,
-                debit: t.originalNetAmount,
-                credit: 0
-            }));
-        
-        const payments = (data.allPayments || data.paymentHistory || [])
-            .map(p => ({
-                date: new Date(p.date),
-                type: 'Payment',
-                particulars: `ID#${p.paymentId} - ${p.receiptType}`,
-                debit: 0,
-                credit: (p.amount + (p.cdAmount || 0))
-            }));
-
-        const combined = [...transactions, ...payments].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-        let balance = 0; // Assuming opening balance is 0 for this statement period
-        const itemsWithBalance = combined.map(item => {
-            balance = balance + item.debit - item.credit;
-            return { ...item, balance };
-        });
-        
-        const openingBalance = 0;
-        const totalDebit = transactions.reduce((sum, t) => sum + t.debit, 0);
-        const totalCredit = payments.reduce((sum, p) => sum + p.credit, 0);
-        const closingBalance = totalDebit - totalCredit;
-
-        return {
-            items: itemsWithBalance,
-            openingBalance,
-            closingBalance,
-            totalDebit,
-            totalCredit,
-        };
-    }, [data]);
-
-    if (!data) return null;
-    const { items, openingBalance, closingBalance, totalDebit, totalCredit } = statementItems;
-
-    return (
-        <div className="bg-background p-4 sm:p-6 rounded-lg font-sans">
-             <header className="mb-6 pb-4 flex flex-col md:flex-row justify-between items-start gap-4">
-                <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-primary">Account Statement</h2>
-                    <p className="text-muted-foreground">BizSuite DataFlow</p>
-                </div>
-                <div className="text-left md:text-right flex-1 space-y-1">
-                    <h3 className="text-lg font-semibold">{toTitleCase(data.name)}</h3>
-                    {data.address && <p className="text-sm text-muted-foreground">{toTitleCase(data.address)}</p>}
-                    {data.contact && <p className="text-sm text-muted-foreground">Contact: {data.contact}</p>}
-                </div>
-            </header>
-            
-            <Card className="mb-6">
-                 <CardHeader className="p-4 pb-2">
-                    <CardTitle className="text-base">Statement Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                    <div>
-                        <p className="text-sm text-muted-foreground">Total Purchases (Debit)</p>
-                        <p className="text-xl font-bold font-mono">{formatCurrency(totalDebit)}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-muted-foreground">Total Payments (Credit)</p>
-                        <p className="text-xl font-bold font-mono text-green-600">{formatCurrency(totalCredit)}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-muted-foreground">Closing Balance</p>
-                        <p className={cn("text-xl font-bold font-mono", closingBalance >= 0 ? "text-destructive" : "text-green-600")}>
-                            {formatCurrency(closingBalance)}
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <ScrollArea className="h-[400px] border rounded-md">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-[100px]">Date</TableHead>
-                            <TableHead>Particulars</TableHead>
-                            <TableHead className="text-right">Debit</TableHead>
-                            <TableHead className="text-right">Credit</TableHead>
-                            <TableHead className="text-right w-[120px]">Balance</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {items.map((item, index) => (
-                            <TableRow key={index} className="[&_td]:py-2">
-                                <TableCell className="text-xs">{format(item.date, "dd-MMM-yy")}</TableCell>
-                                <TableCell>{item.particulars}</TableCell>
-                                <TableCell className="text-right font-mono">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
-                                <TableCell className="text-right font-mono text-green-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
-                                <TableCell className={cn("text-right font-mono font-semibold", item.balance < 0 && 'text-green-600')}>{formatCurrency(item.balance)}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                    <TableFooter>
-                        <TableRow className="bg-muted font-bold">
-                            <TableCell colSpan={2}>Total</TableCell>
-                            <TableCell className="text-right font-mono">{formatCurrency(totalDebit)}</TableCell>
-                            <TableCell className="text-right font-mono text-green-600">{formatCurrency(totalCredit)}</TableCell>
-                            <TableCell className="text-right font-mono">{formatCurrency(closingBalance)}</TableCell>
-                        </TableRow>
-                    </TableFooter>
-                </Table>
-            </ScrollArea>
-        </div>
-    );
-};
 
 
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
-  const [isStatementOpen, setIsStatementOpen] = useState(false);
 
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
@@ -475,44 +346,40 @@ export default function SupplierProfilePage() {
                                 {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
                             </CardDescription>
                         </div>
-                        <Button variant="outline" onClick={() => setIsStatementOpen(true)}>
-                            <FileText className="mr-2 h-4 w-4"/>
-                            Generate Statement
-                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {/* Operational Summary Card */}
-                    <Card className="bg-card/50">
+                    <Card>
                         <CardHeader className="p-4 pb-2">
                             <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1">
-                            <SummaryDetailItem label="Gross Wt" value={`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Teir Wt" value={`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Total Wt" value={`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Karta Wt" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`} />
-                            <SummaryDetailItem label="Net Wt" value={`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`} colorClass="text-primary font-bold"/>
+                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
+                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                             <div className="flex justify-between font-bold text-primary"><span >Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                             <Separator className="my-2"/>
-                            <SummaryDetailItem label="Average Rate" value={formatCurrency(selectedSupplierData.averageRate || 0)} />
+                            <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
                             <Separator className="my-2"/>
-                            <SummaryDetailItem label="Total Transactions" value={`${selectedSupplierData.totalTransactions} Entries`} />
-                            <SummaryDetailItem label="Outstanding Entries" value={`${selectedSupplierData.totalOutstandingTransactions} Entries`} colorClass="text-destructive font-bold"/>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Transactions</span><span className="font-semibold">{`${selectedSupplierData.totalTransactions} Entries`}</span></div>
+                             <div className="flex justify-between font-bold text-destructive"><span>Outstanding Entries</span><span>{`${selectedSupplierData.totalOutstandingTransactions} Entries`}</span></div>
                         </CardContent>
                     </Card>
 
                     {/* Deduction Summary Card */}
-                     <Card className="bg-card/50">
+                     <Card>
                         <CardHeader className="p-4 pb-2">
                              <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1">
-                            <SummaryDetailItem label="Total Amount" subValue={`@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg`} value={`${formatCurrency(selectedSupplierData.totalAmount || 0)}`} />
+                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
                             <Separator className="my-2"/>
-                            <SummaryDetailItem label="Total Karta" subValue={`@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%`} value={`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Laboury" subValue={`@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)}`} value={`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`} />
-                            <SummaryDetailItem label="Total Kanta" value={`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`} />
-                            <SummaryDetailItem label="Total Other" value={`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`} />
+                             <div className="flex justify-between"><span className="text-muted-foreground">Total Karta <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Other</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
                              <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Total Original Amount</p>
@@ -522,15 +389,15 @@ export default function SupplierProfilePage() {
                     </Card>
 
                     {/* Financial Summary Card */}
-                     <Card className="bg-card/50">
+                     <Card>
                         <CardHeader className="p-4 pb-2">
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1">
-                            <SummaryDetailItem label="Total Original Amount" value={formatCurrency(selectedSupplierData.totalOriginalAmount || 0)} subValue={`Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg`} />
+                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Original Amount <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                            <SummaryDetailItem label="Total Paid" value={`${formatCurrency(selectedSupplierData.totalPaid || 0)}`} colorClass="text-green-500" />
-                            <SummaryDetailItem label="Total CD Granted" value={`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`} />
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-500">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Outstanding</p>
@@ -830,29 +697,11 @@ export default function SupplierProfilePage() {
                     </TableBody>
                 </Table>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedPaymentForDetails(null)}>Close</Button>
-              </DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-          <DialogContent className="max-w-4xl p-0">
-             <DialogHeader className="p-4 sr-only">
-                <DialogTitle>Account Statement for {selectedSupplierData?.name}</DialogTitle>
-                <DialogDescription>A detailed account statement of all transactions and payments.</DialogDescription>
-            </DialogHeader>
-              <StatementPreview data={selectedSupplierData} />
-              <DialogFooter className="p-4 border-t">
-                    <Button variant="outline" onClick={() => setIsStatementOpen(false)}>Close</Button>
-                    <div className="flex-grow" />
-                    <Button variant="outline"><Printer className="mr-2 h-4 w-4"/> Print</Button>
-                    <Button><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
-                </DialogFooter>
-          </DialogContent>
-      </Dialog>
     </div>
   );
 }
