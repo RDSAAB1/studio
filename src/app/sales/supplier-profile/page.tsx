@@ -150,54 +150,59 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             </div>
 
             {/* Summary Section */}
-            <Card className="mb-6">
-                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-primary border-b pb-1">Operational Summary</h3>
-                        <div className="text-xs space-y-1">
-                            <div className="flex justify-between"><span>Gross Wt:</span><span className="font-medium">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span>Teir Wt:</span><span className="font-medium">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between font-bold border-t pt-1"><span>Final Wt:</span><span>{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span>Karta Wt (@{(data.averageKartaPercentage || 0).toFixed(2)}%):</span><span className="font-medium">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between font-bold border-t pt-1"><span>Net Wt:</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
-                            <Separator className="my-2" />
-                            <div className="flex justify-between"><span>Avg Rate:</span><span className="font-medium">{formatCurrency(data.averageRate || 0)}</span></div>
-                            <div className="flex justify-between"><span>Total Entries:</span><span className="font-medium">{data.totalTransactions}</span></div>
-                            <div className="flex justify-between font-bold text-red-600"><span>Outstanding Entries:</span><span>{data.totalOutstandingTransactions}</span></div>
+             <div className="mb-6 flex flex-wrap gap-4 justify-center">
+                <Card className="flex-grow min-w-[280px] max-w-full md:max-w-xs">
+                    <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm font-semibold text-primary border-b pb-1">Operational Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2 text-xs space-y-1">
+                        <div className="flex justify-between"><span>Gross Wt:</span><span className="font-medium">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between"><span>Teir Wt:</span><span className="font-medium">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold border-t pt-1"><span>Final Wt:</span><span>{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between"><span>Karta Wt (@{(data.averageKartaPercentage || 0).toFixed(2)}%):</span><span className="font-medium">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold border-t pt-1"><span>Net Wt:</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between"><span>Avg Rate:</span><span className="font-medium">{formatCurrency(data.averageRate || 0)}</span></div>
+                        <div className="flex justify-between"><span>Total Entries:</span><span className="font-medium">{data.totalTransactions}</span></div>
+                        <div className="flex justify-between font-bold text-red-600"><span>Outstanding Entries:</span><span>{data.totalOutstandingTransactions}</span></div>
+                    </CardContent>
+                </Card>
+                 <Card className="flex-grow min-w-[280px] max-w-full md:max-w-xs">
+                     <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm font-semibold text-primary border-b pb-1">Deduction Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2 text-xs space-y-1">
+                        <div className="flex justify-between"><span>Total Amount:</span><span className="font-medium">{formatCurrency(data.totalAmount)}</span></div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between"><span>Total Karta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
+                        <div className="flex justify-between"><span>Total Laboury:</span><span className="font-medium">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
+                        <div className="flex justify-between"><span>Total Kanta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
+                        <div className="flex justify-between"><span>Total Other:</span><span className="font-medium">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between items-center pt-1">
+                            <p className="font-semibold">Original Amount</p>
+                            <p className="font-bold text-base">{formatCurrency(data.totalOriginalAmount || 0)}</p>
                         </div>
-                    </div>
-                     <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-primary border-b pb-1">Deduction Summary</h3>
-                        <div className="text-xs space-y-1">
-                            <div className="flex justify-between"><span>Total Amount:</span><span className="font-medium">{formatCurrency(data.totalAmount)}</span></div>
-                            <Separator className="my-2" />
-                            <div className="flex justify-between"><span>Total Karta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span>Total Laboury:</span><span className="font-medium">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span>Total Kanta:</span><span className="font-medium">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
-                            <div className="flex justify-between"><span>Total Other:</span><span className="font-medium">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
-                            <Separator className="my-2" />
-                            <div className="flex justify-between items-center pt-1">
-                                <p className="font-semibold">Original Amount</p>
-                                <p className="font-bold text-base">{formatCurrency(data.totalOriginalAmount || 0)}</p>
-                            </div>
+                    </CardContent>
+                </Card>
+                 <Card className="flex-grow min-w-[280px] max-w-full md:max-w-xs">
+                    <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm font-semibold text-primary border-b pb-1">Financial Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2 text-xs space-y-1">
+                        <div className="flex justify-between"><span>Original Amt (Avg: {formatCurrency(data.averageOriginalPrice || 0)}/kg):</span><span className="font-medium">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                        <Separator className="my-2"/>
+                        <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">{formatCurrency(data.totalPaid || 0)}</span></div>
+                        <div className="flex justify-between"><span>Total CD Granted:</span><span className="font-medium">{formatCurrency(data.totalCdAmount || 0)}</span></div>
+                        <Separator className="my-2"/>
+                        <div className="flex justify-between items-center pt-1">
+                            <p className="font-semibold text-sm">Outstanding</p>
+                            <p className="font-bold text-lg text-red-600">{formatCurrency(data.totalOutstanding)}</p>
                         </div>
-                    </div>
-                     <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-primary border-b pb-1">Financial Summary</h3>
-                        <div className="text-xs space-y-1">
-                            <div className="flex justify-between"><span>Original Amt (Avg: {formatCurrency(data.averageOriginalPrice || 0)}/kg):</span><span className="font-medium">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">{formatCurrency(data.totalPaid || 0)}</span></div>
-                            <div className="flex justify-between"><span>Total CD Granted:</span><span className="font-medium">{formatCurrency(data.totalCdAmount || 0)}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between items-center pt-1">
-                                <p className="font-semibold text-sm">Outstanding</p>
-                                <p className="font-bold text-lg text-red-600">{formatCurrency(data.totalOutstanding)}</p>
-                            </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </div>
+
 
             <div className="overflow-x-auto">
                 <h3 className="text-lg font-semibold mb-2 text-gray-700">Transaction Details</h3>
