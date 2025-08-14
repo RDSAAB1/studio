@@ -61,14 +61,6 @@ const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl
 const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     if (!data) return null;
 
-    const {
-        totalGrossWeight = 0, totalTeirWeight = 0, totalFinalWeight = 0, totalKartaWeight = 0, totalNetWeight = 0,
-        averageRate = 0, totalTransactions = 0, totalOutstandingTransactions = 0,
-        totalAmount = 0, averageKartaPercentage = 0, totalKartaAmount = 0, averageLabouryRate = 0, totalLabouryAmount = 0,
-        totalKanta = 0, totalOtherCharges = 0, totalOriginalAmount = 0, averageOriginalPrice = 0,
-        totalPaid = 0, totalCdAmount = 0, totalOutstanding = 0
-    } = data;
-
     const transactions = useMemo(() => {
         const allTransactions = data.allTransactions || [];
         const allPayments = data.allPayments || [];
@@ -89,7 +81,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
         const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-        let runningBalance = 0;
+        let runningBalance = 0; // Assuming opening balance is 0
         return combined.map(item => {
             runningBalance += item.debit - item.credit;
             return { ...item, balance: runningBalance };
@@ -98,64 +90,57 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
 
     const totalDebit = transactions.reduce((sum, item) => sum + item.debit, 0);
     const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
+    const closingBalance = totalDebit - totalCredit;
+
+    const getStatementPeriod = () => {
+        if (transactions.length === 0) return "N/A";
+        const firstDate = format(new Date(transactions[0].date), "dd MMM yyyy");
+        const lastDate = format(new Date(transactions[transactions.length - 1].date), "dd MMM yyyy");
+        return `${firstDate} to ${lastDate}`;
+    };
 
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-4xl mx-auto font-sans text-gray-800">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b">
+            <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
-                    <h1 className="text-2xl font-bold">BizSuite DataFlow</h1>
-                    <p className="text-gray-500 text-sm">Supplier Account Statement</p>
+                    <h1 className="text-2xl font-bold text-primary">BizSuite DataFlow</h1>
+                    <p className="text-gray-500 text-sm">Account Statement</p>
                 </div>
                 <div className="text-left sm:text-right text-sm">
-                    <p className="font-semibold">{toTitleCase(data.name)}</p>
+                    <p className="font-semibold text-lg">{toTitleCase(data.name)}</p>
                     {data.so && <p className="text-gray-600">S/O: {toTitleCase(data.so)}</p>}
                     <p className="text-gray-600">{data.address}</p>
                     <p className="text-gray-600">Contact: {data.contact}</p>
                 </div>
             </div>
 
-            {/* Summaries */}
-            <div className="py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                 <Card className="lg:col-span-2">
-                    <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Operational Summary</CardTitle></CardHeader>
-                    <CardContent className="p-3 text-xs grid grid-cols-2 gap-x-4 gap-y-1">
-                        <div className="flex justify-between"><span>Gross Wt</span><span className="font-mono">{totalGrossWeight.toFixed(2)} kg</span></div>
-                        <div className="flex justify-between"><span>Teir Wt</span><span className="font-mono">{totalTeirWeight.toFixed(2)} kg</span></div>
-                        <div className="flex justify-between font-bold col-span-2"><span>Final Wt</span><span className="font-mono">{totalFinalWeight.toFixed(2)} kg</span></div>
-                        <div className="flex justify-between"><span>Karta Wt <span className="text-xs">{`(@${averageKartaPercentage.toFixed(2)}%)`}</span></span><span className="font-mono">{totalKartaWeight.toFixed(2)} kg</span></div>
-                        <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span className="font-mono">{totalNetWeight.toFixed(2)} kg</span></div>
-                        <div className="flex justify-between col-span-2"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold font-mono">{formatCurrency(averageRate)}</span></div>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Deduction Summary</CardTitle></CardHeader>
-                    <CardContent className="p-3 text-xs space-y-1">
-                        <div className="flex justify-between"><span>Total Amount</span><span className="font-mono">{formatCurrency(totalAmount)}</span></div>
-                        <Separator className="my-1"/>
-                        <div className="flex justify-between text-red-600"><span>Total Karta</span><span className="font-mono">- {formatCurrency(totalKartaAmount)}</span></div>
-                        <div className="flex justify-between text-red-600"><span>Total Laboury</span><span className="font-mono">- {formatCurrency(totalLabouryAmount)}</span></div>
-                        <div className="flex justify-between text-red-600"><span>Total Kanta</span><span className="font-mono">- {formatCurrency(totalKanta)}</span></div>
-                        <div className="flex justify-between text-red-600"><span>Total Other</span><span className="font-mono">- {formatCurrency(totalOtherCharges)}</span></div>
-                        <Separator className="my-1"/>
-                        <div className="flex justify-between font-bold text-primary"><span>Payable</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">Financial Summary</CardTitle></CardHeader>
-                    <CardContent className="p-3 text-xs space-y-1">
-                       <div className="flex justify-between"><span>Total Purchases</span><span className="font-mono">{formatCurrency(totalOriginalAmount)}</span></div>
-                       <Separator className="my-1"/>
-                       <div className="flex justify-between text-green-600"><span>Total Paid</span><span className="font-mono">{formatCurrency(totalPaid)}</span></div>
-                       <div className="flex justify-between text-green-600"><span>Total CD</span><span className="font-mono">{formatCurrency(totalCdAmount)}</span></div>
-                       <Separator className="my-1"/>
-                       <div className="flex justify-between font-bold text-destructive"><span>Balance Due</span><span className="font-mono">{formatCurrency(totalOutstanding)}</span></div>
-                    </CardContent>
-                </Card>
+            {/* Account Summary */}
+            <div className="border rounded-lg p-4 mb-6 bg-slate-50">
+                <h2 className="text-lg font-semibold mb-2 text-gray-700">Account Summary</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <p className="text-gray-500">Statement Period</p>
+                        <p className="font-semibold">{getStatementPeriod()}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-500">Total Purchases</p>
+                        <p className="font-semibold font-mono">{formatCurrency(totalDebit)}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-500">Total Payments</p>
+                        <p className="font-semibold font-mono">{formatCurrency(totalCredit)}</p>
+                    </div>
+                    <div className="text-primary">
+                        <p className="font-semibold">Closing Balance</p>
+                        <p className="font-bold text-xl font-mono">{formatCurrency(closingBalance)}</p>
+                    </div>
+                </div>
             </div>
 
             {/* Transactions Table */}
-            <div className="mt-4 overflow-x-auto">
+            <div className="overflow-x-auto">
+                <h3 className="text-lg font-semibold mb-2 text-gray-700">Transaction Details</h3>
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -182,11 +167,11 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
                         ))}
                     </TableBody>
                     <TableFooter>
-                        <TableRow className="bg-gray-100 font-bold">
-                            <TableCell colSpan={2}>Total</TableCell>
+                        <TableRow className="bg-slate-100 font-bold">
+                            <TableCell colSpan={2}>Closing Balance</TableCell>
                             <TableCell className="text-right font-mono">{formatCurrency(totalDebit)}</TableCell>
                             <TableCell className="text-right font-mono">{formatCurrency(totalCredit)}</TableCell>
-                            <TableCell className="text-right font-mono">{formatCurrency(totalDebit - totalCredit)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(closingBalance)}</TableCell>
                         </TableRow>
                     </TableFooter>
                 </Table>
