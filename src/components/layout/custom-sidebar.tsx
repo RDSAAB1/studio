@@ -99,15 +99,11 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
       >
         {isActiveParent && (
             <>
-            <div className="absolute top-[-16px] left-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0)' }}></div>
-            <div className="absolute top-[-16px] right-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 0, 0 100%, 100% 100%)' }}></div>
-            <div className="absolute bottom-[-16px] left-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(100% 100%, 0 0, 100% 0)' }}></div>
-            <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 0)' }}></div>
-
-            <div className="absolute top-[-16px] left-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 16 16 L 16 0 A 16 16 0 0 0 0 16 Z")' }}></div>
-            <div className="absolute top-[-16px] right-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 0 16 L 0 0 A 16 16 0 0 1 16 16 Z")' }}></div>
-            <div className="absolute bottom-[-16px] left-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 16 0 L 16 16 A 16 16 0 0 1 0 0 Z")' }}></div>
-            <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 0 0 L 0 16 A 16 16 0 0 0 16 0 Z")' }}></div>
+              <div className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}></div>
+              <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]" style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}></div>
+              
+              <div className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--content-bg)]" style={{ clipPath: 'path("M 0 16 A 16 16 0 0 1 16 0 L 16 16 Z")' }}></div>
+              <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--content-bg)]" style={{ clipPath: 'path("M 16 16 A 16 16 0 0 1 0 16 L 16 0 Z")' }}></div>
             </>
         )}
         <div className="flex items-center flex-grow">
@@ -147,15 +143,11 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
                 >
                   {isActive && (
                     <>
-                     <div className="absolute top-[-16px] left-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0)' }}></div>
-                    <div className="absolute top-[-16px] right-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 0, 0 100%, 100% 100%)' }}></div>
-                    <div className="absolute bottom-[-16px] left-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(100% 100%, 0 0, 100% 0)' }}></div>
-                    <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 0)' }}></div>
-
-                    <div className="absolute top-[-16px] left-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 16 16 L 16 0 A 16 16 0 0 0 0 16 Z")' }}></div>
-                    <div className="absolute top-[-16px] right-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 0 16 L 0 0 A 16 16 0 0 1 16 16 Z")' }}></div>
-                    <div className="absolute bottom-[-16px] left-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 16 0 L 16 16 A 16 16 0 0 1 0 0 Z")' }}></div>
-                    <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 0 0 L 0 16 A 16 16 0 0 0 16 0 Z")' }}></div>
+                      <div className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}></div>
+                      <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]" style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}></div>
+                      
+                      <div className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--content-bg)]" style={{ clipPath: 'path("M 0 16 A 16 16 0 0 1 16 0 L 16 16 Z")' }}></div>
+                      <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--content-bg)]" style={{ clipPath: 'path("M 16 16 A 16 16 0 0 1 0 16 L 16 0 Z")' }}></div>
                     </>
                   )}
 
@@ -305,15 +297,11 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
                 >
                   {activePath === item.href && (
                     <>
-                      <div className="absolute top-[-16px] left-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0)' }}></div>
-                      <div className="absolute top-[-16px] right-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 0, 0 100%, 100% 100%)' }}></div>
-                      <div className="absolute bottom-[-16px] left-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(100% 100%, 0 0, 100% 0)' }}></div>
-                      <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-primary" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 0)' }}></div>
-
-                      <div className="absolute top-[-16px] left-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 16 16 L 16 0 A 16 16 0 0 0 0 16 Z")' }}></div>
-                      <div className="absolute top-[-16px] right-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 0 16 L 0 0 A 16 16 0 0 1 16 16 Z")' }}></div>
-                      <div className="absolute bottom-[-16px] left-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 16 0 L 16 16 A 16 16 0 0 1 0 0 Z")' }}></div>
-                      <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-background" style={{ clipPath: 'path("M 0 0 L 0 16 A 16 16 0 0 0 16 0 Z")' }}></div>
+                      <div className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}></div>
+                      <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]" style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}></div>
+                      
+                      <div className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--content-bg)]" style={{ clipPath: 'path("M 0 16 A 16 16 0 0 1 16 0 L 16 16 Z")' }}></div>
+                      <div className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--content-bg)]" style={{ clipPath: 'path("M 16 16 A 16 16 0 0 1 0 16 L 16 0 Z")' }}></div>
                     </>
                   )}
                   <div className={isSidebarOpen ? "mr-3" : "w-full text-center"}>
