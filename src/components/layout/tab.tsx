@@ -27,8 +27,8 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
   const tabClasses = cn(
     "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-4 min-w-[120px] max-w-[240px] flex-1 transition-colors duration-200",
     {
-      'bg-background text-foreground z-10 rounded-t-lg': isActive,
-      'bg-primary/80 text-primary-foreground hover:bg-primary/90 rounded-t-md': !isActive,
+      'bg-background text-foreground z-10': isActive,
+      'bg-primary text-primary-foreground hover:bg-primary/90': !isActive,
     }
   );
 
