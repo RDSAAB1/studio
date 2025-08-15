@@ -21,7 +21,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
   
   const tabContainerClasses = "relative h-[40px] px-2 flex-grow";
   const tabBaseClasses = "flex items-center justify-center cursor-pointer group text-sm h-full px-4 transition-colors duration-200 ease-in-out w-full";
-  const activeClasses = "bg-muted/30 text-foreground";
+  const activeClasses = "bg-background text-foreground";
   const inactiveClasses = "bg-primary text-primary-foreground hover:bg-primary/90";
 
   const maskStyle: React.CSSProperties = {
@@ -36,7 +36,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
         style={maskStyle}
         className={cn(tabBaseClasses, isActive ? activeClasses : inactiveClasses)}
       >
-        <div className="flex items-center justify-center z-10">
+        <div className="flex items-center justify-center z-10 w-full">
           {icon}
           <span className="whitespace-nowrap ml-2">{title}</span>
           <Button
