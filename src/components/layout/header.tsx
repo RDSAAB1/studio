@@ -17,33 +17,32 @@ interface HeaderProps {
 
 export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-auto flex-col border-b bg-card">
-        <div className="flex h-14 items-center gap-4 px-4 sm:px-6">
-            <div className="relative flex-1 md:grow-0">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                type="search"
-                placeholder="Search..."
-                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
-                />
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
-                <Button variant="ghost" size="icon">
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">Settings</span>
-                </Button>
-                <Button variant="ghost" size="icon">
-                    <UserCircle className="h-5 w-5" />
-                    <span className="sr-only">Profile</span>
-                </Button>
-            </div>
-        </div>
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
         <TabBar 
             openTabs={openTabs}
             activeTabId={activeTabId}
             onTabClick={onTabClick}
             onCloseTab={onCloseTab}
         />
+
+        <div className="flex items-center gap-2 ml-auto">
+            <div className="relative flex-1 md:grow-0">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    type="search"
+                    placeholder="Search..."
+                    className="w-full rounded-full bg-background pl-8 md:w-[200px] lg:w-[320px]"
+                />
+            </div>
+            <Button variant="ghost" size="icon">
+                <Settings className="h-5 w-5" />
+                <span className="sr-only">Settings</span>
+            </Button>
+            <Button variant="ghost" size="icon">
+                <UserCircle className="h-5 w-5" />
+                <span className="sr-only">Profile</span>
+            </Button>
+        </div>
     </header>
   );
 }

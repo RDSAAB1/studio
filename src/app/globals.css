@@ -285,7 +285,7 @@ body {
     }
     .wrapper .main_container{
         width: 100%;
-        padding: 20px;
+        padding: 0; /* Changed from 20px */
     }
     .wrapper.active .side_bar{
         left: 0;
@@ -311,14 +311,12 @@ body {
 }
 
 .tab-bar-container {
-    background-color: hsl(var(--card));
-    padding: 6px 10px 0 10px;
     display: flex;
     align-items: flex-end;
     overflow-x: auto;
-    border-bottom: 1px solid hsl(var(--border));
     scrollbar-width: none;
     -ms-overflow-style: none;
+    flex-grow: 1; /* Allow tab bar to take up space */
 }
 .tab-bar-container::-webkit-scrollbar {
   display: none;

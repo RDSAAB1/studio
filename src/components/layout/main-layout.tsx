@@ -97,7 +97,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onTabClick={handleTabClick}
               onCloseTab={handleCloseTab}
             />
-            {children}
+            <div className="content">
+                {children}
+            </div>
         </div>
     </div>
   );
