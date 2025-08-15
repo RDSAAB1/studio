@@ -27,7 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { addCustomer, updateCustomer, deleteCustomer, getCustomers, getCustomersRealtime } from "@/lib/firestore";
-import { DocumentData, QuerySnapshot, onSnapshot, collection, doc } from "firebase/firestore";
+import { DocumentData, QuerySnapshot, onSnapshot, collection, doc, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Building, Milestone, UserSquare, BarChart, Wallet, ChevronRight, Receipt, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, ClipboardList, FilePlus, InfoIcon, UserCog, PackageSearch, CircleDollarSign } from "lucide-react";
