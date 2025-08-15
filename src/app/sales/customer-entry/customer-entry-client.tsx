@@ -62,13 +62,12 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
-const getInitialFormState = (customers: Customer[]): Customer => {
-  const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+const getInitialFormState = (): Customer => {
   const staticDate = new Date();
   staticDate.setHours(0,0,0,0);
 
   return {
-    id: "", srNo: formatSrNo(nextSrNum), date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
+    id: "", srNo: 'S----', date: staticDate.toISOString().split('T')[0], term: '0', dueDate: staticDate.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0,
@@ -544,7 +543,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 export default function CustomerEntryClient() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState([]));
+  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -604,6 +603,12 @@ export default function CustomerEntryClient() {
     const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
       const fetchedCustomers: Customer[] = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer));
       setCustomers(fetchedCustomers);
+      if (loading) {
+        const nextSrNum = fetchedCustomers.length > 0 ? Math.max(...fetchedCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+        const initialSrNo = formatSrNo(nextSrNum);
+        form.setValue('srNo', initialSrNo);
+        setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+      }
       setLoading(false);
     }, (error) => {
       console.error("Error fetching customers: ", error);
@@ -612,7 +617,7 @@ export default function CustomerEntryClient() {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [toast, form, loading]);
 
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -648,7 +653,9 @@ export default function CustomerEntryClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
-    const newState = getInitialFormState(customers);
+    const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+    const newState = getInitialFormState();
+    newState.srNo = formatSrNo(nextSrNum);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     newState.date = today.toISOString().split("T")[0];
@@ -677,7 +684,9 @@ export default function CustomerEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
-        const newState = getInitialFormState(customers);
+        const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+        const newState = getInitialFormState();
+        newState.srNo = formatSrNo(nextSrNum);
         resetFormToState({...newState, srNo: formattedSrNo, detailsCustomer: null});
     }
   }
@@ -755,7 +764,7 @@ export default function CustomerEntryClient() {
     form.setValue(field, toTitleCase(value));
   };
 
- if (!isClient || loading) {
+ if (!isClient) {
     return (
         <div className="flex justify-center items-center h-screen">
             <Server className="h-10 w-10 text-muted-foreground animate-pulse"/>

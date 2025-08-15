@@ -56,13 +56,12 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
-const getInitialFormState = (customers: Customer[], lastVariety?: string): Customer => {
-  const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+const getInitialFormState = (lastVariety?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   return {
-    id: "", srNo: formatSrNo(nextSrNum), date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
+    id: "", srNo: 'S----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, otherCharges: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
@@ -543,7 +542,7 @@ export default function SupplierEntryClient() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
-  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState([]));
+  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -566,7 +565,7 @@ export default function SupplierEntryClient() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ...getInitialFormState(safeCustomers, lastVariety),
+      ...getInitialFormState(lastVariety),
     },
     shouldFocusError: false,
   });
@@ -584,6 +583,12 @@ export default function SupplierEntryClient() {
     setIsLoading(true);
     const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
       setCustomers(data);
+      if (isLoading) {
+          const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+          const initialSrNo = formatSrNo(nextSrNum);
+          form.setValue('srNo', initialSrNo);
+          setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+      }
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching suppliers: ", error);
@@ -619,7 +624,7 @@ export default function SupplierEntryClient() {
       unsubscribeSuppliers();
       unsubscribePayments();
     };
-  }, [isClient, form, toast]);
+  }, [isClient, form, toast, isLoading]);
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -663,7 +668,7 @@ export default function SupplierEntryClient() {
   
    useEffect(() => {
     if (isClient) {
-      const initialFormState = getInitialFormState(safeCustomers, lastVariety);
+      const initialFormState = getInitialFormState(lastVariety);
       setCurrentCustomer(initialFormState);
       resetFormToState(initialFormState);
     }
@@ -704,7 +709,9 @@ export default function SupplierEntryClient() {
 
   const handleNew = () => {
     setIsEditing(false);
-    const newState = getInitialFormState(safeCustomers, lastVariety);
+    const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+    const newState = getInitialFormState(lastVariety);
+    newState.srNo = formatSrNo(nextSrNum);
     const today = new Date();
     const year = today.getFullYear();
     const month = (today.getMonth() + 1).toString().padStart(2, '0'); // Month is 0-indexed
@@ -737,7 +744,8 @@ export default function SupplierEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
-        const currentState = {...getInitialFormState(safeCustomers, lastVariety), srNo: formattedSrNo};
+        const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum) };
         resetFormToState(currentState);
     }
   }
