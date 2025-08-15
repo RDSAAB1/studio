@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import CustomSidebar from "./custom-sidebar";
 import { Header } from "./header";
 import type { PageMeta } from "@/app/types";
+import { useTabs, allMenuItems } from "@/hooks/use-tabs";
+import { Tab } from "./tab";
 
 // A simple 'cn' utility similar to shadcn/ui for conditional class merging
 function cn(...classes: any[]) {
@@ -18,36 +20,54 @@ type MainLayoutProps = {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const sidebarRef = useRef<HTMLElement>(null);
+  
+  const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
 
-  // Handle initial sidebar state and resizing
+  // This effect runs only on the client
   useEffect(() => {
+    setIsClient(true);
+
     const handleResize = () => {
       setIsSidebarOpen(window.innerWidth >= 1024);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  // Handle clicks outside the sidebar to close it on small screens
-  useEffect(() => {
+    
     const handleClickOutside = (event: MouseEvent) => {
       if (isSidebarOpen && window.innerWidth < 1024 && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
         setIsSidebarOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
+    
     return () => {
+      window.removeEventListener('resize', handleResize);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isSidebarOpen]);
+
+  // Effect to add a new tab when the path changes, if it's not already open.
+  useEffect(() => {
+    if (pathname) {
+      addTab(pathname);
+    }
+  }, [pathname, addTab]);
+
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleLinkClick = (path: string) => {
+    addTab(path);
+    setActiveTab(path);
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  };
   
   return (
     <div className="relative flex min-h-screen">
@@ -56,11 +76,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
         activePath={pathname}
-        onLinkClick={() => { 
-            if (window.innerWidth < 1024) {
-              setIsSidebarOpen(false);
-            }
-        }}
+        onLinkClick={handleLinkClick}
         setIsSidebarOpen={setIsSidebarOpen}
         sidebarRef={sidebarRef}
       />
@@ -71,10 +87,28 @@ export default function MainLayout({ children }: MainLayoutProps) {
         isSidebarOpen && window.innerWidth >= 1024 ? "lg:ml-64" : "lg:ml-20" 
       )}
       >
-        <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            {children}
-        </main>
+        <Header isSidebarOpen={isSidebarOpen} />
+        <div className="flex-1 flex flex-col">
+            <div className="flex">
+                {isClient && tabs.map(tab => (
+                    <Tab 
+                        key={tab.id}
+                        icon={tab.icon}
+                        title={tab.title}
+                        path={tab.path}
+                        isActive={activeTab === tab.path}
+                        onClick={() => setActiveTab(tab.path)}
+                        onClose={(e) => {
+                            e.stopPropagation();
+                            removeTab(tab.path);
+                        }}
+                    />
+                ))}
+            </div>
+            <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30">
+                {children}
+            </main>
+        </div>
       </div>
     </div>
   );

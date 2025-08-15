@@ -39,101 +39,13 @@ import {
   Users2,
   Package as PackageIcon
 } from 'lucide-react';
+import { allMenuItems } from '@/hooks/use-tabs'; // Import from central location
 
-function cn(...classes) {
+function cn(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
 }
 
-// Sidebar Navigation Data
-const menuItems = [
-  { id: "main-dashboard-from-image", name: "Dashboard", icon: SettingsIcon, href: "/sales/dashboard-overview" },
-  {
-    id: "main-sales",
-    name: "Sales",
-    icon: TrendingUp,
-    subMenus: [
-      { id: "sub-sales-1", name: "Product Catalog", href: "/sales/product-catalog", icon: ShoppingCart },
-      { id: "sub-sales-2", name: "Order Tracking", href: "/sales/order-tracking", icon: PackageCheck },
-      { id: "sub-sales-3", name: "Sales Reports", href: "/sales/sales-reports", icon: BarChart3 },
-    ],
-  },
-  {
-    id: "main-suppliers",
-    name: "Suppliers",
-    icon: Truck,
-    subMenus: [
-      { id: "sub-suppliers-1", name: "Supplier Entry", href: "/sales/supplier-entry", icon: UserPlus },
-      { id: "sub-suppliers-2", name: "Supplier Payments", href: "/sales/supplier-payments", icon: Wallet },
-      { id: "sub-suppliers-3", name: "Supplier Profile", href: "/sales/supplier-profile", icon: UserCircle },
-    ],
-  },
-  {
-    id: "main-customers",
-    name: "Customers",
-    icon: Users,
-    subMenus: [
-      { id: "sub-customers-1", name: "Customer Entry", href: "/sales/customer-entry", icon: UserPlus },
-      { id: "sub-customers-2", name: "Customer Payments", href: "/sales/customer-payments", icon: Wallet },
-      { id: "sub-customers-3", name: "Customer Profile", href: "/sales/customer-profile", icon: UserCircle },
-    ],
-  },
-  {
-    id: "main-income-expense",
-    name: "Income & Expense",
-    icon: Scale,
-    subMenus: [
-      { id: "sub-income-expense-1", name: "Income & Expense Tracker", href: "/expense-tracker", icon: Calculator },
-    ],
-  },
-  {
-    id: "main-cash-bank",
-    name: "Cash & Bank",
-    icon: Landmark,
-    subMenus: [
-      { id: "sub-cash-bank-1", name: "Cash & Bank Management", href: "/cash-bank", icon: Landmark },
-    ],
-  },
-  {
-    id: "main-hr-payroll",
-    name: "HR & Payroll",
-    icon: Users2,
-    subMenus: [
-      { id: "sub-hr-1", name: "Employee Database", href: "/hr/employee-database", icon: Database },
-      { id: "sub-hr-2", name: "Payroll Management", href: "/hr/payroll-management", icon: Calculator },
-      { id: "sub-hr-3", name: "Attendance Tracking", href: "/hr/attendance-tracking", icon: CalendarCheck },
-    ],
-  },
-  {
-    id: "main-inventory",
-    name: "Inventory",
-    icon: PackageIcon,
-    subMenus: [
-      { id: "sub-inventory-1", name: "Inventory Management", href: "/inventory/inventory-management", icon: Boxes },
-      { id: "sub-inventory-2", name: "Supplier Information", href: "/inventory/supplier-information", icon: Building2 },
-      { id: "sub-inventory-3", name: "Purchase Orders", href: "/inventory/purchase-orders", icon: ShoppingCart },
-    ],
-  },
-  {
-    id: "main-marketing",
-    name: "Marketing",
-    icon: Sparkles,
-    subMenus: [
-      { id: "sub-marketing-1", name: "Campaigns", href: "/marketing/campaigns", icon: Rocket },
-      { id: "sub-marketing-2", name: "Email Marketing", href: "/marketing/email-marketing", icon: Mail },
-      { id: "sub-marketing-3", name: "Analytics", href: "/marketing/analytics", icon: LineChart },
-    ],
-  },
-  {
-    id: "main-project-management",
-    name: "Project Management",
-    icon: Briefcase,
-    subMenus: [
-      { id: "sub-project-1", name: "Project Dashboard", href: "/projects/dashboard", icon: LayoutDashboard },
-      { id: "sub-project-2", name: "Task Management", href: "/projects/tasks", icon: ClipboardCheck },
-      { id: "sub-project-3", name: "Team Collaboration", href: "/projects/collaboration", icon: Users2 },
-    ],
-  },
-];
+// Sidebar Navigation Data is now imported from use-tabs.ts
 
 interface MenuItem {
   id: string;
@@ -165,7 +77,8 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, hoveredMenuItemI
     if (isSidebarOpen && isActiveParent) {
       setIsOpen(true);
     } else if (isSidebarOpen) {
-      setIsOpen(false);
+      // Don't close if it's already open and active
+      if (!isActiveParent) setIsOpen(false);
     }
   }, [isSidebarOpen, isActiveParent]);
 
@@ -307,7 +220,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
     }
   };
 
-  const filteredMenuItems = menuItems.filter(item => {
+  const filteredMenuItems = allMenuItems.filter(item => {
     const matchesMain = item.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSub = item.subMenus && item.subMenus.some(sub =>
       sub.name.toLowerCase().includes(searchTerm.toLowerCase())
