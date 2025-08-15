@@ -5,15 +5,8 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { allMenuItems } from '@/hooks/use-tabs';
-import { LayoutDashboard, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface MenuItem {
-  id: string;
-  name: string;
-  icon: React.ElementType;
-  href: string;
-}
 
 interface CustomSidebarProps {
   toggleSidebar: () => void;
@@ -25,12 +18,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar }) => {
   return (
     <aside className="side_bar">
       <div className="side_bar_top">
-        <div className="logo_wrap">
-          <Link href="/">
-              <LayoutDashboard className="icon" />
-              <span className="text">BizSuite</span>
-          </Link>
-        </div>
         <div className="side_bar_menu" onClick={toggleSidebar}>
            <ArrowRight className="menu-icon" />
         </div>
