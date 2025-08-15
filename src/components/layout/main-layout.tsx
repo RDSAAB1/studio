@@ -21,8 +21,8 @@ type MainLayoutProps = {
 export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isClient, setIsClient] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const [isClient, setIsClient] = useState(false);
   
   const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
   const [tabContent, setTabContent] = useState<Map<string, ReactNode>>(new Map());
