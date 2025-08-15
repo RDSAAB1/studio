@@ -7,6 +7,7 @@ import {
   UserCircle,
   Search
 } from "lucide-react";
+import { Tab } from "./tab";
 
 interface HeaderProps {
   isSidebarOpen: boolean;
@@ -27,11 +28,11 @@ export function Header({ isSidebarOpen, children }: HeaderProps) {
         {/* Right section: Search, Profile Icon, Settings Icon */}
         <div className="flex items-center space-x-2 pl-2">
             <div className="relative">
-                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground/70" />
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input 
                     type="text"
                     placeholder="Search..."
-                    className="bg-transparent border border-primary-foreground/30 text-primary-foreground placeholder-primary-foreground/70 rounded-full h-8 w-48 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-foreground"
+                    className="bg-background border border-border text-foreground placeholder-muted-foreground rounded-full h-8 w-48 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
             </div>
           <button
