@@ -27,7 +27,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
   const tabClasses = cn(
     "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-4 min-w-[120px] max-w-[240px] flex-1 transition-colors duration-200",
     {
-      'bg-background text-foreground z-10': isActive,
+      'bg-background text-foreground z-10 rounded-t-lg': isActive,
       'bg-primary text-primary-foreground hover:bg-primary/90': !isActive,
     }
   );
@@ -35,7 +35,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
 
   return (
     <div 
-      className="relative flex-grow-0 flex-shrink-0" 
+      className="relative flex-grow-0 flex-shrink-0 pt-2" // Added pt-2 to make space for top corners
       onClick={onClick}
       style={cornerStyle as React.CSSProperties}
     >
@@ -60,25 +60,33 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
       {/* Inverted Scooped corners for active tab */}
       {isActive && (
         <>
-          {/* Left Corner */}
+          {/* Left Top Corner */}
           <div 
-            className="absolute bottom-0 left-[-16px] w-4 h-4 z-20" 
+            className="absolute top-0 left-[-16px] w-4 h-4 z-20" 
             style={{ 
-              background: 'radial-gradient(circle at 0 0, transparent 0, transparent 16px, var(--content-bg) 16px)',
+              background: 'radial-gradient(circle at 0 100%, transparent 0, transparent 16px, var(--primary) 16px)',
             }}
           />
-           {/* Cover up the straight edge left by the above gradient */}
-          <div className="absolute bottom-0 left-[-16px] w-4 h-4 z-20 bg-primary" />
+           <div 
+            className="absolute top-0 left-[-16px] w-4 h-4 z-20" 
+            style={{ 
+              background: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, var(--content-bg) 15px)',
+            }}
+          />
           
-          {/* Right Corner */}
+          {/* Right Top Corner */}
           <div 
-            className="absolute bottom-0 right-[-16px] w-4 h-4 z-20" 
+            className="absolute top-0 right-[-16px] w-4 h-4 z-20" 
             style={{ 
-              background: 'radial-gradient(circle at 100% 0, transparent 0, transparent 16px, var(--content-bg) 16px)',
+              background: 'radial-gradient(circle at 100% 100%, transparent 0, transparent 16px, var(--primary) 16px)',
             }}
           />
-           {/* Cover up the straight edge left by the above gradient */}
-          <div className="absolute bottom-0 right-[-16px] w-4 h-4 z-20 bg-primary" />
+           <div 
+            className="absolute top-0 right-[-16px] w-4 h-4 z-20" 
+            style={{ 
+              background: 'radial-gradient(circle at 100% 100%, transparent 0, transparent 15px, var(--content-bg) 15px)',
+            }}
+          />
         </>
       )}
       
