@@ -9,15 +9,16 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CustomSidebarProps {
-  toggleSidebar: () => void;
+  isSidebarActive: boolean;
   onMenuItemClick: (item: MenuItemType) => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar, onMenuItemClick }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuItemClick }) => {
   const pathname = usePathname();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
   useEffect(() => {
+    // Automatically find and open the submenu of the current active page
     for (const item of allMenuItems) {
       if (item.subMenus) {
         if (item.subMenus.some(subItem => subItem.href === pathname)) {
@@ -28,14 +29,19 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar, onMenuItem
     }
   }, [pathname]);
 
+  useEffect(() => {
+    // Close submenus when the sidebar collapses
+    if (!isSidebarActive) {
+      setOpenSubMenu(null);
+    }
+  }, [isSidebarActive]);
+
   const handleSubMenuToggle = (id: string) => {
     setOpenSubMenu(openSubMenu === id ? null : id);
   };
   
   const handleItemClick = (item: MenuItemType) => {
-    if(item.href) {
-      onMenuItemClick(item);
-    }
+    onMenuItemClick(item);
   };
 
   const renderMenuItem = (item: MenuItemType) => {
@@ -67,9 +73,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar, onMenuItem
   return (
     <aside className="side_bar">
       <div className="side_bar_top">
-        <div className="side_bar_menu" onClick={toggleSidebar}>
-           <ArrowRight className="menu-icon" />
-        </div>
+        {/* The toggle button is removed as hover now controls the state */}
       </div>
       <div className="side_bar_bottom scrollbar-hide">
         <ul>

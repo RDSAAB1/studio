@@ -87,8 +87,9 @@ body {
 }
 
 .side_bar_top{
-    padding-bottom: 50px;
+    padding-bottom: 20px;
     position: relative;
+    margin-bottom: 20px;
 }
 
 .logo_wrap{
@@ -110,32 +111,6 @@ body {
 
 .logo_wrap a .icon{
     margin-right: 10px;
-}
-
-.side_bar_menu{
-    position: absolute;
-    bottom: -25px;
-    right: -25px;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: hsl(var(--primary));
-    border: 4px solid hsl(var(--background));
-    cursor: pointer;
-    transition: all 0.3s ease;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.side_bar_menu .menu-icon{
-    color: hsl(var(--primary-foreground));
-    transition: all 0.3s ease;
-}
-
-.wrapper.active .side_bar_menu .menu-icon {
-    transform: rotate(180deg);
 }
 
 .side_bar_bottom{
@@ -241,9 +216,6 @@ body {
 }
 .wrapper.active .side_bar .side_bar_bottom ul li a .icon {
     margin-right: 0;
-}
-.wrapper.active .side_bar .side_bar_menu {
-    right: -25px;
 }
 
 .submenu {

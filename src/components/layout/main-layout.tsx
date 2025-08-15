@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import CustomSidebar from "./custom-sidebar";
 import { cn } from "@/lib/utils";
 import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
@@ -13,10 +13,12 @@ type MainLayoutProps = {
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
-  const [isSidebarActive, setIsSidebarActive] = useState(true);
+  const [isSidebarActive, setIsSidebarActive] = useState(false); // Default to collapsed
   const [activeTabId, setActiveTabId] = useState<string>('dashboard');
   const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
   const pathname = usePathname();
+  const router = useRouter();
+
 
   useEffect(() => {
     // Find the initial active tab based on the current path
@@ -48,6 +50,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const handleTabClick = (tabId: string) => {
     setActiveTabId(tabId);
+    const tab = openTabs.find(t => t.id === tabId);
+    if(tab?.href) {
+        router.push(tab.href);
+    }
   };
 
   const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
@@ -55,39 +61,53 @@ export default function MainLayout({ children }: MainLayoutProps) {
     
     const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
     let newActiveTabId = activeTabId;
+    let newPath = '';
     
     if(activeTabId === tabId) {
         if(tabIndex > 0) {
             newActiveTabId = openTabs[tabIndex - 1].id;
+            newPath = openTabs[tabIndex - 1].href || '/';
         } else if (openTabs.length > 1) {
             newActiveTabId = openTabs[tabIndex + 1].id;
+            newPath = openTabs[tabIndex + 1].href || '/';
         } else {
-            // No tabs left, maybe default to dashboard or clear content
             newActiveTabId = ''; 
+            newPath = '/';
+        }
+    } else {
+        const currentActiveTab = openTabs.find(tab => tab.id === activeTabId);
+        if (currentActiveTab) {
+            newPath = currentActiveTab.href || '/';
         }
     }
     
     setOpenTabs(openTabs.filter(tab => tab.id !== tabId));
     setActiveTabId(newActiveTabId);
+    if (newPath) {
+        router.push(newPath);
+    }
   };
 
   const handleSidebarItemClick = (item: MenuItem) => {
-    if (!openTabs.some(tab => tab.id === item.id)) {
-      setOpenTabs([...openTabs, item]);
+    if (item.href) {
+      if (!openTabs.some(tab => tab.id === item.id)) {
+        setOpenTabs([...openTabs, item]);
+      }
+      setActiveTabId(item.id);
+      setIsSidebarActive(false); // Collapse sidebar on item click
     }
-    setActiveTabId(item.id);
-  };
-
-  const toggleSidebar = () => {
-    setIsSidebarActive(!isSidebarActive);
   };
 
   const activeComponent = openTabs.find(tab => tab.id === activeTabId)?.href === pathname ? children : null;
   
   return (
-    <div className={cn("wrapper", isSidebarActive && "active")}>
+    <div 
+        className={cn("wrapper", !isSidebarActive && "active")}
+        onMouseEnter={() => setIsSidebarActive(true)}
+        onMouseLeave={() => setIsSidebarActive(false)}
+    >
         <CustomSidebar 
-            toggleSidebar={toggleSidebar} 
+            isSidebarActive={isSidebarActive}
             onMenuItemClick={handleSidebarItemClick}
         />
         <div className="main_container">
