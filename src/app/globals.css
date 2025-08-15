@@ -3,33 +3,33 @@
 @tailwind utilities;
 
 :root {
-  --background: 240 10% 4%; /* Near-black */
-  --foreground: 0 0% 100%; /* Pure white */
+  --background: 222 47% 11%; /* Lighter Dark Blue/Gray */
+  --foreground: 210 40% 98%;
+
+  --card: 222 47% 15%; /* Slightly lighter than background */
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
   
-  --card: 240 10% 10%; /* Dark gray for cards */
-  --card-foreground: 0 0% 100%;
+  --primary: 259 96% 67%; 
+  --primary-foreground: 210 40% 98%;
   
-  --popover: 240 10% 10%;
-  --popover-foreground: 0 0% 100%;
+  --secondary: 217 33% 30%;
+  --secondary-foreground: 210 40% 98%;
   
-  --primary: 259 96% 67%; /* Slightly more vibrant primary */
-  --primary-foreground: 0 0% 100%;
+  --muted: 217 33% 20%;
+  --muted-foreground: 215 20% 65%;
   
-  --secondary: 240 4% 46%;
-  --secondary-foreground: 0 0% 100%;
+  --accent: 217 33% 30%;
+  --accent-foreground: 210 40% 98%;
   
-  --muted: 240 5% 25%; /* Muted for less important elements */
-  --muted-foreground: 240 4% 65%;
+  --destructive: 0 63% 31%; 
+  --destructive-foreground: 210 40% 98%;
   
-  --accent: 259 96% 75%; /* Lighter accent for hover */
-  --accent-foreground: 0 0% 100%;
-  
-  --destructive: 0 72% 51%; /* Standard destructive red */
-  --destructive-foreground: 0 0% 100%;
-  
-  --border: 240 10% 20%; /* Subtle borders */
-  --input: 240 10% 15%; /* Input background */
-  --ring: 259 96% 67%;
+  --border: 217 33% 25%;
+  --input: 217 33% 22%;
+  --ring: 215 28% 91%;
   
   --radius: 0.5rem;
 
