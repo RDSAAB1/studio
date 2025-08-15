@@ -28,20 +28,69 @@ import {
   Briefcase,
   ClipboardCheck,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-export const allMenuItems = [
-  { id: "main-dashboard", name: "Dashboard", icon: LayoutDashboard, href: "/sales/dashboard-overview" },
-  { id: "sub-suppliers-1", name: "Supplier Entry", icon: UserPlus, href: "/sales/supplier-entry" },
-  { id: "sub-suppliers-2", name: "Supplier Payments", icon: Wallet, href: "/sales/supplier-payments" },
-  { id: "sub-suppliers-3", name: "Supplier Profile", icon: UserCircle, href: "/sales/supplier-profile" },
-  { id: "sub-customers-1", name: "Customer Entry", icon: UserPlus, href: "/sales/customer-entry" },
-  { id: "sub-customers-2", name: "Customer Payments", icon: Wallet, href: "/sales/customer-payments" },
-  { id: "sub-customers-3", name: "Customer Profile", icon: UserCircle, href: "/sales/customer-profile" },
-  { id: "sub-income-expense-1", name: "Income & Expense", icon: Calculator, href: "/expense-tracker" },
-  { id: "sub-cash-bank-1", name: "Cash & Bank", icon: Landmark, href: "/cash-bank" },
-  { id: "sub-hr-1", name: "Employee Database", icon: Database, href: "/hr/employee-database" },
-  { id: "sub-hr-2", name: "Payroll", icon: Calculator, href: "/hr/payroll-management" },
-  { id: "sub-inventory-1", name: "Inventory", icon: Boxes, href: "/inventory/inventory-management" },
-  { id: "sub-inventory-3", name: "Purchase Orders", icon: ShoppingCart, href: "/inventory/purchase-orders" },
-  { id: "sub-project-1", name: "Projects", icon: Briefcase, href: "/projects/dashboard" },
+export type MenuItem = {
+    id: string;
+    name: string;
+    icon: LucideIcon;
+    href?: string;
+    subMenus?: Omit<MenuItem, 'icon' | 'subMenus'>[];
+}
+
+export const allMenuItems: MenuItem[] = [
+  { 
+    id: "dashboard", 
+    name: "Dashboard", 
+    icon: LayoutDashboard, 
+    href: "/sales/dashboard-overview" 
+  },
+  {
+    id: "sales",
+    name: "Sales",
+    icon: TrendingUp,
+    subMenus: [
+      { id: "supplier-entry", name: "Supplier Entry", href: "/sales/supplier-entry" },
+      { id: "supplier-payments", name: "Supplier Payments", href: "/sales/supplier-payments" },
+      { id: "supplier-profile", name: "Supplier Profile", href: "/sales/supplier-profile" },
+      { id: "customer-entry", name: "Customer Entry", href: "/sales/customer-entry" },
+      { id: "customer-payments", name: "Customer Payments", href: "/sales/customer-payments" },
+      { id: "customer-profile", name: "Customer Profile", href: "/sales/customer-profile" },
+    ],
+  },
+  {
+    id: "finance",
+    name: "Finance",
+    icon: Scale,
+    subMenus: [
+        { id: "income-expense", name: "Income & Expense", href: "/expense-tracker" },
+        { id: "cash-bank", name: "Cash & Bank", href: "/cash-bank" },
+    ]
+  },
+  {
+    id: "hr",
+    name: "HR & Payroll",
+    icon: Users2,
+    subMenus: [
+      { id: "employee-db", name: "Employee Database", href: "/hr/employee-database" },
+      { id: "payroll", name: "Payroll", href: "/hr/payroll-management" },
+    ],
+  },
+  {
+    id: "inventory",
+    name: "Inventory",
+    icon: PackageIcon,
+    subMenus: [
+      { id: "inventory-mgmt", name: "Inventory", href: "/inventory/inventory-management" },
+      { id: "purchase-orders", name: "Purchase Orders", href: "/inventory/purchase-orders" },
+    ],
+  },
+  {
+    id: "projects",
+    name: "Projects",
+    icon: Briefcase,
+    subMenus: [
+        { id: "project-dashboard", name: "Dashboard", href: "/projects/dashboard" },
+    ]
+  },
 ];
