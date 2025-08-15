@@ -43,6 +43,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         if (dashboard) {
             setOpenTabs([dashboard]);
             setActiveTabId('dashboard');
+            router.push(dashboard.href || '/');
         }
     }
   }, []);
@@ -97,12 +98,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
       setIsSidebarActive(false); // Collapse sidebar on item click
     }
   };
-
-  const activeComponent = openTabs.find(tab => tab.id === activeTabId)?.href === pathname ? children : null;
   
   return (
     <div 
-        className={cn("wrapper", !isSidebarActive && "active")}
+        className={cn("wrapper", isSidebarActive && "active")}
         onMouseEnter={() => setIsSidebarActive(true)}
         onMouseLeave={() => setIsSidebarActive(false)}
     >
