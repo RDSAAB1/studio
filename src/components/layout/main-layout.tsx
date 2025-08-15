@@ -86,44 +86,43 @@ export default function MainLayout({ children }: MainLayoutProps) {
         sidebarRef={sidebarRef}
       />
 
-
       <div className={cn(
         "flex-1 flex flex-col transition-all duration-300 ease-in-out",
         isSidebarOpen ? "lg:ml-64" : "lg:ml-20" 
       )}
       >
-        <Header isSidebarOpen={isSidebarOpen} />
-        <div className="flex-1 flex flex-col">
-            <div className="bg-primary pt-2">
-              <div className="flex">
-                  {tabs.map(tab => (
-                      <Tab 
-                          key={tab.id}
-                          icon={tab.icon}
-                          title={tab.title}
-                          path={tab.path}
-                          isActive={activeTab === tab.path}
-                          onClick={() => setActiveTab(tab.path)}
-                          onClose={(e) => {
-                              e.stopPropagation();
-                              removeTab(tab.path);
-                          }}
-                      />
-                  ))}
-              </div>
-            </div>
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30 relative">
-                 {tabs.map(tab => (
-                    <div
-                      key={tab.id}
-                      style={{ display: activeTab === tab.path ? 'block' : 'none' }}
-                      className="h-full w-full"
-                    >
-                      {tab.path === pathname ? children : tabContent.get(tab.path)}
-                    </div>
+        <Header isSidebarOpen={isSidebarOpen}>
+          <div className="flex-1 bg-primary pt-2">
+            <div className="flex">
+                {tabs.map(tab => (
+                    <Tab 
+                        key={tab.id}
+                        icon={tab.icon}
+                        title={tab.title}
+                        path={tab.path}
+                        isActive={activeTab === tab.path}
+                        onClick={() => setActiveTab(tab.path)}
+                        onClose={(e) => {
+                            e.stopPropagation();
+                            removeTab(tab.path);
+                        }}
+                    />
                 ))}
-            </main>
-        </div>
+            </div>
+          </div>
+        </Header>
+        
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30 relative">
+             {tabs.map(tab => (
+                <div
+                  key={tab.id}
+                  style={{ display: activeTab === tab.path ? 'block' : 'none' }}
+                  className="h-full w-full"
+                >
+                  {tab.path === pathname ? children : tabContent.get(tab.path)}
+                </div>
+            ))}
+        </main>
       </div>
     </div>
   );
