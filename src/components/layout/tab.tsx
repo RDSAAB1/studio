@@ -20,25 +20,38 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
   const router = useRouter();
 
   const tabClasses = cn(
-    "relative flex items-center justify-center cursor-pointer group text-sm h-[40px] px-4 transition-colors duration-200 ease-in-out flex-grow min-w-0",
+    "relative flex items-center justify-center cursor-pointer group text-sm h-[40px] px-4 transition-colors duration-200 ease-in-out min-w-0",
     {
       'bg-muted/30 text-foreground z-10': isActive,
       'bg-primary text-primary-foreground hover:bg-primary/90': !isActive,
     }
   );
 
-  const cornerClasses = "absolute bottom-0 w-[20px] h-[20px] pointer-events-none";
+  const cornerClasses = "absolute bottom-0 w-4 h-4 z-20 pointer-events-none";
 
   return (
     <div className="relative flex-grow min-w-0" onClick={onClick}>
       <div className={tabClasses}>
-        {/* Left Corner */}
         {isActive && (
-           <div className={cn(cornerClasses, "left-[-20px]")}>
-             <div className="w-full h-full bg-primary" style={{
-                maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 20px, black 20.5px)',
-             }}></div>
-          </div>
+          <>
+            {/* Top rounded corners are handled by the main element's border-radius */}
+            {/* Bottom-left outward curve */}
+            <div 
+              className={cn(cornerClasses, "left-[-16px] bg-primary")}
+              style={{
+                maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 16px, black 16px)',
+                WebkitMaskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 16px, black 16px)',
+              }}
+            ></div>
+            {/* Bottom-right outward curve */}
+            <div 
+              className={cn(cornerClasses, "right-[-16px] bg-primary")}
+              style={{
+                maskImage: 'radial-gradient(circle at 100% 0, transparent 0, transparent 16px, black 16px)',
+                WebkitMaskImage: 'radial-gradient(circle at 100% 0, transparent 0, transparent 16px, black 16px)',
+              }}
+            ></div>
+          </>
         )}
         
         {/* Content */}
@@ -57,18 +70,10 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
         >
           <X className="h-3 w-3" />
         </Button>
-        
-        {/* Right Corner */}
-         {isActive && (
-           <div className={cn(cornerClasses, "right-[-20px]")}>
-             <div className="w-full h-full bg-primary" style={{
-                maskImage: 'radial-gradient(circle at 100% 0, transparent 0, transparent 20px, black 20.5px)',
-             }}></div>
-          </div>
-        )}
       </div>
-      {/* Separator for inactive tabs */}
-      {!isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-px bg-primary-foreground/20" />}
+
+       {/* Separator for inactive tabs */}
+       {!isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-px bg-primary-foreground/20" />}
     </div>
   );
 };

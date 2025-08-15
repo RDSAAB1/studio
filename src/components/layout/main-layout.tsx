@@ -22,11 +22,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const sidebarRef = useRef<HTMLElement>(null);
+  const [isClient, setIsClient] = useState(false);
   
   const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
   const [tabContent, setTabContent] = useState<Map<string, ReactNode>>(new Map());
   
   useEffect(() => {
+    setIsClient(true);
     const handleResize = () => {
       if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
@@ -77,8 +79,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
   
   return (
     <div className="relative flex min-h-screen">
-      <CustomSidebar
-        isSidebarOpen={isSidebarOpen}
+       <CustomSidebar
+        isSidebarOpen={isClient ? isSidebarOpen : true}
         toggleSidebar={toggleSidebar}
         activePath={pathname}
         onLinkClick={handleLinkClick}
@@ -88,26 +90,26 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       <div className={cn(
         "flex-1 flex flex-col transition-all duration-300 ease-in-out",
-        isSidebarOpen ? "lg:ml-64" : "lg:ml-20" 
+        (isClient && isSidebarOpen) ? "lg:ml-64" : "lg:ml-20" 
       )}
       >
         <Header isSidebarOpen={isSidebarOpen}>
-          <div className="flex bg-primary px-2 pt-2">
-            {tabs.map(tab => (
-                <Tab 
-                    key={tab.id}
-                    icon={tab.icon}
-                    title={tab.title}
-                    path={tab.path}
-                    isActive={activeTab === tab.path}
-                    onClick={() => setActiveTab(tab.path)}
-                    onClose={(e) => {
-                        e.stopPropagation();
-                        removeTab(tab.path);
-                    }}
-                />
-            ))}
-          </div>
+            <div className="flex bg-primary px-2 pt-2">
+                {tabs.map(tab => (
+                    <Tab 
+                        key={tab.id}
+                        icon={tab.icon}
+                        title={tab.title}
+                        path={tab.path}
+                        isActive={activeTab === tab.path}
+                        onClick={() => setActiveTab(tab.path)}
+                        onClose={(e) => {
+                            e.stopPropagation();
+                            removeTab(tab.path);
+                        }}
+                    />
+                ))}
+            </div>
         </Header>
         
         <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30 relative">
