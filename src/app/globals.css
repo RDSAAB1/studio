@@ -3,24 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: 15 26% 92%; /* #E5D4CD - Light Peach/Pink */
+  --background: 0 0% 100%; /* #FFFFFF - White */
   --foreground: 200 26% 26%; /* #304655 - Dark Blue-Gray */
-  --card: 15 26% 95%;
+  --card: 15 26% 98%;
   --card-foreground: 200 26% 26%;
-  --popover: 15 26% 95%;
+  --popover: 15 26% 98%;
   --popover-foreground: 200 26% 26%;
   --primary: 262 82% 57%; /* #4F46E5 - Saturated Indigo */
   --primary-foreground: 0 0% 100%;
   --secondary: 200 20% 45%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 15 20% 88%;
+  --muted: 15 20% 94%;
   --muted-foreground: 200 15% 50%;
   --accent: 255 83% 67%; /* #8B5CF6 - Violet Accent */
   --accent-foreground: 0 0% 100%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
-  --border: 200 18% 38%;
-  --input: 15 22% 90%;
+  --border: 200 18% 85%;
+  --input: 15 22% 96%;
   --ring: 21 24% 62%;
   --radius: 0.5rem;
 }
