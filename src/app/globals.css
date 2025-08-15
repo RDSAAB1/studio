@@ -3,36 +3,26 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 47% 11%; /* Lighter Dark Blue/Gray */
+  --background: 222 47% 11%;
   --foreground: 210 40% 98%;
-
-  --card: 222 47% 15%; /* Slightly lighter than background */
+  --card: 222 47% 15%;
   --card-foreground: 210 40% 98%;
-
   --popover: 222 47% 11%;
   --popover-foreground: 210 40% 98%;
-  
-  --primary: 259 96% 67%; 
+  --primary: 259 96% 67%;
   --primary-foreground: 210 40% 98%;
-  
   --secondary: 217 33% 30%;
   --secondary-foreground: 210 40% 98%;
-  
   --muted: 217 33% 20%;
   --muted-foreground: 215 20% 65%;
-  
   --accent: 217 33% 30%;
   --accent-foreground: 210 40% 98%;
-  
-  --destructive: 0 63% 31%; 
+  --destructive: 0 63% 31%;
   --destructive-foreground: 210 40% 98%;
-  
   --border: 217 33% 25%;
   --input: 217 33% 22%;
   --ring: 215 28% 91%;
-  
   --radius: 0.5rem;
-
   --chart-1: hsl(259 96% 67%);
   --chart-2: hsl(0 72% 51%);
   --chart-3: hsl(142 71% 45%);
@@ -65,9 +55,16 @@ body {
 
 .main_container{
     width: calc(100% - 250px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.main_container > .content {
     padding: 30px;
     overflow: auto;
-    transition: all 0.3s ease;
+    flex-grow: 1;
 }
 
 .main_container p{

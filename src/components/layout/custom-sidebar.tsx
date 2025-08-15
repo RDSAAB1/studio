@@ -10,14 +10,14 @@ import { cn } from '@/lib/utils';
 
 interface CustomSidebarProps {
   toggleSidebar: () => void;
+  onMenuItemClick: (item: MenuItemType) => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar, onMenuItemClick }) => {
   const pathname = usePathname();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
   useEffect(() => {
-    // Find the parent menu of the active item and open it
     for (const item of allMenuItems) {
       if (item.subMenus) {
         if (item.subMenus.some(subItem => subItem.href === pathname)) {
@@ -31,15 +31,42 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar }) => {
   const handleSubMenuToggle = (id: string) => {
     setOpenSubMenu(openSubMenu === id ? null : id);
   };
+  
+  const handleItemClick = (item: MenuItemType) => {
+    if(item.href) {
+      onMenuItemClick(item);
+    }
+  };
+
+  const renderMenuItem = (item: MenuItemType) => {
+    const isSubMenuActive = item.subMenus?.some(sub => sub.href === pathname) ?? false;
+    const isActive = (!item.subMenus && pathname === item.href);
+
+    return (
+      <li className={cn((isActive || isSubMenuActive) && "active")}>
+        {(isActive || isSubMenuActive) && <span className="top_curve"></span>}
+        <Link 
+            href={item.href || '#'}
+            onClick={(e) => { 
+                if (item.subMenus) {
+                    e.preventDefault(); 
+                    handleSubMenuToggle(item.id);
+                } else {
+                    handleItemClick(item);
+                }
+            }}
+        >
+          <span className="icon">{React.createElement(item.icon)}</span>
+          <span className="item">{item.name}</span>
+        </Link>
+        {(isActive || isSubMenuActive) && <span className="bottom_curve"></span>}
+      </li>
+    );
+  }
 
   return (
     <aside className="side_bar">
       <div className="side_bar_top">
-        <div className="logo_wrap">
-          <a href="#">
-            <span className="text">BizSuite</span>
-          </a>
-        </div>
         <div className="side_bar_menu" onClick={toggleSidebar}>
            <ArrowRight className="menu-icon" />
         </div>
@@ -48,25 +75,12 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ toggleSidebar }) => {
         <ul>
           {allMenuItems.map(item => (
             <React.Fragment key={item.id}>
-              <li className={cn((!item.subMenus && pathname === item.href) && "active")}>
-                {(!item.subMenus && pathname === item.href) && <span className="top_curve"></span>}
-                <a 
-                  href={item.href || '#'} 
-                  onClick={item.subMenus ? (e) => { e.preventDefault(); handleSubMenuToggle(item.id); } : undefined}
-                  style={{ cursor: item.subMenus ? 'pointer' : 'default' }}
-                >
-                  <span className="icon">
-                    {React.createElement(item.icon)}
-                  </span>
-                  <span className="item">{item.name}</span>
-                </a>
-                {(!item.subMenus && pathname === item.href) && <span className="bottom_curve"></span>}
-              </li>
+              {renderMenuItem(item)}
               {item.subMenus && (
                 <ul className={cn("submenu", openSubMenu === item.id && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <Link href={subItem.href}>
+                      <Link href={subItem.href} onClick={() => handleItemClick(subItem)}>
                          {subItem.name}
                       </Link>
                     </li>
