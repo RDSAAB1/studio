@@ -158,7 +158,7 @@ export const useTabs = () => {
 
   useEffect(() => {
     // Save tabs to localStorage whenever they change
-    const tabsToSave = tabs.map(({ icon, ...rest }) => rest);
+    const tabsToSave = tabs.map(({ icon, ...rest }) => rest); // Exclude icon before saving
     localStorage.setItem('openTabs', JSON.stringify(tabsToSave));
   }, [tabs]);
 

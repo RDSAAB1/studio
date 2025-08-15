@@ -20,7 +20,7 @@ type MainLayoutProps = {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const sidebarRef = useRef<HTMLElement>(null);
   
   const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
@@ -99,10 +99,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
       >
         <Header isSidebarOpen={isSidebarOpen} />
         <div className="flex-1 flex flex-col">
-            <div className="flex">
+            <div className="flex border-b border-border">
                 {tabs.map(tab => (
                     <Tab 
-                        key={tab.id}
+                        key={tab.path} // Use path as key for stability
                         icon={tab.icon}
                         title={tab.title}
                         path={tab.path}
@@ -118,11 +118,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30 relative">
                  {tabs.map(tab => (
                     <div
-                      key={tab.id}
+                      key={tab.path} // Use path as key for stability
                       style={{ display: activeTab === tab.path ? 'block' : 'none' }}
                       className="h-full w-full"
                     >
-                      {tab.path === activeTab ? children : tabContent.get(tab.path)}
+                      {/* Render the children for the active tab, and the memoized content for inactive tabs */}
+                      {tab.path === pathname ? children : tabContent.get(tab.path)}
                     </div>
                 ))}
             </main>
@@ -131,3 +132,4 @@ export default function MainLayout({ children }: MainLayoutProps) {
     </div>
   );
 }
+
