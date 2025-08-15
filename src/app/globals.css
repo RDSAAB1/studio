@@ -3,26 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 47% 11%; /* #111827 - Dark Slate Gray */
-  --foreground: 210 40% 98%; /* #E5E7EB - Light Gray */
-  --card: 222 47% 15%; /* #1F2937 - Lighter Slate Gray */
-  --card-foreground: 210 40% 98%;
-  --popover: 222 47% 15%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 262 82% 57%; /* #4F46E5 - Saturated Indigo */
+  --background: 240 10% 4%; /* Near-black */
+  --foreground: 0 0% 100%; /* Pure white */
+  
+  --card: 240 10% 10%; /* Dark gray for cards */
+  --card-foreground: 0 0% 100%;
+  
+  --popover: 240 10% 10%;
+  --popover-foreground: 0 0% 100%;
+  
+  --primary: 259 96% 67%; /* Slightly more vibrant primary */
   --primary-foreground: 0 0% 100%;
-  --secondary: 217 33% 50%; /* Lighter gray-blue */
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217 33% 25%; /* Darker muted gray */
-  --muted-foreground: 215 28% 65%; /* Lighter muted foreground */
-  --accent: 255 83% 67%; /* #8B5CF6 - Violet Accent */
+  
+  --secondary: 240 4% 46%;
+  --secondary-foreground: 0 0% 100%;
+  
+  --muted: 240 5% 25%; /* Muted for less important elements */
+  --muted-foreground: 240 4% 65%;
+  
+  --accent: 259 96% 75%; /* Lighter accent for hover */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 63% 31%; /* Darker red */
-  --destructive-foreground: 210 40% 98%;
-  --border: 217 33% 25%; /* Darker gray border */
-  --input: 217 33% 20%; /* Dark input background */
-  --ring: 262 82% 57%; /* Primary color for ring */
+  
+  --destructive: 0 72% 51%; /* Standard destructive red */
+  --destructive-foreground: 0 0% 100%;
+  
+  --border: 240 10% 20%; /* Subtle borders */
+  --input: 240 10% 15%; /* Input background */
+  --ring: 259 96% 67%;
+  
   --radius: 0.5rem;
+
+  --chart-1: hsl(259 96% 67%);
+  --chart-2: hsl(0 72% 51%);
+  --chart-3: hsl(142 71% 45%);
+  --chart-4: hsl(48 96% 50%);
+  --chart-5: hsl(200 96% 50%);
 }
 
 body {
@@ -63,8 +78,10 @@ body {
 .side_bar{
     width: 250px;
     height: 100%;
-    background: hsl(var(--primary));
-    border-radius: 15px;
+    background: hsl(var(--card));
+    border-right: 1px solid hsl(var(--border));
+    border-top-left-radius: 15px;
+    border-bottom-left-radius: 15px;
     padding: 20px;
     padding-right: 0;
     transition: all 0.5s ease;
@@ -154,6 +171,7 @@ body {
     font-size: 18px;
     height: 18px;
     color: hsl(var(--primary-foreground));
+    transition: color 0.2s ease;
 }
 
 .side_bar_bottom ul li.active a{
@@ -193,7 +211,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: hsl(var(--primary));
+    background: hsl(var(--card));
 }
 
 .side_bar_bottom ul li.active .top_curve:before{
@@ -231,6 +249,35 @@ body {
     right: -25px;
 }
 
+.submenu {
+  padding-left: 2rem;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.submenu.open {
+  max-height: 500px; /* Adjust as needed */
+}
+
+.submenu li a {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 0.875rem; /* text-sm */
+  color: hsl(var(--muted-foreground));
+}
+
+.submenu li a:hover {
+  color: hsl(var(--primary-foreground));
+}
+
+.submenu li.active a {
+  color: hsl(var(--primary));
+  font-weight: 500;
+  background: transparent !important; /* Override active background */
+}
+
+
 
 @media screen and (max-width: 1024px) {
     .wrapper .side_bar{
@@ -267,12 +314,12 @@ body {
 }
 
 .tab-bar-container {
-    background-color: hsl(var(--primary) / 0.9);
-    backdrop-filter: blur(4px);
+    background-color: hsl(var(--card));
     padding: 6px 10px 0 10px;
     display: flex;
     align-items: flex-end;
     overflow-x: auto;
+    border-bottom: 1px solid hsl(var(--border));
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
