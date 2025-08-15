@@ -1,14 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Menu,
-  ChevronRight,
-  ChevronDown,
 } from 'lucide-react';
 import { allMenuItems } from '@/hooks/use-tabs'; // Import from central location
 
@@ -37,12 +35,8 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
   const Icon = item.icon;
   
   useEffect(() => {
-    if (isSidebarOpen && isActiveParent) {
-      setIsOpen(true);
-    } else if (isSidebarOpen) {
-      if (!isActiveParent) setIsOpen(false);
-    }
-  }, [isSidebarOpen, isActiveParent]);
+    setIsOpen(isActiveParent);
+  }, [isActiveParent]);
 
   const handleToggle = () => {
     if (isSidebarOpen && item.subMenus) {
@@ -51,56 +45,31 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
       onLinkClick(item.href);
     }
   };
-  
-  const cornerStyle = {
-    '--corner-bg': 'hsl(var(--primary))',
-    '--content-bg': 'hsl(var(--background))',
-  };
 
   return (
-    <li className="my-1 relative" style={cornerStyle as React.CSSProperties}>
+    <li className="my-1" >
        <div
         className={cn(
-          "flex items-center justify-between p-2 cursor-pointer h-12 group transition-all duration-300 ease-in-out relative",
+          "flex items-center justify-between p-2 cursor-pointer h-12 group transition-all duration-300 ease-in-out relative rounded-lg",
           isActiveParent 
-            ? 'bg-background text-foreground rounded-l-lg' 
-            : 'text-primary-foreground hover:bg-primary/80 rounded-md'
+            ? 'bg-transparent text-primary' 
+            : 'text-primary-foreground hover:bg-primary/90',
+           isSidebarOpen ? "px-4" : "px-2.5 justify-center"
         )}
         onClick={handleToggle}
       >
-        {isActiveParent && (
-            <>
-                <div 
-                    className="absolute -top-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                    style={{
-                        maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, black 16px)'
-                    }}
-                />
-                <div 
-                    className="absolute -bottom-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                     style={{
-                        maskImage: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, black 16px)'
-                    }}
-                />
-            </>
-        )}
         <div className="flex items-center flex-grow">
-          {Icon && <Icon className="mr-3 h-6 w-6" />}
+          {Icon && <Icon className="mr-3 h-6 w-6 flex-shrink-0" />}
           {isSidebarOpen && (
             <span className="text-base font-medium whitespace-nowrap overflow-hidden text-ellipsis">
               {item.name}
             </span>
           )}
         </div>
-        {item.subMenus && isSidebarOpen && (
-          <div className="flex-shrink-0">
-            {isOpen ? <ChevronDown className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
-          </div>
-        )}
       </div>
 
       {item.subMenus && isOpen && isSidebarOpen && (
-        <ul className="ml-6 py-2">
+        <ul className="ml-4 pl-2 border-l border-primary-foreground/20 py-2">
           {item.subMenus.map(subItem => {
             const SubIcon = subItem.icon;
             const isActive = activePath.startsWith(subItem.href || '');
@@ -108,37 +77,26 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
               <li 
                 key={subItem.id} 
                 className="my-1 relative"
-                style={cornerStyle as React.CSSProperties}
               >
                 <Link
                   href={subItem.href || '#'}
                   onClick={() => onLinkClick(subItem.href || '#')}
                   className={cn(
-                    "flex items-center p-2 relative overflow-visible group transition-all duration-300 ease-in-out",
+                    "flex items-center p-3 relative group transition-colors duration-200 ease-in-out rounded-lg",
                     "text-sm",
                     isActive 
-                      ? 'bg-background text-foreground rounded-l-lg' 
-                      : 'text-primary-foreground hover:bg-primary/80 rounded-md',
+                      ? 'bg-background text-primary font-semibold' 
+                      : 'text-primary-foreground hover:bg-primary/90',
                   )}
                 >
                   {isActive && (
                     <>
-                        <div 
-                            className="absolute -top-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                            style={{
-                                maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, black 16px)'
-                            }}
-                        />
-                        <div 
-                            className="absolute -bottom-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                            style={{
-                                maskImage: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, black 16px)'
-                            }}
-                        />
+                      <div className="absolute -top-4 right-0 h-4 w-4 bg-transparent" style={{background: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, hsl(var(--background)) 16px)'}} />
+                      <div className="absolute -bottom-4 right-0 h-4 w-4 bg-transparent" style={{background: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, hsl(var(--background)) 16px)'}} />
                     </>
                   )}
 
-                  {SubIcon && <SubIcon className="h-5 w-5 mr-3" />}
+                  {SubIcon && <SubIcon className="h-5 w-5 mr-3 flex-shrink-0" />}
                   <span className="whitespace-nowrap overflow-hidden text-ellipsis">
                     {subItem.name}
                   </span>
@@ -162,59 +120,27 @@ interface CustomSidebarProps {
 }
 
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSidebar, activePath, onLinkClick, setIsSidebarOpen, sidebarRef }) => {
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [isExplicitlyOpen, setIsExplicitlyOpen] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const handleToggleSidebar = () => {
-    const newState = !isSidebarOpen;
-    setIsSidebarOpen(newState);
-    if (isDesktop) {
-      setIsExplicitlyOpen(newState);
-    }
-  };
-
-  const handleMouseEnterSidebar = () => {
-    if (!isSidebarOpen && isDesktop && !isExplicitlyOpen) {
-      setIsSidebarOpen(true);
-    }
-  };
-
-  const handleMouseLeaveSidebar = () => {
-    if (!isExplicitlyOpen && isDesktop) {
-      setIsSidebarOpen(false);
-    }
+    setIsSidebarOpen(!isSidebarOpen);
   };
   
   const currentYear = new Date().getFullYear();
-  const cornerStyle = {
-    '--corner-bg': 'hsl(var(--primary))',
-    '--content-bg': 'hsl(var(--background))',
-  };
 
   return (
     <aside
       ref={sidebarRef}
       className={cn(
-        "fixed inset-y-0 left-0 flex flex-col transition-all duration-300 ease-in-out z-40 shadow-xl",
+        "fixed inset-y-0 left-0 flex flex-col transition-all duration-300 ease-in-out z-40",
         "bg-primary", // Background of sidebar
-        isDesktop ? (isSidebarOpen ? "w-64" : "w-20") : (isSidebarOpen ? "w-64" : "w-0 overflow-hidden"),
-        "pt-4",
-        !isSidebarOpen && isDesktop && "overflow-visible"
+        isSidebarOpen ? "w-64" : "w-20"
       )}
-      onMouseEnter={handleMouseEnterSidebar}
-      onMouseLeave={handleMouseLeaveSidebar}
-      style={{ overflowY: 'auto' }}
     >
-      <div className="flex items-center justify-between px-4 pb-4 border-b border-primary-foreground/20 mb-4">
+      <div className={cn(
+          "flex items-center justify-between border-b border-primary-foreground/20 mb-4",
+          isSidebarOpen ? "h-[61px] px-4" : "h-[61px] px-2.5"
+          )}
+      >
         {isSidebarOpen ? (
           <h1 className="text-2xl font-bold whitespace-nowrap overflow-hidden text-primary-foreground">BizSuite</h1>
         ) : (
@@ -222,16 +148,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
              <LayoutDashboard className="h-6 w-6 text-primary-foreground" />
           </div>
         )}
-        <button
-          onClick={handleToggleSidebar}
-          className="p-2 rounded-full text-primary-foreground hover:bg-primary-foreground/10 focus:outline-none focus:ring-2 focus:ring-primary-foreground transition-colors"
-          aria-label={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
-        >
-          <Menu className="h-6 w-6" />
-        </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-4 scrollbar-hide">
+      <nav className="flex-1 overflow-y-auto px-2 scrollbar-hide">
         <ul className="space-y-1">
           {allMenuItems.map(item =>
             item.subMenus ? (
@@ -246,37 +165,25 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
               <li 
                 key={item.id}
                 className="my-1 relative"
-                style={cornerStyle as React.CSSProperties}
               >
                 <Link
                   href={item.href || '#'}
                   onClick={() => onLinkClick(item.href || '#')}
                   className={cn(
-                    "flex items-center p-2 h-12 group relative transition-all duration-300 ease-in-out",
-                    activePath === item.href 
-                      ? 'bg-background text-foreground rounded-l-lg' 
-                      : 'text-primary-foreground hover:bg-primary/80 rounded-md',
+                    "flex items-center p-3 relative group transition-colors duration-200 ease-in-out rounded-lg",
+                    activePath.startsWith(item.href || '@@')
+                      ? 'bg-background text-primary font-semibold' 
+                      : 'text-primary-foreground hover:bg-primary/90',
+                    !isSidebarOpen && "justify-center"
                   )}
                 >
-                  {activePath === item.href && (
+                  {activePath.startsWith(item.href || '@@') && (
                     <>
-                        <div 
-                            className="absolute -top-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                            style={{
-                                maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, black 16px)'
-                            }}
-                        />
-                        <div 
-                            className="absolute -bottom-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                             style={{
-                                maskImage: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, black 16px)'
-                            }}
-                        />
+                      <div className="absolute -top-4 right-0 h-4 w-4 bg-transparent" style={{background: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, hsl(var(--background)) 16px)'}} />
+                      <div className="absolute -bottom-4 right-0 h-4 w-4 bg-transparent" style={{background: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, hsl(var(--background)) 16px)'}} />
                     </>
                   )}
-                  <div className={isSidebarOpen ? "mr-3" : "w-full text-center"}>
-                    {React.createElement(item.icon, { className: "h-6 w-6" })}
-                  </div>
+                  {React.createElement(item.icon, { className: cn("h-6 w-6 flex-shrink-0", isSidebarOpen && "mr-3") })}
                   {isSidebarOpen && (
                     <span className="text-base font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                       {item.name}

@@ -10,23 +10,17 @@ import {
 import { Tab } from "./tab";
 
 interface HeaderProps {
-  isSidebarOpen: boolean;
   children: React.ReactNode;
 }
 
-export function Header({ isSidebarOpen, children }: HeaderProps) {
+export function Header({ children }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 w-full bg-primary text-primary-foreground">
-      <div className="flex h-[40px] items-center px-2">
-        {/* The tabs will be rendered here as children */}
-        <div className="flex-1 overflow-x-auto overflow-y-hidden">
-            <div className="flex items-center">
-                {children}
-            </div>
-        </div>
+      <div className="flex h-[61px] items-center px-4 border-b border-primary-foreground/20">
+        {children}
 
         {/* Right section: Search, Profile Icon, Settings Icon */}
-        <div className="flex items-center space-x-2 pl-2">
+        <div className="flex items-center space-x-2 pl-4 flex-shrink-0">
             <div className="relative">
                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
