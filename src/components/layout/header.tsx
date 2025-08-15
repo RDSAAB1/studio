@@ -8,16 +8,49 @@ import {
   Search
 } from "lucide-react";
 import { Tab } from "./tab";
+import { useTabs } from "@/hooks/use-tabs";
+import { Button } from "../ui/button";
+import { Menu } from "lucide-react";
 
 interface HeaderProps {
-  children: React.ReactNode;
+  toggleSidebar: () => void;
+  isSidebarOpen: boolean;
 }
 
-export function Header({ children }: HeaderProps) {
+export function Header({ toggleSidebar, isSidebarOpen }: HeaderProps) {
+    const { tabs, activeTab, removeTab, setActiveTab } = useTabs();
   return (
-    <header className="sticky top-0 z-30 w-full bg-primary text-primary-foreground">
+    <header className="sticky top-0 z-20 w-full bg-primary text-primary-foreground">
       <div className="flex h-[61px] items-center px-4 border-b border-primary-foreground/20">
-        {children}
+         <button
+            onClick={toggleSidebar}
+            className="p-2 rounded-full text-primary-foreground hover:bg-primary-foreground/10 focus:outline-none focus:ring-2 focus:ring-primary-foreground transition-colors mr-2 flex-shrink-0"
+            aria-label={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        <div className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide">
+            <div className="flex items-end h-full">
+                {tabs.map((tab, index) => {
+                    const isNextTabActive = tabs[index + 1] ? tabs[index + 1].path === activeTab : false;
+                    return (
+                        <Tab 
+                            key={tab.id}
+                            icon={tab.icon}
+                            title={tab.title}
+                            path={tab.path}
+                            isActive={activeTab === tab.path}
+                            onClick={() => setActiveTab(tab.path)}
+                            onClose={(e) => {
+                                e.stopPropagation();
+                                removeTab(tab.path);
+                            }}
+                            isNextTabActive={isNextTabActive}
+                        />
+                    );
+                })}
+            </div>
+        </div>
 
         {/* Right section: Search, Profile Icon, Settings Icon */}
         <div className="flex items-center space-x-2 pl-4 flex-shrink-0">

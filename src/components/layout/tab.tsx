@@ -14,14 +14,15 @@ interface TabProps {
   isActive: boolean;
   onClick: () => void;
   onClose: (e: React.MouseEvent) => void;
+  isNextTabActive: boolean;
 }
 
-export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose }) => {
+export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose, isNextTabActive }) => {
   const router = useRouter();
 
   const cornerStyle = {
-    '--corner-bg': 'hsl(var(--background))', // The color of the main content area
-    '--tab-bar-bg': 'hsl(var(--primary))',  // The color of the tab bar
+    '--corner-bg': 'hsl(var(--background))',
+    '--tab-bar-bg': 'hsl(var(--primary))',
   };
   
   const tabClasses = cn(
@@ -32,6 +33,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
     }
   );
 
+  const showSeparator = !isActive && !isNextTabActive;
 
   return (
     <div 
@@ -57,20 +59,16 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
         </Button>
       </div>
 
-      {/* Inverted Scooped corners for active tab at the BOTTOM */}
       {isActive && (
         <>
-          {/* Left Bottom Corner */}
           <div 
-            className="absolute bottom-0 left-[-16px] w-4 h-4 z-0" 
+            className="absolute bottom-0 left-[-16px] w-4 h-4 z-20" 
             style={{ 
               background: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, var(--corner-bg) 15.5px)',
             }}
           />
-          
-          {/* Right Bottom Corner */}
           <div 
-            className="absolute bottom-0 right-[-16px] w-4 h-4 z-0" 
+            className="absolute bottom-0 right-[-16px] w-4 h-4 z-20" 
             style={{ 
               background: 'radial-gradient(circle at 100% 0, transparent 0, transparent 15px, var(--corner-bg) 15.5px)',
             }}
@@ -78,8 +76,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
         </>
       )}
       
-      {/* Separator for inactive tabs */}
-       {!isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-px bg-primary-foreground/20" />}
+       {showSeparator && <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-px bg-primary-foreground/20 z-10" />}
     </div>
   );
 };

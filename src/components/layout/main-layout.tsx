@@ -98,33 +98,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         (isClient && isSidebarOpen) ? "lg:ml-64" : "lg:ml-20" 
       )}
       >
-        <Header>
-            <button
-              onClick={toggleSidebar}
-              className="p-2 rounded-full text-primary-foreground hover:bg-primary-foreground/10 focus:outline-none focus:ring-2 focus:ring-primary-foreground transition-colors mr-2 flex-shrink-0"
-              aria-label={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <div className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide">
-                <div className="flex items-center h-full">
-                    {tabs.map(tab => (
-                        <Tab 
-                            key={tab.id}
-                            icon={tab.icon}
-                            title={tab.title}
-                            path={tab.path}
-                            isActive={activeTab === tab.path}
-                            onClick={() => setActiveTab(tab.path)}
-                            onClose={(e) => {
-                                e.stopPropagation();
-                                removeTab(tab.path);
-                            }}
-                        />
-                    ))}
-                </div>
-            </div>
-        </Header>
+        <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
         
         <main className="flex-1 bg-background relative rounded-tl-lg">
              {tabs.map(tab => (
