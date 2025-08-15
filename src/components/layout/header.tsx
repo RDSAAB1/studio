@@ -31,7 +31,7 @@ export function Header({ isSidebarOpen, children }: HeaderProps) {
                 <input 
                     type="text"
                     placeholder="Search..."
-                    className="bg-primary-foreground/10 text-primary-foreground placeholder-primary-foreground/70 rounded-full h-8 w-48 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-foreground"
+                    className="bg-transparent border border-primary-foreground/30 text-primary-foreground placeholder-primary-foreground/70 rounded-full h-8 w-48 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-foreground"
                 />
             </div>
           <button

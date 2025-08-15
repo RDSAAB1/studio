@@ -6,46 +6,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  Home,
-  Settings as SettingsIcon,
-  BarChart3,
-  Users,
-  LogOut,
   Menu,
   ChevronRight,
   ChevronDown,
-  Search,
-  UserCircle,
-  TrendingUp,
-  ShoppingCart,
-  PackageCheck,
-  Banknote,
-  Truck,
-  UserPlus,
-  Wallet,
-  Scale,
-  Calculator,
-  Landmark,
-  Database,
-  CalendarCheck,
-  Boxes,
-  Building2,
-  Sparkles,
-  Rocket,
-  Mail,
-  LineChart,
-  ClipboardCheck,
-  Briefcase,
-  Users2,
-  Package as PackageIcon
 } from 'lucide-react';
 import { allMenuItems } from '@/hooks/use-tabs'; // Import from central location
 
 function cn(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
 }
-
-// Sidebar Navigation Data is now imported from use-tabs.ts
 
 interface MenuItem {
   id: string;
@@ -102,15 +71,15 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
         {isActiveParent && (
             <>
                 <div 
-                    className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]"
+                    className="absolute -top-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
                     style={{
-                        clipPath: 'path("M 0 16 C 8.837 16 16 8.837 16 0 L 16 16 Z")'
+                        maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, black 16px)'
                     }}
                 />
                 <div 
-                    className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                    style={{
-                        clipPath: 'path("M 16 16 C 16 7.163 8.837 0 0 0 L 16 0 Z")'
+                    className="absolute -bottom-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
+                     style={{
+                        maskImage: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, black 16px)'
                     }}
                 />
             </>
@@ -155,15 +124,15 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
                   {isActive && (
                     <>
                         <div 
-                            className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]"
+                            className="absolute -top-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
                             style={{
-                                clipPath: 'path("M 0 16 C 8.837 16 16 8.837 16 0 L 16 16 Z")'
+                                maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, black 16px)'
                             }}
                         />
                         <div 
-                            className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]"
+                            className="absolute -bottom-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
                             style={{
-                                clipPath: 'path("M 16 16 C 16 7.163 8.837 0 0 0 L 16 0 Z")'
+                                maskImage: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, black 16px)'
                             }}
                         />
                     </>
@@ -292,15 +261,15 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
                   {activePath === item.href && (
                     <>
                         <div 
-                            className="absolute top-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]"
+                            className="absolute -top-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
                             style={{
-                                clipPath: 'path("M 0 16 C 8.837 16 16 8.837 16 0 L 16 16 Z")'
+                                maskImage: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, black 16px)'
                             }}
                         />
                         <div 
-                            className="absolute bottom-[-16px] right-0 h-4 w-4 bg-[var(--corner-bg)]"
-                            style={{
-                                clipPath: 'path("M 16 16 C 16 7.163 8.837 0 0 0 L 16 0 Z")'
+                            className="absolute -bottom-4 right-0 h-4 w-4 bg-[var(--corner-bg)]"
+                             style={{
+                                maskImage: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, black 16px)'
                             }}
                         />
                     </>
