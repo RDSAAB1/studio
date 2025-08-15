@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -18,16 +19,15 @@ interface TabProps {
 export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose }) => {
   const router = useRouter();
 
-  // Define the base variable for the background color of the tabs container
   const cornerStyle = {
-    '--corner-bg': 'hsl(var(--primary))',
-    '--content-bg': 'hsl(var(--background))',
+    '--corner-bg': 'hsl(var(--background))', // The color of the main content area
+    '--tab-bar-bg': 'hsl(var(--primary))',  // The color of the tab bar
   };
   
   const tabClasses = cn(
     "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-4 min-w-[120px] max-w-[240px] flex-1 transition-colors duration-200",
     {
-      'bg-background text-foreground z-10 rounded-t-lg': isActive,
+      'bg-background text-foreground z-10 rounded-b-lg': isActive, // Change to rounded-b-lg
       'bg-primary text-primary-foreground hover:bg-primary/90': !isActive,
     }
   );
@@ -35,7 +35,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
 
   return (
     <div 
-      className="relative flex-grow-0 flex-shrink-0 pt-2" // Added pt-2 to make space for top corners
+      className="relative flex-grow-0 flex-shrink-0" // Removed pt-2
       onClick={onClick}
       style={cornerStyle as React.CSSProperties}
     >
@@ -57,34 +57,34 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
         </Button>
       </div>
 
-      {/* Inverted Scooped corners for active tab */}
+      {/* Inverted Scooped corners for active tab at the BOTTOM */}
       {isActive && (
         <>
-          {/* Left Top Corner */}
+          {/* Left Bottom Corner */}
           <div 
-            className="absolute top-0 left-[-16px] w-4 h-4 z-20" 
+            className="absolute bottom-0 left-[-16px] w-4 h-4 z-20" 
             style={{ 
-              background: 'radial-gradient(circle at 0 100%, transparent 0, transparent 16px, var(--primary) 16px)',
+              background: 'radial-gradient(circle at 0 0, transparent 0, transparent 16px, var(--tab-bar-bg) 16.5px)',
             }}
           />
            <div 
-            className="absolute top-0 left-[-16px] w-4 h-4 z-20" 
+            className="absolute bottom-0 left-[-16px] w-4 h-4 z-20" 
             style={{ 
-              background: 'radial-gradient(circle at 0 100%, transparent 0, transparent 15px, var(--content-bg) 15px)',
+              background: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, var(--corner-bg) 15.5px)',
             }}
           />
           
-          {/* Right Top Corner */}
+          {/* Right Bottom Corner */}
           <div 
-            className="absolute top-0 right-[-16px] w-4 h-4 z-20" 
+            className="absolute bottom-0 right-[-16px] w-4 h-4 z-20" 
             style={{ 
-              background: 'radial-gradient(circle at 100% 100%, transparent 0, transparent 16px, var(--primary) 16px)',
+              background: 'radial-gradient(circle at 100% 0, transparent 0, transparent 16px, var(--tab-bar-bg) 16.5px)',
             }}
           />
            <div 
-            className="absolute top-0 right-[-16px] w-4 h-4 z-20" 
+            className="absolute bottom-0 right-[-16px] w-4 h-4 z-20" 
             style={{ 
-              background: 'radial-gradient(circle at 100% 100%, transparent 0, transparent 15px, var(--content-bg) 15px)',
+              background: 'radial-gradient(circle at 100% 0, transparent 0, transparent 15px, var(--corner-bg) 15.5px)',
             }}
           />
         </>

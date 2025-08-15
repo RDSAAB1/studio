@@ -46,7 +46,7 @@ export function Header({ isSidebarOpen, children }: HeaderProps) {
         </div>
       </div>
       {/* This is where the tabs will be rendered */}
-      <div className="w-full">{children}</div>
+      <div className="w-full relative z-20">{children}</div>
     </header>
   );
 }

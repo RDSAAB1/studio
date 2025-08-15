@@ -94,7 +94,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       )}
       >
         <Header isSidebarOpen={isSidebarOpen}>
-            <div className="flex bg-primary px-2 pt-2">
+            <div className="flex bg-primary px-2">
                 {tabs.map(tab => (
                     <Tab 
                         key={tab.id}
@@ -112,7 +112,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
         </Header>
         
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-background relative">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-background relative pt-0">
              {tabs.map(tab => (
                 <div
                   key={tab.id}
