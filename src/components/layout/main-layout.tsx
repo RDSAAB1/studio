@@ -92,23 +92,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
       )}
       >
         <Header isSidebarOpen={isSidebarOpen}>
-          <div className="flex-1 bg-primary pt-2">
-            <div className="flex">
-                {tabs.map(tab => (
-                    <Tab 
-                        key={tab.id}
-                        icon={tab.icon}
-                        title={tab.title}
-                        path={tab.path}
-                        isActive={activeTab === tab.path}
-                        onClick={() => setActiveTab(tab.path)}
-                        onClose={(e) => {
-                            e.stopPropagation();
-                            removeTab(tab.path);
-                        }}
-                    />
-                ))}
-            </div>
+          <div className="flex bg-primary px-2 pt-2">
+            {tabs.map(tab => (
+                <Tab 
+                    key={tab.id}
+                    icon={tab.icon}
+                    title={tab.title}
+                    path={tab.path}
+                    isActive={activeTab === tab.path}
+                    onClick={() => setActiveTab(tab.path)}
+                    onClose={(e) => {
+                        e.stopPropagation();
+                        removeTab(tab.path);
+                    }}
+                />
+            ))}
           </div>
         </Header>
         
