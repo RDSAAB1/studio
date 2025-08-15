@@ -78,7 +78,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
   
   return (
-    <div className="relative flex min-h-screen">
+    <div className="relative flex min-h-screen bg-primary">
        <CustomSidebar
         isSidebarOpen={isClient ? isSidebarOpen : true}
         toggleSidebar={toggleSidebar}
