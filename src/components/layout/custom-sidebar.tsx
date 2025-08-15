@@ -84,7 +84,6 @@ const SubMenu: React.FC<SubMenuProps> = ({ item, isSidebarOpen, activePath, onLi
   };
   
   const cornerStyle = {
-    '--corner-size': '16px',
     '--corner-bg': 'hsl(var(--primary))',
     '--content-bg': 'hsl(var(--background))',
   };
@@ -355,3 +354,5 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
 };
 
 export default CustomSidebar;
+
+    
