@@ -94,30 +94,28 @@ export default function MainLayout({ children }: MainLayoutProps) {
       )}
       >
         <Header isSidebarOpen={isSidebarOpen}>
-            <div className="flex bg-primary px-2">
-                {tabs.map(tab => (
-                    <Tab 
-                        key={tab.id}
-                        icon={tab.icon}
-                        title={tab.title}
-                        path={tab.path}
-                        isActive={activeTab === tab.path}
-                        onClick={() => setActiveTab(tab.path)}
-                        onClose={(e) => {
-                            e.stopPropagation();
-                            removeTab(tab.path);
-                        }}
-                    />
-                ))}
-            </div>
+            {tabs.map(tab => (
+                <Tab 
+                    key={tab.id}
+                    icon={tab.icon}
+                    title={tab.title}
+                    path={tab.path}
+                    isActive={activeTab === tab.path}
+                    onClick={() => setActiveTab(tab.path)}
+                    onClose={(e) => {
+                        e.stopPropagation();
+                        removeTab(tab.path);
+                    }}
+                />
+            ))}
         </Header>
         
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-background relative">
+        <main className="flex-1 bg-background relative">
              {tabs.map(tab => (
                 <div
                   key={tab.id}
                   style={{ display: activeTab === tab.path ? 'block' : 'none' }}
-                  className="h-full w-full"
+                  className="h-full w-full p-4 sm:p-6 lg:p-8"
                 >
                   {tab.path === pathname ? children : tabContent.get(tab.path)}
                 </div>
