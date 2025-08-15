@@ -19,7 +19,7 @@ interface TabProps {
 export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose }) => {
   const router = useRouter();
   
-  const tabContainerClasses = "relative h-[40px] px-2 flex-shrink-0";
+  const tabContainerClasses = "relative h-[40px] px-2 flex-grow";
   const tabBaseClasses = "flex items-center justify-center cursor-pointer group text-sm h-full px-4 transition-colors duration-200 ease-in-out w-full";
   const activeClasses = "bg-muted/30 text-foreground";
   const inactiveClasses = "bg-primary text-primary-foreground hover:bg-primary/90";
