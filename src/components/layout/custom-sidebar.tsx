@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils';
 interface CustomSidebarProps {
   isSidebarActive: boolean;
   onMenuItemClick: (item: MenuItemType) => void;
+  toggleSidebar: () => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuItemClick }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuItemClick, toggleSidebar }) => {
   const pathname = usePathname();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
@@ -73,7 +74,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
   return (
     <aside className="side_bar">
       <div className="side_bar_top">
-        {/* The toggle button is removed as hover now controls the state */}
+         <div className="side_bar_menu" onClick={toggleSidebar}>
+            {isSidebarActive ? <ArrowLeft /> : <ArrowRight />}
+        </div>
       </div>
       <div className="side_bar_bottom scrollbar-hide">
         <ul>

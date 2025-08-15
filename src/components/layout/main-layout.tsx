@@ -43,7 +43,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
         if (dashboard) {
             setOpenTabs([dashboard]);
             setActiveTabId('dashboard');
-            router.push(dashboard.href || '/');
+            if (pathname !== dashboard.href) {
+              router.push(dashboard.href || '/');
+            }
         }
     }
   }, []);
@@ -72,8 +74,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
             newActiveTabId = openTabs[tabIndex + 1].id;
             newPath = openTabs[tabIndex + 1].href || '/';
         } else {
-            newActiveTabId = ''; 
-            newPath = '/';
+            // If it's the last tab, navigate to the dashboard or a default page
+            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+            if (dashboard) {
+                newActiveTabId = dashboard.id;
+                newPath = dashboard.href || '/';
+                if (!openTabs.some(tab => tab.id === dashboard.id)) {
+                  setOpenTabs([dashboard]);
+                }
+            } else {
+               newActiveTabId = ''; 
+               newPath = '/';
+            }
         }
     } else {
         const currentActiveTab = openTabs.find(tab => tab.id === activeTabId);
@@ -82,10 +94,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
         }
     }
     
-    setOpenTabs(openTabs.filter(tab => tab.id !== tabId));
-    setActiveTabId(newActiveTabId);
-    if (newPath) {
+    const newOpenTabs = openTabs.filter(tab => tab.id !== tabId);
+    setOpenTabs(newOpenTabs);
+
+    if (newOpenTabs.length === 0) {
+      const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+      if (dashboard) {
+          setOpenTabs([dashboard]);
+          setActiveTabId(dashboard.id);
+          router.push(dashboard.href || '/');
+      }
+    } else {
+      setActiveTabId(newActiveTabId);
+      if (newPath) {
         router.push(newPath);
+      }
     }
   };
 
@@ -95,19 +118,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setOpenTabs([...openTabs, item]);
       }
       setActiveTabId(item.id);
-      setIsSidebarActive(false); // Collapse sidebar on item click
+      // Optional: auto-collapse sidebar on item click
+      // setIsSidebarActive(false); 
     }
+  };
+  
+  const toggleSidebar = () => {
+    setIsSidebarActive(!isSidebarActive);
   };
   
   return (
     <div 
         className={cn("wrapper", isSidebarActive && "active")}
-        onMouseEnter={() => setIsSidebarActive(true)}
-        onMouseLeave={() => setIsSidebarActive(false)}
     >
         <CustomSidebar 
             isSidebarActive={isSidebarActive}
             onMenuItemClick={handleSidebarItemClick}
+            toggleSidebar={toggleSidebar}
         />
         <div className="main_container">
             <Header 
