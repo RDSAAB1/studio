@@ -28,11 +28,12 @@ const TabBar: React.FC<TabBarProps> = ({ openTabs, activeTabId, onTabClick, onCl
       {openTabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
           const isNextTabActive = (index + 1 < openTabs.length) && openTabs[index + 1].id === activeTabId;
+          const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
 
           return (
             <Tab
               key={tab.id}
-              icon={React.createElement(tab.icon, { className: "h-4 w-4" })}
+              icon={iconElement}
               title={tab.name}
               path={tab.href || '#'}
               isActive={isActive}

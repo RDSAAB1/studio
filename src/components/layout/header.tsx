@@ -31,7 +31,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
                 <Input
                     type="search"
                     placeholder="Search..."
-                    className="w-full rounded-full bg-background pl-8 md:w-[200px] lg:w-[320px]"
+                    className="h-9 w-full rounded-full bg-background pl-8 md:w-[180px] lg:w-[250px]"
                 />
             </div>
             <Button variant="ghost" size="icon">

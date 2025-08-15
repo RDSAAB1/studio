@@ -27,6 +27,7 @@ import {
   LineChart,
   Briefcase,
   ClipboardCheck,
+  ChevronRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -35,7 +36,7 @@ export type MenuItem = {
     name: string;
     icon: LucideIcon;
     href?: string;
-    subMenus?: Omit<MenuItem, 'icon' | 'subMenus'>[];
+    subMenus?: MenuItem[];
 }
 
 export const allMenuItems: MenuItem[] = [
@@ -50,12 +51,12 @@ export const allMenuItems: MenuItem[] = [
     name: "Sales",
     icon: TrendingUp,
     subMenus: [
-      { id: "supplier-entry", name: "Supplier Entry", href: "/sales/supplier-entry" },
-      { id: "supplier-payments", name: "Supplier Payments", href: "/sales/supplier-payments" },
-      { id: "supplier-profile", name: "Supplier Profile", href: "/sales/supplier-profile" },
-      { id: "customer-entry", name: "Customer Entry", href: "/sales/customer-entry" },
-      { id: "customer-payments", name: "Customer Payments", href: "/sales/customer-payments" },
-      { id: "customer-profile", name: "Customer Profile", href: "/sales/customer-profile" },
+      { id: "supplier-entry", name: "Supplier Entry", icon: ChevronRight, href: "/sales/supplier-entry" },
+      { id: "supplier-payments", name: "Supplier Payments", icon: ChevronRight, href: "/sales/supplier-payments" },
+      { id: "supplier-profile", name: "Supplier Profile", icon: ChevronRight, href: "/sales/supplier-profile" },
+      { id: "customer-entry", name: "Customer Entry", icon: ChevronRight, href: "/sales/customer-entry" },
+      { id: "customer-payments", name: "Customer Payments", icon: ChevronRight, href: "/sales/customer-payments" },
+      { id: "customer-profile", name: "Customer Profile", icon: ChevronRight, href: "/sales/customer-profile" },
     ],
   },
   {
@@ -63,8 +64,8 @@ export const allMenuItems: MenuItem[] = [
     name: "Finance",
     icon: Scale,
     subMenus: [
-        { id: "income-expense", name: "Income & Expense", href: "/expense-tracker" },
-        { id: "cash-bank", name: "Cash & Bank", href: "/cash-bank" },
+        { id: "income-expense", name: "Income & Expense", icon: ChevronRight, href: "/expense-tracker" },
+        { id: "cash-bank", name: "Cash & Bank", icon: ChevronRight, href: "/cash-bank" },
     ]
   },
   {
@@ -72,8 +73,8 @@ export const allMenuItems: MenuItem[] = [
     name: "HR & Payroll",
     icon: Users2,
     subMenus: [
-      { id: "employee-db", name: "Employee Database", href: "/hr/employee-database" },
-      { id: "payroll", name: "Payroll", href: "/hr/payroll-management" },
+      { id: "employee-db", name: "Employee Database", icon: ChevronRight, href: "/hr/employee-database" },
+      { id: "payroll", name: "Payroll", icon: ChevronRight, href: "/hr/payroll-management" },
     ],
   },
   {
@@ -81,8 +82,8 @@ export const allMenuItems: MenuItem[] = [
     name: "Inventory",
     icon: PackageIcon,
     subMenus: [
-      { id: "inventory-mgmt", name: "Inventory", href: "/inventory/inventory-management" },
-      { id: "purchase-orders", name: "Purchase Orders", href: "/inventory/purchase-orders" },
+      { id: "inventory-mgmt", name: "Inventory", icon: ChevronRight, href: "/inventory/inventory-management" },
+      { id: "purchase-orders", name: "Purchase Orders", icon: ChevronRight, href: "/inventory/purchase-orders" },
     ],
   },
   {
@@ -90,7 +91,7 @@ export const allMenuItems: MenuItem[] = [
     name: "Projects",
     icon: Briefcase,
     subMenus: [
-        { id: "project-dashboard", name: "Dashboard", href: "/projects/dashboard" },
+        { id: "project-dashboard", name: "Dashboard", icon: ChevronRight, href: "/projects/dashboard" },
     ]
   },
 ];
