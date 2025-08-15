@@ -24,7 +24,7 @@ export function Header({ isSidebarOpen, children }: HeaderProps) {
     allMenuItems.find(m => pathname.startsWith(m.href || '###'));
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <header className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-screen-2xl items-center justify-between px-4">
         {/* Empty left section for alignment */}
         <div className="flex items-center space-x-4"></div>
