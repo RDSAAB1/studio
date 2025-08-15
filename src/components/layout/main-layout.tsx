@@ -21,6 +21,7 @@ type MainLayoutProps = {
 export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   
   const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
@@ -28,6 +29,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   // Effect to handle responsive sidebar and outside clicks
   useEffect(() => {
+    setIsClient(true);
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
         setIsSidebarOpen(true);
@@ -53,16 +55,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   // Effect to add a new tab when the path changes, if it's not already open.
   useEffect(() => {
-    if (pathname) {
+    if (isClient && pathname) {
       addTab(pathname);
     }
-  }, [pathname, addTab]);
+  }, [pathname, addTab, isClient]);
 
   useEffect(() => {
-    if (pathname && children) {
+    if (isClient && pathname && children) {
       setTabContent(prev => new Map(prev).set(pathname, children));
     }
-  }, [pathname, children]);
+  }, [pathname, children, isClient]);
 
 
   const toggleSidebar = () => {
@@ -77,7 +79,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   };
 
-  const activeTabContent = tabContent.get(activeTab);
+  const activeTabContent = isClient ? tabContent.get(activeTab) : null;
   
   return (
     <div className="relative flex min-h-screen">
@@ -100,10 +102,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       >
         <Header isSidebarOpen={isSidebarOpen} />
         <div className="flex-1 flex flex-col">
+          {isClient && (
             <div className="flex border-b border-border">
                 {tabs.map(tab => (
                     <Tab 
-                        key={tab.path} // Use path as key for stability
+                        key={tab.id}
                         icon={tab.icon}
                         title={tab.title}
                         path={tab.path}
@@ -116,17 +119,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     />
                 ))}
             </div>
+          )}
             <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30 relative">
-                 {tabs.map(tab => (
+                 {isClient ? tabs.map(tab => (
                     <div
-                      key={tab.path} // Use path as key for stability
+                      key={tab.id}
                       style={{ display: activeTab === tab.path ? 'block' : 'none' }}
                       className="h-full w-full"
                     >
                       {/* Render the children for the active tab, and the memoized content for inactive tabs */}
                       {tab.path === pathname ? children : tabContent.get(tab.path)}
                     </div>
-                ))}
+                )) : children}
             </main>
         </div>
       </div>
