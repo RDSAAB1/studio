@@ -12,6 +12,8 @@
 
 
 
+
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -180,4 +182,56 @@ export type BankBranch = {
     bankName: string;
     branchName: string;
     ifscCode: string;
+};
+
+export type Order = {
+  id: string;
+  customerName: string;
+  orderDate: string;
+  totalAmount: number;
+};
+
+export type InventoryItem = {
+    id?: string;
+    name: string;
+    sku: string;
+    stock: number;
+    unit: string;
+    purchasePrice: number;
+    sellingPrice: number;
+    createdAt?: string;
+};
+
+export type PurchaseOrder = {
+  id: string;
+  supplierId: string;
+  orderDate: string;
+  deliveryDate: string;
+  status: 'Pending' | 'Received' | 'Cancelled';
+  items: { itemId: string; quantity: number; unitPrice: number }[];
+  totalAmount: number;
+};
+
+export type Employee = {
+    id: string;
+    employeeId: string;
+    name: string;
+    position: string;
+    contact: string;
+};
+
+export type PayrollEntry = {
+    id: string;
+    employeeId: string;
+    payPeriod: string; // e.g., "July 2024"
+    amount: number;
+    // Add other fields like deductions, bonuses, paymentDate, etc.
+};
+
+export type Campaign = {
+  id: string;
+  name: string;
+  description: string;
+  startDate: string;
+  endDate: string;
 };

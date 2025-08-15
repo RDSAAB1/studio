@@ -1,5 +1,3 @@
-import PlaceholderPage from "@/components/placeholder-page";
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -20,13 +18,13 @@ export default function OrderTrackingPage() {
 
   useEffect(() => {
     const ordersCollection = collection(db, 'orders');
-    const q = query(ordersCollection, orderBy('createdAt', 'desc')); // Assuming a 'createdAt' field for ordering
+    const q = query(ordersCollection, orderBy('orderDate', 'desc')); // Assuming a 'createdAt' field for ordering
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data() as Order // Cast to Order type
-      }));
+        ...doc.data() as Omit<Order, 'id'>
+      })) as Order[];
       setOrders(ordersData);
       setLoading(false);
     }, (err) => {
@@ -40,11 +38,11 @@ export default function OrderTrackingPage() {
   }, []);
 
   if (loading) {
-    return <PlaceholderPage title="Order Tracking" description="Loading orders..." />;
+    return <PlaceholderPage title="Order Tracking" message="Loading orders..." />;
   }
 
   if (error) {
-    return <PlaceholderPage title="Order Tracking" description={`Error: ${error}`} />;
+    return <PlaceholderPage title="Order Tracking" message={`Error: ${error}`} />;
   }
 
   // Basic functions for actions (implement detailed logic as needed)
