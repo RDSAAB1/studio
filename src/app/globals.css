@@ -3,25 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%; /* #FFFFFF - White */
-  --foreground: 200 26% 26%; /* #304655 - Dark Blue-Gray */
-  --card: 15 26% 98%;
-  --card-foreground: 200 26% 26%;
-  --popover: 15 26% 98%;
-  --popover-foreground: 200 26% 26%;
+  --background: 222 47% 11%; /* #111827 - Dark Slate Gray */
+  --foreground: 210 40% 98%; /* #E5E7EB - Light Gray */
+  --card: 222 47% 15%; /* #1F2937 - Lighter Slate Gray */
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 15%;
+  --popover-foreground: 210 40% 98%;
   --primary: 262 82% 57%; /* #4F46E5 - Saturated Indigo */
   --primary-foreground: 0 0% 100%;
-  --secondary: 200 20% 45%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 15 20% 94%;
-  --muted-foreground: 200 15% 50%;
+  --secondary: 217 33% 50%; /* Lighter gray-blue */
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 25%; /* Darker muted gray */
+  --muted-foreground: 215 28% 65%; /* Lighter muted foreground */
   --accent: 255 83% 67%; /* #8B5CF6 - Violet Accent */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 200 18% 85%;
-  --input: 15 22% 96%;
-  --ring: 21 24% 62%;
+  --destructive: 0 63% 31%; /* Darker red */
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 25%; /* Darker gray border */
+  --input: 217 33% 20%; /* Dark input background */
+  --ring: 262 82% 57%; /* Primary color for ring */
   --radius: 0.5rem;
 }
 
@@ -263,5 +263,19 @@ body {
   -ms-overflow-style: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-bar-container {
+    background-color: hsl(var(--primary) / 0.9);
+    backdrop-filter: blur(4px);
+    padding: 6px 10px 0 10px;
+    display: flex;
+    align-items: flex-end;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.tab-bar-container::-webkit-scrollbar {
   display: none;
 }
