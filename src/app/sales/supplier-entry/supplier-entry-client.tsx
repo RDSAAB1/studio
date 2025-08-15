@@ -558,6 +558,7 @@ export default function SupplierEntryClient() {
   const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
   const [openVarietyCombobox, setOpenVarietyCombobox] = useState(false);
   const [lastVariety, setLastVariety] = useState<string>('');
+  const isInitialLoad = useRef(true);
 
   // Ensure customers is always an array
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
@@ -583,11 +584,12 @@ export default function SupplierEntryClient() {
     setIsLoading(true);
     const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
       setCustomers(data);
-      if (isLoading) {
+      if (isInitialLoad.current) {
           const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
           const initialSrNo = formatSrNo(nextSrNum);
           form.setValue('srNo', initialSrNo);
           setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+          isInitialLoad.current = false;
       }
       setIsLoading(false);
     }, (error) => {
@@ -614,6 +616,7 @@ export default function SupplierEntryClient() {
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
       setLastVariety(savedVariety);
+      form.setValue('variety', savedVariety);
     }
 
     // Set initial form date
@@ -624,7 +627,7 @@ export default function SupplierEntryClient() {
       unsubscribeSuppliers();
       unsubscribePayments();
     };
-  }, [isClient, form, toast, isLoading]);
+  }, [isClient, form, toast]);
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -666,15 +669,6 @@ export default function SupplierEntryClient() {
     }));
   }, [form]);
   
-   useEffect(() => {
-    if (isClient) {
-      const initialFormState = getInitialFormState(lastVariety);
-      setCurrentCustomer(initialFormState);
-      resetFormToState(initialFormState);
-    }
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient, customers, lastVariety]);
-
   useEffect(() => {
     const subscription = form.watch((value) => {
         performCalculations(value as Partial<FormValues>);
@@ -682,7 +676,7 @@ export default function SupplierEntryClient() {
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
 
-  const resetFormToState = (customerState: Customer) => {
+  const resetFormToState = useCallback((customerState: Customer) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     let formDate;
@@ -705,21 +699,19 @@ export default function SupplierEntryClient() {
     setCurrentCustomer(customerState);
     form.reset(formValues);
     performCalculations(formValues);
-  }
+  }, [form, performCalculations]);
 
-  const handleNew = () => {
+  const handleNew = useCallback(() => {
     setIsEditing(false);
     const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety);
     newState.srNo = formatSrNo(nextSrNum);
     const today = new Date();
-    const year = today.getFullYear();
-    const month = (today.getMonth() + 1).toString().padStart(2, '0'); // Month is 0-indexed
-    const day = today.getDate().toString().padStart(2, '0');
-    const localDateString = `${year}-${month}-${day}`;
-    resetFormToState({ ...newState, date: new Date(localDateString), dueDate: localDateString });
+    today.setHours(0,0,0,0);
+    newState.date = today.toISOString().split('T')[0];
+    newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  };
+  }, [safeCustomers, lastVariety, resetFormToState]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);

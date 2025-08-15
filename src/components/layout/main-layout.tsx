@@ -22,18 +22,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const sidebarRef = useRef<HTMLElement>(null);
-  const [isClient, setIsClient] = useState(false);
   
   const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
   const [tabContent, setTabContent] = useState<Map<string, ReactNode>>(new Map());
 
   // Effect to handle responsive sidebar and outside clicks
   useEffect(() => {
-    setIsClient(true);
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setIsSidebarOpen(true);
-      } else {
+      if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
       }
     };
@@ -55,16 +51,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   // Effect to add a new tab when the path changes, if it's not already open.
   useEffect(() => {
-    if (isClient && pathname) {
+    if (pathname) {
       addTab(pathname);
     }
-  }, [pathname, addTab, isClient]);
+  }, [pathname, addTab]);
 
   useEffect(() => {
-    if (isClient && pathname && children) {
+    if (pathname && children) {
       setTabContent(prev => new Map(prev).set(pathname, children));
     }
-  }, [pathname, children, isClient]);
+  }, [pathname, children]);
 
 
   const toggleSidebar = () => {
@@ -83,7 +79,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <div className="relative flex min-h-screen">
       {/* Custom Sidebar Component */}
       <CustomSidebar
-        isSidebarOpen={isClient ? isSidebarOpen : true}
+        isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
         activePath={pathname}
         onLinkClick={handleLinkClick}
@@ -100,7 +96,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
       >
         <Header isSidebarOpen={isSidebarOpen} />
         <div className="flex-1 flex flex-col">
-          {isClient && (
             <div className="flex border-b border-border">
                 {tabs.map(tab => (
                     <Tab 
@@ -117,9 +112,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     />
                 ))}
             </div>
-          )}
             <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30 relative">
-                 {isClient ? tabs.map(tab => (
+                 {tabs.map(tab => (
                     <div
                       key={tab.id}
                       style={{ display: activeTab === tab.path ? 'block' : 'none' }}
@@ -128,7 +122,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       {/* Render the children for the active tab, and the memoized content for inactive tabs */}
                       {tab.path === pathname ? children : tabContent.get(tab.path)}
                     </div>
-                )) : children}
+                ))}
             </main>
         </div>
       </div>
