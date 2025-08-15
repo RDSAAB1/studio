@@ -78,14 +78,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
       setIsSidebarOpen(false);
     }
   };
-
-  const activeTabContent = isClient ? tabContent.get(activeTab) : null;
   
   return (
     <div className="relative flex min-h-screen">
       {/* Custom Sidebar Component */}
       <CustomSidebar
-        isSidebarOpen={isSidebarOpen}
+        isSidebarOpen={isClient ? isSidebarOpen : true}
         toggleSidebar={toggleSidebar}
         activePath={pathname}
         onLinkClick={handleLinkClick}
