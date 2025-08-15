@@ -22,14 +22,14 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
 
   const cornerStyle = {
     '--corner-bg': 'hsl(var(--background))',
-    '--tab-bar-bg': 'hsl(var(--primary))',
+    '--tab-bar-bg': 'hsl(var(--card))',
   };
   
   const tabClasses = cn(
-    "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-4 min-w-[120px] max-w-[240px] flex-1 transition-colors duration-200",
+    "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-4 max-w-[240px] flex-1 transition-colors duration-200",
     {
       'bg-background text-foreground z-10 rounded-t-lg': isActive,
-      'bg-primary text-primary-foreground hover:bg-primary/90': !isActive,
+      'bg-card text-card-foreground hover:bg-accent/50': !isActive,
     }
   );
 
@@ -37,7 +37,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
 
   return (
     <div 
-      className="relative flex-grow-0 flex-shrink-0" 
+      className="relative flex-grow-0 flex-shrink-1" 
       onClick={onClick}
       style={cornerStyle as React.CSSProperties}
     >
