@@ -21,16 +21,26 @@ type MainLayoutProps = {
 export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   
   const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
   const [tabContent, setTabContent] = useState<Map<string, ReactNode>>(new Map());
+  
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
 
   // Effect to handle responsive sidebar and outside clicks
   useEffect(() => {
+    if (!isClient) return;
+
     const handleResize = () => {
       if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
       }
     };
     handleResize(); // Set initial state based on window size
@@ -47,7 +57,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [isClient]);
 
   // Effect to add a new tab when the path changes, if it's not already open.
   useEffect(() => {
@@ -78,14 +88,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="relative flex min-h-screen">
       {/* Custom Sidebar Component */}
-      <CustomSidebar
+      {isClient && <CustomSidebar
         isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
         activePath={pathname}
         onLinkClick={handleLinkClick}
         setIsSidebarOpen={setIsSidebarOpen}
         sidebarRef={sidebarRef}
-      />
+      />}
 
 
       {/* Main content area */}
