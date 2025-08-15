@@ -22,12 +22,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const [isClient, setIsClient] = useState(false);
   
   const { tabs, activeTab, addTab, removeTab, setActiveTab } = useTabs();
   const [tabContent, setTabContent] = useState<Map<string, ReactNode>>(new Map());
 
   // This effect runs only on the client
   useEffect(() => {
+    setIsClient(true);
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
         setIsSidebarOpen(true);
@@ -76,6 +78,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
       setIsSidebarOpen(false);
     }
   };
+
+  const activeTabContent = tabContent.get(activeTab);
   
   return (
     <div className="relative flex min-h-screen">
@@ -97,6 +101,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       >
         <Header isSidebarOpen={isSidebarOpen} />
         <div className="flex-1 flex flex-col">
+            {isClient && (
             <div className="flex">
                 {tabs.map(tab => (
                     <Tab 
@@ -113,16 +118,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     />
                 ))}
             </div>
+            )}
             <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/30 relative">
-                 {tabs.map(tab => (
+                 {isClient ? tabs.map(tab => (
                     <div
                       key={tab.id}
                       style={{ display: activeTab === tab.path ? 'block' : 'none' }}
                       className="h-full w-full"
                     >
-                      {tabContent.get(tab.path)}
+                      {tab.path === activeTab ? children : tabContent.get(tab.path)}
                     </div>
-                ))}
+                )) : children}
             </main>
         </div>
       </div>
