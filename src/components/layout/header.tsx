@@ -5,6 +5,7 @@ import * as React from "react";
 import {
   Settings as SettingsIcon,
   UserCircle,
+  Search
 } from "lucide-react";
 
 interface HeaderProps {
@@ -23,8 +24,16 @@ export function Header({ isSidebarOpen, children }: HeaderProps) {
             </div>
         </div>
 
-        {/* Right section: Profile Icon, Settings Icon */}
-        <div className="flex items-center space-x-1 pl-2">
+        {/* Right section: Search, Profile Icon, Settings Icon */}
+        <div className="flex items-center space-x-2 pl-2">
+            <div className="relative">
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground/70" />
+                <input 
+                    type="text"
+                    placeholder="Search..."
+                    className="bg-primary-foreground/10 text-primary-foreground placeholder-primary-foreground/70 rounded-full h-8 w-48 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-foreground"
+                />
+            </div>
           <button
             className="p-2 rounded-full hover:bg-primary-foreground/10 focus:outline-none focus:ring-2 focus:ring-primary-foreground transition-colors"
             aria-label="User Profile"

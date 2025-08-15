@@ -193,7 +193,6 @@ interface CustomSidebarProps {
 }
 
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSidebar, activePath, onLinkClick, setIsSidebarOpen, sidebarRef }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [isDesktop, setIsDesktop] = useState(false);
   const [isExplicitlyOpen, setIsExplicitlyOpen] = useState(false);
 
@@ -225,15 +224,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
       setIsSidebarOpen(false);
     }
   };
-
-  const filteredMenuItems = allMenuItems.filter(item => {
-    const matchesMain = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSub = item.subMenus && item.subMenus.some(sub =>
-      sub.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    return matchesMain || matchesSub;
-  });
-
+  
   const currentYear = new Date().getFullYear();
   const cornerStyle = {
     '--corner-bg': 'hsl(var(--primary))',
@@ -271,26 +262,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
         </button>
       </div>
 
-      <div className="px-4 mb-4">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder={isSidebarOpen ? "Search..." : ""}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={cn(
-              "w-full p-2 pl-10 rounded-md focus:outline-none focus:ring-2",
-              "bg-primary/80 text-primary-foreground placeholder-primary-foreground/70 focus:ring-primary-foreground",
-              !isSidebarOpen && "md:opacity-0 md:pointer-events-none md:w-0"
-            )}
-          />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary-foreground/70" />
-        </div>
-      </div>
-
       <nav className="flex-1 overflow-y-auto px-4 scrollbar-hide">
         <ul className="space-y-1">
-          {filteredMenuItems.map(item =>
+          {allMenuItems.map(item =>
             item.subMenus ? (
               <SubMenu
                 key={item.id}
@@ -354,5 +328,3 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarOpen, toggleSide
 };
 
 export default CustomSidebar;
-
-    
