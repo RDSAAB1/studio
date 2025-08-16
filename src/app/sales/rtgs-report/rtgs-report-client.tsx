@@ -189,25 +189,23 @@ export default function RtgsReportClient() {
                             <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                            <div className="space-y-4">
-                                <h3 className="text-base font-semibold flex items-center gap-2 text-primary"><Building className="h-5 w-5"/> Company Details</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <DetailItem label="Company Name" value={settings.companyName} />
-                                    <DetailItem label="Contact No." value={settings.contactNo} />
-                                    <DetailItem label="Address Line 1" value={settings.companyAddress1} />
-                                    <DetailItem label="Address Line 2" value={settings.companyAddress2} />
-                                    <DetailItem label="Email" value={settings.gmail} />
-                                </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                            {/* Company Details */}
+                            <div className="space-y-3">
+                                <h3 className="font-semibold text-base flex items-center gap-2"><Building className="h-5 w-5 text-primary" /> Company Details</h3>
+                                <DetailItem label="Company Name" value={settings.companyName} />
+                                <DetailItem label="Address" value={`${settings.companyAddress1}, ${settings.companyAddress2}`} />
+                                <DetailItem label="Contact No." value={settings.contactNo} />
+                                <DetailItem label="Email" value={settings.gmail} />
                             </div>
-                             <div className="space-y-4">
-                                <h3 className="text-base font-semibold flex items-center gap-2 text-primary"><Landmark className="h-5 w-5"/> Bank Details</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <DetailItem label="Bank Name" value={settings.bankName} />
-                                    <DetailItem label="Account No." value={settings.accountNo} />
-                                    <DetailItem label="Branch Name" value={settings.branchName} />
-                                    <DetailItem label="IFSC Code" value={settings.ifscCode} />
-                                </div>
+
+                            {/* Bank Details */}
+                            <div className="space-y-3">
+                                 <h3 className="font-semibold text-base flex items-center gap-2"><Landmark className="h-5 w-5 text-primary" /> Bank Details</h3>
+                                <DetailItem label="Bank Name" value={settings.bankName} />
+                                <DetailItem label="Branch Name" value={settings.branchName} />
+                                <DetailItem label="Account No." value={settings.accountNo} />
+                                <DetailItem label="IFSC Code" value={settings.ifscCode} />
                             </div>
                         </div>
                     )}
@@ -273,3 +271,5 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+
+    
