@@ -159,11 +159,25 @@ export default function RtgsReportClient() {
     return (
         <div className="space-y-6">
             <Card>
-                 <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle>Company & Bank Details</CardTitle>
-                        <CardDescription>This information will be used for RTGS receipts.</CardDescription>
-                    </div>
+                 <CardHeader className="flex flex-row items-start justify-between">
+                    {isEditing ? (
+                         <div className="flex-1 mr-4">
+                            <CardTitle>Edit Details</CardTitle>
+                            <CardDescription>Update your company and bank information here.</CardDescription>
+                        </div>
+                    ) : (
+                         <div className="flex-1">
+                            <h2 className="text-lg font-semibold">{settings.companyName}</h2>
+                            <p className="text-sm text-muted-foreground">{`${settings.companyAddress1}, ${settings.companyAddress2}`}</p>
+                            <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
+                                <p>{settings.contactNo}</p>
+                                <p>{settings.gmail}</p>
+                                <p>{settings.bankName}</p>
+                                <p>A/C: {settings.accountNo}</p>
+                                <p>IFSC: {settings.ifscCode} | Branch: {settings.branchName}</p>
+                            </div>
+                        </div>
+                    )}
                      <div className="flex gap-2">
                         {isEditing ? (
                             <>
@@ -175,8 +189,8 @@ export default function RtgsReportClient() {
                         )}
                     </div>
                 </CardHeader>
-                <CardContent>
-                    {isEditing ? (
+                {isEditing && (
+                    <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                             <div className="space-y-1"><Label>Company Name</Label><Input name="companyName" value={tempSettings.companyName} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Address Line 1</Label><Input name="companyAddress1" value={tempSettings.companyAddress1} onChange={handleInputChange} /></div>
@@ -188,16 +202,8 @@ export default function RtgsReportClient() {
                             <div className="space-y-1"><Label>Contact No.</Label><Input name="contactNo" value={tempSettings.contactNo} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
-                            <DetailItem label="Company Name" value={settings.companyName} />
-                            <DetailItem label="Bank Name" value={settings.bankName} />
-                            <DetailItem label="Account No." value={settings.accountNo} />
-                            <DetailItem label="IFSC Code" value={settings.ifscCode} />
-                            <DetailItem label="Contact No." value={settings.contactNo} />
-                        </div>
-                    )}
-                </CardContent>
+                    </CardContent>
+                 )}
             </Card>
 
             <Card>
