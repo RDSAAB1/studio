@@ -493,19 +493,20 @@ export default function SupplierPaymentsPage() {
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
                 
-                const involvedSupplierDocs = new Map<string, any>();
                 const allInvolvedSrNos = new Set<string>();
                 if (tempEditingPayment) {
                     (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
                 }
                 selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
 
+                const involvedSupplierDocs = new Map<string, any>();
                 for (const srNo of allInvolvedSrNos) {
+                    // Find the supplier doc from the already-fetched `suppliers` state
                     const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
                     if (supplierToUpdate) {
                         const docRef = doc(db, "suppliers", supplierToUpdate.id);
                         const supplierDoc = await transaction.get(docRef);
-                         if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
+                        if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
                         involvedSupplierDocs.set(srNo, supplierDoc);
                     }
                 }
@@ -538,11 +539,12 @@ export default function SupplierPaymentsPage() {
                                 srNo: entryData.srNo, 
                                 amount: amountToPay, 
                                 cdApplied: cdEnabled && isEligibleForCD,
-                                supplierName: supplierDetails.name,
-                                bankName: bankDetails.bank,
-                                bankAcNo: bankDetails.acNo,
-                                bankBranch: bankDetails.branch,
-                                bankIfsc: bankDetails.ifscCode,
+                                supplierName: toTitleCase(entryData.name),
+                                supplierSo: toTitleCase(entryData.so),
+                                bankName: entryData.bank || '',
+                                bankAcNo: entryData.acNo || '',
+                                bankBranch: entryData.branch || '',
+                                bankIfsc: entryData.ifscCode || '',
                             });
                             
                             outstandingBalances[entryData.srNo] -= amountToPay;
@@ -567,8 +569,23 @@ export default function SupplierPaymentsPage() {
                     const newBalance = Math.round(outstandingBalances[srNo]);
                     const supplierDocSnap = involvedSupplierDocs.get(srNo);
                      if (supplierDocSnap) {
-                        transaction.update(supplierDocSnap.ref, { netAmount: newBalance, ...bankDetails });
+                        transaction.update(supplierDocSnap.ref, { netAmount: newBalance });
                     }
+                }
+
+                // Update bank details for the customerId if they have changed in the form
+                const currentSupplierSummary = customerSummaryMap.get(selectedCustomerKey);
+                if (currentSupplierSummary && (
+                    currentSupplierSummary.acNo !== bankDetails.acNo ||
+                    currentSupplierSummary.ifscCode !== bankDetails.ifscCode ||
+                    currentSupplierSummary.bank !== bankDetails.bank ||
+                    currentSupplierSummary.branch !== bankDetails.branch
+                )) {
+                    const q = query(suppliersCollection, where('customerId', '==', selectedCustomerKey));
+                    const supplierDocsToUpdate = await getDocs(q); // Use getDocs inside transaction, though not ideal, needed here
+                    supplierDocsToUpdate.forEach(docSnap => {
+                        transaction.update(docSnap.ref, { ...bankDetails });
+                    });
                 }
                 
                 const paymentData: Omit<Payment, 'id'> = {

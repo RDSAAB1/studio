@@ -1,20 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 export type Customer = {
   id: string;
   srNo: string;
@@ -99,6 +83,7 @@ export type PaidFor = {
     amount: number;
     cdApplied: boolean;
     supplierName?: string;
+    supplierSo?: string;
     bankName?: string;
     bankBranch?: string;
     bankAcNo?: string;
