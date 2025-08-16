@@ -18,7 +18,7 @@ import {
   writeBatch,
   runTransaction,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -27,6 +27,23 @@ const transactionsCollection = collection(db, "transactions");
 const fundTransactionsCollection = collection(db, "fund_transactions");
 const banksCollection = collection(db, "banks");
 const bankBranchesCollection = collection(db, "bankBranches");
+const settingsCollection = collection(db, "settings");
+
+
+// --- RTGS Settings Functions ---
+export async function getRtgsSettings(): Promise<RtgsSettings | null> {
+    const docRef = doc(settingsCollection, "rtgs");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as RtgsSettings;
+    }
+    return null;
+}
+
+export async function updateRtgsSettings(settings: RtgsSettings): Promise<void> {
+    const docRef = doc(settingsCollection, "rtgs");
+    await setDoc(docRef, settings, { merge: true });
+}
 
 
 // --- Bank & Branch Functions ---

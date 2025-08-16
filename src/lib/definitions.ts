@@ -227,3 +227,15 @@ export type Campaign = {
   startDate: string;
   endDate: string;
 };
+
+export type RtgsSettings = {
+    companyName: string;
+    companyAddress1: string;
+    companyAddress2: string;
+    bankName: string;
+    ifscCode: string;
+    branchName: string;
+    accountNo: string;
+    contactNo: string;
+    gmail: string;
+};

@@ -2,15 +2,20 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Payment } from '@/lib/definitions';
+import type { Payment, RtgsSettings } from '@/lib/definitions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Edit, Save, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { getRtgsSettings, updateRtgsSettings } from '@/lib/firestore';
 
 interface RtgsReportRow {
     paymentId: string;
@@ -33,12 +38,37 @@ interface RtgsReportRow {
     parchiNo: string;
 }
 
+const initialSettings: RtgsSettings = {
+    companyName: "JAGDAMBE RICE MILL",
+    companyAddress1: "DEVKALI, BANDA",
+    companyAddress2: "SHAHJAHANPUR, (242042)",
+    bankName: "BANK OF BARODA",
+    ifscCode: "BARB0BANDAX",
+    branchName: "BANDA",
+    accountNo: "08290500004938",
+    contactNo: "9794092767",
+    gmail: "jrmdofficial@gmail.com",
+};
+
 export default function RtgsReportClient() {
     const [reportRows, setReportRows] = useState<RtgsReportRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [settings, setSettings] = useState<RtgsSettings>(initialSettings);
+    const [isEditing, setIsEditing] = useState(false);
+    const [tempSettings, setTempSettings] = useState<RtgsSettings>(initialSettings);
+    const { toast } = useToast();
 
     useEffect(() => {
         setLoading(true);
+
+        const fetchSettings = async () => {
+            const savedSettings = await getRtgsSettings();
+            if (savedSettings) {
+                setSettings(savedSettings);
+                setTempSettings(savedSettings);
+            }
+        };
+        fetchSettings();
 
         const q = query(
             collection(db, "payments"),
@@ -56,7 +86,7 @@ export default function RtgsReportClient() {
                         newReportRows.push({
                             paymentId: p.paymentId,
                             date: p.date,
-                            checkNo: p.utrNo || p.checkNo || '',
+                            checkNo: p.checkNo || p.utrNo || '',
                             type: p.type,
                             srNo: pf.srNo,
                             supplierName: toTitleCase(pf.supplierName || ''),
@@ -89,12 +119,83 @@ export default function RtgsReportClient() {
         return () => unsubscribe();
     }, []);
 
+    const handleEditToggle = () => {
+        if (isEditing) {
+            // Cancel editing
+            setTempSettings(settings);
+        }
+        setIsEditing(!isEditing);
+    };
+
+    const handleSave = async () => {
+        try {
+            await updateRtgsSettings(tempSettings);
+            setSettings(tempSettings);
+            setIsEditing(false);
+            toast({ title: "Success", description: "Details saved successfully." });
+        } catch (error) {
+            console.error("Error saving settings:", error);
+            toast({ title: "Error", description: "Failed to save details.", variant: "destructive" });
+        }
+    };
+    
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setTempSettings(prev => ({ ...prev, [name]: value }));
+    };
+
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
     }
     
     return (
         <div className="space-y-6">
+            <Card>
+                 <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Company & Bank Details</CardTitle>
+                        <CardDescription>This information will be used for RTGS receipts.</CardDescription>
+                    </div>
+                     <div className="flex gap-2">
+                        {isEditing ? (
+                            <>
+                                <Button onClick={handleSave} size="sm"><Save className="mr-2 h-4 w-4"/>Save</Button>
+                                <Button onClick={handleEditToggle} size="sm" variant="outline"><X className="mr-2 h-4 w-4"/>Cancel</Button>
+                            </>
+                        ) : (
+                            <Button onClick={handleEditToggle} size="sm"><Edit className="mr-2 h-4 w-4"/>Edit Details</Button>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                    {isEditing ? (
+                        <>
+                            <div className="space-y-1"><Label>Company Name</Label><Input name="companyName" value={tempSettings.companyName} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Address Line 1</Label><Input name="companyAddress1" value={tempSettings.companyAddress1} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Address Line 2</Label><Input name="companyAddress2" value={tempSettings.companyAddress2} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Bank Name</Label><Input name="bankName" value={tempSettings.bankName} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>IFSC Code</Label><Input name="ifscCode" value={tempSettings.ifscCode} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Branch Name</Label><Input name="branchName" value={tempSettings.branchName} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Account No.</Label><Input name="accountNo" value={tempSettings.accountNo} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Contact No.</Label><Input name="contactNo" value={tempSettings.contactNo} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
+                        </>
+                    ) : (
+                        <>
+                            <p><span className="font-semibold">Company:</span> {settings.companyName}</p>
+                            <p><span className="font-semibold">Address 1:</span> {settings.companyAddress1}</p>
+                            <p><span className="font-semibold">Address 2:</span> {settings.companyAddress2}</p>
+                            <p><span className="font-semibold">Bank:</span> {settings.bankName}</p>
+                            <p><span className="font-semibold">IFSC:</span> {settings.ifscCode}</p>
+                            <p><span className="font-semibold">Branch:</span> {settings.branchName}</p>
+                            <p><span className="font-semibold">A/C No:</span> {settings.accountNo}</p>
+                            <p><span className="font-semibold">Contact:</span> {settings.contactNo}</p>
+                            <p><span className="font-semibold">Email:</span> {settings.gmail}</p>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+
             <Card>
                 <CardHeader>
                     <CardTitle>RTGS Payment Report</CardTitle>
@@ -142,7 +243,7 @@ export default function RtgsReportClient() {
                                     <TableCell>{row.rate.toFixed(2)}</TableCell>
                                     <TableCell>{row.weight.toFixed(2)}</TableCell>
                                     <TableCell>{row.grNo}</TableCell>
-                                    <TableCell>{row.grDate}</TableCell>
+                                    <TableCell>{row.grDate ? format(new Date(row.grDate), 'dd-MMM-yy') : ''}</TableCell>
                                     <TableCell>{row.parchiNo}</TableCell>
                                 </TableRow>
                             ))}
