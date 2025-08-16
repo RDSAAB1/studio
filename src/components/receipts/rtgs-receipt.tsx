@@ -171,4 +171,3 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, onPrint }) =>
         </>
     );
 }
-

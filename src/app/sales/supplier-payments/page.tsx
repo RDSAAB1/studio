@@ -538,11 +538,11 @@ export default function SupplierPaymentsPage() {
                                 srNo: entryData.srNo, 
                                 amount: amountToPay, 
                                 cdApplied: cdEnabled && isEligibleForCD,
-                                supplierName: entryData.name,
-                                bankName: entryData.bank,
-                                bankAcNo: entryData.acNo,
-                                bankBranch: entryData.branch,
-                                bankIfsc: entryData.ifscCode,
+                                supplierName: supplierDetails.name,
+                                bankName: bankDetails.bank,
+                                bankAcNo: bankDetails.acNo,
+                                bankBranch: bankDetails.branch,
+                                bankIfsc: bankDetails.ifscCode,
                             });
                             
                             outstandingBalances[entryData.srNo] -= amountToPay;
@@ -1615,4 +1615,3 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
-
