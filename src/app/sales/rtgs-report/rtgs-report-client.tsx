@@ -42,8 +42,8 @@ export default function RtgsReportClient() {
 
         const q = query(
             collection(db, "payments"),
-            where("receiptType", "==", "RTGS"),
-            orderBy("date", "desc")
+            where("receiptType", "==", "RTGS")
+            // orderBy("date", "desc") // Removed to avoid composite index requirement
         );
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -97,6 +97,9 @@ export default function RtgsReportClient() {
                     });
                 }
             });
+
+            // Sort data client-side
+            newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             setReportRows(newReportRows);
             setLoading(false);
