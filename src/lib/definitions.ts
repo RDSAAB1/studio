@@ -84,6 +84,7 @@ export type PaidFor = {
     cdApplied: boolean;
     supplierName?: string;
     supplierSo?: string;
+    supplierContact?: string;
     bankName?: string;
     bankBranch?: string;
     bankAcNo?: string;

@@ -20,7 +20,7 @@ interface RtgsReportRow {
     srNo: string;
     supplierName: string;
     fatherName: string;
-    contact: string; // This might not be available directly in payment, review needed
+    contact: string;
     acNo: string;
     ifscCode: string;
     branch: string;
@@ -51,8 +51,6 @@ export default function RtgsReportClient() {
             const newReportRows: RtgsReportRow[] = [];
 
             payments.forEach(p => {
-                // The main payment document holds shared info like GR details, rate, etc.
-                // The `paidFor` array has details for each specific supplier entry included in this bulk payment.
                 if (p.paidFor && p.paidFor.length > 0) {
                     p.paidFor.forEach(pf => {
                         newReportRows.push({
@@ -62,15 +60,15 @@ export default function RtgsReportClient() {
                             type: p.type,
                             srNo: pf.srNo,
                             supplierName: toTitleCase(pf.supplierName || ''),
-                            fatherName: toTitleCase(pf.supplierSo || ''),
-                            contact: '', // Contact info is not stored per payment, would require another lookup.
+                            fatherName: toTitleCase(p.supplierFatherName || pf.supplierSo || ''),
+                            contact: pf.supplierContact || '',
                             acNo: pf.bankAcNo || '',
                             ifscCode: pf.bankIfsc || '',
                             branch: toTitleCase(pf.bankBranch || ''),
                             bank: pf.bankName || '',
                             amount: pf.amount,
                             rate: p.rate || 0,
-                            weight: p.quantity || 0, // Assuming weight is stored as quantity in payment
+                            weight: p.quantity || 0,
                             grNo: p.grNo || '',
                             grDate: p.grDate || '',
                             parchiNo: p.parchiNo || '',
@@ -79,7 +77,6 @@ export default function RtgsReportClient() {
                 }
             });
 
-            // Sort data client-side by date
             newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             setReportRows(newReportRows);
