@@ -28,6 +28,7 @@ import {
   Briefcase,
   ClipboardCheck,
   ChevronRight,
+  Banknote,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -57,6 +58,7 @@ export const allMenuItems: MenuItem[] = [
       { id: "customer-entry", name: "Customer Entry", icon: ChevronRight, href: "/sales/customer-entry" },
       { id: "customer-payments", name: "Customer Payments", icon: ChevronRight, href: "/sales/customer-payments" },
       { id: "customer-profile", name: "Customer Profile", icon: ChevronRight, href: "/sales/customer-profile" },
+      { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales/rtgs-report" },
     ],
   },
   {
