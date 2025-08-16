@@ -9,13 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
-import { Loader2, Edit, Save, X } from 'lucide-react';
+import { Loader2, Edit, Save, X, Building, Landmark } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, updateRtgsSettings } from '@/lib/firestore';
+import { Separator } from '@/components/ui/separator';
 
 interface RtgsReportRow {
     paymentId: string;
@@ -49,6 +50,13 @@ const initialSettings: RtgsSettings = {
     contactNo: "9794092767",
     gmail: "jrmdofficial@gmail.com",
 };
+
+const DetailItem = ({ label, value }: { label: string; value: string; }) => (
+    <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="font-semibold text-sm">{value}</p>
+    </div>
+);
 
 export default function RtgsReportClient() {
     const [reportRows, setReportRows] = useState<RtgsReportRow[]>([]);
@@ -167,9 +175,9 @@ export default function RtgsReportClient() {
                         )}
                     </div>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                <CardContent>
                     {isEditing ? (
-                        <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                             <div className="space-y-1"><Label>Company Name</Label><Input name="companyName" value={tempSettings.companyName} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Address Line 1</Label><Input name="companyAddress1" value={tempSettings.companyAddress1} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Address Line 2</Label><Input name="companyAddress2" value={tempSettings.companyAddress2} onChange={handleInputChange} /></div>
@@ -179,19 +187,29 @@ export default function RtgsReportClient() {
                             <div className="space-y-1"><Label>Account No.</Label><Input name="accountNo" value={tempSettings.accountNo} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Contact No.</Label><Input name="contactNo" value={tempSettings.contactNo} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
-                        </>
+                        </div>
                     ) : (
-                        <>
-                            <p><span className="font-semibold">Company:</span> {settings.companyName}</p>
-                            <p><span className="font-semibold">Address 1:</span> {settings.companyAddress1}</p>
-                            <p><span className="font-semibold">Address 2:</span> {settings.companyAddress2}</p>
-                            <p><span className="font-semibold">Bank:</span> {settings.bankName}</p>
-                            <p><span className="font-semibold">IFSC:</span> {settings.ifscCode}</p>
-                            <p><span className="font-semibold">Branch:</span> {settings.branchName}</p>
-                            <p><span className="font-semibold">A/C No:</span> {settings.accountNo}</p>
-                            <p><span className="font-semibold">Contact:</span> {settings.contactNo}</p>
-                            <p><span className="font-semibold">Email:</span> {settings.gmail}</p>
-                        </>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                            <div className="space-y-4">
+                                <h3 className="text-base font-semibold flex items-center gap-2 text-primary"><Building className="h-5 w-5"/> Company Details</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <DetailItem label="Company Name" value={settings.companyName} />
+                                    <DetailItem label="Contact No." value={settings.contactNo} />
+                                    <DetailItem label="Address Line 1" value={settings.companyAddress1} />
+                                    <DetailItem label="Address Line 2" value={settings.companyAddress2} />
+                                    <DetailItem label="Email" value={settings.gmail} />
+                                </div>
+                            </div>
+                             <div className="space-y-4">
+                                <h3 className="text-base font-semibold flex items-center gap-2 text-primary"><Landmark className="h-5 w-5"/> Bank Details</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <DetailItem label="Bank Name" value={settings.bankName} />
+                                    <DetailItem label="Account No." value={settings.accountNo} />
+                                    <DetailItem label="Branch Name" value={settings.branchName} />
+                                    <DetailItem label="IFSC Code" value={settings.ifscCode} />
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </CardContent>
             </Card>
