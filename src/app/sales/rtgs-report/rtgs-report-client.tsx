@@ -212,54 +212,54 @@ export default function RtgsReportClient() {
                     <CardDescription>A detailed report of all payments made via RTGS.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-[70vh]">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>SR No.</TableHead>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Father's Name</TableHead>
-                                <TableHead>Mobile No.</TableHead>
-                                <TableHead>A/C No.</TableHead>
-                                <TableHead>IFSC Code</TableHead>
-                                <TableHead>Bank</TableHead>
-                                <TableHead>Branch</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Check/UTR No.</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Rate</TableHead>
-                                <TableHead>Weight</TableHead>
-                                <TableHead>GR No.</TableHead>
-                                <TableHead>GR Date</TableHead>
-                                <TableHead>Parchi No.</TableHead>
+                    <div className="relative w-full overflow-auto">
+                        <Table className="min-w-[1200px]"> {/* Added min-width for horizontal scrolling */}
+                            <TableHeader className="sticky top-0 z-10 bg-background"> {/* Made header sticky */}
+                                <TableRow>
+                                    <TableHead className="w-[100px]">Date</TableHead> {/* Added width hints */}
+                                    <TableHead className="w-[80px]">SR No.</TableHead>
+                                    <TableHead className="w-[150px]">Name</TableHead>
+                                    <TableHead className="w-[150px]">Father's Name</TableHead>
+                                    <TableHead className="w-[120px]">Mobile No.</TableHead>
+                                    <TableHead className="w-[150px]">A/C No.</TableHead>
+                                    <TableHead className="w-[120px]">IFSC Code</TableHead>
+                                    <TableHead className="w-[150px]">Bank</TableHead>
+                                    <TableHead className="w-[150px]">Branch</TableHead>
+                                    <TableHead className="w-[120px]">Amount</TableHead>
+                                    <TableHead className="w-[150px]">Check/UTR No.</TableHead>
+                                    <TableHead className="w-[100px]">Type</TableHead>
+                                    <TableHead className="w-[80px]">Rate</TableHead>
+                                    <TableHead className="w-[80px]">Weight</TableHead>
+                                    <TableHead className="w-[100px]">GR No.</TableHead>
+                                    <TableHead className="w-[120px]">GR Date</TableHead>
+                                    <TableHead className="w-[100px]">Parchi No.</TableHead>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {reportRows.map((row, index) => (
-                                <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
-                                    <TableCell>{format(new Date(row.date), 'dd-MMM-yy')}</TableCell>
-                                    <TableCell>{row.srNo}</TableCell>
-                                    <TableCell>{row.supplierName}</TableCell>
-                                    <TableCell>{row.fatherName}</TableCell>
-                                    <TableCell>{row.contact}</TableCell>
-                                    <TableCell>{row.acNo}</TableCell>
-                                    <TableCell>{row.ifscCode}</TableCell>
-                                    <TableCell>{row.bank}</TableCell>
-                                    <TableCell>{row.branch}</TableCell>
-                                    <TableCell>{formatCurrency(row.amount)}</TableCell>
-                                    <TableCell>{row.checkNo}</TableCell>
-                                    <TableCell>{row.type}</TableCell>
-                                    <TableCell>{row.rate.toFixed(2)}</TableCell>
-                                    <TableCell>{row.weight.toFixed(2)}</TableCell>
-                                    <TableCell>{row.grNo}</TableCell>
-                                    <TableCell>{row.grDate ? format(new Date(row.grDate), 'dd-MMM-yy') : ''}</TableCell>
-                                    <TableCell>{row.parchiNo}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                    </ScrollArea>
+                            </TableHeader>
+                            <TableBody>
+                                {reportRows.map((row, index) => (
+                                    <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
+                                        <TableCell className="whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.srNo}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.supplierName}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.fatherName}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.contact}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.acNo}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.ifscCode}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.bank}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.branch}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{formatCurrency(row.amount)}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.checkNo}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.type}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.rate.toFixed(2)}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.weight.toFixed(2)}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.grNo}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.grDate ? format(new Date(row.grDate), 'dd-MMM-yy') : ''}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{row.parchiNo}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>
