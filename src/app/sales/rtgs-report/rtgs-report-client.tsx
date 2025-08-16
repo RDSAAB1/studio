@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Payment, Customer } from '@/lib/definitions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -52,13 +52,9 @@ export default function RtgsReportClient() {
             // Get all unique supplier IDs to fetch their details
             const supplierIds = new Set<string>();
             payments.forEach(p => {
-                if (p.paidFor) {
-                    p.paidFor.forEach(pf => {
-                        const [name, contact] = pf.supplierName?.split('|') || [pf.supplierName, ''];
-                        // A more robust way would be to store customerId in paidFor, but we work with what we have
-                    });
+                if (p.customerId) {
+                   supplierIds.add(p.customerId);
                 }
-                 if(p.customerId) supplierIds.add(p.customerId);
             });
             
             let suppliersMap = new Map<string, Customer>();
@@ -76,7 +72,6 @@ export default function RtgsReportClient() {
             payments.forEach(p => {
                 if (p.paidFor) {
                     p.paidFor.forEach(pf => {
-                        const supplierKey = `${pf.supplierName?.toLowerCase()}|${suppliersMap.get(p.customerId)?.contact}`;
                         const supplierInfo = Array.from(suppliersMap.values()).find(s => s.customerId === p.customerId);
                         
                         newReportRows.push({
