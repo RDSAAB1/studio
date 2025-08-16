@@ -2,9 +2,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Payment, Customer } from '@/lib/definitions';
+import type { Payment } from '@/lib/definitions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
@@ -20,7 +20,7 @@ interface RtgsReportRow {
     srNo: string;
     supplierName: string;
     fatherName: string;
-    contact: string;
+    contact: string; // This might not be available directly in payment, review needed
     acNo: string;
     ifscCode: string;
     branch: string;
@@ -43,37 +43,18 @@ export default function RtgsReportClient() {
         const q = query(
             collection(db, "payments"),
             where("receiptType", "==", "RTGS")
-            // orderBy("date", "desc") // Removed to avoid composite index requirement
         );
 
-        const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
             
-            // Get all unique supplier IDs to fetch their details
-            const supplierIds = new Set<string>();
-            payments.forEach(p => {
-                if (p.customerId) {
-                   supplierIds.add(p.customerId);
-                }
-            });
-            
-            let suppliersMap = new Map<string, Customer>();
-            if (supplierIds.size > 0) {
-                 const suppliersQuery = query(collection(db, "suppliers"), where('customerId', 'in', Array.from(supplierIds)));
-                 const supplierSnap = await getDocs(suppliersQuery);
-                 supplierSnap.forEach(doc => {
-                     const data = doc.data() as Customer;
-                     suppliersMap.set(data.customerId, data);
-                 });
-            }
-
-
             const newReportRows: RtgsReportRow[] = [];
+
             payments.forEach(p => {
-                if (p.paidFor) {
+                // The main payment document holds shared info like GR details, rate, etc.
+                // The `paidFor` array has details for each specific supplier entry included in this bulk payment.
+                if (p.paidFor && p.paidFor.length > 0) {
                     p.paidFor.forEach(pf => {
-                        const supplierInfo = Array.from(suppliersMap.values()).find(s => s.customerId === p.customerId);
-                        
                         newReportRows.push({
                             paymentId: p.paymentId,
                             date: p.date,
@@ -82,14 +63,14 @@ export default function RtgsReportClient() {
                             srNo: pf.srNo,
                             supplierName: toTitleCase(pf.supplierName || ''),
                             fatherName: toTitleCase(pf.supplierSo || ''),
-                            contact: supplierInfo?.contact || '',
+                            contact: '', // Contact info is not stored per payment, would require another lookup.
                             acNo: pf.bankAcNo || '',
                             ifscCode: pf.bankIfsc || '',
                             branch: toTitleCase(pf.bankBranch || ''),
                             bank: pf.bankName || '',
                             amount: pf.amount,
                             rate: p.rate || 0,
-                            weight: p.quantity || 0,
+                            weight: p.quantity || 0, // Assuming weight is stored as quantity in payment
                             grNo: p.grNo || '',
                             grDate: p.grDate || '',
                             parchiNo: p.parchiNo || '',
@@ -98,7 +79,7 @@ export default function RtgsReportClient() {
                 }
             });
 
-            // Sort data client-side
+            // Sort data client-side by date
             newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             setReportRows(newReportRows);
