@@ -35,7 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList, ArrowUpDown, Search, ChevronsUpDown, Check, Plus } from "lucide-react";
+import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList, ArrowUpDown, Search, ChevronsUpDown, Check, Plus, Printer } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,6 +47,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
+import { RtgsReceipt } from "@/components/receipts/rtgs-receipt";
 
 
 import { collection, runTransaction, doc, getDocs, query, where, writeBatch, getDoc } from "firebase/firestore";
@@ -134,6 +135,7 @@ export default function SupplierPaymentsPage() {
   const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
   const [newBankName, setNewBankName] = useState('');
   const [newBranchData, setNewBranchData] = useState({ bankName: '', branchName: '', ifscCode: '' });
+  const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
 
   const stableToast = useCallback(toast, []);
 
@@ -487,10 +489,10 @@ export default function SupplierPaymentsPage() {
         }
 
         try {
+            let finalPaymentData: Payment | null = null;
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
                 
-                // --- Supplier document handling and outstanding balance calculation ---
                 const involvedSupplierDocs = new Map<string, any>();
                 const allInvolvedSrNos = new Set<string>();
                 if (tempEditingPayment) {
@@ -521,7 +523,6 @@ export default function SupplierPaymentsPage() {
                     });
                 }
                 
-                // --- Payment distribution logic ---
                 let remainingPayment = Math.round(finalPaymentAmount + calculatedCdAmount);
                 const paidForDetails: PaidFor[] = [];
                 const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -533,7 +534,16 @@ export default function SupplierPaymentsPage() {
 
                         if (amountToPay > 0) {
                             const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
-                            paidForDetails.push({ srNo: entryData.srNo, amount: amountToPay, cdApplied: cdEnabled && isEligibleForCD });
+                            paidForDetails.push({ 
+                                srNo: entryData.srNo, 
+                                amount: amountToPay, 
+                                cdApplied: cdEnabled && isEligibleForCD,
+                                supplierName: entryData.name,
+                                bankName: entryData.bank,
+                                bankAcNo: entryData.acNo,
+                                bankBranch: entryData.branch,
+                                bankIfsc: entryData.ifscCode,
+                            });
                             
                             outstandingBalances[entryData.srNo] -= amountToPay;
                             remainingPayment -= amountToPay;
@@ -553,7 +563,6 @@ export default function SupplierPaymentsPage() {
                     }
                 }
 
-                // --- Update supplier documents in transaction ---
                 for (const srNo in outstandingBalances) {
                     const newBalance = Math.round(outstandingBalances[srNo]);
                     const supplierDocSnap = involvedSupplierDocs.get(srNo);
@@ -562,7 +571,6 @@ export default function SupplierPaymentsPage() {
                     }
                 }
                 
-                // --- Prepare and save payment document ---
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
                     customerId: selectedCustomerKey,
@@ -574,7 +582,6 @@ export default function SupplierPaymentsPage() {
                     receiptType: paymentMethod,
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: paidForDetails,
-                    // RTGS Fields
                     grNo,
                     parchiNo,
                     utrNo,
@@ -582,7 +589,6 @@ export default function SupplierPaymentsPage() {
                     quantity: rtgsQuantity,
                     rate: rtgsRate,
                     rtgsAmount,
-                    // Supplier and Bank details at time of payment
                     supplierName: supplierDetails.name,
                     supplierFatherName: supplierDetails.fatherName,
                     supplierAddress: supplierDetails.address,
@@ -595,13 +601,18 @@ export default function SupplierPaymentsPage() {
                 if (tempEditingPayment) {
                     const paymentRef = doc(db, "payments", tempEditingPayment.id);
                     transaction.update(paymentRef, paymentData);
+                    finalPaymentData = { id: tempEditingPayment.id, ...paymentData };
                 } else {
                     const newPaymentRef = doc(collection(db, "payments"));
                     transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
+                    finalPaymentData = { id: newPaymentRef.id, ...paymentData };
                 }
             });
 
             toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
+            if (paymentMethod === 'RTGS' && finalPaymentData) {
+                setRtgsReceiptData(finalPaymentData);
+            }
             resetPaymentForm();
         } catch (error) {
             console.error("Error processing payment:", error);
@@ -649,7 +660,7 @@ export default function SupplierPaymentsPage() {
             name: paymentToEdit.supplierName || '',
             fatherName: paymentToEdit.supplierFatherName || '',
             address: paymentToEdit.supplierAddress || '',
-            contact: '' // Contact not stored in payment, would need to fetch from supplier if needed
+            contact: ''
         });
         setBankDetails({
             acNo: paymentToEdit.bankAcNo || '',
@@ -811,7 +822,7 @@ export default function SupplierPaymentsPage() {
         });
         return;
     }
-    setIsOutstandingModalOpen(false); // Close the modal
+    setIsOutstandingModalOpen(false);
   };
 
   const handleBranchSelect = (branchValue: string) => {
@@ -861,8 +872,41 @@ export default function SupplierPaymentsPage() {
     return valueParts.some(part => part.trim().startsWith(searchTerm)) || value.toLowerCase().startsWith(searchTerm) ? 1 : 0;
   };
 
+  const handleActualPrint = () => {
+    const receiptNode = document.getElementById('rtgs-receipt-content');
+    if (!receiptNode) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        toast({variant: 'destructive', title: 'Error', description: 'Could not open print window. Please disable pop-up blockers.'});
+        return;
+    }
+    
+    printWindow.document.write('<html><head><title>Print RTGS Receipt</title>');
+    // Copy all stylesheets from the main document to the iframe
+    Array.from(document.styleSheets).forEach(styleSheet => {
+        try {
+            const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+            printWindow.document.write(`<style>${cssText}</style>`);
+        } catch (e) {
+            console.warn("Could not copy stylesheet:", e);
+        }
+    });
+
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(receiptNode.innerHTML);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
+  };
+
+
   if (!isClient) {
-    return null; // Render nothing on the server
+    return null;
   }
   
   if (isLoadingInitial) {
@@ -1275,6 +1319,11 @@ export default function SupplierPaymentsPage() {
                     <TableCell className="max-w-xs truncate">{p.notes}</TableCell>
                     <TableCell className="text-center">
                         <div className="flex justify-center items-center gap-0">
+                             {p.receiptType === 'RTGS' && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRtgsReceiptData(p)}>
+                                    <Printer className="h-4 w-4" />
+                                </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedPaymentForDetails(p)}>
                                 <Info className="h-4 w-4" />
                             </Button>
@@ -1514,6 +1563,11 @@ export default function SupplierPaymentsPage() {
           )}
         </DialogContent>
       </Dialog>
+       <Dialog open={!!rtgsReceiptData} onOpenChange={(open) => !open && setRtgsReceiptData(null)}>
+        <DialogContent className="max-w-4xl p-0">
+            {rtgsReceiptData && <RtgsReceipt payment={rtgsReceiptData} onPrint={handleActualPrint}/>}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isBankSettingsOpen} onOpenChange={setIsBankSettingsOpen}>
         <DialogContent>
@@ -1561,3 +1615,4 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+
