@@ -189,24 +189,12 @@ export default function RtgsReportClient() {
                             <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                            {/* Company Details */}
-                            <div className="space-y-3">
-                                <h3 className="font-semibold text-base flex items-center gap-2"><Building className="h-5 w-5 text-primary" /> Company Details</h3>
-                                <DetailItem label="Company Name" value={settings.companyName} />
-                                <DetailItem label="Address" value={`${settings.companyAddress1}, ${settings.companyAddress2}`} />
-                                <DetailItem label="Contact No." value={settings.contactNo} />
-                                <DetailItem label="Email" value={settings.gmail} />
-                            </div>
-
-                            {/* Bank Details */}
-                            <div className="space-y-3">
-                                 <h3 className="font-semibold text-base flex items-center gap-2"><Landmark className="h-5 w-5 text-primary" /> Bank Details</h3>
-                                <DetailItem label="Bank Name" value={settings.bankName} />
-                                <DetailItem label="Branch Name" value={settings.branchName} />
-                                <DetailItem label="Account No." value={settings.accountNo} />
-                                <DetailItem label="IFSC Code" value={settings.ifscCode} />
-                            </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
+                            <DetailItem label="Company Name" value={settings.companyName} />
+                            <DetailItem label="Bank Name" value={settings.bankName} />
+                            <DetailItem label="Account No." value={settings.accountNo} />
+                            <DetailItem label="IFSC Code" value={settings.ifscCode} />
+                            <DetailItem label="Contact No." value={settings.contactNo} />
                         </div>
                     )}
                 </CardContent>
