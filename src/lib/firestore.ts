@@ -18,7 +18,7 @@ import {
   writeBatch,
   runTransaction,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -28,6 +28,32 @@ const fundTransactionsCollection = collection(db, "fund_transactions");
 const banksCollection = collection(db, "banks");
 const bankBranchesCollection = collection(db, "bankBranches");
 const settingsCollection = collection(db, "settings");
+
+
+// --- Dynamic Options Functions ---
+
+export function getOptionsRealtime(collectionName: string, callback: (options: OptionItem[]) => void, onError: (error: Error) => void): () => void {
+    const q = query(collection(db, collectionName), orderBy("name", "asc"));
+    return onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as OptionItem));
+        callback(data);
+    }, onError);
+}
+
+export async function addOption(collectionName: string, optionData: { name: string }): Promise<OptionItem> {
+    const docRef = await addDoc(collection(db, collectionName), optionData);
+    return { id: docRef.id, ...optionData };
+}
+
+export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
+    const optionRef = doc(db, collectionName, id);
+    await updateDoc(optionRef, optionData);
+}
+
+export async function deleteOption(collectionName: string, id: string): Promise<void> {
+    const optionRef = doc(db, collectionName, id);
+    await deleteDoc(optionRef);
+}
 
 
 // --- RTGS Settings Functions ---

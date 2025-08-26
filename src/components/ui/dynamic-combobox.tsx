@@ -63,6 +63,8 @@ export function DynamicCombobox({
   const filteredOptions = options.filter(option => 
     option.label.toLowerCase().includes(inputValue.toLowerCase())
   );
+  
+  const showAddNew = onAdd && inputValue && !filteredOptions.some(opt => opt.label.toLowerCase() === inputValue.toLowerCase());
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -85,27 +87,17 @@ export function DynamicCombobox({
             onValueChange={setInputValue}
           />
           <CommandList>
-            {filteredOptions.length === 0 && onAdd ? (
-              <CommandEmpty>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={handleAddNew}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add "{toTitleCase(inputValue)}"
-                </Button>
-              </CommandEmpty>
-            ) : (
-              <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
+            {filteredOptions.length === 0 && !showAddNew && (
+                <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
             )}
-            <CommandGroup>
+             <CommandGroup>
               {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.value}
                   onSelect={() => {
                     onChange(option.value);
+                    setInputValue("");
                     setOpen(false);
                   }}
                 >
@@ -120,6 +112,15 @@ export function DynamicCombobox({
                   {toTitleCase(option.label)}
                 </CommandItem>
               ))}
+               {showAddNew && (
+                <CommandItem
+                  onSelect={handleAddNew}
+                  className="text-primary hover:!bg-primary/10 cursor-pointer"
+                >
+                   <PlusCircle className="mr-2 h-4 w-4" />
+                   Add "{toTitleCase(inputValue)}"
+                </CommandItem>
+              )}
             </CommandGroup>
           </CommandList>
         </Command>

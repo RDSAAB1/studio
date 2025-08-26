@@ -1,4 +1,5 @@
 
+
 export type Customer = {
   id: string;
   srNo: string;
@@ -157,6 +158,11 @@ export type CustomerSummary = {
     allPayments: Payment[];
     transactionsByVariety: { [key: string]: number };
 }
+
+export type OptionItem = {
+    id: string;
+    name: string;
+};
 
 export type AppOptions = {
     varieties: string[];

@@ -5,8 +5,7 @@ import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodError } from "zod";
-import { initialCustomers, appOptionsData } from "@/lib/data";
-import type { Customer, Payment } from "@/lib/definitions";
+import type { Customer, Payment, OptionItem } from "@/lib/definitions";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption } from "@/lib/firestore";
 import { formatCurrency } from "@/lib/utils";
 
 const formSchema = z.object({
@@ -84,9 +83,20 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, setVarietyOptions, paymentTypeOptions, setPaymentTypeOptions, isManageVarietiesOpen, setIsManageVarietiesOpen, openVarietyCombobox, setOpenVarietyCombobox, handleFocus, lastVariety, setLastVariety, appOptionsData }: any) {
+const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleFocus, lastVariety, setLastVariety, handleAddOption, handleUpdateOption, handleDeleteOption }: any) {
+    
+    const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
+    const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
+
+    const openManagementDialog = (type: 'variety' | 'paymentType') => {
+        setManagementType(type);
+        setIsManageOptionsOpen(true);
+    };
+
+    const optionsToManage = managementType === 'variety' ? varietyOptions : paymentTypeOptions;
     
     return (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6">
                 <SectionCard>
@@ -139,21 +149,18 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Payment Type</Label>
-                                    <DynamicCombobox
-                                        options={paymentTypeOptions.map((v: string) => ({value: v, label: v}))}
-                                        value={field.value}
-                                        onChange={(val) => form.setValue("paymentType", val)}
-                                        onAdd={(newVal) => {
-                                            const titleCased = toTitleCase(newVal);
-                                            if (!paymentTypeOptions.includes(titleCased)) {
-                                                setPaymentTypeOptions((prev: any) => [...prev, titleCased].sort());
-                                            }
-                                            form.setValue("paymentType", titleCased);
-                                        }}
-                                        placeholder="Select or add type..."
-                                        searchPlaceholder="Search type..."
-                                        emptyPlaceholder="No type found."
-                                    />
+                                    <div className="flex items-center gap-2">
+                                        <DynamicCombobox
+                                            options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
+                                            value={field.value}
+                                            onChange={(val) => form.setValue("paymentType", val)}
+                                            onAdd={(newVal) => handleAddOption('paymentTypes', newVal)}
+                                            placeholder="Select or add type..."
+                                            searchPlaceholder="Search type..."
+                                            emptyPlaceholder="No type found."
+                                        />
+                                        <Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-9 w-9 shrink-0"><Settings className="h-4 w-4"/></Button>
+                                    </div>
                                     {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                                 </div>
                             )}
@@ -224,25 +231,21 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             render={({ field }) => (
                             <div className="space-y-1">
                                 <Label className="text-xs">Variety</Label>
+                                <div className="flex items-center gap-2">
                                 <DynamicCombobox
-                                    options={varietyOptions.map((v: string) => ({value: v, label: v}))}
+                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
                                     value={field.value}
                                     onChange={(val) => {
                                         form.setValue("variety", val);
                                         setLastVariety(val);
                                     }}
-                                    onAdd={(newVal) => {
-                                        const titleCased = toTitleCase(newVal);
-                                        if (!varietyOptions.includes(titleCased)) {
-                                            setVarietyOptions((prev: any) => [...prev, titleCased].sort());
-                                        }
-                                        form.setValue("variety", titleCased);
-                                        setLastVariety(titleCased);
-                                    }}
+                                    onAdd={(newVal) => handleAddOption('varieties', newVal)}
                                     placeholder="Select or add variety..."
                                     searchPlaceholder="Search variety..."
                                     emptyPlaceholder="No variety found."
                                 />
+                                 <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-9 w-9 shrink-0"><Settings className="h-4 w-4"/></Button>
+                                 </div>
                                 {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                             </div>
                             )}
@@ -301,6 +304,15 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                 </SectionCard>
             </div>
         </div>
+        <OptionsManagerDialog
+            isOpen={isManageOptionsOpen}
+            setIsOpen={setIsManageOptionsOpen}
+            type={managementType}
+            options={optionsToManage}
+            onUpdate={handleUpdateOption}
+            onDelete={handleDeleteOption}
+        />
+        </>
     );
 });
 
@@ -537,6 +549,76 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
     );
 };
 
+const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onUpdate, onDelete }: any) => {
+    const [editingOption, setEditingOption] = useState<{ id: string; name: string } | null>(null);
+    const { toast } = useToast();
+
+    const title = type === 'variety' ? "Manage Varieties" : "Manage Payment Types";
+
+    const handleSave = () => {
+        if (editingOption) {
+            onUpdate(type, editingOption.id, editingOption.name);
+            toast({ title: "Success", description: "Option updated successfully." });
+            setEditingOption(null);
+        }
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>Add, edit, or remove options from the list.</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-72 pr-4">
+                    <div className="space-y-2">
+                        {options.map((option: OptionItem) => (
+                            <div key={option.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                                {editingOption?.id === option.id ? (
+                                    <Input
+                                        value={editingOption.name}
+                                        onChange={(e) => setEditingOption({ ...editingOption, name: e.target.value })}
+                                        autoFocus
+                                        onBlur={handleSave}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                                    />
+                                ) : (
+                                    <span className="flex-grow">{toTitleCase(option.name)}</span>
+                                )}
+                                <div className="flex gap-1">
+                                    {editingOption?.id === option.id ? (
+                                        <Button size="icon" variant="ghost" onClick={handleSave}><Save className="h-4 w-4 text-green-500" /></Button>
+                                    ) : (
+                                        <Button size="icon" variant="ghost" onClick={() => setEditingOption({ id: option.id, name: option.name })}><Pen className="h-4 w-4" /></Button>
+                                    )}
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>This will permanently delete the option "{toTitleCase(option.name)}".</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => onDelete(type, option.id)}>Continue</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsOpen(false)}>Done</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
@@ -553,10 +635,8 @@ export default function SupplierEntryClient() {
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
 
 
-  const [varietyOptions, setVarietyOptions] = useState<string[]>([]); // Initialize empty, will load from data
-  const [paymentTypeOptions, setPaymentTypeOptions] = useState<string[]>([]); // Initialize empty, will load from data
-  const [isManageVarietiesOpen, setIsManageVarietiesOpen] = useState(false);
-  const [openVarietyCombobox, setOpenVarietyCombobox] = useState(false);
+  const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
+  const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const isInitialLoad = useRef(true);
 
@@ -608,9 +688,9 @@ export default function SupplierEntryClient() {
         console.error("Error fetching payments: ", error);
     });
 
-    // Load options data (varieties, payment types)
-    setVarietyOptions(appOptionsData.varieties);
-    setPaymentTypeOptions(appOptionsData.paymentTypes);
+    // Fetch dynamic options
+    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
+    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
 
     // Load last selected variety from localStorage (or perhaps user settings in the future)
     const savedVariety = localStorage.getItem('lastSelectedVariety');
@@ -626,6 +706,8 @@ export default function SupplierEntryClient() {
     return () => {
       unsubscribeSuppliers();
       unsubscribePayments();
+      unsubVarieties();
+      unsubPaymentTypes();
     };
   }, [isClient, form, toast]);
   
@@ -757,7 +839,7 @@ export default function SupplierEntryClient() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       const activeElement = document.activeElement as HTMLElement;
-      if (activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
+      if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
         return;
       }
       const formEl = e.currentTarget;
@@ -773,8 +855,7 @@ export default function SupplierEntryClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteSupplier(id);
-      // Optimistic update
-      setCustomers(prevCustomers => prevCustomers.filter(c => c.id !== id));
+      // Optimistic update handled by realtime listener
       toast({ title: "Success", description: "Entry deleted successfully." });
       if (currentCustomer.id === id) {
         handleNew(); // Clear form if deleting the currently edited customer
@@ -895,6 +976,38 @@ export default function SupplierEntryClient() {
     }, 500); // A small delay to ensure content and styles are fully loaded
   };
 
+  const handleAddOption = async (collectionName: string, name: string) => {
+    const titleCasedName = toTitleCase(name);
+    try {
+        await addOption(collectionName, { name: titleCasedName });
+        toast({ title: "Success", description: `"${titleCasedName}" has been added.` });
+    } catch (error) {
+        console.error(`Error adding to ${collectionName}:`, error);
+        toast({ title: "Error", description: "Failed to add option.", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateOption = async (collectionName: string, id: string, name: string) => {
+    const titleCasedName = toTitleCase(name);
+    try {
+        await updateOption(collectionName, id, { name: titleCasedName });
+        toast({ title: "Success", description: "Option has been updated." });
+    } catch (error) {
+        console.error(`Error updating ${collectionName}:`, error);
+        toast({ title: "Error", description: "Failed to update option.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteOption = async (collectionName: string, id: string) => {
+     try {
+        await deleteOption(collectionName, id);
+        toast({ title: "Success", description: "Option has been deleted." });
+    } catch (error) {
+        console.error(`Error deleting ${collectionName}:`, error);
+        toast({ title: "Error", description: "Failed to delete option.", variant: "destructive" });
+    }
+  };
+
 
   if (!isClient) {
     return null; // Render nothing on the server
@@ -919,17 +1032,13 @@ export default function SupplierEntryClient() {
                 handleCapitalizeOnBlur={handleCapitalizeOnBlur}
                 handleContactBlur={handleContactBlur}
                 varietyOptions={varietyOptions}
-                setVarietyOptions={setVarietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
-                setPaymentTypeOptions={setPaymentTypeOptions}
-                isManageVarietiesOpen={isManageVarietiesOpen}
-                setIsManageVarietiesOpen={setIsManageVarietiesOpen}
-                openVarietyCombobox={openVarietyCombobox}
-                setOpenVarietyCombobox={setOpenVarietyCombobox}
                 handleFocus={handleFocus}
                 lastVariety={lastVariety}
                 setLastVariety={handleSetLastVariety}
-                appOptionsData={appOptionsData}
+                handleAddOption={handleAddOption}
+                handleUpdateOption={handleUpdateOption}
+                handleDeleteOption={handleDeleteOption}
             />
             
             <CalculatedSummary currentCustomer={currentCustomer} />
@@ -1100,3 +1209,4 @@ export default function SupplierEntryClient() {
     </>
   );
 }
+
