@@ -92,6 +92,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
     const [nameSuggestions, setNameSuggestions] = useState<Customer[]>([]);
     const [isNamePopoverOpen, setIsNamePopoverOpen] = useState(false);
+    const nameInputRef = useRef<HTMLInputElement>(null);
 
     const openManagementDialog = (type: 'variety' | 'paymentType') => {
         setManagementType(type);
@@ -204,20 +205,32 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <Label htmlFor="name" className="text-xs">Name</Label>
-                             <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
+                            <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                                 <PopoverTrigger asChild>
-                                    <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input 
-                                            value={form.watch('name')} 
-                                            onChange={handleNameChange}
-                                            onBlur={handleCapitalizeOnBlur}
-                                            autoComplete="off"
-                                            className="h-9 text-sm pl-10"
-                                            name="name"
-                                        />
-                                    </InputWithIcon>
+                                    {/* This is just a trigger, not the actual input */}
+                                    <div ref={nameInputRef} className="w-full" />
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                    <Input
+                                        id="name"
+                                        value={form.watch('name')}
+                                        onChange={handleNameChange}
+                                        onBlur={handleCapitalizeOnBlur}
+                                        autoComplete="off"
+                                        className="h-9 text-sm pl-10"
+                                        name="name"
+                                        onFocus={e => {
+                                            if (e.target.value.length > 1 && nameSuggestions.length > 0) {
+                                                setIsNamePopoverOpen(true);
+                                            }
+                                        }}
+                                    />
+                                </InputWithIcon>
+                                <PopoverContent 
+                                    className="w-[--radix-popover-trigger-width] p-0" 
+                                    align="start" 
+                                    onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
+                                >
                                     <Command>
                                         <CommandList>
                                             <CommandEmpty>No suppliers found.</CommandEmpty>
