@@ -1432,7 +1432,7 @@ export default function SupplierPaymentsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card>
-                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight</CardTitle></CardHeader>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0 space-y-3">
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                   <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsSupplierEntry.vehicleNo.toUpperCase()} />
