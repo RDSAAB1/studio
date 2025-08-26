@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodError } from "zod";
-import type { Customer, Payment, OptionItem, ReceiptSettings } from "@/lib/definitions";
+import type { Customer, Payment, OptionItem, ReceiptSettings, ReceiptFieldSettings } from "@/lib/definitions";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer } from "lucide-react";
@@ -478,6 +479,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 );
 
 const ReceiptPreview = ({ data, onPrint, settings }: { data: Customer; onPrint: () => void; settings: ReceiptSettings; }) => {
+    const { fields } = settings;
     return (
         <>
             <DialogHeader className="p-4 pb-0">
@@ -505,7 +507,6 @@ const ReceiptPreview = ({ data, onPrint, settings }: { data: Customer; onPrint: 
                     <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">INVOICE</div>
                     
                     <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
-                        {/* Left Column: Mill Details */}
                         <div>
                             <div className="bg-red-200 text-center font-bold text-xl p-1 border border-black">
                                 {settings.companyName}
@@ -515,61 +516,56 @@ const ReceiptPreview = ({ data, onPrint, settings }: { data: Customer; onPrint: 
                                 <p>{settings.address2}</p>
                                 <p>CONTACT NO:- {settings.contactNo}</p>
                                 <p>EMAIL:- {settings.email}</p>
-                                {/* Placeholder for barcode */}
                                 <div className="h-10 mt-1 bg-gray-200 flex items-center justify-center">
                                     <p className="text-xs text-gray-500">Barcode Placeholder</p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right Column: Customer Details */}
                         <div>
                             <div className="text-center font-bold text-xl p-1 border-t border-r border-black">JRM</div>
                             <div className="border-x border-b border-t border-black p-1">
                                 <div className="text-center font-bold underline mb-2">CUSTOMER DETAIL</div>
                                 <table className="w-full text-sm">
                                     <tbody>
-                                        <tr><td className="font-bold pr-2">DATE</td><td>{format(new Date(data.date), "dd-MMM-yy")}</td></tr>
-                                        <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.name)}</td></tr>
-                                        <tr><td className="font-bold pr-2">CONTACT</td><td>{data.contact}</td></tr>
-                                        <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.address)}</td></tr>
+                                        {fields.date && <tr><td className="font-bold pr-2">DATE</td><td>{format(new Date(data.date), "dd-MMM-yy")}</td></tr>}
+                                        {fields.name && <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.name)}</td></tr>}
+                                        {fields.contact && <tr><td className="font-bold pr-2">CONTACT</td><td>{data.contact}</td></tr>}
+                                        {fields.address && <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.address)}</td></tr>}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
 
-                    {/* Transaction Table */}
                     <table className="w-full border-collapse border border-black text-sm">
                         <thead>
                             <tr className="bg-orange-300 text-black font-bold">
-                                <td className="border border-black p-1 text-center">VEHICLE</td>
-                                <td className="border border-black p-1 text-center">TERM</td>
-                                <td className="border border-black p-1 text-center">RATE</td>
-                                <td className="border border-black p-1 text-center">LOAD</td>
-                                <td className="border border-black p-1 text-center">UNLOAD</td>
-                                <td className="border border-black p-1 text-center">QTY</td>
-                                <td className="border border-black p-1 text-center">AMOUNT</td>
+                                {fields.vehicleNo && <td className="border border-black p-1 text-center">VEHICLE</td>}
+                                {fields.term && <td className="border border-black p-1 text-center">TERM</td>}
+                                {fields.rate && <td className="border border-black p-1 text-center">RATE</td>}
+                                {fields.grossWeight && <td className="border border-black p-1 text-center">LOAD</td>}
+                                {fields.teirWeight && <td className="border border-black p-1 text-center">UNLOAD</td>}
+                                {fields.weight && <td className="border border-black p-1 text-center">QTY</td>}
+                                {fields.amount && <td className="border border-black p-1 text-center">AMOUNT</td>}
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td className="border border-black p-1">{data.vehicleNo.toUpperCase()}</td>
-                                <td className="border border-black p-1 text-center">{data.term}</td>
-                                <td className="border border-black p-1 text-right">{data.rate.toFixed(2)}</td>
-                                <td className="border border-black p-1 text-right">{data.grossWeight.toFixed(2)}</td>
-                                <td className="border border-black p-1 text-right">{data.teirWeight.toFixed(2)}</td>
-                                <td className="border border-black p-1 text-right">{data.weight.toFixed(2)}</td>
-                                <td className="border border-black p-1 text-right">{formatCurrency(data.amount)}</td>
+                                {fields.vehicleNo && <td className="border border-black p-1">{data.vehicleNo.toUpperCase()}</td>}
+                                {fields.term && <td className="border border-black p-1 text-center">{data.term}</td>}
+                                {fields.rate && <td className="border border-black p-1 text-right">{data.rate.toFixed(2)}</td>}
+                                {fields.grossWeight && <td className="border border-black p-1 text-right">{data.grossWeight.toFixed(2)}</td>}
+                                {fields.teirWeight && <td className="border border-black p-1 text-right">{data.teirWeight.toFixed(2)}</td>}
+                                {fields.weight && <td className="border border-black p-1 text-right">{data.weight.toFixed(2)}</td>}
+                                {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(data.amount)}</td>}
                             </tr>
-                            {/* Empty rows for appearance */}
-                            <tr><td className="border border-black p-2 h-6"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td></tr>
-                            <tr><td className="border border-black p-2 h-6"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td></tr>
-                            <tr><td className="border border-black p-2 h-6"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td><td className="border border-black"></td></tr>
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <tr key={i}><td className="border border-black p-2 h-6" colSpan={Object.values(fields).filter(v => v).length - 4}></td></tr>
+                            ))}
                         </tbody>
                     </table>
 
-                     {/* Footer */}
                     <div className="flex justify-between items-end mt-2">
                         <div className="text-sm">
                             <p className="mt-8 border-t border-black pt-1">Authorized Sign</p>
@@ -577,18 +573,9 @@ const ReceiptPreview = ({ data, onPrint, settings }: { data: Customer; onPrint: 
                         <div className="text-sm">
                             <table className="w-full border-collapse">
                                 <tbody>
-                                    <tr>
-                                        <td className="font-bold border border-black p-1">DUE DATE</td>
-                                        <td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="font-bold border border-black p-1">KARTA</td>
-                                        <td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="font-bold border border-black p-1">NET AMOUNT</td>
-                                        <td className="border border-black p-1 text-right font-bold">{formatCurrency(data.netAmount)}</td>
-                                    </tr>
+                                    {fields.dueDate && <tr><td className="font-bold border border-black p-1">DUE DATE</td><td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td></tr>}
+                                    {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td></tr>}
+                                    {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(data.netAmount)}</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -716,12 +703,10 @@ export default function SupplierEntryClient() {
   const [lastVariety, setLastVariety] = useState<string>('');
   const isInitialLoad = useRef(true);
 
-  // Receipt settings state
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isReceiptSettingsOpen, setIsReceiptSettingsOpen] = useState(false);
   const [tempReceiptSettings, setTempReceiptSettings] = useState<ReceiptSettings | null>(null);
 
-  // Ensure customers is always an array
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
 
   const form = useForm<FormValues>({
@@ -738,7 +723,6 @@ export default function SupplierEntryClient() {
     }
   }, []);
 
-  // Fetch data from Firestore and set up real-time listener
   useEffect(() => {
     if (!isClient) return;
 
@@ -779,21 +763,17 @@ export default function SupplierEntryClient() {
     fetchSettings();
 
 
-    // Fetch dynamic options
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
 
-    // Load last selected variety from localStorage (or perhaps user settings in the future)
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
       setLastVariety(savedVariety);
       form.setValue('variety', savedVariety);
     }
 
-    // Set initial form date
     form.setValue('date', new Date());
 
-    // Cleanup the listener when the component unmounts
     return () => {
       unsubscribeSuppliers();
       unsubscribePayments();
@@ -828,8 +808,8 @@ export default function SupplierEntryClient() {
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
-    const otherCharges = values.otherCharges || 0; // Added other charges
-    const netAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges; // Deduct other charges
+    const otherCharges = values.otherCharges || 0;
+    const netAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges;
     setCurrentCustomer(prev => ({
       ...prev, ...values,
       date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
@@ -866,7 +846,7 @@ export default function SupplierEntryClient() {
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
       labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
-      otherCharges: customerState.otherCharges || 0, // Include other charges
+      otherCharges: customerState.otherCharges || 0,
       paymentType: customerState.paymentType || 'Full',
     };
     setCurrentCustomer(customerState);
@@ -890,7 +870,7 @@ export default function SupplierEntryClient() {
     const customerToEdit = safeCustomers.find(c => c.id === id);
     if (customerToEdit) {
       setIsEditing(true);
-      setCurrentCustomer(customerToEdit); // Explicitly set the full customer object with ID
+      setCurrentCustomer(customerToEdit);
       resetFormToState(customerToEdit);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -905,7 +885,7 @@ export default function SupplierEntryClient() {
     const foundCustomer = safeCustomers.find(c => c.srNo === formattedSrNo);
     if (foundCustomer) {
         setIsEditing(true);
-        setCurrentCustomer(foundCustomer); // Explicitly set the full customer object with ID
+        setCurrentCustomer(foundCustomer);
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
@@ -918,7 +898,7 @@ export default function SupplierEntryClient() {
   const handleContactBlur = (contactValue: string) => {
     if (contactValue.length === 10) {
       const foundCustomer = customers.find(c => c.contact === contactValue);
-      if (foundCustomer && foundCustomer.id !== currentCustomer.id) { // Only auto-fill if not the current customer being edited
+      if (foundCustomer && foundCustomer.id !== currentCustomer.id) {
         form.setValue('name', foundCustomer.name);
         form.setValue('so', foundCustomer.so);
         form.setValue('address', foundCustomer.address);
@@ -946,10 +926,9 @@ export default function SupplierEntryClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteSupplier(id);
-      // Optimistic update handled by realtime listener
       toast({ title: "Success", description: "Entry deleted successfully." });
       if (currentCustomer.id === id) {
-        handleNew(); // Clear form if deleting the currently edited customer
+        handleNew();
       }
     } catch (error) {
       console.error("Error deleting supplier: ", error);
@@ -965,7 +944,6 @@ export default function SupplierEntryClient() {
     const completeEntry: Customer = {
       ...currentCustomer, ...values,
       name: toTitleCase(values.name), so: toTitleCase(values.so),
-      // Ensure calculated fields are included and correctly formatted
       weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges, netAmount: currentCustomer.netAmount, originalNetAmount: currentCustomer.originalNetAmount,
       address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
       variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
@@ -985,7 +963,7 @@ export default function SupplierEntryClient() {
              toast({ title: "Error", description: "Failed to update entry.", variant: "destructive" });
            });
     } else {
-      const { id, ...newEntryData } = completeEntry; // Destructure to omit the ID field
+      const { id, ...newEntryData } = completeEntry;
       addSupplier(newEntryData)
         .then(() => {
           toast({ title: "Success", description: "New entry saved successfully." });
@@ -1043,7 +1021,6 @@ export default function SupplierEntryClient() {
     iframeDoc.open();
     iframeDoc.write('<html><head><title>Print Receipt</title>');
 
-    // Copy all stylesheets from the main document to the iframe
     Array.from(document.styleSheets).forEach(styleSheet => {
         try {
             const style = iframeDoc.createElement('style');
@@ -1064,7 +1041,7 @@ export default function SupplierEntryClient() {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
         document.body.removeChild(iframe);
-    }, 500); // A small delay to ensure content and styles are fully loaded
+    }, 500);
   };
 
   const handleAddOption = async (collectionName: string, name: string) => {
@@ -1118,17 +1095,28 @@ export default function SupplierEntryClient() {
       }
   };
 
+  const handleFieldVisibilityChange = (field: keyof ReceiptFieldSettings, checked: boolean) => {
+    if (tempReceiptSettings) {
+      setTempReceiptSettings({
+        ...tempReceiptSettings,
+        fields: {
+          ...tempReceiptSettings.fields,
+          [field]: checked,
+        },
+      });
+    }
+  };
+
   if (!isClient) {
-    return null; // Render nothing on the server
+    return null;
   }
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-[calc(100vh-200px)]"> {/* Adjust height as needed */}
+      <div className="flex justify-center items-center h-[calc(100vh-200px)]">
         <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
       </div>
     );
-    return null;
   }
 
   return (
@@ -1320,34 +1308,38 @@ export default function SupplierEntryClient() {
         </DialogContent>
       </Dialog>
       
-      {/* Receipt Settings Dialog */}
       <Dialog open={isReceiptSettingsOpen} onOpenChange={setIsReceiptSettingsOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-3xl">
               <DialogHeader>
                   <DialogTitle>Edit Receipt Details</DialogTitle>
-                  <DialogDescription>Update the company details that appear on the printed receipt.</DialogDescription>
+                  <DialogDescription>Update the company details and visible fields on the printed receipt.</DialogDescription>
               </DialogHeader>
               {tempReceiptSettings && (
-                  <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="companyName" className="text-right">Company Name</Label>
-                          <Input id="companyName" value={tempReceiptSettings.companyName} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, companyName: e.target.value})} className="col-span-3" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 py-4">
+                      <div className="space-y-4">
+                          <h3 className="font-semibold text-lg border-b pb-2">Company Information</h3>
+                          <div className="space-y-1"><Label>Company Name</Label><Input value={tempReceiptSettings.companyName} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, companyName: e.target.value})} /></div>
+                          <div className="space-y-1"><Label>Address 1</Label><Input value={tempReceiptSettings.address1} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address1: e.target.value})} /></div>
+                          <div className="space-y-1"><Label>Address 2</Label><Input value={tempReceiptSettings.address2} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address2: e.target.value})} /></div>
+                          <div className="space-y-1"><Label>Contact No.</Label><Input value={tempReceiptSettings.contactNo} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, contactNo: e.target.value})} /></div>
+                          <div className="space-y-1"><Label>Email</Label><Input value={tempReceiptSettings.email} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, email: e.target.value})} /></div>
                       </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="address1" className="text-right">Address 1</Label>
-                          <Input id="address1" value={tempReceiptSettings.address1} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address1: e.target.value})} className="col-span-3" />
-                      </div>
-                       <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="address2" className="text-right">Address 2</Label>
-                          <Input id="address2" value={tempReceiptSettings.address2} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address2: e.target.value})} className="col-span-3" />
-                      </div>
-                       <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="contactNo" className="text-right">Contact No.</Label>
-                          <Input id="contactNo" value={tempReceiptSettings.contactNo} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, contactNo: e.target.value})} className="col-span-3" />
-                      </div>
-                       <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="email" className="text-right">Email</Label>
-                          <Input id="email" value={tempReceiptSettings.email} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, email: e.target.value})} className="col-span-3" />
+                      <div className="space-y-4">
+                          <h3 className="font-semibold text-lg border-b pb-2">Visible Fields</h3>
+                          <ScrollArea className="h-64 pr-4">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                {Object.keys(tempReceiptSettings.fields).map((key) => (
+                                    <div key={key} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`field-${key}`}
+                                            checked={tempReceiptSettings.fields[key as keyof ReceiptFieldSettings]}
+                                            onCheckedChange={(checked) => handleFieldVisibilityChange(key as keyof ReceiptFieldSettings, !!checked)}
+                                        />
+                                        <Label htmlFor={`field-${key}`} className="font-normal text-sm">{toTitleCase(key.replace(/([A-Z])/g, ' $1'))}</Label>
+                                    </div>
+                                ))}
+                            </div>
+                          </ScrollArea>
                       </div>
                   </div>
               )}

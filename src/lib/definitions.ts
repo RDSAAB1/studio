@@ -246,10 +246,28 @@ export type RtgsSettings = {
     gmail: string;
 };
 
+export type ReceiptFieldSettings = {
+    date: boolean;
+    name: boolean;
+    contact: boolean;
+    address: boolean;
+    vehicleNo: boolean;
+    term: boolean;
+    rate: boolean;
+    grossWeight: boolean;
+    teirWeight: boolean;
+    weight: boolean;
+    amount: boolean;
+    dueDate: boolean;
+    kartaWeight: boolean;
+    netAmount: boolean;
+};
+
 export type ReceiptSettings = {
     companyName: string;
     address1: string;
     address2: string;
     contactNo: string;
     email: string;
+    fields: ReceiptFieldSettings;
 };

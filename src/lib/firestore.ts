@@ -18,7 +18,7 @@ import {
   writeBatch,
   runTransaction,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -71,20 +71,48 @@ export async function updateRtgsSettings(settings: RtgsSettings): Promise<void> 
     await setDoc(docRef, settings, { merge: true });
 }
 
+const defaultReceiptFields: ReceiptFieldSettings = {
+    date: true,
+    name: true,
+    contact: true,
+    address: true,
+    vehicleNo: true,
+    term: true,
+    rate: true,
+    grossWeight: true,
+    teirWeight: true,
+    weight: true,
+    amount: true,
+    dueDate: true,
+    kartaWeight: true,
+    netAmount: true,
+};
+
+
 // --- Receipt Settings Functions ---
 export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
     const docRef = doc(settingsCollection, "receiptDetails");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-        return docSnap.data() as ReceiptSettings;
+        const data = docSnap.data() as Partial<ReceiptSettings>;
+        // Merge with defaults to ensure `fields` object exists
+        return {
+            companyName: data.companyName || "JAGDAMBE RICE MILL",
+            address1: data.address1 || "Devkali Road, Banda, Shajahanpur",
+            address2: data.address2 || "Near Devkali, Uttar Pradesh",
+            contactNo: data.contactNo || "9555130735",
+            email: data.email || "JRMDofficial@gmail.com",
+            fields: { ...defaultReceiptFields, ...data.fields }
+        };
     }
     return {
         companyName: "JAGDAMBE RICE MILL",
         address1: "Devkali Road, Banda, Shajahanpur",
         address2: "Near Devkali, Uttar Pradesh",
         contactNo: "9555130735",
-        email: "JRMDofficial@gmail.com"
-    }; // Default values
+        email: "JRMDofficial@gmail.com",
+        fields: defaultReceiptFields,
+    };
 }
 
 export async function updateReceiptSettings(settings: ReceiptSettings): Promise<void> {
