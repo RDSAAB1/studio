@@ -1094,7 +1094,7 @@ export default function SupplierEntryClient() {
     }
   };
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
       ...currentCustomer, ...values,
       name: toTitleCase(values.name), so: toTitleCase(values.so),
@@ -1103,30 +1103,41 @@ export default function SupplierEntryClient() {
       variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
       term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
-    if (isEditing && completeEntry.id) {
-      updateSupplier(completeEntry.id, completeEntry)
-        .then((success) => {
-          if (success) {
-            toast({ title: "Success", description: "Entry updated successfully." });
-            handleNew();
-          } else {
-            toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
-          }
-        }).catch((error) => {
-             console.error("Error updating supplier: ", error);
-             toast({ title: "Error", description: "Failed to update entry.", variant: "destructive" });
-           });
+    try {
+      if (isEditing && completeEntry.id) {
+        const success = await updateSupplier(completeEntry.id, completeEntry);
+        if (success) {
+          toast({ title: "Success", description: "Entry updated successfully." });
+          if(callback) callback(completeEntry);
+          else handleNew();
+        } else {
+          toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
+        }
+      } else {
+        const newEntry = await addSupplier(completeEntry);
+        toast({ title: "Success", description: "New entry saved successfully." });
+        if (callback) callback(newEntry);
+        else handleNew();
+      }
+    } catch (error) {
+      console.error("Error saving supplier: ", error);
+      toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
+    }
+  };
+  
+  const handleSaveAndPrint = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      onSubmit(form.getValues(), (savedEntry) => {
+        handlePrint([savedEntry]);
+        handleNew();
+      });
     } else {
-      const { id, ...newEntryData } = completeEntry;
-      addSupplier(newEntryData)
-        .then(() => {
-          toast({ title: "Success", description: "New entry saved successfully." });
-          handleNew();
-        })
-        .catch((error) => {
-          console.error("Error adding supplier: ", error);
-          toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
-        });
+      toast({
+        title: "Invalid Form",
+        description: "Please check the form for errors before saving.",
+        variant: "destructive"
+      });
     }
   };
   
@@ -1316,7 +1327,7 @@ export default function SupplierEntryClient() {
   return (
     <>
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -1335,9 +1346,12 @@ export default function SupplierEntryClient() {
             
             <CalculatedSummary currentCustomer={currentCustomer} />
 
-            <div className="flex justify-start space-x-4 pt-4">
+            <div className="flex justify-start space-x-2 pt-4">
               <Button type="submit" size="sm">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+              </Button>
+              <Button type="button" onClick={handleSaveAndPrint} size="sm">
+                <Printer className="mr-2 h-4 w-4"/> Save & Print
               </Button>
               <Button type="button" variant="outline" onClick={handleNew} size="sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
