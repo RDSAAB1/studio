@@ -104,7 +104,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
         if (value.length > 1) {
             const uniqueSuppliers = Array.from(new Map(allSuppliers.map((s: Customer) => [s.customerId, s])).values());
             const filtered = uniqueSuppliers.filter((s: Customer) => 
-                s.name.toLowerCase().includes(value.toLowerCase())
+                s.name.toLowerCase().includes(value.toLowerCase()) || s.contact.includes(value)
             );
             setNameSuggestions(filtered);
             setIsNamePopoverOpen(true);
@@ -223,7 +223,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                                 {nameSuggestions.map((s) => (
                                                     <CommandItem
                                                         key={s.id}
-                                                        value={s.name}
+                                                        value={`${s.name} ${s.contact}`}
                                                         onSelect={() => handleNameSelect(s)}
                                                     >
                                                         {toTitleCase(s.name)} ({s.contact})
@@ -1286,3 +1286,4 @@ export default function SupplierEntryClient() {
     </>
   );
 }
+
