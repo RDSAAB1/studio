@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodError } from "zod";
-import type { Customer, Payment, OptionItem } from "@/lib/definitions";
+import type { Customer, Payment, OptionItem, ReceiptSettings } from "@/lib/definitions";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
 import { formatCurrency } from "@/lib/utils";
 
 const formSchema = z.object({
@@ -477,7 +477,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void; }) => {
+const ReceiptPreview = ({ data, onPrint, settings }: { data: Customer; onPrint: () => void; settings: ReceiptSettings; }) => {
     return (
         <>
             <DialogHeader className="p-4 pb-0">
@@ -508,13 +508,13 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
                         {/* Left Column: Mill Details */}
                         <div>
                             <div className="bg-red-200 text-center font-bold text-xl p-1 border border-black">
-                                JAGDAMBE RICE <span className="italic">MILL</span>
+                                {settings.companyName}
                             </div>
                             <div className="border-x border-b border-black p-1 text-sm">
-                                <p>Devkali Road, Banda, Shajahanpur</p>
-                                <p>Near Devkali, Uttar Pradesh</p>
-                                <p>CONTACT NO:- 9555130735</p>
-                                <p>EMAIL:- JRMDofficial@gmail.com</p>
+                                <p>{settings.address1}</p>
+                                <p>{settings.address2}</p>
+                                <p>CONTACT NO:- {settings.contactNo}</p>
+                                <p>EMAIL:- {settings.email}</p>
                                 {/* Placeholder for barcode */}
                                 <div className="h-10 mt-1 bg-gray-200 flex items-center justify-center">
                                     <p className="text-xs text-gray-500">Barcode Placeholder</p>
@@ -716,6 +716,11 @@ export default function SupplierEntryClient() {
   const [lastVariety, setLastVariety] = useState<string>('');
   const isInitialLoad = useRef(true);
 
+  // Receipt settings state
+  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
+  const [isReceiptSettingsOpen, setIsReceiptSettingsOpen] = useState(false);
+  const [tempReceiptSettings, setTempReceiptSettings] = useState<ReceiptSettings | null>(null);
+
   // Ensure customers is always an array
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
 
@@ -763,6 +768,16 @@ export default function SupplierEntryClient() {
     }, (error) => {
         console.error("Error fetching payments: ", error);
     });
+
+    const fetchSettings = async () => {
+        const settings = await getReceiptSettings();
+        if (settings) {
+            setReceiptSettings(settings);
+            setTempReceiptSettings(settings);
+        }
+    };
+    fetchSettings();
+
 
     // Fetch dynamic options
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
@@ -1084,6 +1099,24 @@ export default function SupplierEntryClient() {
     }
   };
 
+  const handleOpenReceiptSettings = () => {
+    setTempReceiptSettings(receiptSettings);
+    setIsReceiptSettingsOpen(true);
+  };
+
+  const handleSaveReceiptSettings = async () => {
+      if (tempReceiptSettings) {
+          try {
+              await updateReceiptSettings(tempReceiptSettings);
+              setReceiptSettings(tempReceiptSettings);
+              setIsReceiptSettingsOpen(false);
+              toast({ title: "Success", description: "Receipt details saved successfully." });
+          } catch (error) {
+              console.error("Error saving receipt settings:", error);
+              toast({ title: "Error", description: "Failed to save details.", variant: "destructive" });
+          }
+      }
+  };
 
   if (!isClient) {
     return null; // Render nothing on the server
@@ -1126,6 +1159,9 @@ export default function SupplierEntryClient() {
               </Button>
               <Button type="button" variant="outline" onClick={handleNew} size="sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
+              </Button>
+              <Button type="button" variant="ghost" size="icon" onClick={handleOpenReceiptSettings}>
+                <Settings className="h-5 w-5" />
               </Button>
             </div>
         </form>
@@ -1280,10 +1316,47 @@ export default function SupplierEntryClient() {
 
       <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
         <DialogContent className="sm:max-w-3xl">
-            {receiptData && <ReceiptPreview data={receiptData} onPrint={handleActualPrint}/>}
+            {receiptData && receiptSettings && <ReceiptPreview data={receiptData} onPrint={handleActualPrint} settings={receiptSettings}/>}
         </DialogContent>
+      </Dialog>
+      
+      {/* Receipt Settings Dialog */}
+      <Dialog open={isReceiptSettingsOpen} onOpenChange={setIsReceiptSettingsOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Edit Receipt Details</DialogTitle>
+                  <DialogDescription>Update the company details that appear on the printed receipt.</DialogDescription>
+              </DialogHeader>
+              {tempReceiptSettings && (
+                  <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="companyName" className="text-right">Company Name</Label>
+                          <Input id="companyName" value={tempReceiptSettings.companyName} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, companyName: e.target.value})} className="col-span-3" />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="address1" className="text-right">Address 1</Label>
+                          <Input id="address1" value={tempReceiptSettings.address1} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address1: e.target.value})} className="col-span-3" />
+                      </div>
+                       <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="address2" className="text-right">Address 2</Label>
+                          <Input id="address2" value={tempReceiptSettings.address2} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address2: e.target.value})} className="col-span-3" />
+                      </div>
+                       <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="contactNo" className="text-right">Contact No.</Label>
+                          <Input id="contactNo" value={tempReceiptSettings.contactNo} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, contactNo: e.target.value})} className="col-span-3" />
+                      </div>
+                       <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="email" className="text-right">Email</Label>
+                          <Input id="email" value={tempReceiptSettings.email} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, email: e.target.value})} className="col-span-3" />
+                      </div>
+                  </div>
+              )}
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsReceiptSettingsOpen(false)}>Cancel</Button>
+                  <Button onClick={handleSaveReceiptSettings}>Save Changes</Button>
+              </DialogFooter>
+          </DialogContent>
       </Dialog>
     </>
   );
 }
-

@@ -245,3 +245,11 @@ export type RtgsSettings = {
     contactNo: string;
     gmail: string;
 };
+
+export type ReceiptSettings = {
+    companyName: string;
+    address1: string;
+    address2: string;
+    contactNo: string;
+    email: string;
+};

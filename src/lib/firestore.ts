@@ -18,7 +18,7 @@ import {
   writeBatch,
   runTransaction,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -68,6 +68,27 @@ export async function getRtgsSettings(): Promise<RtgsSettings | null> {
 
 export async function updateRtgsSettings(settings: RtgsSettings): Promise<void> {
     const docRef = doc(settingsCollection, "rtgs");
+    await setDoc(docRef, settings, { merge: true });
+}
+
+// --- Receipt Settings Functions ---
+export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
+    const docRef = doc(settingsCollection, "receiptDetails");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as ReceiptSettings;
+    }
+    return {
+        companyName: "JAGDAMBE RICE MILL",
+        address1: "Devkali Road, Banda, Shajahanpur",
+        address2: "Near Devkali, Uttar Pradesh",
+        contactNo: "9555130735",
+        email: "JRMDofficial@gmail.com"
+    }; // Default values
+}
+
+export async function updateReceiptSettings(settings: ReceiptSettings): Promise<void> {
+    const docRef = doc(settingsCollection, "receiptDetails");
     await setDoc(docRef, settings, { merge: true });
 }
 
