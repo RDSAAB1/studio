@@ -106,7 +106,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
         if (value.length > 1) {
             const uniqueSuppliers = Array.from(new Map(allSuppliers.map((s: Customer) => [s.customerId, s])).values());
             const filtered = uniqueSuppliers.filter((s: Customer) => 
-                s.name.toLowerCase().includes(value.toLowerCase()) || s.contact.includes(value)
+                s.name.toLowerCase().startsWith(value.toLowerCase()) || s.contact.startsWith(value)
             );
             setNameSuggestions(filtered);
             setIsNamePopoverOpen(true);
@@ -855,9 +855,9 @@ export default function SupplierEntryClient() {
     const lowercasedFilter = debouncedSearchTerm.toLowerCase();
     return safeCustomers.filter(customer => {
       return (
-        customer.name?.toLowerCase().includes(lowercasedFilter) ||
-        customer.contact?.includes(lowercasedFilter) ||
-        customer.srNo?.toLowerCase().includes(lowercasedFilter)
+        customer.name?.toLowerCase().startsWith(lowercasedFilter) ||
+        customer.contact?.startsWith(lowercasedFilter) ||
+        customer.srNo?.toLowerCase().startsWith(lowercasedFilter)
       );
     });
   }, [safeCustomers, debouncedSearchTerm]);
