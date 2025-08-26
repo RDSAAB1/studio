@@ -611,7 +611,11 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
 
 const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedReceiptData; settings: ReceiptSettings }) => {
     const { fields } = settings;
-    const colspan = Object.values(fields).filter(v => ['srNo', 'date', 'vehicleNo', 'variety', 'netWeight', 'netAmount'].some(f => f === v)).length;
+    const visibleColumns = Object.keys(fields).filter(key => fields[key as keyof ReceiptFieldSettings]);
+    const colspan = visibleColumns.filter(key => 
+        ['srNo', 'date', 'vehicleNo', 'variety', 'term', 'rate', 'grossWeight', 'teirWeight', 'weight', 'kartaWeight', 'netWeight', 'amount', 'netAmount'].includes(key)
+    ).length;
+
     return (
         <div className="text-black bg-white font-sans p-4">
              <style>
@@ -665,9 +669,17 @@ const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedRece
                     <tr className="bg-orange-300 text-black font-bold">
                         {fields.srNo && <td className="border border-black p-1 text-center">SR No.</td>}
                         {fields.date && <td className="border border-black p-1 text-center">Date</td>}
-                        {fields.vehicleNo && <td className="border border-black p-1 text-center">Vehicle</td>}
                         {fields.variety && <td className="border border-black p-1 text-center">Variety</td>}
+                        {fields.vehicleNo && <td className="border border-black p-1 text-center">Vehicle</td>}
+                        {fields.term && <td className="border border-black p-1 text-center">Term</td>}
+                        {fields.rate && <td className="border border-black p-1 text-center">Rate</td>}
+                        {fields.grossWeight && <td className="border border-black p-1 text-center">Gross Wt.</td>}
+                        {fields.teirWeight && <td className="border border-black p-1 text-center">Teir Wt.</td>}
+                        {fields.weight && <td className="border border-black p-1 text-center">Weight</td>}
+                        {fields.kartaWeight && <td className="border border-black p-1 text-center">Karta Wt.</td>}
                         {fields.netWeight && <td className="border border-black p-1 text-center">Net Wt.</td>}
+                        {fields.amount && <td className="border border-black p-1 text-center">Amount</td>}
+                        {fields.dueDate && <td className="border border-black p-1 text-center">Due Date</td>}
                         {fields.netAmount && <td className="border border-black p-1 text-center">Net Amt.</td>}
                     </tr>
                 </thead>
@@ -676,16 +688,24 @@ const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedRece
                          <tr key={entry.id}>
                             {fields.srNo && <td className="border border-black p-1 text-center">{entry.srNo}</td>}
                             {fields.date && <td className="border border-black p-1 text-center">{format(new Date(entry.date), "dd-MMM-yy")}</td>}
-                            {fields.vehicleNo && <td className="border border-black p-1 text-center">{entry.vehicleNo.toUpperCase()}</td>}
                             {fields.variety && <td className="border border-black p-1 text-center">{toTitleCase(entry.variety)}</td>}
+                            {fields.vehicleNo && <td className="border border-black p-1 text-center">{entry.vehicleNo.toUpperCase()}</td>}
+                            {fields.term && <td className="border border-black p-1 text-center">{entry.term}</td>}
+                            {fields.rate && <td className="border border-black p-1 text-right">{entry.rate.toFixed(2)}</td>}
+                            {fields.grossWeight && <td className="border border-black p-1 text-right">{entry.grossWeight.toFixed(2)}</td>}
+                            {fields.teirWeight && <td className="border border-black p-1 text-right">{entry.teirWeight.toFixed(2)}</td>}
+                            {fields.weight && <td className="border border-black p-1 text-right">{entry.weight.toFixed(2)}</td>}
+                            {fields.kartaWeight && <td className="border border-black p-1 text-right">{entry.kartaWeight.toFixed(2)}</td>}
                             {fields.netWeight && <td className="border border-black p-1 text-right">{entry.netWeight.toFixed(2)}</td>}
-                            {fields.netAmount && <td className="border border-black p-1 text-right">{formatCurrency(entry.netAmount)}</td>}
+                            {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(entry.amount)}</td>}
+                            {fields.dueDate && <td className="border border-black p-1 text-center">{format(new Date(entry.dueDate), "dd-MMM-yy")}</td>}
+                            {fields.netAmount && <td className="border border-black p-1 text-right font-semibold">{formatCurrency(entry.netAmount)}</td>}
                         </tr>
                     ))}
                 </tbody>
                 <tfoot>
                     <tr className="font-bold bg-gray-200">
-                        <td colSpan={colspan - 1} className="border border-black p-1 text-right">GRAND TOTAL</td>
+                        <td colSpan={colspan -1} className="border border-black p-1 text-right">GRAND TOTAL</td>
                         {fields.netAmount && <td className="border border-black p-1 text-right">{formatCurrency(data.totalAmount)}</td>}
                     </tr>
                 </tfoot>
