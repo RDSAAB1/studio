@@ -609,6 +609,95 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
     );
 };
 
+const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedReceiptData; settings: ReceiptSettings }) => {
+    return (
+        <div className="text-black bg-white font-sans p-4">
+             <style>
+                {`
+                  @media print {
+                    @page {
+                      size: A4;
+                      margin: 10mm;
+                    }
+                    body {
+                      -webkit-print-color-adjust: exact;
+                      print-color-adjust: exact;
+                    }
+                  }
+                `}
+            </style>
+            <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">CONSOLIDATED INVOICE</div>
+            
+            <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
+                <div>
+                    <div className="bg-red-200 text-center font-bold text-xl p-1 border border-black">
+                        {settings.companyName}
+                    </div>
+                    <div className="border-x border-b border-black p-1 text-sm">
+                        <p>{settings.address1}</p>
+                        <p>{settings.address2}</p>
+                        <p>CONTACT NO:- {settings.contactNo}</p>
+                        <p>EMAIL:- {settings.email}</p>
+                    </div>
+                </div>
+
+                <div>
+                    <div className="text-center font-bold text-xl p-1 border-t border-r border-black">JRM</div>
+                     <div className="border-x border-b border-t border-black p-1">
+                        <div className="text-center font-bold underline mb-2">CUSTOMER DETAIL</div>
+                        <table className="w-full text-sm">
+                            <tbody>
+                                <tr><td className="font-bold pr-2">DATE</td><td>{data.date}</td></tr>
+                                <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.supplier.name)}</td></tr>
+                                <tr><td className="font-bold pr-2">S/O</td><td>{toTitleCase(data.supplier.so)}</td></tr>
+                                <tr><td className="font-bold pr-2">CONTACT</td><td>{data.supplier.contact}</td></tr>
+                                <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.supplier.address)}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <table className="w-full border-collapse border border-black text-sm my-4">
+                <thead>
+                    <tr className="bg-orange-300 text-black font-bold">
+                        <td className="border border-black p-1 text-center">SR No.</td>
+                        <td className="border border-black p-1 text-center">Date</td>
+                        <td className="border border-black p-1 text-center">Vehicle</td>
+                        <td className="border border-black p-1 text-center">Variety</td>
+                        <td className="border border-black p-1 text-center">Net Wt.</td>
+                        <td className="border border-black p-1 text-center">Net Amt.</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    {data.entries.map(entry => (
+                         <tr key={entry.id}>
+                            <td className="border border-black p-1 text-center">{entry.srNo}</td>
+                            <td className="border border-black p-1 text-center">{format(new Date(entry.date), "dd-MMM-yy")}</td>
+                            <td className="border border-black p-1 text-center">{entry.vehicleNo.toUpperCase()}</td>
+                            <td className="border border-black p-1 text-center">{toTitleCase(entry.variety)}</td>
+                            <td className="border border-black p-1 text-right">{entry.netWeight.toFixed(2)}</td>
+                            <td className="border border-black p-1 text-right">{formatCurrency(entry.netAmount)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot>
+                    <tr className="font-bold bg-gray-200">
+                        <td colSpan={5} className="border border-black p-1 text-right">GRAND TOTAL</td>
+                        <td className="border border-black p-1 text-right">{formatCurrency(data.totalAmount)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div className="flex justify-between items-end mt-16">
+                <div className="text-sm">
+                    <p className="mt-8 border-t border-black pt-1">Authorized Sign</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, onUpdate, onDelete }: any) => {
     const [editingOption, setEditingOption] = useState<{ id: string; name: string } | null>(null);
@@ -713,6 +802,7 @@ export default function SupplierEntryClient() {
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
+  const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<string>>(new Set());
   const receiptRef = useRef<HTMLDivElement>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
@@ -1021,14 +1111,46 @@ export default function SupplierEntryClient() {
 
   const handlePrint = (entriesToPrint: Customer[]) => {
     if (!entriesToPrint || entriesToPrint.length === 0) {
-      toast({
-        title: "No Selection",
-        description: "Please select one or more entries to print.",
-        variant: "destructive",
-      });
-      return;
+        toast({
+            title: "No Selection",
+            description: "Please select one or more entries to print.",
+            variant: "destructive",
+        });
+        return;
     }
-    setReceiptsToPrint(entriesToPrint);
+
+    if (entriesToPrint.length === 1) {
+        setReceiptsToPrint(entriesToPrint);
+        setConsolidatedReceiptData(null);
+    } else {
+        const firstCustomerId = entriesToPrint[0].customerId;
+        const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
+
+        if (!allSameCustomer) {
+            toast({
+                title: "Multiple Suppliers Selected",
+                description: "Consolidated receipts can only be printed for a single supplier at a time.",
+                variant: "destructive",
+            });
+            return;
+        }
+        
+        const supplier = entriesToPrint[0];
+        const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
+        
+        setConsolidatedReceiptData({
+            supplier: {
+                name: supplier.name,
+                so: supplier.so,
+                address: supplier.address,
+                contact: supplier.contact,
+            },
+            entries: entriesToPrint,
+            totalAmount: totalAmount,
+            date: format(new Date(), "dd-MMM-yy"),
+        });
+        setReceiptsToPrint([]);
+    }
   };
   
   const handleActualPrint = (id: string) => {
@@ -1344,19 +1466,29 @@ export default function SupplierEntryClient() {
           )}
         </DialogContent>
       </Dialog>
-
-      <Dialog open={receiptsToPrint.length > 0} onOpenChange={(open) => !open && setReceiptsToPrint([])}>
+      
+      <Dialog open={receiptsToPrint.length > 0 || !!consolidatedReceiptData} onOpenChange={(open) => {
+          if (!open) {
+              setReceiptsToPrint([]);
+              setConsolidatedReceiptData(null);
+          }
+      }}>
         <DialogContent className="sm:max-w-3xl">
             <DialogHeader className="p-4 pb-0">
                 <DialogTitle className="sr-only">Print Receipts</DialogTitle>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
                 <div id="receipt-content">
-                    {receiptsToPrint.map((receiptData, index) => (
+                    {receiptsToPrint.length > 0 && receiptsToPrint.map((receiptData, index) => (
                         <div key={index} className="receipt-container">
                             {receiptSettings && <ReceiptPreview data={receiptData} settings={receiptSettings}/>}
                         </div>
                     ))}
+                    {consolidatedReceiptData && receiptSettings && (
+                        <div className="receipt-container">
+                            <ConsolidatedReceiptPreview data={consolidatedReceiptData} settings={receiptSettings} />
+                        </div>
+                    )}
                 </div>
             </ScrollArea>
              <DialogFooter className="p-4 pt-0">
@@ -1366,6 +1498,7 @@ export default function SupplierEntryClient() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       <Dialog open={isReceiptSettingsOpen} onOpenChange={setIsReceiptSettingsOpen}>
           <DialogContent className="max-w-3xl">
