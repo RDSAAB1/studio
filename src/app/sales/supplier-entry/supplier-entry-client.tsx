@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 
 import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer } from "lucide-react";
@@ -83,10 +84,12 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleFocus, lastVariety, setLastVariety, handleAddOption, handleUpdateOption, handleDeleteOption }: any) {
+const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleFocus, lastVariety, setLastVariety, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers }: any) {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
+    const [nameSuggestions, setNameSuggestions] = useState<Customer[]>([]);
+    const [isNamePopoverOpen, setIsNamePopoverOpen] = useState(false);
 
     const openManagementDialog = (type: 'variety' | 'paymentType') => {
         setManagementType(type);
@@ -95,6 +98,30 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
 
     const optionsToManage = managementType === 'variety' ? varietyOptions : paymentTypeOptions;
     
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        form.setValue('name', value);
+        if (value.length > 1) {
+            const uniqueSuppliers = Array.from(new Map(allSuppliers.map((s: Customer) => [s.customerId, s])).values());
+            const filtered = uniqueSuppliers.filter((s: Customer) => 
+                s.name.toLowerCase().includes(value.toLowerCase())
+            );
+            setNameSuggestions(filtered);
+            setIsNamePopoverOpen(true);
+        } else {
+            setNameSuggestions([]);
+            setIsNamePopoverOpen(false);
+        }
+    };
+    
+    const handleNameSelect = (supplier: Customer) => {
+        form.setValue('name', toTitleCase(supplier.name));
+        form.setValue('so', toTitleCase(supplier.so));
+        form.setValue('address', toTitleCase(supplier.address));
+        form.setValue('contact', supplier.contact);
+        setIsNamePopoverOpen(false);
+    };
+
     return (
         <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -175,12 +202,39 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <Label htmlFor="name" className="text-xs">Name</Label>
-                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="name" control={form.control} render={({ field }) => (
-                                    <Input {...field} placeholder="e.g. John Doe" onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                                )}/>
-                            </InputWithIcon>
-                                {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
+                             <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                        <Input 
+                                            value={form.watch('name')} 
+                                            onChange={handleNameChange}
+                                            onBlur={handleCapitalizeOnBlur}
+                                            autoComplete="off"
+                                            className="h-9 text-sm pl-10"
+                                            name="name"
+                                        />
+                                    </InputWithIcon>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                    <Command>
+                                        <CommandList>
+                                            <CommandEmpty>No suppliers found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {nameSuggestions.map((s) => (
+                                                    <CommandItem
+                                                        key={s.id}
+                                                        value={s.name}
+                                                        onSelect={() => handleNameSelect(s)}
+                                                    >
+                                                        {toTitleCase(s.name)} ({s.contact})
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                            {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="so" className="text-xs">S/O</Label>
@@ -1061,6 +1115,7 @@ export default function SupplierEntryClient() {
                 handleAddOption={handleAddOption}
                 handleUpdateOption={handleUpdateOption}
                 handleDeleteOption={handleDeleteOption}
+                allSuppliers={safeCustomers}
             />
             
             <CalculatedSummary currentCustomer={currentCustomer} />
