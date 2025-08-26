@@ -261,6 +261,9 @@ export type ReceiptFieldSettings = {
     dueDate: boolean;
     kartaWeight: boolean;
     netAmount: boolean;
+    srNo: boolean;
+    variety: boolean;
+    netWeight: boolean;
 };
 
 export type ReceiptSettings = {

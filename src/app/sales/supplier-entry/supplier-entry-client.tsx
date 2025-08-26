@@ -610,6 +610,8 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
 };
 
 const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedReceiptData; settings: ReceiptSettings }) => {
+    const { fields } = settings;
+    const colspan = Object.values(fields).filter(v => ['srNo', 'date', 'vehicleNo', 'variety', 'netWeight', 'netAmount'].some(f => f === v)).length;
     return (
         <div className="text-black bg-white font-sans p-4">
              <style>
@@ -661,30 +663,30 @@ const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedRece
             <table className="w-full border-collapse border border-black text-sm my-4">
                 <thead>
                     <tr className="bg-orange-300 text-black font-bold">
-                        <td className="border border-black p-1 text-center">SR No.</td>
-                        <td className="border border-black p-1 text-center">Date</td>
-                        <td className="border border-black p-1 text-center">Vehicle</td>
-                        <td className="border border-black p-1 text-center">Variety</td>
-                        <td className="border border-black p-1 text-center">Net Wt.</td>
-                        <td className="border border-black p-1 text-center">Net Amt.</td>
+                        {fields.srNo && <td className="border border-black p-1 text-center">SR No.</td>}
+                        {fields.date && <td className="border border-black p-1 text-center">Date</td>}
+                        {fields.vehicleNo && <td className="border border-black p-1 text-center">Vehicle</td>}
+                        {fields.variety && <td className="border border-black p-1 text-center">Variety</td>}
+                        {fields.netWeight && <td className="border border-black p-1 text-center">Net Wt.</td>}
+                        {fields.netAmount && <td className="border border-black p-1 text-center">Net Amt.</td>}
                     </tr>
                 </thead>
                 <tbody>
                     {data.entries.map(entry => (
                          <tr key={entry.id}>
-                            <td className="border border-black p-1 text-center">{entry.srNo}</td>
-                            <td className="border border-black p-1 text-center">{format(new Date(entry.date), "dd-MMM-yy")}</td>
-                            <td className="border border-black p-1 text-center">{entry.vehicleNo.toUpperCase()}</td>
-                            <td className="border border-black p-1 text-center">{toTitleCase(entry.variety)}</td>
-                            <td className="border border-black p-1 text-right">{entry.netWeight.toFixed(2)}</td>
-                            <td className="border border-black p-1 text-right">{formatCurrency(entry.netAmount)}</td>
+                            {fields.srNo && <td className="border border-black p-1 text-center">{entry.srNo}</td>}
+                            {fields.date && <td className="border border-black p-1 text-center">{format(new Date(entry.date), "dd-MMM-yy")}</td>}
+                            {fields.vehicleNo && <td className="border border-black p-1 text-center">{entry.vehicleNo.toUpperCase()}</td>}
+                            {fields.variety && <td className="border border-black p-1 text-center">{toTitleCase(entry.variety)}</td>}
+                            {fields.netWeight && <td className="border border-black p-1 text-right">{entry.netWeight.toFixed(2)}</td>}
+                            {fields.netAmount && <td className="border border-black p-1 text-right">{formatCurrency(entry.netAmount)}</td>}
                         </tr>
                     ))}
                 </tbody>
                 <tfoot>
                     <tr className="font-bold bg-gray-200">
-                        <td colSpan={5} className="border border-black p-1 text-right">GRAND TOTAL</td>
-                        <td className="border border-black p-1 text-right">{formatCurrency(data.totalAmount)}</td>
+                        <td colSpan={colspan - 1} className="border border-black p-1 text-right">GRAND TOTAL</td>
+                        {fields.netAmount && <td className="border border-black p-1 text-right">{formatCurrency(data.totalAmount)}</td>}
                     </tr>
                 </tfoot>
             </table>

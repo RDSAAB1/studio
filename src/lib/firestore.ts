@@ -86,6 +86,9 @@ const defaultReceiptFields: ReceiptFieldSettings = {
     dueDate: true,
     kartaWeight: true,
     netAmount: true,
+    srNo: true,
+    variety: true,
+    netWeight: true,
 };
 
 
