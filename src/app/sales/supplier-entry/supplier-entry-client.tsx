@@ -309,6 +309,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
             setIsOpen={setIsManageOptionsOpen}
             type={managementType}
             options={optionsToManage}
+            onAdd={handleAddOption}
             onUpdate={handleUpdateOption}
             onDelete={handleDeleteOption}
         />
@@ -549,17 +550,26 @@ const ReceiptPreview = ({ data, onPrint }: { data: Customer; onPrint: () => void
     );
 };
 
-const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onUpdate, onDelete }: any) => {
+const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, onUpdate, onDelete }: any) => {
     const [editingOption, setEditingOption] = useState<{ id: string; name: string } | null>(null);
+    const [newOptionName, setNewOptionName] = useState("");
     const { toast } = useToast();
 
     const title = type === 'variety' ? "Manage Varieties" : "Manage Payment Types";
+    const collectionName = type === 'variety' ? 'varieties' : 'paymentTypes';
 
     const handleSave = () => {
         if (editingOption) {
-            onUpdate(type, editingOption.id, editingOption.name);
+            onUpdate(collectionName, editingOption.id, editingOption.name);
             toast({ title: "Success", description: "Option updated successfully." });
             setEditingOption(null);
+        }
+    };
+    
+    const handleAdd = () => {
+        if (newOptionName.trim()) {
+            onAdd(collectionName, newOptionName);
+            setNewOptionName("");
         }
     };
     
@@ -570,47 +580,59 @@ const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onUpdate, onDe
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>Add, edit, or remove options from the list.</DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="max-h-72 pr-4">
-                    <div className="space-y-2">
-                        {options.map((option: OptionItem) => (
-                            <div key={option.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                                {editingOption?.id === option.id ? (
-                                    <Input
-                                        value={editingOption.name}
-                                        onChange={(e) => setEditingOption({ ...editingOption, name: e.target.value })}
-                                        autoFocus
-                                        onBlur={handleSave}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                                    />
-                                ) : (
-                                    <span className="flex-grow">{toTitleCase(option.name)}</span>
-                                )}
-                                <div className="flex gap-1">
-                                    {editingOption?.id === option.id ? (
-                                        <Button size="icon" variant="ghost" onClick={handleSave}><Save className="h-4 w-4 text-green-500" /></Button>
-                                    ) : (
-                                        <Button size="icon" variant="ghost" onClick={() => setEditingOption({ id: option.id, name: option.name })}><Pen className="h-4 w-4" /></Button>
-                                    )}
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                <AlertDialogDescription>This will permanently delete the option "{toTitleCase(option.name)}".</AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => onDelete(type, option.id)}>Continue</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </div>
-                            </div>
-                        ))}
+                <div className="space-y-4">
+                    <div className="flex gap-2">
+                        <Input 
+                            placeholder="Add new..."
+                            value={newOptionName}
+                            onChange={(e) => setNewOptionName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                        />
+                        <Button onClick={handleAdd} size="sm">Add</Button>
                     </div>
-                </ScrollArea>
+                    <Separator />
+                    <ScrollArea className="max-h-60 pr-4">
+                        <div className="space-y-2">
+                            {options.map((option: OptionItem) => (
+                                <div key={option.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                                    {editingOption?.id === option.id ? (
+                                        <Input
+                                            value={editingOption.name}
+                                            onChange={(e) => setEditingOption({ ...editingOption, name: e.target.value })}
+                                            autoFocus
+                                            onBlur={handleSave}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                                        />
+                                    ) : (
+                                        <span className="flex-grow">{toTitleCase(option.name)}</span>
+                                    )}
+                                    <div className="flex gap-1">
+                                        {editingOption?.id === option.id ? (
+                                            <Button size="icon" variant="ghost" onClick={handleSave}><Save className="h-4 w-4 text-green-500" /></Button>
+                                        ) : (
+                                            <Button size="icon" variant="ghost" onClick={() => setEditingOption({ id: option.id, name: option.name })}><Pen className="h-4 w-4" /></Button>
+                                        )}
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>This will permanently delete the option "{toTitleCase(option.name)}".</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => onDelete(collectionName, option.id)}>Continue</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Done</Button>
                 </DialogFooter>
@@ -1209,4 +1231,3 @@ export default function SupplierEntryClient() {
     </>
   );
 }
-
