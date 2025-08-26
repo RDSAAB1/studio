@@ -23,7 +23,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer, Search } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns"
@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator";
 import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
 import { formatCurrency } from "@/lib/utils";
+import { useDebounce } from "@/hooks/use-debounce";
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -611,10 +612,13 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
 
 const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedReceiptData; settings: ReceiptSettings }) => {
     const { fields } = settings;
-    const visibleColumns = Object.keys(fields).filter(key => fields[key as keyof ReceiptFieldSettings]);
-    const colspan = visibleColumns.filter(key => 
-        ['srNo', 'date', 'vehicleNo', 'variety', 'term', 'rate', 'grossWeight', 'teirWeight', 'weight', 'kartaWeight', 'netWeight', 'amount', 'netAmount'].includes(key)
-    ).length;
+    
+    const visibleColumns: (keyof ReceiptFieldSettings)[] = [
+        'srNo', 'date', 'variety', 'vehicleNo', 'term', 'rate', 'grossWeight', 
+        'teirWeight', 'weight', 'kartaWeight', 'netWeight', 'amount', 'dueDate', 'netAmount'
+    ];
+
+    const colspan = visibleColumns.filter(key => fields[key]).length;
 
     return (
         <div className="text-black bg-white font-sans p-4">
@@ -839,7 +843,25 @@ export default function SupplierEntryClient() {
   const [isReceiptSettingsOpen, setIsReceiptSettingsOpen] = useState(false);
   const [tempReceiptSettings, setTempReceiptSettings] = useState<ReceiptSettings | null>(null);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
+  
+  const filteredCustomers = useMemo(() => {
+    if (!debouncedSearchTerm) {
+      return safeCustomers;
+    }
+    const lowercasedFilter = debouncedSearchTerm.toLowerCase();
+    return safeCustomers.filter(customer => {
+      return (
+        customer.name?.toLowerCase().includes(lowercasedFilter) ||
+        customer.contact?.includes(lowercasedFilter) ||
+        customer.srNo?.toLowerCase().includes(lowercasedFilter)
+      );
+    });
+  }, [safeCustomers, debouncedSearchTerm]);
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -1327,7 +1349,17 @@ export default function SupplierEntryClient() {
         </form>
       </FormProvider>      
       
-      <div className="flex justify-end mt-4">
+      <div className="flex justify-between items-center mt-6 mb-2">
+        <div className="relative w-full max-w-sm">
+            <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
+                <Input
+                    placeholder="Search by SR No, Name, or Contact..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-9 pl-10"
+                />
+            </InputWithIcon>
+        </div>
         <Button onClick={() => handlePrint(customers.filter(c => selectedSupplierIds.has(c.id)))} disabled={selectedSupplierIds.size === 0}>
             <Printer className="mr-2 h-4 w-4" />
             Print Selected ({selectedSupplierIds.size})
@@ -1335,7 +1367,7 @@ export default function SupplierEntryClient() {
       </div>
 
       <SupplierTable 
-        customers={customers} 
+        customers={filteredCustomers} 
         onEdit={handleEdit} 
         onDelete={handleDelete} 
         onShowDetails={handleShowDetails} 
