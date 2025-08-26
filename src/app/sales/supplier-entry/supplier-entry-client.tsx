@@ -5,14 +5,14 @@ import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodError } from "zod";
-import type { Customer, Payment, OptionItem, ReceiptSettings, ReceiptFieldSettings } from "@/lib/definitions";
+import type { Customer, Payment, OptionItem, ReceiptSettings, ReceiptFieldSettings, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -398,15 +398,38 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
     );
 });
 
-const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete, onShowDetails, onPrint }: any) {
+const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete, onShowDetails, onPrint, selectedIds, onSelectionChange }: any) {
+    
+    const handleSelectAll = (checked: boolean) => {
+        const allCustomerIds = customers.map((c: Customer) => c.id);
+        onSelectionChange(checked ? new Set(allCustomerIds) : new Set());
+    };
+
+    const handleRowSelect = (id: string) => {
+        const newSelectedIds = new Set(selectedIds);
+        if (newSelectedIds.has(id)) {
+            newSelectedIds.delete(id);
+        } else {
+            newSelectedIds.add(id);
+        }
+        onSelectionChange(newSelectedIds);
+    };
+
     return (
-        <div className="mt-6 min-h-[200px]"> {/* Added min-height to avoid layout shift */}
+        <div className="mt-6 min-h-[200px]">
             <Card>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="px-3 py-2 text-xs w-10">
+                                         <Checkbox
+                                            checked={selectedIds.size > 0 && selectedIds.size === customers.length}
+                                            onCheckedChange={handleSelectAll}
+                                            aria-label="Select all rows"
+                                        />
+                                    </TableHead>
                                     <TableHead className="px-3 py-2 text-xs">SR No.</TableHead>
                                     <TableHead className="px-3 py-2 text-xs">Date</TableHead>
                                     <TableHead className="px-3 py-2 text-xs">Name</TableHead>
@@ -418,7 +441,14 @@ const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete,
                             </TableHeader>
                             <TableBody>
                                 {customers.map((customer: Customer) => (
-                                    <TableRow key={customer.id} className="h-12">
+                                    <TableRow key={customer.id} className="h-12" data-state={selectedIds.has(customer.id) ? 'selected' : ''}>
+                                        <TableCell className="px-3 py-1">
+                                            <Checkbox
+                                                checked={selectedIds.has(customer.id)}
+                                                onCheckedChange={() => handleRowSelect(customer.id)}
+                                                aria-label={`Select row ${customer.srNo}`}
+                                            />
+                                        </TableCell>
                                         <TableCell className="font-mono px-3 py-1 text-sm">{customer.srNo}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
@@ -591,6 +621,85 @@ const ReceiptPreview = ({ data, onPrint, settings }: { data: Customer; onPrint: 
     );
 };
 
+const ConsolidatedReceiptPreview = ({ data, onPrint, settings }: { data: ConsolidatedReceiptData; onPrint: () => void; settings: ReceiptSettings; }) => {
+    return (
+         <>
+            <DialogHeader className="p-4 pb-0">
+                <DialogTitle className="sr-only">Print Consolidated Receipt</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="max-h-[70vh]">
+                <div id="consolidated-receipt-content" className="p-4 text-black bg-white font-sans text-sm">
+                    <style>
+                        {`
+                          @media print {
+                            @page {
+                              size: A5;
+                              margin: 10mm;
+                            }
+                            body {
+                              -webkit-print-color-adjust: exact;
+                              print-color-adjust: exact;
+                            }
+                          }
+                        `}
+                    </style>
+                    <div className="text-center mb-4">
+                        <h1 className="text-xl font-bold">{settings.companyName}</h1>
+                        <p className="text-xs">{settings.address1}, {settings.address2}</p>
+                        <p className="text-xs">Contact: {settings.contactNo}</p>
+                    </div>
+                    <Separator className="my-2 bg-black"/>
+                    <div className="flex justify-between mb-2">
+                        <div>
+                            <p><span className="font-bold">Supplier:</span> {toTitleCase(data.supplier.name)}</p>
+                            <p><span className="font-bold">S/O:</span> {toTitleCase(data.supplier.so)}</p>
+                            <p><span className="font-bold">Address:</span> {toTitleCase(data.supplier.address)}</p>
+                        </div>
+                        <div>
+                            <p><span className="font-bold">Date:</span> {data.date}</p>
+                            <p><span className="font-bold">Contact:</span> {data.supplier.contact}</p>
+                        </div>
+                    </div>
+                    <Separator className="my-2 bg-black"/>
+                    <h2 className="text-center font-bold text-lg mb-2">Consolidated Purchase Slip</h2>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="h-auto p-1 border border-black text-black">SR No.</TableHead>
+                                <TableHead className="h-auto p-1 border border-black text-black">Variety</TableHead>
+                                <TableHead className="h-auto p-1 border border-black text-black text-right">Net Wt.</TableHead>
+                                <TableHead className="h-auto p-1 border border-black text-black text-right">Net Amt.</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {data.entries.map(entry => (
+                                <TableRow key={entry.id}>
+                                    <TableCell className="p-1 border border-black">{entry.srNo}</TableCell>
+                                    <TableCell className="p-1 border border-black">{toTitleCase(entry.variety)}</TableCell>
+                                    <TableCell className="p-1 border border-black text-right">{entry.netWeight.toFixed(2)}</TableCell>
+                                    <TableCell className="p-1 border border-black text-right">{formatCurrency(Number(entry.netAmount))}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow>
+                                <TableCell colSpan={3} className="text-right font-bold p-1 border border-black">Grand Total</TableCell>
+                                <TableCell className="text-right font-bold p-1 border border-black">{formatCurrency(data.totalAmount)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </div>
+            </ScrollArea>
+            <DialogFooter className="p-4 pt-0">
+                <Button variant="outline" onClick={onPrint}>
+                    <Printer className="mr-2 h-4 w-4" /> Print
+                </Button>
+            </DialogFooter>
+        </>
+    )
+};
+
+
 const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, onUpdate, onDelete }: any) => {
     const [editingOption, setEditingOption] = useState<{ id: string; name: string } | null>(null);
     const [newOptionName, setNewOptionName] = useState("");
@@ -694,6 +803,8 @@ export default function SupplierEntryClient() {
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [receiptData, setReceiptData] = useState<Customer | null>(null);
+  const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<string>>(new Set());
   const receiptRef = useRef<HTMLDivElement>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
 
@@ -1002,9 +1113,35 @@ export default function SupplierEntryClient() {
   const handlePrintReceipt = (customer: Customer) => {
     setReceiptData(customer);
   };
+
+  const handlePrintSelected = () => {
+    if (selectedSupplierIds.size === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select one or more entries to print.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const selectedEntries = customers.filter(c => selectedSupplierIds.has(c.id));
+    const firstSupplier = selectedEntries[0];
+    
+    const consolidatedData: ConsolidatedReceiptData = {
+        supplier: {
+            name: firstSupplier.name,
+            so: firstSupplier.so,
+            address: firstSupplier.address,
+            contact: firstSupplier.contact,
+        },
+        entries: selectedEntries,
+        totalAmount: selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0),
+        date: format(new Date(), 'dd-MMM-yyyy'),
+    };
+    setConsolidatedReceiptData(consolidatedData);
+  };
   
-  const handleActualPrint = () => {
-    const receiptNode = document.getElementById('receipt-content');
+  const handleActualPrint = (id: string) => {
+    const receiptNode = document.getElementById(id);
     if (!receiptNode) return;
 
     const iframe = document.createElement('iframe');
@@ -1155,7 +1292,22 @@ export default function SupplierEntryClient() {
         </form>
       </FormProvider>      
       
-      <SupplierTable customers={customers} onEdit={handleEdit} onDelete={handleDelete} onShowDetails={handleShowDetails} onPrint={handlePrintReceipt} />
+      <div className="flex justify-end mt-4">
+        <Button onClick={handlePrintSelected} disabled={selectedSupplierIds.size === 0}>
+            <Printer className="mr-2 h-4 w-4" />
+            Print Selected ({selectedSupplierIds.size})
+        </Button>
+      </div>
+
+      <SupplierTable 
+        customers={customers} 
+        onEdit={handleEdit} 
+        onDelete={handleDelete} 
+        onShowDetails={handleShowDetails} 
+        onPrint={handlePrintReceipt}
+        selectedIds={selectedSupplierIds}
+        onSelectionChange={setSelectedSupplierIds}
+      />
         
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
         <DialogContent className="max-w-4xl p-0">
@@ -1187,7 +1339,7 @@ export default function SupplierEntryClient() {
                 </div>
             </DialogHeader>
             <ScrollArea className="max-h-[85vh]">
-              <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-6">
+              <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
                 {activeLayout === 'classic' && (
                   <div className="space-y-4">
                     <Card>
@@ -1304,10 +1456,22 @@ export default function SupplierEntryClient() {
 
       <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
         <DialogContent className="sm:max-w-3xl">
-            {receiptData && receiptSettings && <ReceiptPreview data={receiptData} onPrint={handleActualPrint} settings={receiptSettings}/>}
+            {receiptData && receiptSettings && <ReceiptPreview data={receiptData} onPrint={() => handleActualPrint('receipt-content')} settings={receiptSettings}/>}
         </DialogContent>
       </Dialog>
       
+      <Dialog open={!!consolidatedReceiptData} onOpenChange={(open) => !open && setConsolidatedReceiptData(null)}>
+          <DialogContent className="sm:max-w-3xl">
+              {consolidatedReceiptData && receiptSettings && (
+                  <ConsolidatedReceiptPreview 
+                      data={consolidatedReceiptData} 
+                      onPrint={() => handleActualPrint('consolidated-receipt-content')} 
+                      settings={receiptSettings}
+                  />
+              )}
+          </DialogContent>
+      </Dialog>
+
       <Dialog open={isReceiptSettingsOpen} onOpenChange={setIsReceiptSettingsOpen}>
           <DialogContent className="max-w-3xl">
               <DialogHeader>

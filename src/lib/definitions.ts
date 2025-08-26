@@ -271,3 +271,16 @@ export type ReceiptSettings = {
     email: string;
     fields: ReceiptFieldSettings;
 };
+
+// New type for consolidated receipt data
+export type ConsolidatedReceiptData = {
+    supplier: {
+        name: string;
+        so: string;
+        address: string;
+        contact: string;
+    };
+    entries: Customer[];
+    totalAmount: number;
+    date: string;
+};
