@@ -457,7 +457,7 @@ const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete,
                                         <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
                                         <TableCell className="text-center px-3 py-1">
                                             <div className="flex justify-center items-center gap-0">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint(customer)}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([customer])}>
                                                     <Printer className="h-4 w-4" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(customer)}>
@@ -508,195 +508,105 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-const ReceiptPreview = ({ data, onPrint, settings }: { data: Customer; onPrint: () => void; settings: ReceiptSettings; }) => {
+const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptSettings; }) => {
     const { fields } = settings;
     return (
-        <>
-            <DialogHeader className="p-4 pb-0">
-                <DialogTitle className="sr-only">Print Receipt</DialogTitle>
-                <DialogDescription className="sr-only">
-                    Preview of the receipt for SR No: {data.srNo}.
-                </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[70vh]">
-                <div id="receipt-content" className="p-4 text-black bg-white font-sans">
-                    <style>
-                        {`
-                          @media print {
-                            @page {
-                              size: A6 landscape;
-                              margin: 5mm;
-                            }
-                            body {
-                              -webkit-print-color-adjust: exact;
-                              print-color-adjust: exact;
-                            }
-                          }
-                        `}
-                    </style>
-                    <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">INVOICE</div>
-                    
-                    <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
-                        <div>
-                            <div className="bg-red-200 text-center font-bold text-xl p-1 border border-black">
-                                {settings.companyName}
-                            </div>
-                            <div className="border-x border-b border-black p-1 text-sm">
-                                <p>{settings.address1}</p>
-                                <p>{settings.address2}</p>
-                                <p>CONTACT NO:- {settings.contactNo}</p>
-                                <p>EMAIL:- {settings.email}</p>
-                                <div className="h-10 mt-1 bg-gray-200 flex items-center justify-center">
-                                    <p className="text-xs text-gray-500">Barcode Placeholder</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div className="text-center font-bold text-xl p-1 border-t border-r border-black">JRM</div>
-                            <div className="border-x border-b border-t border-black p-1">
-                                <div className="text-center font-bold underline mb-2">CUSTOMER DETAIL</div>
-                                <table className="w-full text-sm">
-                                    <tbody>
-                                        {fields.date && <tr><td className="font-bold pr-2">DATE</td><td>{format(new Date(data.date), "dd-MMM-yy")}</td></tr>}
-                                        {fields.name && <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.name)}</td></tr>}
-                                        {fields.contact && <tr><td className="font-bold pr-2">CONTACT</td><td>{data.contact}</td></tr>}
-                                        {fields.address && <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.address)}</td></tr>}
-                                    </tbody>
-                                </table>
-                            </div>
+        <div className="text-black bg-white font-sans p-4">
+             <style>
+                {`
+                  @media print {
+                    @page {
+                      size: A6 landscape;
+                      margin: 5mm;
+                    }
+                    body {
+                      -webkit-print-color-adjust: exact;
+                      print-color-adjust: exact;
+                    }
+                    .receipt-container {
+                        page-break-after: always;
+                    }
+                  }
+                `}
+            </style>
+            <div className="text-center font-bold text-lg border-b-2 border-black pb-1 mb-2">INVOICE</div>
+            
+            <div className="grid grid-cols-2 gap-4 border-b-2 border-black pb-2 mb-2">
+                <div>
+                    <div className="bg-red-200 text-center font-bold text-xl p-1 border border-black">
+                        {settings.companyName}
+                    </div>
+                    <div className="border-x border-b border-black p-1 text-sm">
+                        <p>{settings.address1}</p>
+                        <p>{settings.address2}</p>
+                        <p>CONTACT NO:- {settings.contactNo}</p>
+                        <p>EMAIL:- {settings.email}</p>
+                        <div className="h-10 mt-1 bg-gray-200 flex items-center justify-center">
+                            <p className="text-xs text-gray-500">Barcode Placeholder</p>
                         </div>
                     </div>
+                </div>
 
-                    <table className="w-full border-collapse border border-black text-sm">
-                        <thead>
-                            <tr className="bg-orange-300 text-black font-bold">
-                                {fields.vehicleNo && <td className="border border-black p-1 text-center">VEHICLE</td>}
-                                {fields.term && <td className="border border-black p-1 text-center">TERM</td>}
-                                {fields.rate && <td className="border border-black p-1 text-center">RATE</td>}
-                                {fields.grossWeight && <td className="border border-black p-1 text-center">LOAD</td>}
-                                {fields.teirWeight && <td className="border border-black p-1 text-center">UNLOAD</td>}
-                                {fields.weight && <td className="border border-black p-1 text-center">QTY</td>}
-                                {fields.amount && <td className="border border-black p-1 text-center">AMOUNT</td>}
-                            </tr>
-                        </thead>
+                <div>
+                    <div className="text-center font-bold text-xl p-1 border-t border-r border-black">JRM</div>
+                    <div className="border-x border-b border-t border-black p-1">
+                        <div className="text-center font-bold underline mb-2">CUSTOMER DETAIL</div>
+                        <table className="w-full text-sm">
+                            <tbody>
+                                {fields.date && <tr><td className="font-bold pr-2">DATE</td><td>{format(new Date(data.date), "dd-MMM-yy")}</td></tr>}
+                                {fields.name && <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.name)}</td></tr>}
+                                {fields.contact && <tr><td className="font-bold pr-2">CONTACT</td><td>{data.contact}</td></tr>}
+                                {fields.address && <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.address)}</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <table className="w-full border-collapse border border-black text-sm">
+                <thead>
+                    <tr className="bg-orange-300 text-black font-bold">
+                        {fields.vehicleNo && <td className="border border-black p-1 text-center">VEHICLE</td>}
+                        {fields.term && <td className="border border-black p-1 text-center">TERM</td>}
+                        {fields.rate && <td className="border border-black p-1 text-center">RATE</td>}
+                        {fields.grossWeight && <td className="border border-black p-1 text-center">LOAD</td>}
+                        {fields.teirWeight && <td className="border border-black p-1 text-center">UNLOAD</td>}
+                        {fields.weight && <td className="border border-black p-1 text-center">QTY</td>}
+                        {fields.amount && <td className="border border-black p-1 text-center">AMOUNT</td>}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        {fields.vehicleNo && <td className="border border-black p-1">{data.vehicleNo.toUpperCase()}</td>}
+                        {fields.term && <td className="border border-black p-1 text-center">{data.term}</td>}
+                        {fields.rate && <td className="border border-black p-1 text-right">{data.rate.toFixed(2)}</td>}
+                        {fields.grossWeight && <td className="border border-black p-1 text-right">{data.grossWeight.toFixed(2)}</td>}
+                        {fields.teirWeight && <td className="border border-black p-1 text-right">{data.teirWeight.toFixed(2)}</td>}
+                        {fields.weight && <td className="border border-black p-1 text-right">{data.weight.toFixed(2)}</td>}
+                        {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(data.amount)}</td>}
+                    </tr>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <tr key={i}><td className="border border-black p-2 h-6" colSpan={Object.values(fields).filter(v => v).length - 4}></td></tr>
+                    ))}
+                </tbody>
+            </table>
+
+            <div className="flex justify-between items-end mt-2">
+                <div className="text-sm">
+                    <p className="mt-8 border-t border-black pt-1">Authorized Sign</p>
+                </div>
+                <div className="text-sm">
+                    <table className="w-full border-collapse">
                         <tbody>
-                            <tr>
-                                {fields.vehicleNo && <td className="border border-black p-1">{data.vehicleNo.toUpperCase()}</td>}
-                                {fields.term && <td className="border border-black p-1 text-center">{data.term}</td>}
-                                {fields.rate && <td className="border border-black p-1 text-right">{data.rate.toFixed(2)}</td>}
-                                {fields.grossWeight && <td className="border border-black p-1 text-right">{data.grossWeight.toFixed(2)}</td>}
-                                {fields.teirWeight && <td className="border border-black p-1 text-right">{data.teirWeight.toFixed(2)}</td>}
-                                {fields.weight && <td className="border border-black p-1 text-right">{data.weight.toFixed(2)}</td>}
-                                {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(data.amount)}</td>}
-                            </tr>
-                            {Array.from({ length: 4 }).map((_, i) => (
-                                <tr key={i}><td className="border border-black p-2 h-6" colSpan={Object.values(fields).filter(v => v).length - 4}></td></tr>
-                            ))}
+                            {fields.dueDate && <tr><td className="font-bold border border-black p-1">DUE DATE</td><td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td></tr>}
+                            {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td></tr>}
+                            {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(data.netAmount)}</td></tr>}
                         </tbody>
                     </table>
-
-                    <div className="flex justify-between items-end mt-2">
-                        <div className="text-sm">
-                            <p className="mt-8 border-t border-black pt-1">Authorized Sign</p>
-                        </div>
-                        <div className="text-sm">
-                            <table className="w-full border-collapse">
-                                <tbody>
-                                    {fields.dueDate && <tr><td className="font-bold border border-black p-1">DUE DATE</td><td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td></tr>}
-                                    {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td></tr>}
-                                    {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(data.netAmount)}</td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
-            </ScrollArea>
-            <DialogFooter className="p-4 pt-0">
-                <Button variant="outline" onClick={onPrint}>
-                    <Printer className="mr-2 h-4 w-4" /> Print
-                </Button>
-            </DialogFooter>
-        </>
+            </div>
+        </div>
     );
-};
-
-const ConsolidatedReceiptPreview = ({ data, onPrint, settings }: { data: ConsolidatedReceiptData; onPrint: () => void; settings: ReceiptSettings; }) => {
-    return (
-         <>
-            <DialogHeader className="p-4 pb-0">
-                <DialogTitle className="sr-only">Print Consolidated Receipt</DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="max-h-[70vh]">
-                <div id="consolidated-receipt-content" className="p-4 text-black bg-white font-sans text-sm">
-                    <style>
-                        {`
-                          @media print {
-                            @page {
-                              size: A5;
-                              margin: 10mm;
-                            }
-                            body {
-                              -webkit-print-color-adjust: exact;
-                              print-color-adjust: exact;
-                            }
-                          }
-                        `}
-                    </style>
-                    <div className="text-center mb-4">
-                        <h1 className="text-xl font-bold">{settings.companyName}</h1>
-                        <p className="text-xs">{settings.address1}, {settings.address2}</p>
-                        <p className="text-xs">Contact: {settings.contactNo}</p>
-                    </div>
-                    <Separator className="my-2 bg-black"/>
-                    <div className="flex justify-between mb-2">
-                        <div>
-                            <p><span className="font-bold">Supplier:</span> {toTitleCase(data.supplier.name)}</p>
-                            <p><span className="font-bold">S/O:</span> {toTitleCase(data.supplier.so)}</p>
-                            <p><span className="font-bold">Address:</span> {toTitleCase(data.supplier.address)}</p>
-                        </div>
-                        <div>
-                            <p><span className="font-bold">Date:</span> {data.date}</p>
-                            <p><span className="font-bold">Contact:</span> {data.supplier.contact}</p>
-                        </div>
-                    </div>
-                    <Separator className="my-2 bg-black"/>
-                    <h2 className="text-center font-bold text-lg mb-2">Consolidated Purchase Slip</h2>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="h-auto p-1 border border-black text-black">SR No.</TableHead>
-                                <TableHead className="h-auto p-1 border border-black text-black">Variety</TableHead>
-                                <TableHead className="h-auto p-1 border border-black text-black text-right">Net Wt.</TableHead>
-                                <TableHead className="h-auto p-1 border border-black text-black text-right">Net Amt.</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {data.entries.map(entry => (
-                                <TableRow key={entry.id}>
-                                    <TableCell className="p-1 border border-black">{entry.srNo}</TableCell>
-                                    <TableCell className="p-1 border border-black">{toTitleCase(entry.variety)}</TableCell>
-                                    <TableCell className="p-1 border border-black text-right">{entry.netWeight.toFixed(2)}</TableCell>
-                                    <TableCell className="p-1 border border-black text-right">{formatCurrency(Number(entry.netAmount))}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFooter>
-                            <TableRow>
-                                <TableCell colSpan={3} className="text-right font-bold p-1 border border-black">Grand Total</TableCell>
-                                <TableCell className="text-right font-bold p-1 border border-black">{formatCurrency(data.totalAmount)}</TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </div>
-            </ScrollArea>
-            <DialogFooter className="p-4 pt-0">
-                <Button variant="outline" onClick={onPrint}>
-                    <Printer className="mr-2 h-4 w-4" /> Print
-                </Button>
-            </DialogFooter>
-        </>
-    )
 };
 
 
@@ -802,8 +712,7 @@ export default function SupplierEntryClient() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
-  const [receiptData, setReceiptData] = useState<Customer | null>(null);
-  const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
+  const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<string>>(new Set());
   const receiptRef = useRef<HTMLDivElement>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
@@ -1110,12 +1019,8 @@ export default function SupplierEntryClient() {
     );
   }, [detailsCustomer, paymentHistory]);
 
-  const handlePrintReceipt = (customer: Customer) => {
-    setReceiptData(customer);
-  };
-
-  const handlePrintSelected = () => {
-    if (selectedSupplierIds.size === 0) {
+  const handlePrint = (entriesToPrint: Customer[]) => {
+    if (!entriesToPrint || entriesToPrint.length === 0) {
       toast({
         title: "No Selection",
         description: "Please select one or more entries to print.",
@@ -1123,21 +1028,7 @@ export default function SupplierEntryClient() {
       });
       return;
     }
-    const selectedEntries = customers.filter(c => selectedSupplierIds.has(c.id));
-    const firstSupplier = selectedEntries[0];
-    
-    const consolidatedData: ConsolidatedReceiptData = {
-        supplier: {
-            name: firstSupplier.name,
-            so: firstSupplier.so,
-            address: firstSupplier.address,
-            contact: firstSupplier.contact,
-        },
-        entries: selectedEntries,
-        totalAmount: selectedEntries.reduce((sum, entry) => sum + Number(entry.netAmount), 0),
-        date: format(new Date(), 'dd-MMM-yyyy'),
-    };
-    setConsolidatedReceiptData(consolidatedData);
+    setReceiptsToPrint(entriesToPrint);
   };
   
   const handleActualPrint = (id: string) => {
@@ -1163,7 +1054,7 @@ export default function SupplierEntryClient() {
             const style = iframeDoc.createElement('style');
             const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
             style.appendChild(iframeDoc.createTextNode(cssText));
-            style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
+            style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .receipt-container { page-break-after: always; }'));
             iframeDoc.head.appendChild(style);
         } catch (e) {
             console.warn("Could not copy stylesheet:", e);
@@ -1293,7 +1184,7 @@ export default function SupplierEntryClient() {
       </FormProvider>      
       
       <div className="flex justify-end mt-4">
-        <Button onClick={handlePrintSelected} disabled={selectedSupplierIds.size === 0}>
+        <Button onClick={() => handlePrint(customers.filter(c => selectedSupplierIds.has(c.id)))} disabled={selectedSupplierIds.size === 0}>
             <Printer className="mr-2 h-4 w-4" />
             Print Selected ({selectedSupplierIds.size})
         </Button>
@@ -1304,7 +1195,7 @@ export default function SupplierEntryClient() {
         onEdit={handleEdit} 
         onDelete={handleDelete} 
         onShowDetails={handleShowDetails} 
-        onPrint={handlePrintReceipt}
+        onPrint={handlePrint}
         selectedIds={selectedSupplierIds}
         onSelectionChange={setSelectedSupplierIds}
       />
@@ -1454,22 +1345,26 @@ export default function SupplierEntryClient() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
+      <Dialog open={receiptsToPrint.length > 0} onOpenChange={(open) => !open && setReceiptsToPrint([])}>
         <DialogContent className="sm:max-w-3xl">
-            {receiptData && receiptSettings && <ReceiptPreview data={receiptData} onPrint={() => handleActualPrint('receipt-content')} settings={receiptSettings}/>}
+            <DialogHeader className="p-4 pb-0">
+                <DialogTitle className="sr-only">Print Receipts</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="max-h-[70vh]">
+                <div id="receipt-content">
+                    {receiptsToPrint.map((receiptData, index) => (
+                        <div key={index} className="receipt-container">
+                            {receiptSettings && <ReceiptPreview data={receiptData} settings={receiptSettings}/>}
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+             <DialogFooter className="p-4 pt-0">
+                <Button variant="outline" onClick={() => handleActualPrint('receipt-content')}>
+                    <Printer className="mr-2 h-4 w-4" /> Print All
+                </Button>
+            </DialogFooter>
         </DialogContent>
-      </Dialog>
-      
-      <Dialog open={!!consolidatedReceiptData} onOpenChange={(open) => !open && setConsolidatedReceiptData(null)}>
-          <DialogContent className="sm:max-w-3xl">
-              {consolidatedReceiptData && receiptSettings && (
-                  <ConsolidatedReceiptPreview 
-                      data={consolidatedReceiptData} 
-                      onPrint={() => handleActualPrint('consolidated-receipt-content')} 
-                      settings={receiptSettings}
-                  />
-              )}
-          </DialogContent>
       </Dialog>
 
       <Dialog open={isReceiptSettingsOpen} onOpenChange={setIsReceiptSettingsOpen}>
