@@ -990,10 +990,10 @@ export default function SupplierPaymentsPage() {
                 </div>
                 {selectedCustomerKey && (
                      <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0">
-                        <div className="flex items-center gap-2">
-                           <p className="text-muted-foreground text-xs font-medium whitespace-nowrap">Total Outstanding:</p>
-                           <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
-                        </div>
+                         <div className="flex items-center gap-2">
+                             <p className="text-xs text-muted-foreground font-medium">Total Outstanding:</p>
+                             <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                         </div>
                         <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">
                             Change
                         </Button>
@@ -1057,7 +1057,14 @@ export default function SupplierPaymentsPage() {
       {selectedCustomerKey && (
         <div onKeyDown={handleKeyDown}>
           <Card>
-            <CardContent className="p-3">
+            <CardHeader className="p-3">
+              <CardTitle className="flex items-center gap-2">
+                <p className="text-sm font-semibold">Selected: {selectedEntryIds.size} entries</p>
+                <Separator orientation="vertical" className="h-4"/>
+                <p className="text-sm text-muted-foreground">Total: <span className="font-semibold text-foreground">{formatCurrency(totalOutstandingForSelected)}</span></p>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
               <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 h-9">
                   <TabsTrigger value="Cash">Cash</TabsTrigger>
@@ -1125,29 +1132,26 @@ export default function SupplierPaymentsPage() {
                 </div>
 
                 <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
-                     <Card className="p-2">
-                         <CardHeader className="p-1 pb-1 flex-row items-center justify-between">
-                           <CardTitle className="text-xs font-semibold">RTGS Generator</CardTitle>
-                            <div className="flex items-center space-x-2">
-                               <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
-                               <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
-                           </div>
-                        </CardHeader>
-                        <CardContent className="p-1 pt-0 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-                           <div className="space-y-1">
-                              <Label htmlFor="minRate" className="text-xs">Min Rate</Label>
-                              <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs"/>
-                           </div>
-                           <div className="space-y-1">
-                              <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
-                              <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs"/>
-                           </div>
-                           <Button onClick={generatePaymentCombinations} size="sm" className="w-full md:w-auto h-8 text-xs">
+                    <Card className="p-2">
+                      <CardContent className="p-1 pt-0 flex flex-wrap items-center gap-x-4 gap-y-2">
+                          <div className="flex items-center space-x-2">
+                              <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
+                              <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <Label htmlFor="minRate" className="text-xs whitespace-nowrap">Min Rate</Label>
+                              <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <Label htmlFor="maxRate" className="text-xs whitespace-nowrap">Max Rate</Label>
+                              <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                          </div>
+                          <Button onClick={generatePaymentCombinations} size="sm" className="h-8 text-xs flex-grow sm:flex-grow-0">
                               <Calculator className="h-3 w-3 mr-1"/>
                               Generate for {formatCurrency(targetAmountForGenerator)}
-                           </Button>
-                        </CardContent>
-                     </Card>
+                          </Button>
+                      </CardContent>
+                    </Card>
                      
                      <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
                         <DialogContent className="max-w-3xl">
@@ -1277,8 +1281,8 @@ export default function SupplierPaymentsPage() {
                 <Card className="bg-muted/30 w-full p-2">
                      <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Amount:</span>
-                            <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
+                           <span className="text-xs text-muted-foreground">To Pay:</span>
+                           <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
                         </div>
                         {cdEnabled && (
                             <div className="flex items-center gap-2">
@@ -1288,7 +1292,7 @@ export default function SupplierPaymentsPage() {
                         )}
                         <div className="flex items-center gap-2">
                              <Separator orientation="vertical" className="h-5" />
-                             <span className="text-sm font-semibold">Total:</span>
+                             <span className="text-sm font-medium text-muted-foreground">Total:</span>
                              <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
                         </div>
                         <div className="flex-grow"></div>
