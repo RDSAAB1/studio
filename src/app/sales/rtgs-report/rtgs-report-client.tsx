@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Payment, RtgsSettings } from '@/lib/definitions';
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
-import { Loader2, Edit, Save, X, Building, Landmark } from 'lucide-react';
+import { Loader2, Edit, Save, X, Building, Landmark, Printer } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +65,7 @@ export default function RtgsReportClient() {
     const [isEditing, setIsEditing] = useState(false);
     const [tempSettings, setTempSettings] = useState<RtgsSettings>(initialSettings);
     const { toast } = useToast();
+    const tableRef = useRef<HTMLTableElement>(null);
 
     // State for search filters
     const [searchSrNo, setSearchSrNo] = useState('');
@@ -117,9 +118,7 @@ export default function RtgsReportClient() {
                 };
             });
 
-            // Initial sort before any filtering
             newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
             setReportRows(newReportRows);
             setLoading(false);
         }, (error) => {
@@ -132,7 +131,6 @@ export default function RtgsReportClient() {
 
     const handleEditToggle = () => {
         if (isEditing) {
-            // Cancel editing
             setTempSettings(settings);
         }
         setIsEditing(!isEditing);
@@ -155,44 +153,74 @@ export default function RtgsReportClient() {
         setTempSettings(prev => ({ ...prev, [name]: value }));
     };
 
-    // Filter report rows based on search criteria
     const filteredReportRows = useMemo(() => {
         let filtered = reportRows;
 
         if (searchSrNo) {
             filtered = filtered.filter(row => row.srNo.toLowerCase().includes(searchSrNo.toLowerCase()));
         }
-
         if (searchCheckNo) {
             filtered = filtered.filter(row => row.checkNo.toLowerCase().includes(searchCheckNo.toLowerCase()));
         }
-
         if (startDate && endDate) {
             const start = new Date(startDate);
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999); // Include whole end day
-            filtered = filtered.filter(row => {
-                const rowDate = new Date(row.date);
-                return rowDate >= start && rowDate <= end;
-            });
-        } else if (startDate) { // If only start date is provided, filter from that date onwards
-            const start = new Date(startDate);
-            filtered = filtered.filter(row => {
-                const rowDate = new Date(row.date);
-                return rowDate >= start;
-            });
-        } else if (endDate) { // If only end date is provided, filter up to that date
             const end = new Date(endDate);
             end.setHours(23, 59, 59, 999);
             filtered = filtered.filter(row => {
                 const rowDate = new Date(row.date);
-                return rowDate <= end;
+                return rowDate >= start && rowDate <= end;
             });
+        } else if (startDate) {
+            const start = new Date(startDate);
+            filtered = filtered.filter(row => new Date(row.date) >= start);
+        } else if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(row => new Date(row.date) <= end);
         }
-
-        // Always sort by date (descending) after all filters
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, startDate, endDate]);
+
+    const handlePrint = () => {
+        const tableNode = tableRef.current;
+        if (!tableNode) return;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not open print window. Please disable pop-up blockers.' });
+            return;
+        }
+        
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>RTGS Report</title>
+                    <style>
+                        @media print {
+                            @page { size: landscape; margin: 20px; }
+                            body { font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+                            th, td { border: 1px solid #ddd; padding: 4px; text-align: left; }
+                            th { background-color: #f2f2f2 !important; }
+                            h2 { text-align: center; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2>${toTitleCase(settings.companyName)} - RTGS Report</h2>
+                    <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+                    <table>${tableNode.innerHTML}</table>
+                </body>
+            </html>
+        `);
+        
+        printWindow.document.close();
+        setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        }, 250);
+    };
 
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
@@ -201,61 +229,60 @@ export default function RtgsReportClient() {
     return (
         <div className="space-y-6">
             <Card>
-                    <CardHeader className="flex flex-row items-start justify-between">
-                        {isEditing ? (
-                            <div className="flex-1 mr-4">
-                                <CardTitle>Edit Details</CardTitle>
-                                <CardDescription>Update your company and bank information here.</CardDescription>
-                            </div>
-                        ) : (
-                            <div className="flex-1">
-                                <h2 className="text-lg font-semibold">{settings.companyName}</h2>
-                                <p className="text-sm text-muted-foreground">{`${settings.companyAddress1}, ${settings.companyAddress2}`}</p>
-                                <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
-                                    <p>{settings.contactNo}</p>
-                                    <p>{settings.gmail}</p>
-                                    <p>{settings.bankName}</p>
-                                    <p>A/C: {settings.accountNo}</p>
-                                    <p>IFSC: {settings.ifscCode} | Branch: {settings.branchName}</p>
-                                </div>
-                            </div>
-                        )}
-                        <div className="flex gap-2">
-                            {isEditing ? (
-                                <>
-                                    <Button onClick={handleSave} size="sm"><Save className="mr-2 h-4 w-4"/>Save</Button>
-                                    <Button onClick={handleEditToggle} size="sm" variant="outline"><X className="mr-2 h-4 w-4"/>Cancel</Button>
-                                </>
-                            ) : (
-                                <Button onClick={handleEditToggle} size="sm"><Edit className="mr-2 h-4 w-4"/>Edit Details</Button>
-                            )}
+                <CardHeader className="flex flex-row items-start justify-between">
+                    {isEditing ? (
+                        <div className="flex-1 mr-4">
+                            <CardTitle>Edit Details</CardTitle>
+                            <CardDescription>Update your company and bank information here.</CardDescription>
                         </div>
-                    </CardHeader>
-                    {isEditing && (
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                                <div className="space-y-1"><Label>Company Name</Label><Input name="companyName" value={tempSettings.companyName} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>Address Line 1</Label><Input name="companyAddress1" value={tempSettings.companyAddress1} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>Address Line 2</Label><Input name="companyAddress2" value={tempSettings.companyAddress2} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>Bank Name</Label><Input name="bankName" value={tempSettings.bankName} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>IFSC Code</Label><Input name="ifscCode" value={tempSettings.ifscCode} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>Branch Name</Label><Input name="branchName" value={tempSettings.branchName} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>Account No.</Label><Input name="accountNo" value={tempSettings.accountNo} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>Contact No.</Label><Input name="contactNo" value={tempSettings.contactNo} onChange={handleInputChange} /></div>
-                                <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
+                    ) : (
+                        <div className="flex-1">
+                            <h2 className="text-lg font-semibold">{settings.companyName}</h2>
+                            <p className="text-sm text-muted-foreground">{`${settings.companyAddress1}, ${settings.companyAddress2}`}</p>
+                            <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
+                                <p>{settings.contactNo}</p>
+                                <p>{settings.gmail}</p>
+                                <p>{settings.bankName}</p>
+                                <p>A/C: {settings.accountNo}</p>
+                                <p>IFSC: {settings.ifscCode} | Branch: {settings.branchName}</p>
                             </div>
-                        </CardContent>
+                        </div>
                     )}
+                    <div className="flex gap-2">
+                        {isEditing ? (
+                            <>
+                                <Button onClick={handleSave} size="sm"><Save className="mr-2 h-4 w-4"/>Save</Button>
+                                <Button onClick={handleEditToggle} size="sm" variant="outline"><X className="mr-2 h-4 w-4"/>Cancel</Button>
+                            </>
+                        ) : (
+                            <Button onClick={handleEditToggle} size="sm"><Edit className="mr-2 h-4 w-4"/>Edit Details</Button>
+                        )}
+                    </div>
+                </CardHeader>
+                {isEditing && (
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                            <div className="space-y-1"><Label>Company Name</Label><Input name="companyName" value={tempSettings.companyName} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Address Line 1</Label><Input name="companyAddress1" value={tempSettings.companyAddress1} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Address Line 2</Label><Input name="companyAddress2" value={tempSettings.companyAddress2} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Bank Name</Label><Input name="bankName" value={tempSettings.bankName} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>IFSC Code</Label><Input name="ifscCode" value={tempSettings.ifscCode} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Branch Name</Label><Input name="branchName" value={tempSettings.branchName} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Account No.</Label><Input name="accountNo" value={tempSettings.accountNo} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Contact No.</Label><Input name="contactNo" value={tempSettings.contactNo} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
+                        </div>
+                    </CardContent>
+                )}
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Filter RTGS Reports</CardTitle> {/* New CardTitle for filter section */}
-                    <CardDescription>Use the fields below to search and filter payments.</CardDescription> {/* New CardDescription */}
+                    <CardTitle>Filter RTGS Reports</CardTitle>
+                    <CardDescription>Use the fields below to search and filter payments.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {/* Filter Inputs moved here */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"> {/* Removed mb-6 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="space-y-1">
                             <Label htmlFor="searchSrNo">Search SR No.</Label>
                             <Input
@@ -294,21 +321,28 @@ export default function RtgsReportClient() {
                         </div>
                     </div>
                 </CardContent>
-            </Card> {/* End of new filter Card */}
+            </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>RTGS Payment Report</CardTitle>
-                    <CardDescription>A detailed report of all payments made via RTGS.</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>RTGS Payment Report</CardTitle>
+                        <CardDescription>A detailed report of all payments made via RTGS.</CardDescription>
+                    </div>
+                    {filteredReportRows.length > 0 && (
+                        <Button onClick={handlePrint} size="sm" variant="outline">
+                            <Printer className="mr-2 h-4 w-4" /> Print Report
+                        </Button>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <div className="relative w-full overflow-auto">
-                        <Table className="min-w-[1200px]">
+                        <Table ref={tableRef} className="min-w-[1200px]">
                             <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
                                     <TableHead className="w-[100px]">Date</TableHead>
                                     <TableHead className="w-[80px]">SR No.</TableHead>
-                                    <TableHead className className="w-[150px]">Name</TableHead>
+                                    <TableHead className="w-[150px]">Name</TableHead>
                                     <TableHead className="w-[150px]">Father's Name</TableHead>
                                     <TableHead className="w-[120px]">Mobile No.</TableHead>
                                     <TableHead className="w-[150px]">A/C No.</TableHead>
