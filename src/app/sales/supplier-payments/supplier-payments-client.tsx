@@ -230,10 +230,10 @@ export default function SupplierPaymentsPage() {
   }, [detailsSupplierEntry, paymentHistory]);
 
   const currentPaymentHistory = useMemo(() => {
-    if (!selectedCustomerKey) return [];
-    const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
+    if (!selectedCustomerKey && rtgsFor !== 'Outsider') return [];
+    const customerPayments = paymentHistory.filter(p => (rtgsFor === 'Outsider' && p.customerId === 'OUTSIDER') || p.customerId === selectedCustomerKey);
     return customerPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [paymentHistory, selectedCustomerKey]);
+  }, [paymentHistory, selectedCustomerKey, rtgsFor]);
   
   const availableCdOptions = useMemo(() => {
     if (paymentType === 'Partial') {
@@ -1073,16 +1073,41 @@ export default function SupplierPaymentsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                <TabsTrigger value="history" disabled={rtgsFor === 'Outsider'}>Full History</TabsTrigger>
+                <TabsTrigger value="history">Full History</TabsTrigger>
             </TabsList>
             <TabsContent value="processing">
                 <div onKeyDown={handleKeyDown}>
                     <Card>
                         <CardContent className="p-3">
+                            <Card className="mt-2 p-2">
+                                <CardHeader className="p-1 pb-2">
+                                <CardTitle className="text-sm">Supplier/Payee Details</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Name</Label>
+                                        <Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, name: toTitleCase(e.target.value)})} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">{rtgsFor === 'Outsider' ? 'Company Name' : "Father's Name"}</Label>
+                                        <Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, fatherName: toTitleCase(e.target.value)})} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Address</Label>
+                                        <Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, address: toTitleCase(e.target.value)})} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Contact</Label>
+                                        <Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" disabled={rtgsFor === 'Supplier'}/>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            
                             <div className="mt-2 space-y-2">
                                 <Card className="bg-muted/30 p-2">
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end">
-                                    {rtgsFor === 'Supplier' &&
+                                    {rtgsFor === 'Supplier' && (
+                                    <>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Payment ID</Label>
                                             <Input
@@ -1092,9 +1117,6 @@ export default function SupplierPaymentsPage() {
                                                 onBlur={handlePaymentIdBlur}
                                                 className="h-8 text-xs font-mono" />
                                         </div>
-                                    }
-                                    {rtgsFor === 'Supplier' && (
-                                    <>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Payment Type</Label>
                                             <Select value={paymentType} onValueChange={setPaymentType}>
@@ -1141,30 +1163,6 @@ export default function SupplierPaymentsPage() {
                                 </div>
                             </Card>
                             </div>
-                            
-                            <Card className="mt-2 p-2">
-                                <CardHeader className="p-1 pb-2">
-                                <CardTitle className="text-sm">Supplier/Payee Details</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Name</Label>
-                                        <Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, name: toTitleCase(e.target.value)})} className="h-8 text-xs" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Father's Name</Label>
-                                        <Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, fatherName: toTitleCase(e.target.value)})} className="h-8 text-xs" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Address</Label>
-                                        <Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, address: toTitleCase(e.target.value)})} className="h-8 text-xs" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Contact</Label>
-                                        <Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" disabled={rtgsFor === 'Supplier'}/>
-                                    </div>
-                                </CardContent>
-                            </Card>
 
                             {paymentMethod === 'RTGS' && (
                                 <div className="mt-2 border-t pt-2 space-y-2">
@@ -1305,10 +1303,13 @@ export default function SupplierPaymentsPage() {
                                     </div>
                                     <div className="p-2 border rounded-lg space-y-2">
                                         <div className="grid grid-cols-2 gap-2 items-end">
-                                            {rtgsFor === 'Outsider' &&
-                                                <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/></div>
+                                            {rtgsFor === 'Outsider' ?
+                                                <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/></div> :
+                                                null
                                             }
-                                            <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                            {rtgsFor === 'Outsider' &&
+                                                <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                            }
                                             <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
                                             <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
                                         </div>
