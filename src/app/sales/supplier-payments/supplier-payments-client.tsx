@@ -1023,10 +1023,7 @@ export default function SupplierPaymentsPage() {
             </TabsList>
             <TabsContent value="processing">
               <Card>
-                <CardHeader>
-                    <CardTitle className="text-base">Payment Processing</CardTitle>
-                </CardHeader>
-                <CardContent onKeyDown={handleKeyDown}>
+                <CardContent onKeyDown={handleKeyDown} className="pt-6">
                     {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
                         <Card>
                             <CardContent className="p-3">
