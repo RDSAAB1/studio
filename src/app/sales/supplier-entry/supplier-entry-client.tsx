@@ -394,7 +394,7 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
           { label: "Due Date", value: dueDate }, { label: "Weight", value: currentCustomer.weight },
           { label: "Karta Weight", value: currentCustomer.kartaWeight }, { label: "Karta Amount", value: formatCurrency(currentCustomer.kartaAmount) },
           { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Laboury Amount", value: formatCurrency(currentCustomer.labouryAmount) },
-          { label: "Amount", value: formatCurrency(currentCustomer.amount) }, { label: "Net Amount", value: formatCurrency(currentCustomer.netAmount), isBold: true },
+          { label: "Amount", value: formatCurrency(currentCustomer.amount) }, { label: "Net Amount", value: formatCurrency(Number(currentCustomer.netAmount)), isBold: true },
         ];
       }, [currentCustomer]);
 
@@ -614,7 +614,7 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
                         <tbody>
                             {fields.dueDate && <tr><td className="font-bold border border-black p-1">DUE DATE</td><td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td></tr>}
                             {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td></tr>}
-                            {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(data.netAmount)}</td></tr>}
+                            {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(Number(data.netAmount))}</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -716,7 +716,7 @@ const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedRece
                             {fields.netWeight && <td className="border border-black p-1 text-right">{entry.netWeight.toFixed(2)}</td>}
                             {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(entry.amount)}</td>}
                             {fields.dueDate && <td className="border border-black p-1 text-center">{format(new Date(entry.dueDate), "dd-MMM-yy")}</td>}
-                            {fields.netAmount && <td className="border border-black p-1 text-right font-semibold">{formatCurrency(entry.netAmount)}</td>}
+                            {fields.netAmount && <td className="border border-black p-1 text-right font-semibold">{formatCurrency(Number(entry.netAmount))}</td>}
                         </tr>
                     ))}
                 </tbody>
@@ -976,7 +976,18 @@ export default function SupplierEntryClient() {
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
     const otherCharges = values.otherCharges || 0;
-    const netAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges;
+    
+    // Calculate total paid amount for the current entry if editing
+    const totalPaidForThisEntry = paymentHistory
+      .filter(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo))
+      .reduce((sum, p) => {
+        const paidForDetail = p.paidFor?.find(pf => pf.srNo === currentCustomer.srNo);
+        return sum + (paidForDetail?.amount || 0) + (p.cdAmount && paidForDetail?.cdApplied ? p.cdAmount : 0);
+      }, 0);
+
+    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges;
+    const netAmount = originalNetAmount - totalPaidForThisEntry;
+
     setCurrentCustomer(prev => ({
       ...prev, ...values,
       date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
@@ -984,10 +995,11 @@ export default function SupplierEntryClient() {
       weight: parseFloat(weight.toFixed(2)), kartaWeight: parseFloat(kartaWeight.toFixed(2)),
       kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
       amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
-      kanta: parseFloat(kanta.toFixed(2)), otherCharges: parseFloat(otherCharges.toFixed(2)), netAmount: parseFloat(netAmount.toFixed(2)),
-      originalNetAmount: parseFloat(netAmount.toFixed(2)),
+      kanta: parseFloat(kanta.toFixed(2)), otherCharges: parseFloat(otherCharges.toFixed(2)), 
+      originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
+      netAmount: parseFloat(netAmount.toFixed(2)),
     }));
-  }, [form]);
+  }, [form, paymentHistory, currentCustomer.srNo]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -1037,7 +1049,6 @@ export default function SupplierEntryClient() {
     const customerToEdit = safeCustomers.find(c => c.id === id);
     if (customerToEdit) {
       setIsEditing(true);
-      setCurrentCustomer(customerToEdit);
       resetFormToState(customerToEdit);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -1052,7 +1063,6 @@ export default function SupplierEntryClient() {
     const foundCustomer = safeCustomers.find(c => c.srNo === formattedSrNo);
     if (foundCustomer) {
         setIsEditing(true);
-        setCurrentCustomer(foundCustomer);
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
@@ -1110,8 +1120,10 @@ export default function SupplierEntryClient() {
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
       ...currentCustomer, ...values,
+      netAmount: currentCustomer.netAmount,
+      originalNetAmount: currentCustomer.originalNetAmount,
       name: toTitleCase(values.name), so: toTitleCase(values.so),
-      weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges, netAmount: currentCustomer.netAmount, originalNetAmount: currentCustomer.originalNetAmount,
+      weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges,
       address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
       variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
       term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
@@ -1494,8 +1506,13 @@ export default function SupplierEntryClient() {
 
                     <Card className="border-primary/50 bg-primary/5 text-center">
                          <CardContent className="p-3">
-                            <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
-                            <p className="text-3xl font-bold text-primary font-mono">
+                            <p className="text-sm text-primary/80 font-medium">Original Total</p>
+                            <p className="text-2xl font-bold text-primary/90 font-mono">
+                                {formatCurrency(Number(detailsCustomer.originalNetAmount))}
+                            </p>
+                            <Separator className="my-2"/>
+                            <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
+                            <p className="text-3xl font-bold text-destructive font-mono">
                                 {formatCurrency(Number(detailsCustomer.netAmount))}
                             </p>
                          </CardContent>
