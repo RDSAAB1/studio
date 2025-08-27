@@ -984,7 +984,8 @@ export default function SupplierEntryClient() {
       .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
       .reduce((sum, p) => {
         const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-        return sum + (paidForDetail?.amount || 0) + (p.cdAmount && paidForDetail?.cdApplied ? p.cdAmount : 0);
+        // Correctly sum only the amount paid, not the CD amount
+        return sum + (paidForDetail?.amount || 0);
       }, 0);
       
     const netAmount = originalNetAmount - totalPaidForThisEntry;
