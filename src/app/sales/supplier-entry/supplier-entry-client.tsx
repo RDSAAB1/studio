@@ -978,18 +978,15 @@ export default function SupplierEntryClient() {
     const kanta = values.kanta || 0;
     const otherCharges = values.otherCharges || 0;
     
-    // Calculate the original net amount before any payments
     const originalNetAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges;
 
-    // Calculate total paid for this specific entry (SR No.) from the payment history
     const totalPaidForThisEntry = paymentHistory
-      .filter(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo))
+      .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
       .reduce((sum, p) => {
-        const paidForDetail = p.paidFor?.find(pf => pf.srNo === currentCustomer.srNo);
+        const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
         return sum + (paidForDetail?.amount || 0) + (p.cdAmount && paidForDetail?.cdApplied ? p.cdAmount : 0);
       }, 0);
-
-    // The current net amount is the original amount minus what has been paid
+      
     const netAmount = originalNetAmount - totalPaidForThisEntry;
 
     setCurrentCustomer(prev => ({
@@ -1003,7 +1000,7 @@ export default function SupplierEntryClient() {
       originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
       netAmount: parseFloat(netAmount.toFixed(2)),
     }));
-  }, [form, paymentHistory, currentCustomer.srNo]);
+  }, [form, paymentHistory]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
