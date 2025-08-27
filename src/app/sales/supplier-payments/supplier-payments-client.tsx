@@ -209,7 +209,6 @@ export default function SupplierPaymentsPage() {
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    // Enable CD if at least one selected entry's due date is in the future
     const isAnyDueInFuture = selectedEntries.some(e => new Date(e.dueDate) > today);
     setCdEnabled(isAnyDueInFuture);
   }, [selectedEntries]);
@@ -291,7 +290,6 @@ export default function SupplierPaymentsPage() {
 
     return combinedBankBranches.filter(branch => {
         const branchBankNameLower = branch.bankName.toLowerCase();
-        // Check if branch's bank name matches either the short or long form of the selected bank
         return branchBankNameLower === shortName || (longName && branchBankNameLower === longName);
     });
 }, [bankDetails.bank, combinedBankBranches]);
@@ -347,7 +345,6 @@ export default function SupplierPaymentsPage() {
       }
     });
 
-    // Load persisted rates
     const savedMinRate = localStorage.getItem('minRate');
     const savedMaxRate = localStorage.getItem('maxRate');
     if (savedMinRate) setMinRate(Number(savedMinRate));
@@ -363,7 +360,6 @@ export default function SupplierPaymentsPage() {
     };
   }, [isClient, editingPayment, stableToast, getNextPaymentId]);
   
-    // Persist Min/Max Rate
   useEffect(() => {
     if (isClient) {
         localStorage.setItem('minRate', String(minRate));
@@ -388,51 +384,49 @@ export default function SupplierPaymentsPage() {
   
   useEffect(() => {
     if (!cdEnabled) {
-      setCalculatedCdAmount(0);
-      return;
+        setCalculatedCdAmount(0);
+        return;
     }
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) > today);
-    if(eligibleEntries.length === 0) {
+    
+    if (eligibleEntries.length === 0) {
         setCalculatedCdAmount(0);
         return;
     }
 
     let base = 0;
     const currentPaymentAmount = paymentAmount || 0;
-    
     const outstandingForEligible = Math.round(eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0));
     
     switch (cdAt) {
-      case 'payment_amount':
-        base = currentPaymentAmount;
-        break;
-      case 'unpaid_amount':
-        base = outstandingForEligible;
-        break;
-      case 'full_amount': {
-        const eligibleSrNos = new Set(eligibleEntries.map(e => e.srNo));
-        const pastPaymentsForEligible = paymentHistory.filter(p => 
-            !p.cdApplied && p.paidFor?.some(pf => eligibleSrNos.has(pf.srNo))
-        );
+        case 'payment_amount':
+            base = currentPaymentAmount;
+            break;
+        case 'unpaid_amount':
+            base = outstandingForEligible;
+            break;
+        case 'full_amount': {
+            const eligibleSrNos = new Set(eligibleEntries.map(e => e.srNo));
+            const pastPaymentsForEligible = paymentHistory
+                .filter(p => !p.cdApplied && p.paidFor?.some(pf => eligibleSrNos.has(pf.srNo)));
 
-        const paidAmountForEligibleWithoutCD = pastPaymentsForEligible.reduce((sum, p) => {
-            const paidForTheseEntries = p.paidFor?.filter(pf => eligibleSrNos.has(pf.srNo)) || [];
-            return sum + paidForTheseEntries.reduce((innerSum, pf) => innerSum + pf.amount, 0);
-        }, 0);
-        
-        base = paidAmountForEligibleWithoutCD + outstandingForEligible;
-        break;
-      }
-      default:
-        base = 0;
+            const paidAmountForEligibleWithoutCD = pastPaymentsForEligible.reduce((sum, p) => {
+                const paidForTheseEntries = p.paidFor?.filter(pf => eligibleSrNos.has(pf.srNo)) || [];
+                return sum + paidForTheseEntries.reduce((innerSum, pf) => innerSum + pf.amount, 0);
+            }, 0);
+            
+            base = paidAmountForEligibleWithoutCD + outstandingForEligible;
+            break;
+        }
+        default:
+            base = 0;
     }
 
     setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
-  }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory, totalOutstandingForSelected]);
+}, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory]);
 
 
   useEffect(() => {
