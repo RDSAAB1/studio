@@ -198,20 +198,13 @@ export default function SupplierPaymentsPage() {
   const totalOutstandingForSelected = useMemo(() => {
     return Math.round(selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0));
   }, [selectedEntries]);
-
-  const cdEligibleEntries = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return selectedEntries.filter(e => new Date(e.dueDate) >= today);
-}, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
     if (selectedEntries.length === 0) {
         setCdEnabled(false);
         return;
     }
-    setCdEnabled(cdEligibleEntries.length > 0);
-  }, [selectedEntries.length, cdEligibleEntries.length]);
+  }, [selectedEntries.length]);
 
   const sortedCombinations = useMemo(() => {
     if (!sortConfig) return paymentCombinations;
@@ -563,11 +556,10 @@ export default function SupplierPaymentsPage() {
                         const amountToPay = Math.min(outstanding, remainingPayment);
 
                         if (amountToPay > 0) {
-                            const isEligibleForCD = cdEligibleEntries.some(entry => entry.id === entryData.id);
                             paidForDetails.push({ 
                                 srNo: entryData.srNo, 
                                 amount: amountToPay, 
-                                cdApplied: cdEnabled && isEligibleForCD,
+                                cdApplied: cdEnabled,
                                 supplierName: toTitleCase(entryData.name),
                                 supplierSo: toTitleCase(entryData.so),
                                 supplierContact: entryData.contact,
@@ -854,8 +846,10 @@ export default function SupplierPaymentsPage() {
 
   const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value && !isNaN(Number(value))) {
-      setPaymentId(formatPaymentId(Number(value)));
+    const existingPayment = paymentHistory.find(p => p.paymentId === value);
+    
+    if (existingPayment) {
+      handleEditPayment(existingPayment);
     } else if (value && !value.startsWith('P')) {
        const numericPart = value.replace(/\D/g, '');
        if(numericPart) {
@@ -1024,7 +1018,16 @@ export default function SupplierPaymentsPage() {
 
                                 <div className="mt-2 space-y-2">
                                     <Card className="bg-muted/30 p-2">
-                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-2 gap-y-2 items-end">
+                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Payment ID</Label>
+                                                <Input 
+                                                    id="payment-id" 
+                                                    value={paymentId} 
+                                                    onChange={e => setPaymentId(e.target.value)} 
+                                                    onBlur={handlePaymentIdBlur}
+                                                    className="h-8 text-xs font-mono" />
+                                            </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Payment Type</Label>
                                                 <Select value={paymentType} onValueChange={setPaymentType}>
@@ -1071,28 +1074,28 @@ export default function SupplierPaymentsPage() {
                                 </div>
 
                                 <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
-                                    <Card className="p-2">
-                                     <CardContent className="p-1 pt-0">
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2 border rounded-lg">
-                                            <div className="flex items-center space-x-2">
-                                                <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
-                                                <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                     <Card className="p-2">
+                                        <CardContent className="p-1 pt-0">
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2 border rounded-lg">
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
+                                                    <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Label htmlFor="minRate" className="text-xs whitespace-nowrap">Min Rate</Label>
+                                                    <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Label htmlFor="maxRate" className="text-xs whitespace-nowrap">Max Rate</Label>
+                                                    <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                                                </div>
+                                                <Button onClick={generatePaymentCombinations} size="sm" className="h-8 text-xs flex-grow sm:flex-grow-0">
+                                                    <Calculator className="h-3 w-3 mr-1"/>
+                                                    Generate for {formatCurrency(targetAmountForGenerator)}
+                                                </Button>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <Label htmlFor="minRate" className="text-xs whitespace-nowrap">Min Rate</Label>
-                                                <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Label htmlFor="maxRate" className="text-xs whitespace-nowrap">Max Rate</Label>
-                                                <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
-                                            </div>
-                                            <Button onClick={generatePaymentCombinations} size="sm" className="h-8 text-xs flex-grow sm:flex-grow-0">
-                                                <Calculator className="h-3 w-3 mr-1"/>
-                                                Generate for {formatCurrency(targetAmountForGenerator)}
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                    </Card>
+                                        </CardContent>
+                                     </Card>
                                     
                                     <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
                                         <DialogContent className="max-w-3xl">
@@ -1133,7 +1136,7 @@ export default function SupplierPaymentsPage() {
                                         </DialogContent>
                                     </Dialog>
                                     
-                                    <Card className="p-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
+                                     <Card className="p-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
                                         <div className="p-2 border rounded-lg space-y-2">
                                             <div className="flex justify-between items-center mb-1">
                                                 <p className="text-xs font-semibold">Bank Details</p>
@@ -1141,7 +1144,7 @@ export default function SupplierPaymentsPage() {
                                                     <Settings className="h-4 w-4"/>
                                                 </Button>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-2">
+                                            <div className="grid grid-cols-2 gap-2 items-end">
                                                 <div className="space-y-1"><Label className="text-xs">Bank</Label>
                                                     <Popover>
                                                     <PopoverTrigger asChild>
@@ -1205,24 +1208,26 @@ export default function SupplierPaymentsPage() {
                                             </div>
                                         </div>
                                         <div className="p-2 border rounded-lg space-y-2">
-                                           <div className="grid grid-cols-2 gap-2">
+                                           <div className="grid grid-cols-2 gap-2 items-end">
+                                                <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
                                                 <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                                                 <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
                                                 <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                                <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
                                             </div>
                                         </div>
                                     </Card>
-                                    <div className="p-2 border rounded-lg grid grid-cols-3 gap-2 items-end">
-                                        <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
-                                        <div className="space-y-1"><Label className="text-xs">6R Date</Label>
-                                            <Popover>
-                                                <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal h-8 text-xs", !sixRDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{sixRDate ? format(sixRDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus /></PopoverContent>
-                                            </Popover>
-                                        </div>
-                                        <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
-                                    </div>
+                                     <Card className="p-2">
+                                        <CardContent className="p-1 grid grid-cols-3 gap-2">
+                                            <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
+                                            <div className="space-y-1"><Label className="text-xs">6R Date</Label>
+                                                <Popover>
+                                                    <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal h-8 text-xs", !sixRDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{sixRDate ? format(sixRDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus /></PopoverContent>
+                                                </Popover>
+                                            </div>
+                                            <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
+                                        </CardContent>
+                                    </Card>
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
