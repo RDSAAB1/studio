@@ -409,13 +409,15 @@ export default function SupplierPaymentsPage() {
           p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
         );
 
-        const paidAmountWithoutCD = pastPaymentsForSelectedEntries.reduce((sum, p) => {
-          if (!p.cdApplied) {
-            return sum + p.amount;
-          }
-          return sum;
+        const paidAmountWithCD = pastPaymentsForSelectedEntries.reduce((sum, p) => {
+             if (p.cdApplied) {
+                return sum + p.amount + (p.cdAmount || 0);
+             }
+             return sum;
         }, 0);
-        base = outstandingForSelected + paidAmountWithoutCD;
+
+        const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || entry.amount), 0);
+        base = totalOriginalAmount - paidAmountWithCD;
         break;
       }
       default:
@@ -1044,11 +1046,22 @@ export default function SupplierPaymentsPage() {
       {selectedCustomerKey && (
         <div onKeyDown={handleKeyDown}>
           <Card>
-            <CardHeader className="p-3 pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
+            <CardHeader className="p-3 pb-2 flex-row justify-between items-center">
+              <div className="flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-primary"/>
-                {editingPayment ? `Editing Payment` : 'Payment Processing'}
-              </CardTitle>
+                <CardTitle className="text-base">
+                    {editingPayment ? `Editing Payment` : 'Payment Processing'}
+                </CardTitle>
+              </div>
+               <div className="p-2 border rounded-lg bg-card/30 flex items-center gap-4">
+                  <div>
+                      <p className="text-muted-foreground text-xs">Selected Outstanding:</p>
+                      <p className="text-base font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}>
+                      Change
+                  </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
               <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
@@ -1058,17 +1071,7 @@ export default function SupplierPaymentsPage() {
                   <TabsTrigger value="RTGS">RTGS</TabsTrigger>
                 </TabsList>
 
-                <div className="mt-3 space-y-2">
-                    <div className="p-2 border rounded-lg bg-card/30 flex justify-between items-center">
-                        <div>
-                            <p className="text-muted-foreground text-xs">Selected Outstanding:</p>
-                            <p className="text-base font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}>
-                           Change
-                        </Button>
-                    </div>
-                    
+                <div className="mt-2 space-y-2">
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 items-end">
                         <div className="space-y-1">
                             <Label className="text-xs">Payment Type</Label>
@@ -1127,9 +1130,9 @@ export default function SupplierPaymentsPage() {
                     </div>
                 </div>
 
-                <TabsContent value="RTGS" className="mt-3 border-t pt-3 space-y-3">
+                <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
                      <Card>
-                        <CardHeader className="p-2 pb-2 flex-row items-center justify-between">
+                        <CardHeader className="p-2 pb-1 flex-row items-center justify-between">
                            <CardTitle className="text-sm">RTGS Generator</CardTitle>
                             <div className="flex items-center space-x-2">
                                <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
@@ -1190,26 +1193,18 @@ export default function SupplierPaymentsPage() {
                            </DialogFooter>
                         </DialogContent>
                      </Dialog>
-
-                     <Card>
-                        <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between">
-                           <CardTitle className="text-sm">RTGS Details</CardTitle>
+                    
+                    <Card className="p-2 space-y-2">
+                        <div className="flex justify-between items-center mb-1">
+                           <p className="text-xs font-semibold">RTGS Payment & Document Details</p>
                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
                               <Settings className="h-4 w-4"/>
                            </Button>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0 grid grid-cols-1 md:grid-cols-2 gap-3">
-                           <Card className="md:col-span-2 p-2">
-                              <p className="text-xs font-semibold mb-2">RTGS Payment</p>
-                              <div className="grid grid-cols-3 gap-2">
-                                 <div className="space-y-1"><Label htmlFor="rtgsQuantity" className="text-xs">Quantity</Label><Input id="rtgsQuantity" type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                 <div className="space-y-1"><Label htmlFor="rtgsRate" className="text-xs">Rate</Label><Input id="rtgsRate" type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                 <div className="space-y-1"><Label htmlFor="rtgsAmount" className="text-xs">RTGS Amount</Label><Input id="rtgsAmount" type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
-                              </div>
-                           </Card>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
                             <div className="p-2 border rounded-lg space-y-2">
-                              <p className="text-xs font-semibold">Bank Details</p>
-                                 <div className="space-y-1">
+                                <p className="text-xs font-semibold text-center">Bank Details</p>
+                                <div className="space-y-1">
                                     <Label className="text-xs">Bank</Label>
                                     <Popover>
                                        <PopoverTrigger asChild>
@@ -1239,8 +1234,8 @@ export default function SupplierPaymentsPage() {
                                           </Command>
                                        </PopoverContent>
                                     </Popover>
-                                 </div>
-                                 <div className="space-y-1">
+                                </div>
+                                <div className="space-y-1">
                                     <Label className="text-xs">Branch</Label>
                                     <Popover>
                                        <PopoverTrigger asChild disabled={!bankDetails.bank}>
@@ -1268,37 +1263,37 @@ export default function SupplierPaymentsPage() {
                                           </Command>
                                        </PopoverContent>
                                     </Popover>
-                                 </div>
-                                 <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
-                                 <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
+                                </div>
+                                <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
+                                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
                             </div>
                            <div className="p-2 border rounded-lg space-y-2">
-                                <p className="text-xs font-semibold">Document Details</p>
+                                <p className="text-xs font-semibold text-center">Document Details</p>
+                                <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
                                 <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
                                 <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">GR No.</Label><Input value={grNo} onChange={e => setGrNo(e.target.value)} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">Parchi No. (SR#)</Label><Input value={parchiNo} readOnly className="h-8 text-xs"/></div>
                            </div>
-                        </CardContent>
-                     </Card>
+                        </div>
+                    </Card>
                   </TabsContent>
               </Tabs>
             </CardContent>
-             <CardFooter className="p-3 pt-0">
-                <Card className="bg-muted/30 w-full p-2">
-                    <CardHeader className="p-1">
-                        <CardTitle className="text-sm">{editingPayment ? `Update Payment: ${paymentId}` : `Finalize Payment`}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-1 space-y-1 text-xs">
-                        <div className="flex justify-between items-center"><p>Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount || paymentAmount)}</p></div>
-                        {cdEnabled && <div className="flex justify-between items-center"><p>CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
-                        <Separator/>
-                        <div className="flex justify-between items-center text-sm"><p className="font-bold">Total Reduction:</p><p className="font-bold text-green-600">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</p></div>
-                    </CardContent>
-                    <CardFooter className="flex justify-end p-1 pt-2">
-                        <Button onClick={processPayment} size="sm">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                    </CardFooter>
-                </Card>
+            <CardFooter className="p-3 pt-0">
+              <Card className="bg-muted/30 w-full p-2">
+                  <CardHeader className="p-1 pb-2">
+                      <CardTitle className="text-sm">{editingPayment ? `Update Payment: ${paymentId}` : `Finalize Payment`}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-1 space-y-1 text-xs">
+                      <div className="flex justify-between items-center"><p>Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount || paymentAmount)}</p></div>
+                      {cdEnabled && <div className="flex justify-between items-center"><p>CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                      <Separator/>
+                      <div className="flex justify-between items-center text-sm"><p className="font-bold">Total Reduction:</p><p className="font-bold text-green-600">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</p></div>
+                  </CardContent>
+                  <CardFooter className="flex justify-end p-1 pt-2">
+                      <Button onClick={processPayment} size="sm">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                  </CardFooter>
+              </Card>
             </CardFooter>
           </Card>
         </div>
@@ -1576,9 +1571,6 @@ export default function SupplierPaymentsPage() {
                     </TableBody>
                 </Table>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedPaymentForDetails(null)}>Close</Button>
-              </DialogFooter>
             </>
           )}
         </DialogContent>
