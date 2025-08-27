@@ -139,6 +139,7 @@ export default function SupplierPaymentsPage() {
   const [newBankName, setNewBankName] = useState('');
   const [newBranchData, setNewBranchData] = useState({ bankName: '', branchName: '', ifscCode: '' });
   const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
+  const [activeTab, setActiveTab] = useState('processing');
 
   const stableToast = useCallback(toast, []);
 
@@ -719,6 +720,8 @@ export default function SupplierPaymentsPage() {
             branch: paymentToEdit.bankBranch || '',
         });
 
+        setActiveTab('processing');
+
         toast({
             title: "Editing Mode",
             description: `Editing payment ${paymentToEdit.paymentId}. Associated entries have been selected.`,
@@ -970,10 +973,10 @@ export default function SupplierPaymentsPage() {
   
   return (
     <div className="space-y-3">
-        <Card>
+       <Card>
             <CardContent className="p-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr] gap-x-4 items-center">
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+                    <div className="flex flex-1 items-center gap-2">
                         <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
                         <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
                             <SelectTrigger id="supplier-select" className="h-8 text-xs flex-1">
@@ -989,9 +992,11 @@ export default function SupplierPaymentsPage() {
                         </Select>
                     </div>
                      {selectedCustomerKey && (
-                        <div className="flex items-center gap-2 border-l pl-2">
-                            <Label className="text-xs text-muted-foreground font-medium">Total Outstanding:</Label>
-                            <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                        <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
+                           <div className="flex items-center gap-1 text-xs">
+                                <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
+                                <p className="font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                            </div>
                             <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">
                                 Change Selection
                             </Button>
@@ -1003,7 +1008,7 @@ export default function SupplierPaymentsPage() {
 
 
       {selectedCustomerKey && (
-        <Tabs defaultValue="processing">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="processing">Payment Processing</TabsTrigger>
                 <TabsTrigger value="history">Full History</TabsTrigger>
@@ -1082,23 +1087,25 @@ export default function SupplierPaymentsPage() {
 
                                 <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
                                     <Card className="p-2">
-                                    <CardContent className="p-1 pt-0 flex flex-wrap items-center gap-x-4 gap-y-2">
-                                        <div className="flex items-center space-x-2">
-                                            <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
-                                            <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                     <CardContent className="p-1 pt-0">
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2 border rounded-lg">
+                                            <div className="flex items-center space-x-2">
+                                                <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
+                                                <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="minRate" className="text-xs whitespace-nowrap">Min Rate</Label>
+                                                <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="maxRate" className="text-xs whitespace-nowrap">Max Rate</Label>
+                                                <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                                            </div>
+                                            <Button onClick={generatePaymentCombinations} size="sm" className="h-8 text-xs flex-grow sm:flex-grow-0">
+                                                <Calculator className="h-3 w-3 mr-1"/>
+                                                Generate for {formatCurrency(targetAmountForGenerator)}
+                                            </Button>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <Label htmlFor="minRate" className="text-xs whitespace-nowrap">Min Rate</Label>
-                                            <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Label htmlFor="maxRate" className="text-xs whitespace-nowrap">Max Rate</Label>
-                                            <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
-                                        </div>
-                                        <Button onClick={generatePaymentCombinations} size="sm" className="h-8 text-xs flex-grow sm:flex-grow-0">
-                                            <Calculator className="h-3 w-3 mr-1"/>
-                                            Generate for {formatCurrency(targetAmountForGenerator)}
-                                        </Button>
                                     </CardContent>
                                     </Card>
                                     
@@ -1213,15 +1220,11 @@ export default function SupplierPaymentsPage() {
                                             </div>
                                         </div>
                                         <div className="p-2 border rounded-lg space-y-2">
-                                            <p className="text-xs font-semibold">Document Details</p>
-                                            <div className="grid grid-cols-3 gap-2">
+                                           <div className="grid grid-cols-2 gap-2">
                                                 <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                                                 <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                                <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
                                                 <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                                <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
+                                                <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
                                             </div>
                                         </div>
                                     </Card>
@@ -1233,31 +1236,31 @@ export default function SupplierPaymentsPage() {
                                                 <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus /></PopoverContent>
                                             </Popover>
                                         </div>
+                                        <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
                                     </Card>
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
                         <CardFooter className="p-3 pt-0">
                             <Card className="bg-muted/30 w-full p-2">
-                                <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                               <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-muted-foreground">To Pay:</span>
+                                    <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
+                                </div>
+                                {cdEnabled && (
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">Amount to be Paid:</span>
-                                        <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
+                                        <span className="text-xs font-medium text-muted-foreground">CD:</span>
+                                        <span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span>
                                     </div>
-                                    {cdEnabled && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-muted-foreground">CD Amount:</span>
-                                            <span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-2">
-                                        <Separator orientation="vertical" className="h-5" />
-                                        <span className="text-sm font-medium text-muted-foreground">Total Reduction:</span>
-                                        <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
-                                    </div>
-                                    <div className="flex-grow"></div>
-                                    <Button onClick={processPayment} size="sm" className="h-8 text-xs">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                                </CardContent>
+                                )}
+                                <div className="flex items-center gap-2 border-l pl-2 ml-2">
+                                    <span className="text-sm font-medium text-muted-foreground">Total Reduction:</span>
+                                    <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
+                                </div>
+                                <div className="flex-grow"></div>
+                                <Button onClick={processPayment} size="sm" className="h-8 text-xs">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                            </CardContent>
                             </Card>
                         </CardFooter>
                     </Card>
