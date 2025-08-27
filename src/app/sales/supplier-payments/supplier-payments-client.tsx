@@ -119,6 +119,7 @@ export default function SupplierPaymentsPage() {
   const [rtgsQuantity, setRtgsQuantity] = useState(0);
   const [rtgsRate, setRtgsRate] = useState(0);
   const [rtgsAmount, setRtgsAmount] = useState(0);
+  const [isRoundFigureMode, setIsRoundFigureMode] = useState(false);
 
 
   const [cdEnabled, setCdEnabled] = useState(false);
@@ -1142,8 +1143,8 @@ export default function SupplierPaymentsPage() {
                               <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-9"/>
                            </div>
                            <div className="flex items-center space-x-2 pt-5">
-                              <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
-                              <Label htmlFor="round-figure-toggle" className="text-sm">Round Figure</Label>
+                               <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
+                               <Label htmlFor="round-figure-toggle" className="text-sm">Round Figure</Label>
                            </div>
                            <Button onClick={generatePaymentCombinations} className="w-full md:w-auto h-9">
                               <Calculator className="h-4 w-4 mr-2"/>
