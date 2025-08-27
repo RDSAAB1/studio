@@ -1133,15 +1133,24 @@ export default function SupplierEntryClient() {
         if (isEditing && completeEntry.id) {
             if (deletePayments) {
                 await deletePaymentsForSrNo(completeEntry.srNo);
-                completeEntry.netAmount = completeEntry.originalNetAmount; // Reset netAmount
+                // After deleting payments, reset netAmount to originalNetAmount
+                const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
                 toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
-            }
-            const success = await updateSupplier(completeEntry.id, completeEntry);
-            if (success) {
-                toast({ title: "Success", description: "Entry updated successfully." });
-                if (callback) callback(completeEntry); else handleNew();
+                const success = await updateSupplier(updatedEntry.id, updatedEntry);
+                 if (success) {
+                    toast({ title: "Success", description: "Entry updated successfully." });
+                    if (callback) callback(updatedEntry); else handleNew();
+                } else {
+                    toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
+                }
             } else {
-                toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
+                 const success = await updateSupplier(completeEntry.id, completeEntry);
+                 if (success) {
+                    toast({ title: "Success", description: "Entry updated successfully." });
+                    if (callback) callback(completeEntry); else handleNew();
+                } else {
+                    toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
+                }
             }
         } else {
             const newEntry = await addSupplier(completeEntry);
