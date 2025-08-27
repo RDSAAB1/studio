@@ -199,7 +199,7 @@ export default function SupplierPaymentsPage() {
   }, [suppliers, selectedEntryIds]);
   
   const totalOutstandingForSelected = useMemo(() => {
-    return Math.round(selectedEntries.reduce((acc, entry) => acc + parseFloat(String(entry.netAmount)), 0));
+    return Math.round(selectedEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || 0), 0));
   }, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
@@ -207,7 +207,11 @@ export default function SupplierPaymentsPage() {
         setCdEnabled(false);
         return;
     }
-  }, [selectedEntries.length]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const allDueInFuture = selectedEntries.every(e => new Date(e.dueDate) > today);
+    setCdEnabled(allDueInFuture);
+  }, [selectedEntries]);
 
   const sortedCombinations = useMemo(() => {
     if (!sortConfig) return paymentCombinations;
@@ -1019,7 +1023,7 @@ export default function SupplierPaymentsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                <TabsTrigger value="history">Full History</TabsTrigger>
+                <TabsTrigger value="history" disabled={rtgsFor === 'Outsider'}>Full History</TabsTrigger>
             </TabsList>
             <TabsContent value="processing">
               <Card>
@@ -1317,8 +1321,16 @@ export default function SupplierPaymentsPage() {
                                         </div>
                                         <div className="p-2 border rounded-lg space-y-2">
                                             <div className="grid grid-cols-2 gap-2 items-end">
-                                                {rtgsFor === 'Outsider' && <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/></div> }
-                                                {rtgsFor === 'Outsider' && <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div> }
+                                                {rtgsFor === 'Outsider' ?
+                                                 <>
+                                                    <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/></div> 
+                                                    <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div> 
+                                                 </> :
+                                                 <>
+                                                    <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                                    <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                                 </>
+                                                }
                                                 <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
                                                 <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
                                             </div>
