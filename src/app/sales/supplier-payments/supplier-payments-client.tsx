@@ -230,14 +230,24 @@ export default function SupplierPaymentsPage() {
   }, [detailsSupplierEntry, paymentHistory]);
 
   const currentPaymentHistory = useMemo(() => {
-    if (!selectedCustomerKey && rtgsFor !== 'Outsider' && activeTab === 'history') {
-      return paymentHistory.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (activeTab === 'history' && !selectedCustomerKey) {
+        return paymentHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-    if (!selectedCustomerKey && rtgsFor !== 'Outsider') return [];
+    if (!selectedCustomerKey) return [];
     
-    const customerPayments = paymentHistory.filter(p => (rtgsFor === 'Outsider' && p.customerId === 'OUTSIDER') || p.customerId === selectedCustomerKey);
-    return customerPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [paymentHistory, selectedCustomerKey, rtgsFor, activeTab]);
+    const customerPayments = paymentHistory.filter(p => p.customerId === selectedCustomerKey);
+    return customerPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [paymentHistory, selectedCustomerKey, activeTab]);
+
+  const displayedSuppliers = useMemo(() => {
+    if (activeTab === 'history' && !selectedCustomerKey) {
+        return suppliers;
+    }
+    if (selectedCustomerKey) {
+        return suppliers.filter(s => s.customerId === selectedCustomerKey);
+    }
+    return [];
+  }, [suppliers, selectedCustomerKey, activeTab]);
   
   const availableCdOptions = useMemo(() => {
     if (paymentType === 'Partial') {
@@ -1009,10 +1019,14 @@ export default function SupplierPaymentsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                <TabsTrigger value="history" disabled={!selectedCustomerKey && rtgsFor !== 'Outsider'}>Full History</TabsTrigger>
+                <TabsTrigger value="history">Full History</TabsTrigger>
             </TabsList>
             <TabsContent value="processing">
-                <div onKeyDown={handleKeyDown}>
+              <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Payment Processing</CardTitle>
+                </CardHeader>
+                <CardContent onKeyDown={handleKeyDown}>
                     {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
                         <Card>
                             <CardContent className="p-3">
@@ -1080,9 +1094,8 @@ export default function SupplierPaymentsPage() {
                     )}
 
                     {(selectedCustomerKey || rtgsFor === 'Outsider') && (
-                        <Card className="mt-3">
-                            <CardContent className="p-3">
-                                <Card className="mt-2 p-2">
+                        <div className="mt-3">
+                            <Card className="p-2">
                                     <CardHeader className="p-1 pb-2">
                                     <CardTitle className="text-sm">Supplier/Payee Details</CardTitle>
                                     </CardHeader>
@@ -1104,7 +1117,7 @@ export default function SupplierPaymentsPage() {
                                             <Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" disabled={rtgsFor === 'Supplier'}/>
                                         </div>
                                     </CardContent>
-                                </Card>
+                            </Card>
                                 
                                 <div className="mt-2 space-y-2">
                                     <Card className="bg-muted/30 p-2">
@@ -1307,12 +1320,8 @@ export default function SupplierPaymentsPage() {
                                         </div>
                                         <div className="p-2 border rounded-lg space-y-2">
                                             <div className="grid grid-cols-2 gap-2 items-end">
-                                                {(rtgsFor === 'Outsider' || paymentMethod === 'RTGS') &&
-                                                    <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/></div>
-                                                }
-                                                {rtgsFor === 'Outsider' &&
-                                                    <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                                }
+                                                {rtgsFor === 'Outsider' && <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/></div> }
+                                                {rtgsFor === 'Outsider' && <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div> }
                                                 <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
                                                 <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
                                             </div>
@@ -1320,8 +1329,7 @@ export default function SupplierPaymentsPage() {
                                     </Card>
                                 </div>
                                 )}
-                            </CardContent>
-                            <CardFooter className="p-3 pt-0">
+                              <CardFooter className="p-3 pt-0 mt-2">
                                 <Card className="bg-muted/30 w-full p-2">
                                     <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                                     <div className="flex items-center gap-2">
@@ -1347,9 +1355,10 @@ export default function SupplierPaymentsPage() {
                                 </CardContent>
                                 </Card>
                             </CardFooter>
-                        </Card>
+                        </div>
                     )}
-                </div>
+                </CardContent>
+              </Card>
             </TabsContent>
             <TabsContent value="history">
                  <Card>
@@ -1414,7 +1423,7 @@ export default function SupplierPaymentsPage() {
                                     ))}
                                     {currentPaymentHistory.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history for this supplier.</TableCell>
+                                            <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>
@@ -1440,7 +1449,7 @@ export default function SupplierPaymentsPage() {
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
-                                  {suppliers.filter(s => selectedCustomerKey ? s.customerId === selectedCustomerKey : true).map(entry => (
+                                  {displayedSuppliers.map(entry => (
                                       <TableRow key={entry.id}>
                                           <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
                                           <TableCell className="p-2 text-xs">{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
@@ -1454,6 +1463,11 @@ export default function SupplierPaymentsPage() {
                                           </TableCell>
                                       </TableRow>
                                   ))}
+                                  {displayedSuppliers.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center text-muted-foreground h-24">No transactions found for this supplier.</TableCell>
+                                        </TableRow>
+                                    )}
                               </TableBody>
                           </Table>
                          </ScrollArea>
@@ -1462,7 +1476,7 @@ export default function SupplierPaymentsPage() {
               </Card>
             </TabsContent>
         </Tabs>
-      )}
+      
 
       <Dialog open={isOutstandingModalOpen} onOpenChange={setIsOutstandingModalOpen}>
         <DialogContent className="max-w-4xl">
