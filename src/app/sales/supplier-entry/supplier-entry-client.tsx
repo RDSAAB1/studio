@@ -1119,48 +1119,14 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    // Re-run calculations just before submitting to ensure data is fresh.
-    const { date, term, grossWeight, teirWeight, kartaPercentage, rate, labouryRate, kanta, otherCharges } = values;
-    const newDueDate = new Date(date);
-    newDueDate.setDate(newDueDate.getDate() + (Number(term) || 0));
-    const weight = (grossWeight || 0) - (teirWeight || 0);
-    const calculatedKartaWeight = weight * ((kartaPercentage || 0) / 100);
-    const calculatedKartaAmount = calculatedKartaWeight * (rate || 0);
-    const netWeight = weight - calculatedKartaWeight;
-    const amount = netWeight * (rate || 0);
-    const labouryAmount = weight * (labouryRate || 0);
-    
-    const originalNetAmount = amount - labouryAmount - (kanta || 0) - calculatedKartaAmount - (otherCharges || 0);
-    
-    let finalNetAmount = originalNetAmount;
-    if (isEditing && !deletePayments) {
-      const totalPaidForThisEntry = paymentHistory
-        .filter(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo))
-        .reduce((sum, p) => {
-            const paidForDetail = p.paidFor?.find(pf => pf.srNo === currentCustomer.srNo);
-            return sum + (paidForDetail?.amount || 0) + (p.cdAmount && paidForDetail?.cdApplied ? p.cdAmount : 0);
-        }, 0);
-        finalNetAmount -= totalPaidForThisEntry;
-    }
-
     const completeEntry: Customer = {
-        ...currentCustomer,
-        ...values,
-        date: values.date.toISOString().split("T")[0],
-        dueDate: newDueDate.toISOString().split("T")[0],
-        term: String(term),
-        name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-        weight: parseFloat(weight.toFixed(2)),
-        kartaWeight: parseFloat(calculatedKartaWeight.toFixed(2)),
-        kartaAmount: parseFloat(calculatedKartaAmount.toFixed(2)),
-        netWeight: parseFloat(netWeight.toFixed(2)),
-        amount: parseFloat(amount.toFixed(2)),
-        labouryAmount: parseFloat(labouryAmount.toFixed(2)),
-        kanta: parseFloat(String(kanta || 0)),
-        otherCharges: parseFloat(String(otherCharges || 0)),
-        originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
-        netAmount: parseFloat(finalNetAmount.toFixed(2)),
+      ...currentCustomer,
+      ...values,
+      date: values.date.toISOString().split("T")[0],
+      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
+      term: String(values.term),
+      name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
+      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
     try {
@@ -1186,7 +1152,7 @@ export default function SupplierEntryClient() {
         console.error("Error saving supplier:", error);
         toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
     }
-};
+  };
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
     if (isEditing) {
