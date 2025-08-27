@@ -119,6 +119,8 @@ export default function SupplierPaymentsPage() {
   const [rtgsQuantity, setRtgsQuantity] = useState(0);
   const [rtgsRate, setRtgsRate] = useState(0);
   const [rtgsAmount, setRtgsAmount] = useState(0);
+  const [isRoundFigureMode, setIsRoundFigureMode] = useState(false);
+
 
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
@@ -769,6 +771,7 @@ export default function SupplierPaymentsPage() {
 
     const combinations: PaymentCombination[] = [];
     const seenRemainders = new Set<number>();
+    const seenAmounts = new Set<number>();
 
     for (let rate = minRate; rate <= maxRate; rate += 1) {
         if (rate === 0 || rate % 5 !== 0) continue;
@@ -783,24 +786,35 @@ export default function SupplierPaymentsPage() {
             if (Math.round(roundedQuantity * 10) % 1 !== 0) continue;
             
             const amount = Math.round(roundedQuantity * rate);
+            
+            if (isRoundFigureMode) {
+                 if (amount % 100 !== 0 || seenAmounts.has(amount)) continue;
+                 seenAmounts.add(amount);
+            }
+
             const remainingAmount = targetAmountForGenerator - amount;
             
-            if (remainingAmount >= 0 && remainingAmount <= 500) {
-                 const roundedRemainder = Math.round(remainingAmount);
-                 if (!seenRemainders.has(roundedRemainder)) {
-                    combinations.push({ quantity: roundedQuantity, rate, amount, remainingAmount });
-                    seenRemainders.add(roundedRemainder);
-                }
+            if (!isRoundFigureMode) {
+              if (remainingAmount >= 0 && remainingAmount <= 500) {
+                   const roundedRemainder = Math.round(remainingAmount);
+                   if (!seenRemainders.has(roundedRemainder)) {
+                      combinations.push({ quantity: roundedQuantity, rate, amount, remainingAmount });
+                      seenRemainders.add(roundedRemainder);
+                  }
+              }
+            } else {
+                 combinations.push({ quantity: roundedQuantity, rate, amount, remainingAmount });
             }
         }
     }
-     if (combinations.length === 0) {
+
+    if (combinations.length === 0) {
         toast({ title: 'No Combinations Found', description: 'Try adjusting the rate range or target amount.' });
     }
 
     const sortedCombinations = combinations
         .sort((a, b) => Math.abs(a.remainingAmount) - Math.abs(b.remainingAmount))
-        .slice(0, 100); 
+        .slice(0, isRoundFigureMode ? 20 : 100); 
 
     setPaymentCombinations(sortedCombinations);
     setIsGeneratorOpen(true);
@@ -1128,7 +1142,7 @@ export default function SupplierPaymentsPage() {
                   <Card>
                     <CardHeader><CardTitle className="text-base">RTGS Details</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                         <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
                             <div className="space-y-2">
                                 <Label htmlFor="minRate" className="text-xs">Min Rate</Label>
                                 <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} />
@@ -1136,6 +1150,10 @@ export default function SupplierPaymentsPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="maxRate" className="text-xs">Max Rate</Label>
                                 <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} />
+                            </div>
+                             <div className="flex items-center space-x-2 pt-6">
+                                <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
+                                <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure Payments</Label>
                             </div>
                             <Button onClick={generatePaymentCombinations} className="w-full md:w-auto">
                                 <Calculator className="h-4 w-4 mr-2"/>
