@@ -379,33 +379,37 @@ export default function SupplierPaymentsPage() {
       const currentPaymentAmount = paymentAmount || 0;
       const outstandingForSelected = totalOutstandingForSelected;
       
-      const amountWithCDAlready = cdEligibleEntries.reduce((acc, entry) => {
-          const paymentsForThisEntry = paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo && pf.cdApplied));
-          return acc + paymentsForThisEntry.reduce((sum, p) => sum + (p.paidFor?.find(pf => pf.srNo === entry.srNo)?.amount || 0), 0);
-      }, 0);
-  
-      if (paymentType === 'Partial') {
-          base = currentPaymentAmount;
-      } else { // Full Payment
-          switch (cdAt) {
-              case 'paid_amount':
-                  // For 'Full' payment, the amount to be paid is the outstanding amount.
-                  base = outstandingForSelected;
-                  break;
-              case 'unpaid_amount':
-                  base = outstandingForSelected;
-                  break;
-              case 'full_amount':
-                  const totalOriginalAmount = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
-                  base = totalOriginalAmount - amountWithCDAlready;
-                  break;
-              default:
-                  base = 0;
+      switch (cdAt) {
+          case 'paid_amount': {
+              const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
+              const pastPaymentsForSelectedEntries = paymentHistory.filter(p =>
+                  p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
+              );
+              
+              const paidAmountWithoutCD = pastPaymentsForSelectedEntries.reduce((sum, p) => {
+                  if (p.cdAmount === 0 || !p.cdApplied) {
+                      return sum + p.amount;
+                  }
+                  return sum;
+              }, 0);
+              base = paidAmountWithoutCD;
+              break;
           }
+          case 'payment_amount':
+              base = currentPaymentAmount;
+              break;
+          case 'unpaid_amount':
+              base = outstandingForSelected;
+              break;
+          case 'full_amount':
+              base = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
+              break;
+          default:
+              base = 0;
       }
       
       setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
-  }, [cdEnabled, paymentAmount, cdPercent, cdAt, cdEligibleEntries, paymentHistory, paymentType, totalOutstandingForSelected]);
+  }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory, totalOutstandingForSelected, cdEligibleEntries]);
 
   useEffect(() => {
     if (paymentType === 'Full') {
