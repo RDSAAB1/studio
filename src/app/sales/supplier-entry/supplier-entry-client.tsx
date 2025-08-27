@@ -29,7 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo } from "@/lib/firestore";
 import { formatCurrency } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -855,6 +855,8 @@ export default function SupplierEntryClient() {
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isReceiptSettingsOpen, setIsReceiptSettingsOpen] = useState(false);
   const [tempReceiptSettings, setTempReceiptSettings] = useState<ReceiptSettings | null>(null);
+  const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
+  const [updateAction, setUpdateAction] = useState<(() => void) | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -955,7 +957,6 @@ export default function SupplierEntryClient() {
         localStorage.setItem('lastSelectedVariety', variety);
     }
   }
-
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
     const values = {...form.getValues(), ...data};
@@ -1103,12 +1104,13 @@ export default function SupplierEntryClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteSupplier(id);
-      toast({ title: "Success", description: "Entry deleted successfully." });
+      await deletePaymentsForSrNo(currentCustomer.srNo);
+      toast({ title: "Success", description: "Entry and associated payments deleted successfully." });
       if (currentCustomer.id === id) {
         handleNew();
       }
     } catch (error) {
-      console.error("Error deleting supplier: ", error);
+      console.error("Error deleting supplier and payments: ", error);
       toast({
         title: "Error",
         description: "Failed to delete entry. Please try again.",
@@ -1117,39 +1119,58 @@ export default function SupplierEntryClient() {
     }
   };
 
-  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
-    const completeEntry: Customer = {
-      ...currentCustomer, ...values,
-      netAmount: currentCustomer.netAmount,
-      originalNetAmount: currentCustomer.originalNetAmount,
-      name: toTitleCase(values.name), so: toTitleCase(values.so),
-      weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges,
-      address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
-      variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
-      term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-    };
-    try {
-      if (isEditing && completeEntry.id) {
-        const success = await updateSupplier(completeEntry.id, completeEntry);
-        if (success) {
-          toast({ title: "Success", description: "Entry updated successfully." });
-          if(callback) callback(completeEntry);
-          else handleNew();
-        } else {
-          toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
-        }
-      } else {
-        const newEntry = await addSupplier(completeEntry);
-        toast({ title: "Success", description: "New entry saved successfully." });
-        if (callback) callback(newEntry);
-        else handleNew();
+  const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+      const completeEntry: Customer = {
+          ...currentCustomer, ...values,
+          netAmount: currentCustomer.netAmount,
+          originalNetAmount: currentCustomer.originalNetAmount,
+          name: toTitleCase(values.name), so: toTitleCase(values.so),
+          weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges,
+          address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
+          variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
+          term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+      };
+      
+      try {
+          if (isEditing && completeEntry.id) {
+              if (deletePayments) {
+                  await deletePaymentsForSrNo(completeEntry.srNo);
+                  // Recalculate netAmount as if no payments were made
+                  completeEntry.netAmount = completeEntry.originalNetAmount;
+                  toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
+              }
+              const success = await updateSupplier(completeEntry.id, completeEntry);
+              if (success) {
+                  toast({ title: "Success", description: "Entry updated successfully." });
+                  if (callback) callback(completeEntry); else handleNew();
+              } else {
+                  toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
+              }
+          } else {
+              const newEntry = await addSupplier(completeEntry);
+              toast({ title: "Success", description: "New entry saved successfully." });
+              if (callback) callback(newEntry); else handleNew();
+          }
+      } catch (error) {
+          console.error("Error saving supplier:", error);
+          toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
       }
-    } catch (error) {
-      console.error("Error saving supplier: ", error);
-      toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
-    }
   };
-  
+
+
+  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+    if (isEditing) {
+        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
+        if (hasPayments) {
+            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
+            setIsUpdateConfirmOpen(true);
+            return;
+        }
+    }
+    // If not editing or no payments, submit directly
+    executeSubmit(values, false, callback);
+  };
+
   const handleSaveAndPrint = async () => {
     const isValid = await form.trigger();
     if (isValid) {
@@ -1639,6 +1660,31 @@ export default function SupplierEntryClient() {
               </DialogFooter>
           </DialogContent>
       </Dialog>
+      <AlertDialog open={isUpdateConfirmOpen} onOpenChange={setIsUpdateConfirmOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Update Paid Entry?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This receipt already has payments associated with it. How would you like to proceed?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <AlertDialogAction onClick={() => {
+                    updateAction?.(true); // Yes, delete payments
+                    setIsUpdateConfirmOpen(false);
+                }} className="bg-destructive hover:bg-destructive/90">
+                    Yes, Delete Payments
+                </AlertDialogAction>
+                <AlertDialogAction onClick={() => {
+                    updateAction?.(false); // No, continue update
+                    setIsUpdateConfirmOpen(false);
+                }}>
+                    Continue Update
+                </AlertDialogAction>
+                 <AlertDialogCancel className="sm:col-span-2">Cancel</AlertDialogCancel>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

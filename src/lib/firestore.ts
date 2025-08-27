@@ -257,6 +257,49 @@ export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onE
   }, onError);
 }
 
+export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
+  if (!srNo) {
+    console.error("SR No. is required to delete payments.");
+    return;
+  }
+  
+  // This function now needs to handle the nested `paidFor` array.
+  // It finds all payment documents that contain a reference to the given srNo.
+  const q = query(paymentsCollection, where("paidFor", "array-contains-any", [{srNo: srNo}]));
+
+  // A more robust query would be `where('paidFor.srNo', '==', srNo)`, but Firestore doesn't support querying nested array fields directly like this.
+  // The workaround is to fetch potentially matching documents and filter client-side.
+  // A better data model might be a subcollection of payments on each supplier entry.
+  // Given the current model, this is the approach:
+  const paymentsSnapshot = await getDocs(query(paymentsCollection));
+  
+  const batch = writeBatch(db);
+  let paymentsDeleted = 0;
+
+  paymentsSnapshot.forEach(paymentDoc => {
+    const payment = paymentDoc.data() as Payment;
+    const initialPaidFor = payment.paidFor || [];
+    const filteredPaidFor = initialPaidFor.filter(pf => pf.srNo !== srNo);
+    
+    if (filteredPaidFor.length < initialPaidFor.length) {
+      if (filteredPaidFor.length === 0) {
+        // If no other entries are being paid by this payment, delete the whole payment.
+        batch.delete(paymentDoc.ref);
+      } else {
+        // Otherwise, just remove the specific entry from the `paidFor` array.
+        const originalAmountForSr = initialPaidFor.find(pf => pf.srNo === srNo)?.amount || 0;
+        const newTotalAmount = payment.amount - originalAmountForSr;
+        batch.update(paymentDoc.ref, { paidFor: filteredPaidFor, amount: newTotalAmount });
+      }
+      paymentsDeleted++;
+    }
+  });
+
+  if (paymentsDeleted > 0) {
+    await batch.commit();
+  }
+}
+
 // --- General Transaction Functions ---
 
 export function getTransactionsRealtime(callback: (transactions: Transaction[]) => void, onError: (error: Error) => void): () => void {
