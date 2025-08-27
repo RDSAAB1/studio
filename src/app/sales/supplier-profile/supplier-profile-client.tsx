@@ -561,7 +561,7 @@ export default function SupplierProfilePage() {
                 <h3 className="text-base font-semibold">Select Profile</h3>
             </div>
             <div className="w-full sm:w-auto sm:min-w-64">
-                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                 <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                     <PopoverTrigger asChild>
                         <Button
                         variant="outline"
