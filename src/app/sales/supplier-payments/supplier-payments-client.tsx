@@ -29,7 +29,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -1292,7 +1292,7 @@ export default function SupplierPaymentsPage() {
             </CardContent>
             <CardFooter className="p-3 pt-0">
                 <Card className="bg-muted/30 w-full p-2">
-                     <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                         <div className="flex items-center gap-2">
                            <span className="text-xs text-muted-foreground">Amount to be Paid:</span>
                            <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
