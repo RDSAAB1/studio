@@ -969,8 +969,8 @@ export default function SupplierPaymentsPage() {
   return (
     <div className="space-y-3">
         <Card>
-            <CardContent className="p-3 flex items-center gap-2">
-                <div className="flex items-center gap-2">
+             <CardContent className="p-3 flex items-center gap-4">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <Users className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold whitespace-nowrap">Select Supplier</h3>
                 </div>
@@ -989,9 +989,9 @@ export default function SupplierPaymentsPage() {
                     </Select>
                 </div>
                 {selectedCustomerKey && (
-                     <div className="flex items-center justify-between gap-2 p-1 border rounded-lg bg-card/30">
-                         <p className="text-muted-foreground text-xs font-medium whitespace-nowrap pl-2">Total Outstanding:</p>
-                         <p className="text-sm font-bold text-destructive pr-2">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                     <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0">
+                         <p className="text-muted-foreground text-xs font-medium whitespace-nowrap">Total Outstanding:</p>
+                         <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
                         <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">
                             Change
                         </Button>
@@ -1123,15 +1123,15 @@ export default function SupplierPaymentsPage() {
                 </div>
 
                 <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
-                     <Card>
-                        <CardHeader className="p-2 pb-1 flex-row items-center justify-between">
-                           <CardTitle className="text-sm">RTGS Generator</CardTitle>
+                     <Card className="p-2">
+                         <CardHeader className="p-1 pb-1 flex-row items-center justify-between">
+                           <CardTitle className="text-xs font-semibold">RTGS Generator</CardTitle>
                             <div className="flex items-center space-x-2">
                                <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
                                <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
                            </div>
                         </CardHeader>
-                        <CardContent className="p-2 pt-0 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                        <CardContent className="p-1 pt-0 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
                            <div className="space-y-1">
                               <Label htmlFor="minRate" className="text-xs">Min Rate</Label>
                               <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs"/>
@@ -1271,21 +1271,18 @@ export default function SupplierPaymentsPage() {
                   </TabsContent>
               </Tabs>
             </CardContent>
-             <CardFooter className="p-3 pt-0">
-              <Card className="bg-muted/30 w-full p-2">
-                  <CardHeader className="p-1 pb-2">
-                      <CardTitle className="text-sm">{editingPayment ? `Update Payment: ${paymentId}` : `Finalize Payment`}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-1 space-y-1 text-xs">
-                      <div className="flex justify-between items-center"><p>Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount || paymentAmount)}</p></div>
-                      {cdEnabled && <div className="flex justify-between items-center"><p>CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
-                      <Separator/>
-                      <div className="flex justify-between items-center text-sm"><p className="font-bold">Total Reduction:</p><p className="font-bold text-green-600">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</p></div>
-                  </CardContent>
-                  <CardFooter className="flex justify-end p-1 pt-2">
-                      <Button onClick={processPayment} size="sm">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
-                  </CardFooter>
-              </Card>
+            <CardFooter className="p-3 pt-0">
+                <Card className="bg-muted/30 w-full p-2">
+                    <CardContent className="p-1 flex justify-between items-center">
+                        <div className="text-xs space-y-1">
+                            <div className="flex items-center gap-2"><p>Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount || paymentAmount)}</p></div>
+                            {cdEnabled && <div className="flex items-center gap-2"><p>CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                            <Separator/>
+                            <div className="flex items-center gap-2 text-sm"><p className="font-bold">Total Reduction:</p><p className="font-bold text-green-600">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</p></div>
+                        </div>
+                        <Button onClick={processPayment} size="sm">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                    </CardContent>
+                </Card>
             </CardFooter>
           </Card>
         </div>
