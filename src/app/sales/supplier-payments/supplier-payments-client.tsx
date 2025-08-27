@@ -37,7 +37,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Trash, Info, Pen, X, Calendar as CalendarIcon, Banknote, Percent, Hash, Users, Loader2, UserSquare, Home, Phone, Truck, Wheat, Wallet, Scale, Calculator, Landmark, Server, Milestone, Settings, Rows3, LayoutList, LayoutGrid, StepForward, ArrowRight, FileText, Weight, Receipt, User, Building, ClipboardList, ArrowUpDown, Search, ChevronsUpDown, Check, Plus, Printer, RefreshCw } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipProvider, TooltipContent } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from 'date-fns';
@@ -547,31 +547,38 @@ export default function SupplierPaymentsPage() {
                         }
                     }
 
-                    let remainingPayment = Math.round(finalPaymentAmount + calculatedCdAmount);
+                    let amountToDistribute = Math.round(finalPaymentAmount);
+                    let cdToDistribute = Math.round(calculatedCdAmount);
+                    
                     const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                     
                     for (const entryData of sortedEntries) {
-                        if (remainingPayment > 0) {
-                           const supplierDocRef = doc(db, "suppliers", entryData.id);
-                           const supplierDoc = await transaction.get(supplierDocRef);
-                           if (!supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
+                        if (amountToDistribute <= 0 && cdToDistribute <= 0) break;
 
-                           let outstanding = Number(supplierDoc.data().netAmount);
-                           const amountToPay = Math.min(outstanding, remainingPayment);
+                        const supplierDocRef = doc(db, "suppliers", entryData.id);
+                        const supplierDoc = await transaction.get(supplierDocRef);
+                        if (!supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
 
-                           if (amountToPay > 0) {
-                                paidForDetails.push({ 
-                                    srNo: entryData.srNo, 
-                                    amount: amountToPay, 
-                                    cdApplied: cdEnabled,
-                                    supplierName: toTitleCase(entryData.name),
-                                    supplierSo: toTitleCase(entryData.so),
-                                    supplierContact: entryData.contact,
-                                });
-                                
-                                transaction.update(supplierDocRef, { netAmount: outstanding - amountToPay });
-                                remainingPayment -= amountToPay;
-                           }
+                        let outstanding = Number(supplierDoc.data().netAmount);
+                        
+                        const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
+                        const cdForThisEntry = Math.round((paymentForThisEntry / amountToDistribute) * cdToDistribute) || 0;
+                        const totalReductionForThisEntry = paymentForThisEntry + cdForThisEntry;
+                        const actualReduction = Math.min(outstanding, totalReductionForThisEntry);
+
+                        if (actualReduction > 0) {
+                             paidForDetails.push({ 
+                                srNo: entryData.srNo, 
+                                amount: paymentForThisEntry, 
+                                cdApplied: cdEnabled,
+                                supplierName: toTitleCase(entryData.name),
+                                supplierSo: toTitleCase(entryData.so),
+                                supplierContact: entryData.contact,
+                            });
+                            
+                            transaction.update(supplierDocRef, { netAmount: outstanding - actualReduction });
+                            amountToDistribute -= paymentForThisEntry;
+                            cdToDistribute -= cdForThisEntry;
                         }
                     }
 
@@ -979,7 +986,7 @@ export default function SupplierPaymentsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                <TabsTrigger value="history" disabled={rtgsFor === 'Outsider'}>Full History</TabsTrigger>
+                <TabsTrigger value="history">Full History</TabsTrigger>
             </TabsList>
             <TabsContent value="processing">
               <Card>
@@ -1134,7 +1141,7 @@ export default function SupplierPaymentsPage() {
                                             </>
                                             ) : null
                                         }
-                                         {paymentMethod === 'RTGS' && rtgsFor === 'Supplier' && (
+                                         {(paymentMethod === 'RTGS' && rtgsFor === 'Supplier') && (
                                             <>
                                                  <div className="space-y-1">
                                                     <Label className="text-xs">6R No.</Label>
@@ -1153,6 +1160,18 @@ export default function SupplierPaymentsPage() {
                                                             <Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus />
                                                         </PopoverContent>
                                                     </Popover>
+                                                </div>
+                                            </>
+                                        )}
+                                         {paymentMethod === 'RTGS' && rtgsFor === 'Outsider' && (
+                                            <>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Payment ID</Label>
+                                                    <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Amount</Label>
+                                                    <Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/>
                                                 </div>
                                             </>
                                         )}
@@ -1299,15 +1318,11 @@ export default function SupplierPaymentsPage() {
                                         </div>
                                         <div className="p-2 border rounded-lg space-y-2">
                                             <div className="grid grid-cols-2 gap-2 items-end">
-                                                {rtgsFor === 'Outsider' ?
-                                                 <>
-                                                    <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs"/></div> 
-                                                    <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div> 
-                                                 </> :
+                                                {rtgsFor === 'Supplier' ?
                                                  <>
                                                     <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                                                     <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                                 </>
+                                                 </> : null
                                                 }
                                                 <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
                                                 <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
