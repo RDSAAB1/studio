@@ -990,9 +990,9 @@ export default function SupplierPaymentsPage() {
                 </div>
                 {selectedCustomerKey && (
                      <div className="p-1 border rounded-lg bg-card/30 flex items-center justify-between gap-4 md:col-span-5">
-                        <div className="flex-1 pl-2">
-                            <p className="text-muted-foreground text-[10px] leading-tight">Total Outstanding:</p>
-                            <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                        <div className="flex-1 pl-2 flex items-center gap-2">
+                           <p className="text-muted-foreground text-xs font-medium">Total Outstanding:</p>
+                           <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
                         </div>
                         <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-8 text-xs">
                             Change Selection
