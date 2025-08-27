@@ -73,7 +73,7 @@ const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
     { value: 'unpaid_amount', label: 'CD on Unpaid Amount (Selected)' },
     { value: 'payment_amount', label: 'CD on Payment Amount (Manual)' },
-    { value: 'full_amount', label: 'CD on Full Amount (Selected)' },
+    { value: 'full_amount', label: 'CD on Full Amount' },
 ];
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -387,7 +387,7 @@ export default function SupplierPaymentsPage() {
               );
               
               const paidAmountWithoutCD = pastPaymentsForSelectedEntries.reduce((sum, p) => {
-                  if (p.cdAmount === 0 || !p.cdApplied) {
+                  if (!p.cdApplied) {
                       return sum + p.amount;
                   }
                   return sum;
@@ -401,15 +401,27 @@ export default function SupplierPaymentsPage() {
           case 'unpaid_amount':
               base = outstandingForSelected;
               break;
-          case 'full_amount':
-              base = cdEligibleEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || Number(entry.netAmount) + (paymentHistory.filter(p=>p.paidFor?.some(pf=>pf.srNo===entry.srNo)).reduce((sum,p)=>sum+(p.paidFor?.find(pf=>pf.srNo===entry.srNo)?.amount||0),0))), 0);
+          case 'full_amount': {
+              const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
+              const pastPaymentsForSelectedEntries = paymentHistory.filter(p =>
+                  p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
+              );
+              
+              const paidAmountWithoutCD = pastPaymentsForSelectedEntries.reduce((sum, p) => {
+                  if (!p.cdApplied) {
+                      return sum + p.amount;
+                  }
+                  return sum;
+              }, 0);
+              base = outstandingForSelected + paidAmountWithoutCD;
               break;
+          }
           default:
               base = 0;
       }
       
       setCalculatedCdAmount(Math.round((base * cdPercent) / 100));
-  }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory, totalOutstandingForSelected, cdEligibleEntries]);
+  }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory, totalOutstandingForSelected]);
 
   useEffect(() => {
     if (paymentType === 'Full') {
