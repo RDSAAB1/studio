@@ -969,12 +969,12 @@ export default function SupplierPaymentsPage() {
   return (
     <div className="space-y-3">
         <Card>
-            <CardContent className="p-3 grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
-                <div className="flex items-center gap-2 md:col-span-3">
+            <CardContent className="p-3 flex items-center gap-2">
+                <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold">Select Supplier</h3>
+                    <h3 className="text-sm font-semibold whitespace-nowrap">Select Supplier</h3>
                 </div>
-                <div className="w-full md:col-span-4">
+                <div className="w-full">
                     <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
                         <SelectTrigger className="h-8 text-xs">
                             <SelectValue placeholder="Search and select supplier..."/>
@@ -989,13 +989,11 @@ export default function SupplierPaymentsPage() {
                     </Select>
                 </div>
                 {selectedCustomerKey && (
-                     <div className="p-1 border rounded-lg bg-card/30 flex items-center justify-between gap-4 md:col-span-5">
-                        <div className="flex-1 pl-2 flex items-center gap-2">
-                           <p className="text-muted-foreground text-xs font-medium">Total Outstanding:</p>
-                           <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-8 text-xs">
-                            Change Selection
+                     <div className="flex items-center justify-between gap-2 p-1 border rounded-lg bg-card/30">
+                         <p className="text-muted-foreground text-xs font-medium whitespace-nowrap pl-2">Total Outstanding:</p>
+                         <p className="text-sm font-bold text-destructive pr-2">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">
+                            Change
                         </Button>
                     </div>
                 )}
@@ -1057,15 +1055,7 @@ export default function SupplierPaymentsPage() {
       {selectedCustomerKey && (
         <div onKeyDown={handleKeyDown}>
           <Card>
-            <CardHeader className="p-3 pb-2 flex-row justify-between items-center">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-primary"/>
-                <CardTitle className="text-base">
-                    {editingPayment ? `Editing Payment` : 'Payment Processing'}
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
+            <CardContent className="p-3">
               <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 h-9">
                   <TabsTrigger value="Cash">Cash</TabsTrigger>
