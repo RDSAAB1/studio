@@ -990,8 +990,10 @@ export default function SupplierPaymentsPage() {
                 </div>
                 {selectedCustomerKey && (
                      <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0">
-                         <p className="text-muted-foreground text-xs font-medium whitespace-nowrap">Total Outstanding:</p>
-                         <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                        <div className="flex items-center gap-2">
+                           <p className="text-muted-foreground text-xs font-medium whitespace-nowrap">Total Outstanding:</p>
+                           <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                        </div>
                         <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">
                             Change
                         </Button>
@@ -1273,14 +1275,13 @@ export default function SupplierPaymentsPage() {
             </CardContent>
             <CardFooter className="p-3 pt-0">
                 <Card className="bg-muted/30 w-full p-2">
-                    <CardContent className="p-1 flex justify-between items-center">
-                        <div className="text-xs space-y-1">
-                            <div className="flex items-center gap-2"><p>Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount || paymentAmount)}</p></div>
-                            {cdEnabled && <div className="flex items-center gap-2"><p>CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
-                            <Separator/>
-                            <div className="flex items-center gap-2 text-sm"><p className="font-bold">Total Reduction:</p><p className="font-bold text-green-600">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</p></div>
-                        </div>
-                        <Button onClick={processPayment} size="sm">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                    <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        <div className="flex items-center gap-2 text-xs"><p>Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount || paymentAmount)}</p></div>
+                        {cdEnabled && <div className="flex items-center gap-2 text-xs"><p>CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
+                        <Separator orientation="vertical" className="h-6 mx-2 hidden sm:block" />
+                        <div className="flex items-center gap-2 text-sm"><p className="font-semibold">Total Reduction:</p><p className="font-bold text-green-600">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</p></div>
+                        <div className="flex-grow"></div>
+                        <Button onClick={processPayment} size="sm" className="h-8 text-xs">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
                     </CardContent>
                 </Card>
             </CardFooter>
