@@ -140,6 +140,8 @@ export default function SupplierPaymentsPage() {
   const [newBranchData, setNewBranchData] = useState({ bankName: '', branchName: '', ifscCode: '' });
   const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
   const [activeTab, setActiveTab] = useState('processing');
+  const [openCombobox, setOpenCombobox] = useState(false);
+
 
   const stableToast = useCallback(toast, []);
 
@@ -970,18 +972,49 @@ export default function SupplierPaymentsPage() {
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
                     <div className="flex flex-1 items-center gap-2">
                         <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
-                        <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
-                            <SelectTrigger id="supplier-select" className="h-8 text-xs flex-1">
-                                <SelectValue placeholder="Search and select supplier..."/>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                                <SelectItem key={key} value={key} className="text-sm">
-                                    {toTitleCase(data.name)} ({data.contact})
-                                </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                         <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={openCombobox}
+                                className="h-8 text-xs flex-1 justify-between font-normal"
+                                >
+                                {selectedCustomerKey
+                                    ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '') + ` (${customerSummaryMap.get(selectedCustomerKey)?.contact || ''})`
+                                    : "Search and select supplier..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <Command>
+                                <CommandInput placeholder="Search by name or contact..." />
+                                <CommandList>
+                                    <CommandEmpty>No supplier found.</CommandEmpty>
+                                    <CommandGroup>
+                                    {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
+                                        <CommandItem
+                                        key={key}
+                                        value={`${data.name} ${data.contact}`}
+                                        onSelect={() => {
+                                            handleCustomerSelect(key);
+                                            setOpenCombobox(false);
+                                        }}
+                                        >
+                                        <Check
+                                            className={cn(
+                                            "mr-2 h-4 w-4",
+                                            selectedCustomerKey === key ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {toTitleCase(data.name)} ({data.contact})
+                                        </CommandItem>
+                                    ))}
+                                    </CommandGroup>
+                                </CommandList>
+                                </Command>
+                            </PopoverContent>
+                            </Popover>
                     </div>
                      {selectedCustomerKey && (
                         <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
@@ -1284,7 +1317,7 @@ export default function SupplierPaymentsPage() {
                                             <TableCell className="p-2 text-xs">{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
                                             <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
                                             <TableCell className="text-right p-2 text-xs">{formatCurrency(Number(entry.netAmount))}</TableCell>
-                                            <TableCell className="p-2 text-xs"><Badge variant={Number(entry.netAmount) < 1 ? "default" : "destructive"}>{Number(entry.netAmount) < 1 ? "Paid" : "Outstanding"}</Badge></TableCell>
+                                            <TableCell className="p-2 text-xs"><Badge variant={Number(entry.netAmount) < 1 ? 'default' : 'destructive'}>{Number(entry.netAmount) < 1 ? "Paid" : "Outstanding"}</Badge></TableCell>
                                             <TableCell className="text-center p-0">
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
                                                     <Info className="h-4 w-4" />
