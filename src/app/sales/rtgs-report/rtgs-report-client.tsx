@@ -92,58 +92,29 @@ export default function RtgsReportClient() {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
             
-            const newReportRows: RtgsReportRow[] = [];
-
-            payments.forEach(p => {
-                // Now directly use p.paymentId for the srNo in the report row
-                const paymentSrNo = p.paymentId || ''; 
-
-                if (p.paidFor && p.paidFor.length > 0) {
-                    p.paidFor.forEach(pf => {
-                        newReportRows.push({
-                            paymentId: p.paymentId,
-                            date: p.date,
-                            checkNo: p.checkNo || p.utrNo || '',
-                            type: p.type,
-                            srNo: paymentSrNo, // Updated: Use p.paymentId
-                            supplierName: toTitleCase(pf.supplierName || ''),
-                            fatherName: toTitleCase(p.supplierFatherName || pf.supplierSo || ''),
-                            contact: pf.supplierContact || '',
-                            acNo: pf.bankAcNo || '',
-                            ifscCode: pf.bankIfsc || '',
-                            branch: toTitleCase(pf.bankBranch || ''),
-                            bank: pf.bankName || '',
-                            amount: pf.amount,
-                            rate: p.rate || 0,
-                            weight: p.quantity || 0,
-                            sixRNo: p.sixRNo || '',
-                            sixRDate: p.sixRDate || '',
-                            parchiNo: p.parchiNo || '', // This is the paidFor item's parchiNo
-                        });
-                    });
-                } else {
-                    // Handle payments that might not have a paidFor array but are still RTGS
-                    newReportRows.push({
-                        paymentId: p.paymentId,
-                        date: p.date,
-                        checkNo: p.checkNo || p.utrNo || '',
-                        type: p.type,
-                        srNo: paymentSrNo, // Updated: Use p.paymentId
-                        supplierName: toTitleCase(p.supplierName || ''),
-                        fatherName: toTitleCase(p.supplierFatherName || ''),
-                        contact: p.supplierContact || '',
-                        acNo: p.bankAcNo || '',
-                        ifscCode: p.bankIfsc || '',
-                        branch: toTitleCase(p.bankBranch || ''),
-                        bank: p.bankName || '',
-                        amount: p.amount || 0,
-                        rate: p.rate || 0,
-                        weight: p.quantity || 0,
-                        sixRNo: p.sixRNo || '',
-                        sixRDate: p.sixRDate || '',
-                        parchiNo: p.parchiNo || '',
-                    });
-                }
+            const newReportRows: RtgsReportRow[] = payments.map(p => {
+                const totalPaidForAmount = p.paidFor?.reduce((sum, pf) => sum + pf.amount, 0) || 0;
+                
+                return {
+                    paymentId: p.paymentId,
+                    date: p.date,
+                    checkNo: p.checkNo || p.utrNo || '',
+                    type: p.type,
+                    srNo: p.paymentId || '',
+                    supplierName: toTitleCase(p.supplierName || ''),
+                    fatherName: toTitleCase(p.supplierFatherName || ''),
+                    contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
+                    acNo: p.bankAcNo || '',
+                    ifscCode: p.bankIfsc || '',
+                    branch: toTitleCase(p.bankBranch || ''),
+                    bank: p.bankName || '',
+                    amount: p.rtgsAmount || p.amount || totalPaidForAmount,
+                    rate: p.rate || 0,
+                    weight: p.quantity || 0,
+                    sixRNo: p.sixRNo || '',
+                    sixRDate: p.sixRDate || '',
+                    parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
+                };
             });
 
             // Initial sort before any filtering
