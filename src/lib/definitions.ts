@@ -119,6 +119,7 @@ export type Payment = {
     bankBranch?: string;
     bankAcNo?: string;
     bankIfsc?: string;
+    rtgsFor?: 'Supplier' | 'Outsider';
 }
 
 export type CustomerSummary = {

@@ -121,6 +121,7 @@ export default function SupplierPaymentsPage() {
   const [rtgsRate, setRtgsRate] = useState(0);
   const [rtgsAmount, setRtgsAmount] = useState(0);
   const [isRoundFigureMode, setIsRoundFigureMode] = useState(false);
+  const [rtgsFor, setRtgsFor] = useState<'Supplier' | 'Outsider'>('Supplier');
 
 
   const [cdEnabled, setCdEnabled] = useState(false);
@@ -439,8 +440,10 @@ export default function SupplierPaymentsPage() {
     }
   }, [selectedEntries]);
    
-  const resetPaymentForm = useCallback(() => {
-    setSelectedEntryIds(new Set());
+  const resetPaymentForm = useCallback((isOutsider: boolean = false) => {
+    if (!isOutsider) {
+      setSelectedEntryIds(new Set());
+    }
     setPaymentAmount(0);
     setCdEnabled(false);
     setEditingPayment(null);
@@ -453,6 +456,11 @@ export default function SupplierPaymentsPage() {
     setRtgsAmount(0);
     setPaymentCombinations([]);
     setPaymentId(getNextPaymentId(paymentHistory));
+    if (isOutsider) {
+      setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
+      setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
+      setPaymentType('Full');
+    }
   }, [getNextPaymentId, paymentHistory]);
 
   const handleFullReset = useCallback(() => {
@@ -492,11 +500,11 @@ export default function SupplierPaymentsPage() {
 
 
     const processPayment = async () => {
-        if (!selectedCustomerKey) {
+        if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
             toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
             return;
         }
-        if (selectedEntryIds.size === 0) {
+        if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
             return;
         }
@@ -507,7 +515,7 @@ export default function SupplierPaymentsPage() {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
             return;
         }
-        if (paymentType === 'Partial' && !editingPayment && finalPaymentAmount > totalOutstandingForSelected) {
+        if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && finalPaymentAmount > totalOutstandingForSelected) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
             return;
         }
@@ -517,104 +525,105 @@ export default function SupplierPaymentsPage() {
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
                 
-                const allInvolvedSrNos = new Set<string>();
-                if (tempEditingPayment) {
-                    (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
-                }
-                selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
-
-                const involvedSupplierDocs = new Map<string, any>();
-                for (const srNo of allInvolvedSrNos) {
-                    // Find the supplier doc from the already-fetched `suppliers` state
-                    const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
-                    if (supplierToUpdate) {
-                        const docRef = doc(db, "suppliers", supplierToUpdate.id);
-                        const supplierDoc = await transaction.get(docRef);
-                        if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
-                        involvedSupplierDocs.set(srNo, supplierDoc);
+                if (rtgsFor === 'Supplier') {
+                    const allInvolvedSrNos = new Set<string>();
+                    if (tempEditingPayment) {
+                        (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
                     }
-                }
+                    selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
 
-                const outstandingBalances: { [key: string]: number } = {};
-                involvedSupplierDocs.forEach((docSnap, srNo) => {
-                    outstandingBalances[srNo] = Math.round(Number(docSnap.data().netAmount));
-                });
+                    const involvedSupplierDocs = new Map<string, any>();
+                    for (const srNo of allInvolvedSrNos) {
+                        const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
+                        if (supplierToUpdate) {
+                            const docRef = doc(db, "suppliers", supplierToUpdate.id);
+                            const supplierDoc = await transaction.get(docRef);
+                            if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
+                            involvedSupplierDocs.set(srNo, supplierDoc);
+                        }
+                    }
 
-                if (tempEditingPayment) {
-                    (tempEditingPayment.paidFor || []).forEach(detail => {
-                        if (outstandingBalances[detail.srNo] !== undefined) {
-                            outstandingBalances[detail.srNo] += Math.round(detail.amount);
+                    const outstandingBalances: { [key: string]: number } = {};
+                    involvedSupplierDocs.forEach((docSnap, srNo) => {
+                        outstandingBalances[srNo] = Math.round(Number(docSnap.data().netAmount));
+                    });
+
+                    if (tempEditingPayment) {
+                        (tempEditingPayment.paidFor || []).forEach(detail => {
+                            if (outstandingBalances[detail.srNo] !== undefined) {
+                                outstandingBalances[detail.srNo] += Math.round(detail.amount);
+                            }
+                        });
+                    }
+                    
+                    let remainingPayment = Math.round(finalPaymentAmount + calculatedCdAmount);
+                    const paidForDetails: PaidFor[] = [];
+                    const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    
+                    sortedEntries.forEach(entryData => {
+                        if (remainingPayment > 0) {
+                            let outstanding = outstandingBalances[entryData.srNo];
+                            const amountToPay = Math.min(outstanding, remainingPayment);
+
+                            if (amountToPay > 0) {
+                                paidForDetails.push({ 
+                                    srNo: entryData.srNo, 
+                                    amount: amountToPay, 
+                                    cdApplied: cdEnabled,
+                                    supplierName: toTitleCase(entryData.name),
+                                    supplierSo: toTitleCase(entryData.so),
+                                    supplierContact: entryData.contact,
+                                    bankName: entryData.bank || '',
+                                    bankAcNo: entryData.acNo || '',
+                                    bankBranch: entryData.branch || '',
+                                    bankIfsc: entryData.ifscCode || '',
+                                });
+                                
+                                outstandingBalances[entryData.srNo] -= amountToPay;
+                                remainingPayment -= amountToPay;
+                            }
                         }
                     });
-                }
-                
-                let remainingPayment = Math.round(finalPaymentAmount + calculatedCdAmount);
-                const paidForDetails: PaidFor[] = [];
-                const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                
-                sortedEntries.forEach(entryData => {
-                    if (remainingPayment > 0) {
-                        let outstanding = outstandingBalances[entryData.srNo];
-                        const amountToPay = Math.min(outstanding, remainingPayment);
 
-                        if (amountToPay > 0) {
-                            paidForDetails.push({ 
-                                srNo: entryData.srNo, 
-                                amount: amountToPay, 
-                                cdApplied: cdEnabled,
-                                supplierName: toTitleCase(entryData.name),
-                                supplierSo: toTitleCase(entryData.so),
-                                supplierContact: entryData.contact,
-                                bankName: entryData.bank || '',
-                                bankAcNo: entryData.acNo || '',
-                                bankBranch: entryData.branch || '',
-                                bankIfsc: entryData.ifscCode || '',
-                            });
-                            
-                            outstandingBalances[entryData.srNo] -= amountToPay;
-                            remainingPayment -= amountToPay;
+                    if (remainingPayment > 0 && sortedEntries.length > 0) {
+                        const lastEntrySrNo = sortedEntries[sortedEntries.length - 1].srNo;
+                        if (outstandingBalances[lastEntrySrNo] >= remainingPayment) {
+                            outstandingBalances[lastEntrySrNo] -= remainingPayment;
+                            const detailToUpdate = paidForDetails.find(d => d.srNo === lastEntrySrNo);
+                            if (detailToUpdate) {
+                                detailToUpdate.amount += remainingPayment;
+                            }
+                            remainingPayment = 0;
                         }
                     }
-                });
 
-                if (remainingPayment > 0 && sortedEntries.length > 0) {
-                    const lastEntrySrNo = sortedEntries[sortedEntries.length - 1].srNo;
-                    if (outstandingBalances[lastEntrySrNo] >= remainingPayment) {
-                        outstandingBalances[lastEntrySrNo] -= remainingPayment;
-                        const detailToUpdate = paidForDetails.find(d => d.srNo === lastEntrySrNo);
-                        if (detailToUpdate) {
-                            detailToUpdate.amount += remainingPayment;
+                    for (const srNo in outstandingBalances) {
+                        const newBalance = Math.round(outstandingBalances[srNo]);
+                        const supplierDocSnap = involvedSupplierDocs.get(srNo);
+                         if (supplierDocSnap) {
+                            transaction.update(supplierDocSnap.ref, { netAmount: newBalance });
                         }
-                        remainingPayment = 0;
                     }
-                }
 
-                for (const srNo in outstandingBalances) {
-                    const newBalance = Math.round(outstandingBalances[srNo]);
-                    const supplierDocSnap = involvedSupplierDocs.get(srNo);
-                     if (supplierDocSnap) {
-                        transaction.update(supplierDocSnap.ref, { netAmount: newBalance });
+                    // Update bank details for the customerId if they have changed in the form
+                    const currentSupplierSummary = customerSummaryMap.get(selectedCustomerKey);
+                    if (currentSupplierSummary && (
+                        currentSupplierSummary.acNo !== bankDetails.acNo ||
+                        currentSupplierSummary.ifscCode !== bankDetails.ifscCode ||
+                        currentSupplierSummary.bank !== bankDetails.bank ||
+                        currentSupplierSummary.branch !== bankDetails.branch
+                    )) {
+                        const q = query(suppliersCollection, where('customerId', '==', selectedCustomerKey));
+                        const supplierDocsToUpdate = await getDocs(q); // Use getDocs inside transaction, though not ideal, needed here
+                        supplierDocsToUpdate.forEach(docSnap => {
+                            transaction.update(docSnap.ref, { ...bankDetails });
+                        });
                     }
-                }
-
-                // Update bank details for the customerId if they have changed in the form
-                const currentSupplierSummary = customerSummaryMap.get(selectedCustomerKey);
-                if (currentSupplierSummary && (
-                    currentSupplierSummary.acNo !== bankDetails.acNo ||
-                    currentSupplierSummary.ifscCode !== bankDetails.ifscCode ||
-                    currentSupplierSummary.bank !== bankDetails.bank ||
-                    currentSupplierSummary.branch !== bankDetails.branch
-                )) {
-                    const q = query(suppliersCollection, where('customerId', '==', selectedCustomerKey));
-                    const supplierDocsToUpdate = await getDocs(q); // Use getDocs inside transaction, though not ideal, needed here
-                    supplierDocsToUpdate.forEach(docSnap => {
-                        transaction.update(docSnap.ref, { ...bankDetails });
-                    });
                 }
                 
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-                    customerId: selectedCustomerKey,
+                    customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                     date: new Date().toISOString().split("T")[0],
                     amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount),
@@ -622,7 +631,7 @@ export default function SupplierPaymentsPage() {
                     type: paymentType,
                     receiptType: paymentMethod,
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
-                    paidFor: paidForDetails,
+                    paidFor: rtgsFor === 'Supplier' ? selectedEntries.map(e => ({ srNo: e.srNo, amount: 0, cdApplied: cdEnabled })) : [],
                     sixRNo: sixRNo,
                     sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
                     parchiNo,
@@ -631,13 +640,14 @@ export default function SupplierPaymentsPage() {
                     quantity: rtgsQuantity,
                     rate: rtgsRate,
                     rtgsAmount,
-                    supplierName: supplierDetails.name,
-                    supplierFatherName: supplierDetails.fatherName,
-                    supplierAddress: supplierDetails.address,
+                    supplierName: toTitleCase(supplierDetails.name),
+                    supplierFatherName: toTitleCase(supplierDetails.fatherName),
+                    supplierAddress: toTitleCase(supplierDetails.address),
                     bankName: bankDetails.bank,
                     bankBranch: bankDetails.branch,
                     bankAcNo: bankDetails.acNo,
                     bankIfsc: bankDetails.ifscCode,
+                    rtgsFor: rtgsFor,
                 };
 
                 if (tempEditingPayment) {
@@ -655,7 +665,7 @@ export default function SupplierPaymentsPage() {
             if (paymentMethod === 'RTGS' && finalPaymentData) {
                 setRtgsReceiptData(finalPaymentData);
             }
-            resetPaymentForm();
+            resetPaymentForm(rtgsFor === 'Outsider');
         } catch (error) {
             console.error("Error processing payment:", error);
             toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment. Please try again." });
@@ -666,22 +676,27 @@ export default function SupplierPaymentsPage() {
     const handleEditPayment = async (paymentToEdit: Payment) => {
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         
-        const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
-        const supplierDocs = await getDocs(q);
-        const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
-        
-        if (foundSrNos.size !== srNosInPayment.length) {
-            toast({
-                variant: "destructive",
-                title: "Cannot Edit Payment",
-                description: "Some original supplier entries for this payment could not be found. They may have been deleted.",
-            });
-            return;
+        if (paymentToEdit.rtgsFor === 'Supplier') {
+          const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
+          const supplierDocs = await getDocs(q);
+          const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
+          
+          if (foundSrNos.size !== srNosInPayment.length) {
+              toast({
+                  variant: "destructive",
+                  title: "Cannot Edit Payment",
+                  description: "Some original supplier entries for this payment could not be found. They may have been deleted.",
+              });
+              return;
+          }
+
+          const newSelectedEntryIds = new Set<string>();
+          supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
+          setSelectedEntryIds(newSelectedEntryIds);
+        } else {
+            setSelectedEntryIds(new Set());
         }
 
-        const newSelectedEntryIds = new Set<string>();
-        supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
-        
         setSelectedCustomerKey(paymentToEdit.customerId);
         setEditingPayment(paymentToEdit);
         setPaymentId(paymentToEdit.paymentId);
@@ -690,7 +705,7 @@ export default function SupplierPaymentsPage() {
         setPaymentMethod(paymentToEdit.receiptType);
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
-        setSelectedEntryIds(newSelectedEntryIds);
+        setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
         setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
         setSixRNo(paymentToEdit.sixRNo || '');
@@ -1032,11 +1047,11 @@ export default function SupplierPaymentsPage() {
         </Card>
 
 
-      {selectedCustomerKey && (
+      {(selectedCustomerKey || rtgsFor === 'Outsider') && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                <TabsTrigger value="history">Full History</TabsTrigger>
+                <TabsTrigger value="history" disabled={rtgsFor === 'Outsider'}>Full History</TabsTrigger>
             </TabsList>
             <TabsContent value="processing">
                 <div onKeyDown={handleKeyDown}>
@@ -1048,10 +1063,10 @@ export default function SupplierPaymentsPage() {
                                 <TabsTrigger value="Online">Online</TabsTrigger>
                                 <TabsTrigger value="RTGS">RTGS</TabsTrigger>
                                 </TabsList>
-
+                                
                                 <div className="mt-2 space-y-2">
-                                    <Card className="bg-muted/30 p-2">
-                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end">
+                                     <Card className="bg-muted/30 p-2">
+                                        <div className={cn("grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end", paymentMethod === 'RTGS' && "lg:grid-cols-5")}>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Payment ID</Label>
                                                 <Input 
@@ -1063,7 +1078,7 @@ export default function SupplierPaymentsPage() {
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Payment Type</Label>
-                                                <Select value={paymentType} onValueChange={setPaymentType}>
+                                                <Select value={paymentType} onValueChange={setPaymentType} disabled={rtgsFor === 'Outsider'}>
                                                     <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="Full">Full</SelectItem>
@@ -1078,7 +1093,7 @@ export default function SupplierPaymentsPage() {
                                                 </div>
                                             )}
                                             <div className="flex items-center space-x-2 pb-1">
-                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
+                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={rtgsFor === 'Outsider'} />
                                                 <Label htmlFor="cd-toggle" className="text-xs">Apply CD</Label>
                                             </div>
                                             {cdEnabled && <>
@@ -1105,8 +1120,45 @@ export default function SupplierPaymentsPage() {
                                         </div>
                                     </Card>
                                 </div>
+                                
+                                {(paymentMethod === 'RTGS' || paymentMethod === 'Cash') && (
+                                  <Card className="mt-2 p-2">
+                                      <CardHeader className="p-1 pb-2">
+                                        <CardTitle className="text-sm">Supplier/Payee Details</CardTitle>
+                                      </CardHeader>
+                                      <CardContent className="p-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                                          <div className="space-y-1">
+                                              <Label className="text-xs">Name</Label>
+                                              <Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, name: toTitleCase(e.target.value)})} className="h-8 text-xs" />
+                                          </div>
+                                          <div className="space-y-1">
+                                              <Label className="text-xs">Father's Name</Label>
+                                              <Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, fatherName: toTitleCase(e.target.value)})} className="h-8 text-xs" />
+                                          </div>
+                                          <div className="space-y-1">
+                                              <Label className="text-xs">Address</Label>
+                                              <Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} onBlur={e => setSupplierDetails({...supplierDetails, address: toTitleCase(e.target.value)})} className="h-8 text-xs" />
+                                          </div>
+                                          <div className="space-y-1">
+                                              <Label className="text-xs">Contact</Label>
+                                              <Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" disabled={rtgsFor === 'Supplier'}/>
+                                          </div>
+                                      </CardContent>
+                                  </Card>
+                                )}
 
                                 <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
+                                     <div className="flex items-center space-x-2 p-2">
+                                        <Label htmlFor="rtgs-for-toggle" className="text-sm font-medium">RTGS For:</Label>
+                                        <Switch id="rtgs-for-toggle" checked={rtgsFor === 'Outsider'} onCheckedChange={(checked) => {
+                                            const newType = checked ? 'Outsider' : 'Supplier';
+                                            setRtgsFor(newType);
+                                            resetPaymentForm(newType === 'Outsider');
+                                        }} />
+                                        <Label htmlFor="rtgs-for-toggle" className="text-sm">{rtgsFor}</Label>
+                                    </div>
+
+                                    {rtgsFor === 'Supplier' && (
                                      <Card className="p-2">
                                         <CardContent className="p-1 pt-0">
                                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2 border rounded-lg">
@@ -1129,6 +1181,7 @@ export default function SupplierPaymentsPage() {
                                             </div>
                                         </CardContent>
                                      </Card>
+                                    )}
                                     
                                     <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
                                         <DialogContent className="max-w-3xl">
@@ -1282,7 +1335,7 @@ export default function SupplierPaymentsPage() {
                                     <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
                                 </div>
                                 <div className="flex-grow"></div>
-                                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={resetPaymentForm}>
+                                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}>
                                     <RefreshCw className="mr-2 h-3 w-3" />
                                     Clear Form
                                 </Button>
