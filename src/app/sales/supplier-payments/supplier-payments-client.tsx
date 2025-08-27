@@ -482,7 +482,6 @@ export default function SupplierPaymentsPage() {
             bank: customerData.bank || '',
             branch: customerData.branch || '',
         });
-        setIsOutstandingModalOpen(true);
     }
     resetPaymentForm();
   };
@@ -971,427 +970,460 @@ export default function SupplierPaymentsPage() {
   
   return (
     <div className="space-y-3">
-       <Card>
-            <CardContent className="p-3 flex items-center gap-4">
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <Users className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold whitespace-nowrap">Select Supplier</h3>
-                </div>
-                <div className="flex-1">
-                    <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
-                        <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Search and select supplier..."/>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                            <SelectItem key={key} value={key} className="text-sm">
-                                {toTitleCase(data.name)} ({data.contact})
-                            </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                {selectedCustomerKey && (
-                     <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0">
-                         <div className="flex items-center gap-2">
-                             <p className="text-xs text-muted-foreground font-medium">Total Outstanding:</p>
-                             <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
-                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">
-                            Change
-                        </Button>
+        <Card>
+            <CardContent className="p-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr] gap-x-4 items-center">
+                    <div className="flex items-center gap-2">
+                        <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
+                        <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
+                            <SelectTrigger id="supplier-select" className="h-8 text-xs flex-1">
+                                <SelectValue placeholder="Search and select supplier..."/>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
+                                <SelectItem key={key} value={key} className="text-sm">
+                                    {toTitleCase(data.name)} ({data.contact})
+                                </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
-                )}
+                     {selectedCustomerKey && (
+                        <div className="flex items-center gap-2 border-l pl-2">
+                            <Label className="text-xs text-muted-foreground font-medium">Total Outstanding:</Label>
+                            <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                            <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">
+                                Change Selection
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </CardContent>
         </Card>
 
-      {selectedCustomerKey && (
-            <Dialog open={isOutstandingModalOpen} onOpenChange={setIsOutstandingModalOpen}>
-                <DialogContent className="max-w-4xl">
-                    <DialogHeader>
-                        <DialogTitle>Outstanding Entries for {toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '')}</DialogTitle>
-                        <DialogDescription>Select the entries you want to pay for.</DialogDescription>
-                    </DialogHeader>
-                    <div className="max-h-[60vh] overflow-y-auto">
-                       <Table>
-                        <TableHeader>
-                        <TableRow>
-                            <TableHead><Checkbox onCheckedChange={(checked) => {
-                                const newSet = new Set<string>();
-                                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
-                                if(checked) {
-                                    outstandingEntries.forEach(e => newSet.add(e.id));
-                                }
-                                setSelectedEntryIds(newSet);
-                            }}
-                            checked={selectedEntryIds.size > 0 && selectedEntryIds.size === suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).length}
-                             /></TableHead>
-                            <TableHead>SR No</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Due Date</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                        {suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).map(entry => (
-                            <TableRow key={entry.id} onClick={() => handleEntrySelect(entry.id)} className="cursor-pointer">
-                                <TableCell><Checkbox checked={selectedEntryIds.has(entry.id)} onCheckedChange={() => handleEntrySelect(entry.id)} /></TableCell>
-                                <TableCell>{entry.srNo}</TableCell>
-                                <TableCell>{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
-                                <TableCell>{format(new Date(entry.dueDate), "dd-MMM-yy")}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
-                            </TableRow>
-                        ))}
-                        </TableBody>
-                    </Table>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => {
-                            setIsOutstandingModalOpen(false);
-                            handleFullReset();
-                        }}>Cancel</Button>
-                        <Button onClick={handlePaySelectedOutstanding}>Confirm Selection</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-      )}
-
 
       {selectedCustomerKey && (
-        <div onKeyDown={handleKeyDown}>
-          <Card>
-            <CardContent className="p-3">
-              <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 h-9">
-                  <TabsTrigger value="Cash">Cash</TabsTrigger>
-                  <TabsTrigger value="Online">Online</TabsTrigger>
-                  <TabsTrigger value="RTGS">RTGS</TabsTrigger>
-                </TabsList>
+        <Tabs defaultValue="processing">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="processing">Payment Processing</TabsTrigger>
+                <TabsTrigger value="history">Full History</TabsTrigger>
+            </TabsList>
+            <TabsContent value="processing">
+                <div onKeyDown={handleKeyDown}>
+                    <Card>
+                        <CardContent className="p-3">
+                            <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
+                                <TabsList className="grid w-full grid-cols-3 h-9">
+                                <TabsTrigger value="Cash">Cash</TabsTrigger>
+                                <TabsTrigger value="Online">Online</TabsTrigger>
+                                <TabsTrigger value="RTGS">RTGS</TabsTrigger>
+                                </TabsList>
 
-                <div className="mt-2 space-y-2">
-                     <Card className="bg-muted/30 p-2">
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-2 gap-y-2 items-end">
-                            <div className="space-y-1">
-                                <Label className="text-xs">Payment Type</Label>
-                                <Select value={paymentType} onValueChange={setPaymentType}>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Full">Full</SelectItem>
-                                        <SelectItem value="Partial">Partial</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {paymentType === 'Partial' && (
-                                <div className="space-y-1">
-                                    <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
-                                    <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
-                                </div>
-                            )}
-                            <div className="flex items-center space-x-2 pb-1">
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="flex items-center space-x-2">
-                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
-                                                <Label htmlFor="cd-toggle" className={cn("text-xs", isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
+                                <div className="mt-2 space-y-2">
+                                    <Card className="bg-muted/30 p-2">
+                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-2 gap-y-2 items-end">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Payment Type</Label>
+                                                <Select value={paymentType} onValueChange={setPaymentType}>
+                                                    <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Full">Full</SelectItem>
+                                                        <SelectItem value="Partial">Partial</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
-                                        </TooltipTrigger>
-                                        {isCdSwitchDisabled && (
-                                            <TooltipContent>
-                                                <p>No selected entries are eligible for CD.</p>
-                                            </TooltipContent>
-                                        )}
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </div>
-                            {cdEnabled && <>
-                                <div className="space-y-1">
-                                    <Label htmlFor="cd-percent" className="text-xs">CD %</Label>
-                                    <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                                            {paymentType === 'Partial' && (
+                                                <div className="space-y-1">
+                                                    <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
+                                                    <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
+                                                </div>
+                                            )}
+                                            <div className="flex items-center space-x-2 pb-1">
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <div className="flex items-center space-x-2">
+                                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
+                                                                <Label htmlFor="cd-toggle" className={cn("text-xs", isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
+                                                            </div>
+                                                        </TooltipTrigger>
+                                                        {isCdSwitchDisabled && (
+                                                            <TooltipContent>
+                                                                <p>No selected entries are eligible for CD.</p>
+                                                            </TooltipContent>
+                                                        )}
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                            {cdEnabled && <>
+                                                <div className="space-y-1">
+                                                    <Label htmlFor="cd-percent" className="text-xs">CD %</Label>
+                                                    <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">CD At</Label>
+                                                    <Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}>
+                                                        <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
+                                                        <SelectContent>
+                                                            {availableCdOptions.map(opt => (
+                                                                <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">CD Amount</Label>
+                                                    <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
+                                                </div>
+                                            </>}
+                                        </div>
+                                    </Card>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">CD At</Label>
-                                    <Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}>
-                                        <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
-                                        <SelectContent>
-                                            {availableCdOptions.map(opt => (
-                                                <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">CD Amount</Label>
-                                    <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
-                                </div>
-                            </>}
-                        </div>
+
+                                <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
+                                    <Card className="p-2">
+                                    <CardContent className="p-1 pt-0 flex flex-wrap items-center gap-x-4 gap-y-2">
+                                        <div className="flex items-center space-x-2">
+                                            <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
+                                            <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="minRate" className="text-xs whitespace-nowrap">Min Rate</Label>
+                                            <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="maxRate" className="text-xs whitespace-nowrap">Max Rate</Label>
+                                            <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
+                                        </div>
+                                        <Button onClick={generatePaymentCombinations} size="sm" className="h-8 text-xs flex-grow sm:flex-grow-0">
+                                            <Calculator className="h-3 w-3 mr-1"/>
+                                            Generate for {formatCurrency(targetAmountForGenerator)}
+                                        </Button>
+                                    </CardContent>
+                                    </Card>
+                                    
+                                    <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
+                                        <DialogContent className="max-w-3xl">
+                                        <DialogHeader>
+                                            <DialogTitle>RTGS Payment Generator</DialogTitle>
+                                            <DialogDescription>
+                                                Target: {formatCurrency(targetAmountForGenerator)} | 
+                                                Rate Range: {formatCurrency(minRate)} - {formatCurrency(maxRate)}
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="mt-4 space-y-4">
+                                            <ScrollArea className="h-72">
+                                                <Table>
+                                                    <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('quantity')}>Qty <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('rate')}>Rate <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                        <TableHead className="cursor-pointer" onClick={() => requestSort('remainingAmount')}>Remaining <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                                                    </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                    {sortedCombinations.map((combo, index) => (
+                                                    <TableRow key={index} onClick={() => handleSelectCombination(combo)} className="cursor-pointer">
+                                                        <TableCell>{combo.quantity.toFixed(1)}</TableCell>
+                                                        <TableCell>{formatCurrency(combo.rate)}</TableCell>
+                                                        <TableCell>{formatCurrency(combo.amount)}</TableCell>
+                                                        <TableCell className="font-semibold text-red-500">{formatCurrency(combo.remainingAmount)}</TableCell>
+                                                    </TableRow>
+                                                    ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </ScrollArea>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button variant="outline" onClick={() => setIsGeneratorOpen(false)}>Close</Button>
+                                        </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                    
+                                    <Card className="p-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
+                                        <div className="p-2 border rounded-lg space-y-2">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <p className="text-xs font-semibold">Bank Details</p>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
+                                                    <Settings className="h-4 w-4"/>
+                                                </Button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1"><Label className="text-xs">Bank</Label>
+                                                    <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
+                                                            {bankDetails.bank || "Select bank"}
+                                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                                        <Command filter={customFilter}>
+                                                            <CommandInput placeholder="Search bank..." />
+                                                            <CommandEmpty>No bank found.</CommandEmpty>
+                                                            <CommandList>
+                                                                {combinedBanks.map((bank) => (
+                                                                <CommandItem
+                                                                    key={bank}
+                                                                    value={bank}
+                                                                    onSelect={(currentValue) => {
+                                                                    setBankDetails(prev => ({...prev, bank: currentValue === prev.bank ? "" : currentValue, branch: '', ifscCode: ''}));
+                                                                    }}
+                                                                    >
+                                                                    <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />
+                                                                    {bank}
+                                                                </CommandItem>
+                                                                ))}
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                                <div className="space-y-1"><Label className="text-xs">Branch</Label>
+                                                    <Popover>
+                                                    <PopoverTrigger asChild disabled={!bankDetails.bank}>
+                                                        <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
+                                                            {bankDetails.branch || "Select branch"}
+                                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                                        <Command filter={customFilter}>
+                                                            <CommandInput placeholder="Search branch..." />
+                                                            <CommandEmpty>No branch found.</CommandEmpty>
+                                                            <CommandList>
+                                                                {availableBranches.map((branch) => (
+                                                                <CommandItem
+                                                                    key={branch.id || branch.ifscCode + branch.branchName}
+                                                                    value={branch.branchName}
+                                                                    onSelect={(currentValue) => handleBranchSelect(currentValue)}
+                                                                    >
+                                                                    <Check className={cn("mr-2 h-4 w-4", bankDetails.branch === branch.branchName ? "opacity-100" : "opacity-0")} />
+                                                                    {branch.branchName}
+                                                                </CommandItem>
+                                                                ))}
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                                <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
+                                                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
+                                            </div>
+                                        </div>
+                                        <div className="p-2 border rounded-lg space-y-2">
+                                            <p className="text-xs font-semibold">Document Details</p>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                                <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                                <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
+                                                <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                     <Card className="p-2 grid grid-cols-3 gap-2 items-end">
+                                        <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
+                                        <div className="space-y-1"><Label className="text-xs">6R Date</Label>
+                                            <Popover>
+                                                <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal h-8 text-xs", !sixRDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{sixRDate ? format(sixRDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus /></PopoverContent>
+                                            </Popover>
+                                        </div>
+                                    </Card>
+                                </TabsContent>
+                            </Tabs>
+                        </CardContent>
+                        <CardFooter className="p-3 pt-0">
+                            <Card className="bg-muted/30 w-full p-2">
+                                <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-muted-foreground">Amount to be Paid:</span>
+                                        <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
+                                    </div>
+                                    {cdEnabled && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-muted-foreground">CD Amount:</span>
+                                            <span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <Separator orientation="vertical" className="h-5" />
+                                        <span className="text-sm font-medium text-muted-foreground">Total Reduction:</span>
+                                        <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
+                                    </div>
+                                    <div className="flex-grow"></div>
+                                    <Button onClick={processPayment} size="sm" className="h-8 text-xs">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                                </CardContent>
+                            </Card>
+                        </CardFooter>
                     </Card>
                 </div>
-
-                <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
-                    <Card className="p-2">
-                      <CardContent className="p-1 pt-0 flex flex-wrap items-center gap-x-4 gap-y-2">
-                          <div className="flex items-center space-x-2">
-                              <Switch id="round-figure-toggle" checked={isRoundFigureMode} onCheckedChange={setIsRoundFigureMode} />
-                              <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                              <Label htmlFor="minRate" className="text-xs whitespace-nowrap">Min Rate</Label>
-                              <Input id="minRate" type="number" value={minRate} onChange={e => setMinRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
-                          </div>
-                          <div className="flex items-center gap-2">
-                              <Label htmlFor="maxRate" className="text-xs whitespace-nowrap">Max Rate</Label>
-                              <Input id="maxRate" type="number" value={maxRate} onChange={e => setMaxRate(Number(e.target.value))} className="h-8 text-xs w-24"/>
-                          </div>
-                          <Button onClick={generatePaymentCombinations} size="sm" className="h-8 text-xs flex-grow sm:flex-grow-0">
-                              <Calculator className="h-3 w-3 mr-1"/>
-                              Generate for {formatCurrency(targetAmountForGenerator)}
-                          </Button>
-                      </CardContent>
-                    </Card>
-                     
-                     <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
-                        <DialogContent className="max-w-3xl">
-                           <DialogHeader>
-                              <DialogTitle>RTGS Payment Generator</DialogTitle>
-                              <DialogDescription>
-                                 Target: {formatCurrency(targetAmountForGenerator)} | 
-                                 Rate Range: {formatCurrency(minRate)} - {formatCurrency(maxRate)}
-                              </DialogDescription>
-                           </DialogHeader>
-                           <div className="mt-4 space-y-4">
-                              <ScrollArea className="h-72">
-                                 <Table>
-                                    <TableHeader>
-                                       <TableRow>
-                                          <TableHead className="cursor-pointer" onClick={() => requestSort('quantity')}>Qty <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                          <TableHead className="cursor-pointer" onClick={() => requestSort('rate')}>Rate <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                          <TableHead className="cursor-pointer" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                          <TableHead className="cursor-pointer" onClick={() => requestSort('remainingAmount')}>Remaining <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                                       </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                       {sortedCombinations.map((combo, index) => (
-                                       <TableRow key={index} onClick={() => handleSelectCombination(combo)} className="cursor-pointer">
-                                          <TableCell>{combo.quantity.toFixed(1)}</TableCell>
-                                          <TableCell>{formatCurrency(combo.rate)}</TableCell>
-                                          <TableCell>{formatCurrency(combo.amount)}</TableCell>
-                                          <TableCell className="font-semibold text-red-500">{formatCurrency(combo.remainingAmount)}</TableCell>
-                                       </TableRow>
-                                       ))}
-                                    </TableBody>
-                                 </Table>
-                              </ScrollArea>
-                           </div>
-                           <DialogFooter>
-                              <Button variant="outline" onClick={() => setIsGeneratorOpen(false)}>Close</Button>
-                           </DialogFooter>
-                        </DialogContent>
-                     </Dialog>
-                    
-                    <Card className="p-2">
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                           <div className="p-2 border rounded-lg space-y-2">
-                                <div className="flex justify-between items-center mb-1">
-                                    <p className="text-xs font-semibold">Bank Details</p>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
-                                        <Settings className="h-4 w-4"/>
-                                    </Button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-1"><Label className="text-xs">Bank</Label>
-                                        <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
-                                                {bankDetails.bank || "Select bank"}
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                            <Command filter={customFilter}>
-                                                <CommandInput placeholder="Search bank..." />
-                                                <CommandEmpty>No bank found.</CommandEmpty>
-                                                <CommandList>
-                                                    {combinedBanks.map((bank) => (
-                                                    <CommandItem
-                                                        key={bank}
-                                                        value={bank}
-                                                        onSelect={(currentValue) => {
-                                                        setBankDetails(prev => ({...prev, bank: currentValue === prev.bank ? "" : currentValue, branch: '', ifscCode: ''}));
-                                                        }}
-                                                        >
-                                                        <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />
-                                                        {bank}
-                                                    </CommandItem>
-                                                    ))}
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                    <div className="space-y-1"><Label className="text-xs">Branch</Label>
-                                        <Popover>
-                                        <PopoverTrigger asChild disabled={!bankDetails.bank}>
-                                            <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
-                                                {bankDetails.branch || "Select branch"}
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                            <Command filter={customFilter}>
-                                                <CommandInput placeholder="Search branch..." />
-                                                <CommandEmpty>No branch found.</CommandEmpty>
-                                                <CommandList>
-                                                    {availableBranches.map((branch) => (
-                                                    <CommandItem
-                                                        key={branch.id || branch.ifscCode + branch.branchName}
-                                                        value={branch.branchName}
-                                                        onSelect={(currentValue) => handleBranchSelect(currentValue)}
-                                                        >
-                                                        <Check className={cn("mr-2 h-4 w-4", bankDetails.branch === branch.branchName ? "opacity-100" : "opacity-0")} />
-                                                        {branch.branchName}
-                                                    </CommandItem>
-                                                    ))}
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                     <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
-                                    <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
-                                </div>
-                           </div>
-                           <div className="p-2 border rounded-lg space-y-2">
-                                <p className="text-xs font-semibold">Document Details</p>
-                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                    <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                    <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                </div>
-                           </div>
+            </TabsContent>
+            <TabsContent value="history">
+                 <Card>
+                    <CardHeader className="p-4 pb-2"><CardTitle className="text-base">All Transactions</CardTitle></CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                           <ScrollArea className="h-96">
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="p-2 text-xs">SR No</TableHead>
+                                        <TableHead className="p-2 text-xs">Date</TableHead>
+                                        <TableHead className="p-2 text-xs">Original Amt</TableHead>
+                                        <TableHead className="p-2 text-xs">Outstanding</TableHead>
+                                        <TableHead className="p-2 text-xs">Status</TableHead>
+                                        <TableHead className="p-2 text-xs text-center">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {suppliers.filter(s => s.customerId === selectedCustomerKey).map(entry => (
+                                        <TableRow key={entry.id}>
+                                            <TableCell className="font-mono text-xs p-2">{entry.srNo}</TableCell>
+                                            <TableCell className="p-2 text-xs">{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
+                                            <TableCell className="text-right p-2 text-xs">{formatCurrency(entry.originalNetAmount)}</TableCell>
+                                            <TableCell className="text-right p-2 text-xs">{formatCurrency(Number(entry.netAmount))}</TableCell>
+                                            <TableCell className="p-2 text-xs"><Badge variant={Number(entry.netAmount) < 1 ? "default" : "destructive"}>{Number(entry.netAmount) < 1 ? "Paid" : "Outstanding"}</Badge></TableCell>
+                                            <TableCell className="text-center p-0">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailsSupplierEntry(entry)}>
+                                                    <Info className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                           </ScrollArea>
                         </div>
-                         <Card className="p-2 mt-2">
-                            <div className="grid grid-cols-3 gap-2">
-                                <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">6R Date</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal h-8 text-xs", !sixRDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{sixRDate ? format(sixRDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus /></PopoverContent>
-                                    </Popover>
-                                </div>
-                                <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
-                            </div>
-                        </Card>
-                    </Card>
-                  </TabsContent>
-              </Tabs>
-            </CardContent>
-            <CardFooter className="p-3 pt-0">
-                <Card className="bg-muted/30 w-full p-2">
-                    <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                        <div className="flex items-center gap-2">
-                           <span className="text-xs text-muted-foreground">Amount to be Paid:</span>
-                           <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
-                        </div>
-                        {cdEnabled && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">CD Amount:</span>
-                                <span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span>
-                            </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                             <Separator orientation="vertical" className="h-5" />
-                             <span className="text-sm font-medium text-muted-foreground">Total Reduction:</span>
-                             <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
-                        </div>
-                        <div className="flex-grow"></div>
-                        <Button onClick={processPayment} size="sm" className="h-8 text-xs">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
                     </CardContent>
                 </Card>
-            </CardFooter>
-          </Card>
-        </div>
+                <Card className="mt-3">
+                  <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
+                  <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <ScrollArea className="h-96">
+                          <Table>
+                              <TableHeader>
+                                  <TableRow>
+                                      <TableHead className="p-2 text-xs">ID</TableHead>
+                                      <TableHead className="p-2 text-xs">Date</TableHead>
+                                      <TableHead className="p-2 text-xs">Method</TableHead>
+                                      <TableHead className="p-2 text-xs">Ref (SR#)</TableHead>
+                                      <TableHead className="text-right p-2 text-xs">Amount</TableHead>
+                                      <TableHead className="text-right p-2 text-xs">CD</TableHead>
+                                      <TableHead className="text-center p-2 text-xs">Actions</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {currentPaymentHistory.map(p => (
+                                      <TableRow key={p.id}>
+                                          <TableCell className="font-mono text-xs p-2">{p.paymentId}</TableCell>
+                                          <TableCell className="p-2 text-xs">{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
+                                          <TableCell className="p-2 text-xs"><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
+                                          <TableCell className="text-xs max-w-[100px] truncate p-2" title={(p.paidFor || []).map(pf => pf.srNo).join(', ')}>
+                                              {(p.paidFor || []).map(pf => pf.srNo).join(', ')}
+                                          </TableCell>
+                                          <TableCell className="text-right p-2 text-xs">{formatCurrency(p.amount)}</TableCell>
+                                          <TableCell className="text-right p-2 text-xs">{formatCurrency(p.cdAmount)}</TableCell>
+                                          <TableCell className="text-center p-0">
+                                              <div className="flex justify-center items-center gap-0">
+                                                  {p.receiptType === 'RTGS' && (
+                                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRtgsReceiptData(p)}>
+                                                          <Printer className="h-4 w-4" />
+                                                      </Button>
+                                                  )}
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedPaymentForDetails(p)}>
+                                                      <Info className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}>
+                                                      <Pen className="h-4 w-4" />
+                                                  </Button>
+                                                  <AlertDialog>
+                                                      <AlertDialogTrigger asChild>
+                                                      <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                                                      </AlertDialogTrigger>
+                                                      <AlertDialogContent>
+                                                      <AlertDialogHeader>
+                                                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                          <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount. This action cannot be undone.</AlertDialogDescription>
+                                                      </AlertDialogHeader>
+                                                      <AlertDialogFooter>
+                                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                          <AlertDialogAction onClick={() => p.id && handleDeletePayment(p.id)}>Continue</AlertDialogAction>
+                                                      </AlertDialogFooter>
+                                                      </AlertDialogContent>
+                                                  </AlertDialog>
+                                              </div>
+                                          </TableCell>
+                                      </TableRow>
+                                  ))}
+                                  {currentPaymentHistory.length === 0 && (
+                                      <TableRow>
+                                          <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history for this supplier.</TableCell>
+                                      </TableRow>
+                                  )}
+                              </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      </div>
+                  </CardContent>
+              </Card>
+            </TabsContent>
+        </Tabs>
       )}
 
-      {selectedCustomerKey && <Card>
-        <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
-        <CardContent className="p-0">
-            <div className="overflow-x-auto">
+      <Dialog open={isOutstandingModalOpen} onOpenChange={setIsOutstandingModalOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Outstanding Entries for {toTitleCase(customerSummaryMap.get(selectedCustomerKey || '')?.name || '')}</DialogTitle>
+                <DialogDescription>Select the entries you want to pay for.</DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto">
                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="p-2 text-xs">ID</TableHead>
-                            <TableHead className="p-2 text-xs">Date</TableHead>
-                            <TableHead className="p-2 text-xs">Method</TableHead>
-                            <TableHead className="p-2 text-xs">Ref (SR#)</TableHead>
-                            <TableHead className="p-2 text-xs">UTR No.</TableHead>
-                            <TableHead className="p-2 text-xs">Check No.</TableHead>
-                            <TableHead className="text-right p-2 text-xs">Amount</TableHead>
-                            <TableHead className="text-right p-2 text-xs">CD</TableHead>
-                            <TableHead className="text-right p-2 text-xs">Total</TableHead>
-                            <TableHead className="text-center p-2 text-xs">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {currentPaymentHistory.map(p => (
-                            <TableRow key={p.id}>
-                                <TableCell className="font-mono text-xs p-2">{p.paymentId}</TableCell>
-                                <TableCell className="p-2 text-xs">{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
-                                <TableCell className="p-2 text-xs"><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
-                                <TableCell className="text-xs max-w-[100px] truncate p-2" title={(p.paidFor || []).map(pf => pf.srNo).join(', ')}>
-                                    {(p.paidFor || []).map(pf => pf.srNo).join(', ')}
-                                </TableCell>
-                                <TableCell className="font-mono text-xs text-blue-400 p-2">{p.utrNo}</TableCell>
-                                <TableCell className="font-mono text-xs text-purple-400 p-2">{p.checkNo}</TableCell>
-                                <TableCell className="text-right p-2 text-xs">{formatCurrency(p.amount)}</TableCell>
-                                <TableCell className="text-right p-2 text-xs">{formatCurrency(p.cdAmount)}</TableCell>
-                                <TableCell className="text-right font-semibold p-2 text-xs">{formatCurrency(p.amount + p.cdAmount)}</TableCell>
-                                <TableCell className="text-center p-0">
-                                    <div className="flex justify-center items-center gap-0">
-                                         {p.receiptType === 'RTGS' && (
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRtgsReceiptData(p)}>
-                                                <Printer className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedPaymentForDetails(p)}>
-                                            <Info className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}>
-                                            <Pen className="h-4 w-4" />
-                                        </Button>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount. This action cannot be undone.</AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => p.id && handleDeletePayment(p.id)}>Continue</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                        {currentPaymentHistory.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history for this supplier.</TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+                <TableHeader>
+                <TableRow>
+                    <TableHead><Checkbox onCheckedChange={(checked) => {
+                        const newSet = new Set<string>();
+                        const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
+                        if(checked) {
+                            outstandingEntries.forEach(e => newSet.add(e.id));
+                        }
+                        setSelectedEntryIds(newSet);
+                    }}
+                    checked={selectedEntryIds.size > 0 && selectedEntryIds.size === suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).length}
+                        /></TableHead>
+                    <TableHead>SR No</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+                </TableHeader>
+                <TableBody>
+                {suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).map(entry => (
+                    <TableRow key={entry.id} onClick={() => handleEntrySelect(entry.id)} className="cursor-pointer">
+                        <TableCell><Checkbox checked={selectedEntryIds.has(entry.id)} onCheckedChange={() => handleEntrySelect(entry.id)} /></TableCell>
+                        <TableCell>{entry.srNo}</TableCell>
+                        <TableCell>{format(new Date(entry.date), "dd-MMM-yy")}</TableCell>
+                        <TableCell>{format(new Date(entry.dueDate), "dd-MMM-yy")}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
+                    </TableRow>
+                ))}
+                </TableBody>
+            </Table>
             </div>
-        </CardContent>
-      </Card>}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => {
+                    setIsOutstandingModalOpen(false);
+                    handleFullReset();
+                }}>Cancel</Button>
+                <Button onClick={handlePaySelectedOutstanding}>Confirm Selection</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!detailsSupplierEntry} onOpenChange={(open) => !open && setDetailsSupplierEntry(null)}>
         <DialogContent className="max-w-4xl p-0">
