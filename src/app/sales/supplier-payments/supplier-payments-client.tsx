@@ -106,6 +106,7 @@ export default function SupplierPaymentsPage() {
   const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
   const [grNo, setGrNo] = useState('');
+  const [grDate, setGrDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
@@ -631,6 +632,7 @@ export default function SupplierPaymentsPage() {
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: paidForDetails,
                     grNo,
+                    grDate: grDate ? format(grDate, 'yyyy-MM-dd') : '',
                     parchiNo,
                     utrNo,
                     checkNo,
@@ -700,6 +702,7 @@ export default function SupplierPaymentsPage() {
         setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
         setGrNo(paymentToEdit.grNo || '');
+        setGrDate(paymentToEdit.grDate ? new Date(paymentToEdit.grDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || '');
         setRtgsQuantity(paymentToEdit.quantity || 0);
         setRtgsRate(paymentToEdit.rate || 0);
@@ -969,12 +972,12 @@ export default function SupplierPaymentsPage() {
   return (
     <div className="space-y-3">
         <Card>
-             <CardContent className="p-3 flex items-center gap-4">
-                <div className="flex items-center gap-2 flex-shrink-0">
+             <CardContent className="p-3 flex flex-col sm:flex-row items-center gap-4">
+                <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center">
                     <Users className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold whitespace-nowrap">Select Supplier</h3>
                 </div>
-                <div className="w-full">
+                <div className="w-full sm:flex-1">
                     <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
                         <SelectTrigger className="h-8 text-xs">
                             <SelectValue placeholder="Search and select supplier..."/>
@@ -989,7 +992,7 @@ export default function SupplierPaymentsPage() {
                     </Select>
                 </div>
                 {selectedCustomerKey && (
-                     <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0">
+                     <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0 self-start sm:self-center">
                          <div className="flex items-center gap-2">
                              <p className="text-xs text-muted-foreground font-medium">Total Outstanding:</p>
                              <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
@@ -1057,12 +1060,12 @@ export default function SupplierPaymentsPage() {
       {selectedCustomerKey && (
         <div onKeyDown={handleKeyDown}>
           <Card>
-            <CardHeader className="p-3">
-              <CardTitle className="flex items-center gap-2">
-                <p className="text-sm font-semibold">Selected: {selectedEntryIds.size} entries</p>
-                <Separator orientation="vertical" className="h-4"/>
-                <p className="text-sm text-muted-foreground">Total: <span className="font-semibold text-foreground">{formatCurrency(totalOutstandingForSelected)}</span></p>
-              </CardTitle>
+             <CardHeader className="p-3">
+                <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold">Selected: {selectedEntryIds.size} entries</p>
+                    <Separator orientation="vertical" className="h-4"/>
+                    <p className="text-sm text-muted-foreground">Total: <span className="font-semibold text-foreground">{formatCurrency(totalOutstandingForSelected)}</span></p>
+                </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
               <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
@@ -1192,87 +1195,105 @@ export default function SupplierPaymentsPage() {
                         </DialogContent>
                      </Dialog>
                     
-                     <Card className="p-2">
-                         <div className="flex justify-between items-center mb-1">
-                           <p className="text-xs font-semibold">RTGS Payment & Document Details</p>
-                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
-                              <Settings className="h-4 w-4"/>
-                           </Button>
-                        </div>
+                    <Card className="p-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
                            <div className="p-2 border rounded-lg space-y-2">
-                                <p className="text-xs font-semibold text-center">Bank Details</p>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Bank</Label>
-                                    <Popover>
-                                       <PopoverTrigger asChild>
-                                          <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
-                                             {bankDetails.bank || "Select bank"}
-                                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                          </Button>
-                                       </PopoverTrigger>
-                                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                          <Command filter={customFilter}>
-                                             <CommandInput placeholder="Search bank..." />
-                                             <CommandEmpty>No bank found.</CommandEmpty>
-                                             <CommandList>
-                                                {combinedBanks.map((bank) => (
-                                                <CommandItem
-                                                   key={bank}
-                                                   value={bank}
-                                                   onSelect={(currentValue) => {
-                                                      setBankDetails(prev => ({...prev, bank: currentValue === prev.bank ? "" : currentValue, branch: '', ifscCode: ''}));
-                                                   }}
-                                                   >
-                                                   <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />
-                                                   {bank}
-                                                </CommandItem>
-                                                ))}
-                                             </CommandList>
-                                          </Command>
-                                       </PopoverContent>
-                                    </Popover>
+                                <div className="flex justify-between items-center mb-1">
+                                    <p className="text-xs font-semibold text-center">Bank Details</p>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
+                                        <Settings className="h-4 w-4"/>
+                                    </Button>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Branch</Label>
-                                    <Popover>
-                                       <PopoverTrigger asChild disabled={!bankDetails.bank}>
-                                          <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
-                                             {bankDetails.branch || "Select branch"}
-                                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                          </Button>
-                                       </PopoverTrigger>
-                                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                          <Command filter={customFilter}>
-                                             <CommandInput placeholder="Search branch..." />
-                                             <CommandEmpty>No branch found.</CommandEmpty>
-                                             <CommandList>
-                                                {availableBranches.map((branch) => (
-                                                <CommandItem
-                                                   key={branch.id || branch.ifscCode + branch.branchName}
-                                                   value={branch.branchName}
-                                                   onSelect={(currentValue) => handleBranchSelect(currentValue)}
-                                                   >
-                                                   <Check className={cn("mr-2 h-4 w-4", bankDetails.branch === branch.branchName ? "opacity-100" : "opacity-0")} />
-                                                   {branch.branchName}
-                                                </CommandItem>
-                                                ))}
-                                             </CommandList>
-                                          </Command>
-                                       </PopoverContent>
-                                    </Popover>
+                                <div className="grid grid-cols-2 gap-x-2">
+                                    <div className="space-y-1"><Label className="text-xs">Bank</Label>
+                                        <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
+                                                {bankDetails.bank || "Select bank"}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                            <Command filter={customFilter}>
+                                                <CommandInput placeholder="Search bank..." />
+                                                <CommandEmpty>No bank found.</CommandEmpty>
+                                                <CommandList>
+                                                    {combinedBanks.map((bank) => (
+                                                    <CommandItem
+                                                        key={bank}
+                                                        value={bank}
+                                                        onSelect={(currentValue) => {
+                                                        setBankDetails(prev => ({...prev, bank: currentValue === prev.bank ? "" : currentValue, branch: '', ifscCode: ''}));
+                                                        }}
+                                                        >
+                                                        <Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />
+                                                        {bank}
+                                                    </CommandItem>
+                                                    ))}
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                    <div className="space-y-1"><Label className="text-xs">Branch</Label>
+                                        <Popover>
+                                        <PopoverTrigger asChild disabled={!bankDetails.bank}>
+                                            <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">
+                                                {bankDetails.branch || "Select branch"}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                            <Command filter={customFilter}>
+                                                <CommandInput placeholder="Search branch..." />
+                                                <CommandEmpty>No branch found.</CommandEmpty>
+                                                <CommandList>
+                                                    {availableBranches.map((branch) => (
+                                                    <CommandItem
+                                                        key={branch.id || branch.ifscCode + branch.branchName}
+                                                        value={branch.branchName}
+                                                        onSelect={(currentValue) => handleBranchSelect(currentValue)}
+                                                        >
+                                                        <Check className={cn("mr-2 h-4 w-4", bankDetails.branch === branch.branchName ? "opacity-100" : "opacity-0")} />
+                                                        {branch.branchName}
+                                                    </CommandItem>
+                                                    ))}
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                        </Popover>
+                                    </div>
                                 </div>
-                                <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
+                                <div className="grid grid-cols-2 gap-x-2">
+                                     <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
+                                    <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
+                                </div>
                            </div>
                            <div className="p-2 border rounded-lg space-y-2">
                                 <p className="text-xs font-semibold text-center">Document Details</p>
-                                <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
+                                <div className="grid grid-cols-2 gap-x-2">
+                                     <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
+                                     <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-2">
+                                    <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                    <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                </div>
                            </div>
                         </div>
+                         <Card className="p-2 mt-2">
+                            <p className="text-xs font-semibold text-center mb-2">GR Details</p>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="space-y-1"><Label className="text-xs">GR No.</Label><Input value={grNo} onChange={e => setGrNo(e.target.value)} className="h-8 text-xs"/></div>
+                                <div className="space-y-1"><Label className="text-xs">GR Date</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal h-8 text-xs", !grDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent>
+                                    </Popover>
+                                </div>
+                                <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
+                            </div>
+                        </Card>
                     </Card>
                   </TabsContent>
               </Tabs>
