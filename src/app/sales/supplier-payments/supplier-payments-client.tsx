@@ -968,28 +968,39 @@ export default function SupplierPaymentsPage() {
   
   return (
     <div className="space-y-3">
-      <Card>
-        <CardContent className="p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Select Supplier</h3>
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-60">
-            <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Search and select supplier..."/>
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                  <SelectItem key={key} value={key} className="text-sm">
-                    {toTitleCase(data.name)} ({data.contact})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+            <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2 items-center">
+                <div className="flex items-center gap-2 md:col-span-3">
+                    <Users className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Select Supplier</h3>
+                </div>
+                <div className="w-full md:col-span-4">
+                    <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
+                        <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Search and select supplier..."/>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
+                            <SelectItem key={key} value={key} className="text-sm">
+                                {toTitleCase(data.name)} ({data.contact})
+                            </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                {selectedCustomerKey && (
+                     <div className="p-2 border rounded-lg bg-card/30 flex items-center justify-between gap-4 md:col-span-5">
+                        <div className="flex-1">
+                            <p className="text-muted-foreground text-xs">Total Outstanding:</p>
+                            <p className="text-base font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}>
+                            Change Selection
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
 
       {selectedCustomerKey && (
             <Dialog open={isOutstandingModalOpen} onOpenChange={setIsOutstandingModalOpen}>
@@ -1053,15 +1064,12 @@ export default function SupplierPaymentsPage() {
                     {editingPayment ? `Editing Payment` : 'Payment Processing'}
                 </CardTitle>
               </div>
-               <div className="p-2 border rounded-lg bg-card/30 flex items-center gap-4">
-                  <div>
-                      <p className="text-muted-foreground text-xs">Selected Outstanding:</p>
-                      <p className="text-base font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}>
-                      Change
-                  </Button>
-              </div>
+                <div className="p-2 border rounded-lg bg-card/30 flex items-center gap-4">
+                    <div>
+                        <p className="text-muted-foreground text-xs">Selected Outstanding:</p>
+                        <p className="text-base font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
+                    </div>
+                </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
               <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
@@ -1451,7 +1459,7 @@ export default function SupplierPaymentsPage() {
                             <CardContent className="p-4 pt-0">
                             <Table className="text-xs">
                                 <TableBody>
-                                    <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsSupplierEntry.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={14} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsSupplierEntry.netWeight.toFixed(2)} kg</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsSupplierEntry.rate)}</TableCell></TableRow>
                                     <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsSupplierEntry.amount)}</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsSupplierEntry.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.kartaAmount)}</TableCell></TableRow>
