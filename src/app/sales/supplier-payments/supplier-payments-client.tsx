@@ -246,8 +246,6 @@ export default function SupplierPaymentsPage() {
     return cdOptions.filter(opt => opt.value !== 'payment_amount');
   }, [paymentType]);
   
-  const isCdSwitchDisabled = cdEligibleEntries.length === 0;
-
   const targetAmountForGenerator = useMemo(() => {
     return paymentType === 'Full' 
       ? Math.round(totalOutstandingForSelected - calculatedCdAmount) 
@@ -1044,21 +1042,8 @@ export default function SupplierPaymentsPage() {
                                                 </div>
                                             )}
                                             <div className="flex items-center space-x-2 pb-1">
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center space-x-2">
-                                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
-                                                                <Label htmlFor="cd-toggle" className={cn("text-xs", isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        {isCdSwitchDisabled && (
-                                                            <TooltipContent>
-                                                                <p>No selected entries are eligible for CD.</p>
-                                                            </TooltipContent>
-                                                        )}
-                                                    </Tooltip>
-                                                </TooltipProvider>
+                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
+                                                <Label htmlFor="cd-toggle" className="text-xs">Apply CD</Label>
                                             </div>
                                             {cdEnabled && <>
                                                 <div className="space-y-1">
@@ -1228,7 +1213,7 @@ export default function SupplierPaymentsPage() {
                                             </div>
                                         </div>
                                     </Card>
-                                     <Card className="p-2 grid grid-cols-3 gap-2 items-end">
+                                    <div className="p-2 border rounded-lg grid grid-cols-3 gap-2 items-end">
                                         <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
                                         <div className="space-y-1"><Label className="text-xs">6R Date</Label>
                                             <Popover>
@@ -1237,7 +1222,7 @@ export default function SupplierPaymentsPage() {
                                             </Popover>
                                         </div>
                                         <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
-                                    </Card>
+                                    </div>
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
@@ -1519,8 +1504,13 @@ export default function SupplierPaymentsPage() {
 
                     <Card className="border-primary/50 bg-primary/5 text-center">
                          <CardContent className="p-3">
-                            <p className="text-sm text-primary/80 font-medium">Net Payable Amount</p>
-                            <p className="text-3xl font-bold text-primary font-mono">
+                            <p className="text-sm text-primary/80 font-medium">Original Total</p>
+                            <p className="text-2xl font-bold text-primary/90 font-mono">
+                                {formatCurrency(Number(detailsSupplierEntry.originalNetAmount))}
+                            </p>
+                            <Separator className="my-2"/>
+                            <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
+                            <p className="text-3xl font-bold text-destructive font-mono">
                                 {formatCurrency(Number(detailsSupplierEntry.netAmount))}
                             </p>
                          </CardContent>
