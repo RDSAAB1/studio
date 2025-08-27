@@ -978,7 +978,6 @@ export default function SupplierEntryClient() {
     const kanta = values.kanta || 0;
     const otherCharges = values.otherCharges || 0;
     
-    // Calculate total paid amount for the current entry if editing
     const totalPaidForThisEntry = paymentHistory
       .filter(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo))
       .reduce((sum, p) => {
@@ -1120,15 +1119,48 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    // Re-run calculations just before submitting to ensure data is fresh.
+    const { date, term, grossWeight, teirWeight, kartaPercentage, rate, labouryRate, kanta, otherCharges } = values;
+    const newDueDate = new Date(date);
+    newDueDate.setDate(newDueDate.getDate() + (Number(term) || 0));
+    const weight = (grossWeight || 0) - (teirWeight || 0);
+    const calculatedKartaWeight = weight * ((kartaPercentage || 0) / 100);
+    const calculatedKartaAmount = calculatedKartaWeight * (rate || 0);
+    const netWeight = weight - calculatedKartaWeight;
+    const amount = netWeight * (rate || 0);
+    const labouryAmount = weight * (labouryRate || 0);
+    
+    const originalNetAmount = amount - labouryAmount - (kanta || 0) - calculatedKartaAmount - (otherCharges || 0);
+    
+    let finalNetAmount = originalNetAmount;
+    if (isEditing && !deletePayments) {
+      const totalPaidForThisEntry = paymentHistory
+        .filter(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo))
+        .reduce((sum, p) => {
+            const paidForDetail = p.paidFor?.find(pf => pf.srNo === currentCustomer.srNo);
+            return sum + (paidForDetail?.amount || 0) + (p.cdAmount && paidForDetail?.cdApplied ? p.cdAmount : 0);
+        }, 0);
+        finalNetAmount -= totalPaidForThisEntry;
+    }
+
     const completeEntry: Customer = {
-        ...currentCustomer, ...values,
-        netAmount: currentCustomer.netAmount,
-        originalNetAmount: currentCustomer.originalNetAmount,
-        weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges,
-        name: toTitleCase(values.name), so: toTitleCase(values.so),
-        address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
-        variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
-        term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        ...currentCustomer,
+        ...values,
+        date: values.date.toISOString().split("T")[0],
+        dueDate: newDueDate.toISOString().split("T")[0],
+        term: String(term),
+        name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        weight: parseFloat(weight.toFixed(2)),
+        kartaWeight: parseFloat(calculatedKartaWeight.toFixed(2)),
+        kartaAmount: parseFloat(calculatedKartaAmount.toFixed(2)),
+        netWeight: parseFloat(netWeight.toFixed(2)),
+        amount: parseFloat(amount.toFixed(2)),
+        labouryAmount: parseFloat(labouryAmount.toFixed(2)),
+        kanta: parseFloat(String(kanta || 0)),
+        otherCharges: parseFloat(String(otherCharges || 0)),
+        originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
+        netAmount: parseFloat(finalNetAmount.toFixed(2)),
     };
 
     try {
@@ -1165,7 +1197,6 @@ export default function SupplierEntryClient() {
             return;
         }
     }
-    // If not editing or no payments, submit directly
     executeSubmit(values, false, callback);
   };
 
