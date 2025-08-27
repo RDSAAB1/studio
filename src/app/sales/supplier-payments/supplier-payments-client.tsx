@@ -969,7 +969,7 @@ export default function SupplierPaymentsPage() {
   return (
     <div className="space-y-3">
         <Card>
-            <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2 items-center">
+            <CardContent className="p-3 grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
                 <div className="flex items-center gap-2 md:col-span-3">
                     <Users className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold">Select Supplier</h3>
@@ -989,12 +989,12 @@ export default function SupplierPaymentsPage() {
                     </Select>
                 </div>
                 {selectedCustomerKey && (
-                     <div className="p-2 border rounded-lg bg-card/30 flex items-center justify-between gap-4 md:col-span-5">
-                        <div className="flex-1">
-                            <p className="text-muted-foreground text-xs">Total Outstanding:</p>
-                            <p className="text-base font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                     <div className="p-1 border rounded-lg bg-card/30 flex items-center justify-between gap-4 md:col-span-5">
+                        <div className="flex-1 pl-2">
+                            <p className="text-muted-foreground text-[10px] leading-tight">Total Outstanding:</p>
+                            <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}>
+                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-8 text-xs">
                             Change Selection
                         </Button>
                     </div>
@@ -1064,12 +1064,6 @@ export default function SupplierPaymentsPage() {
                     {editingPayment ? `Editing Payment` : 'Payment Processing'}
                 </CardTitle>
               </div>
-                <div className="p-2 border rounded-lg bg-card/30 flex items-center gap-4">
-                    <div>
-                        <p className="text-muted-foreground text-xs">Selected Outstanding:</p>
-                        <p className="text-base font-bold text-primary">{formatCurrency(totalOutstandingForSelected)}</p>
-                    </div>
-                </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
               <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
@@ -1202,15 +1196,15 @@ export default function SupplierPaymentsPage() {
                         </DialogContent>
                      </Dialog>
                     
-                    <Card className="p-2 space-y-2">
-                        <div className="flex justify-between items-center mb-1">
+                     <Card className="p-2">
+                         <div className="flex justify-between items-center mb-1">
                            <p className="text-xs font-semibold">RTGS Payment & Document Details</p>
                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
                               <Settings className="h-4 w-4"/>
                            </Button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
-                            <div className="p-2 border rounded-lg space-y-2">
+                           <div className="p-2 border rounded-lg space-y-2">
                                 <p className="text-xs font-semibold text-center">Bank Details</p>
                                 <div className="space-y-1">
                                     <Label className="text-xs">Bank</Label>
@@ -1274,7 +1268,7 @@ export default function SupplierPaymentsPage() {
                                 </div>
                                 <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
                                 <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
-                            </div>
+                           </div>
                            <div className="p-2 border rounded-lg space-y-2">
                                 <p className="text-xs font-semibold text-center">Document Details</p>
                                 <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
@@ -1287,7 +1281,7 @@ export default function SupplierPaymentsPage() {
                   </TabsContent>
               </Tabs>
             </CardContent>
-            <CardFooter className="p-3 pt-0">
+             <CardFooter className="p-3 pt-0">
               <Card className="bg-muted/30 w-full p-2">
                   <CardHeader className="p-1 pb-2">
                       <CardTitle className="text-sm">{editingPayment ? `Update Payment: ${paymentId}` : `Finalize Payment`}</CardTitle>
