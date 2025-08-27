@@ -981,12 +981,12 @@ export default function SupplierEntryClient() {
     const originalNetAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges;
 
     const totalPaidForThisEntry = paymentHistory
-      .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
-      .reduce((sum, p) => {
-        const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-        // Correctly sum only the amount paid, not the CD amount
-        return sum + (paidForDetail?.amount || 0);
-      }, 0);
+        .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
+        .reduce((sum, p) => {
+            const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
+            // Deduct both the payment amount and the associated CD amount
+            return sum + (paidForDetail?.amount || 0) + (paymentHistory.find(ph => ph.paymentId === p.paymentId)?.cdAmount || 0);
+        }, 0);
       
     const netAmount = originalNetAmount - totalPaidForThisEntry;
 
