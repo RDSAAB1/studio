@@ -199,7 +199,7 @@ export default function SupplierPaymentsPage() {
   }, [suppliers, selectedEntryIds]);
   
   const totalOutstandingForSelected = useMemo(() => {
-    return Math.round(selectedEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || 0), 0));
+    return Math.round(selectedEntries.reduce((acc, entry) => acc + (entry.netAmount || 0), 0));
   }, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
@@ -418,20 +418,8 @@ export default function SupplierPaymentsPage() {
         base = outstandingForSelected;
         break;
       case 'full_amount': {
-        const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-        const pastPaymentsForSelectedEntries = paymentHistory.filter(p =>
-          p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
-        );
-
-        const paidAmountWithCD = pastPaymentsForSelectedEntries.reduce((sum, p) => {
-             if (p.cdApplied) {
-                return sum + p.amount + (p.cdAmount || 0);
-             }
-             return sum;
-        }, 0);
-
         const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || entry.amount), 0);
-        base = totalOriginalAmount - paidAmountWithCD;
+        base = totalOriginalAmount;
         break;
       }
       default:
@@ -445,7 +433,7 @@ export default function SupplierPaymentsPage() {
   useEffect(() => {
     if (paymentType === 'Full') {
       const newAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
-      setPaymentAmount(newAmount);
+      setPaymentAmount(newAmount > 0 ? newAmount : 0);
     }
   }, [totalOutstandingForSelected, calculatedCdAmount, paymentType]);
 
@@ -522,7 +510,7 @@ export default function SupplierPaymentsPage() {
             toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
             return;
         }
-        if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0) {
+        if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
             return;
         }
@@ -542,48 +530,36 @@ export default function SupplierPaymentsPage() {
             let finalPaymentData: Payment | null = null;
             await runTransaction(db, async (transaction) => {
                 const tempEditingPayment = editingPayment;
+                let paidForDetails: PaidFor[] = [];
                 
                 if (rtgsFor === 'Supplier') {
-                    const allInvolvedSrNos = new Set<string>();
+                    // Revert old payment if editing
                     if (tempEditingPayment) {
-                        (tempEditingPayment.paidFor || []).forEach(pf => allInvolvedSrNos.add(pf.srNo));
-                    }
-                    selectedEntries.forEach(e => allInvolvedSrNos.add(e.srNo));
-
-                    const involvedSupplierDocs = new Map<string, any>();
-                    for (const srNo of allInvolvedSrNos) {
-                        const supplierToUpdate = suppliers.find(s => s.srNo === srNo);
-                        if (supplierToUpdate) {
-                            const docRef = doc(db, "suppliers", supplierToUpdate.id);
-                            const supplierDoc = await transaction.get(docRef);
-                            if (!supplierDoc.exists()) throw new Error(`Supplier with SR No ${srNo} not found in DB.`);
-                            involvedSupplierDocs.set(srNo, supplierDoc);
+                        for (const detail of tempEditingPayment.paidFor || []) {
+                            const q = query(suppliersCollection, where("srNo", "==", detail.srNo));
+                            const supplierDocs = await getDocs(q); // getDocs is not available in transaction, need to fetch before.
+                            if (!supplierDocs.empty) {
+                                const supplierDocRef = supplierDocs.docs[0].ref;
+                                const supplierDoc = await transaction.get(supplierDocRef);
+                                const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
+                                transaction.update(supplierDocRef, { netAmount: currentNetAmount + detail.amount + (detail.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0) });
+                            }
                         }
                     }
 
-                    const outstandingBalances: { [key: string]: number } = {};
-                    involvedSupplierDocs.forEach((docSnap, srNo) => {
-                        outstandingBalances[srNo] = Math.round(Number(docSnap.data().netAmount));
-                    });
-
-                    if (tempEditingPayment) {
-                        (tempEditingPayment.paidFor || []).forEach(detail => {
-                            if (outstandingBalances[detail.srNo] !== undefined) {
-                                outstandingBalances[detail.srNo] += Math.round(detail.amount);
-                            }
-                        });
-                    }
-                    
                     let remainingPayment = Math.round(finalPaymentAmount + calculatedCdAmount);
-                    const paidForDetails: PaidFor[] = [];
                     const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                     
-                    sortedEntries.forEach(entryData => {
+                    for (const entryData of sortedEntries) {
                         if (remainingPayment > 0) {
-                            let outstanding = outstandingBalances[entryData.srNo];
-                            const amountToPay = Math.min(outstanding, remainingPayment);
+                           const supplierDocRef = doc(db, "suppliers", entryData.id);
+                           const supplierDoc = await transaction.get(supplierDocRef);
+                           if (!supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
 
-                            if (amountToPay > 0) {
+                           let outstanding = Number(supplierDoc.data().netAmount);
+                           const amountToPay = Math.min(outstanding, remainingPayment);
+
+                           if (amountToPay > 0) {
                                 paidForDetails.push({ 
                                     srNo: entryData.srNo, 
                                     amount: amountToPay, 
@@ -591,35 +567,11 @@ export default function SupplierPaymentsPage() {
                                     supplierName: toTitleCase(entryData.name),
                                     supplierSo: toTitleCase(entryData.so),
                                     supplierContact: entryData.contact,
-                                    bankName: entryData.bank || '',
-                                    bankAcNo: entryData.acNo || '',
-                                    bankBranch: entryData.branch || '',
-                                    bankIfsc: entryData.ifscCode || '',
                                 });
                                 
-                                outstandingBalances[entryData.srNo] -= amountToPay;
+                                transaction.update(supplierDocRef, { netAmount: outstanding - amountToPay });
                                 remainingPayment -= amountToPay;
-                            }
-                        }
-                    });
-
-                    if (remainingPayment > 0 && sortedEntries.length > 0) {
-                        const lastEntrySrNo = sortedEntries[sortedEntries.length - 1].srNo;
-                        if (outstandingBalances[lastEntrySrNo] >= remainingPayment) {
-                            outstandingBalances[lastEntrySrNo] -= remainingPayment;
-                            const detailToUpdate = paidForDetails.find(d => d.srNo === lastEntrySrNo);
-                            if (detailToUpdate) {
-                                detailToUpdate.amount += remainingPayment;
-                            }
-                            remainingPayment = 0;
-                        }
-                    }
-
-                    for (const srNo in outstandingBalances) {
-                        const newBalance = Math.round(outstandingBalances[srNo]);
-                        const supplierDocSnap = involvedSupplierDocs.get(srNo);
-                         if (supplierDocSnap) {
-                            transaction.update(supplierDocSnap.ref, { netAmount: newBalance });
+                           }
                         }
                     }
 
@@ -632,9 +584,15 @@ export default function SupplierPaymentsPage() {
                         currentSupplierSummary.branch !== bankDetails.branch
                     )) {
                         const q = query(suppliersCollection, where('customerId', '==', selectedCustomerKey));
-                        const supplierDocsToUpdate = await getDocs(q); // Use getDocs inside transaction, though not ideal, needed here
+                        const supplierDocsToUpdate = await getDocs(q); // This is a read outside transaction, which is not ideal but necessary here.
                         supplierDocsToUpdate.forEach(docSnap => {
-                            transaction.update(docSnap.ref, { ...bankDetails });
+                            const docRef = doc(db, "suppliers", docSnap.id);
+                            transaction.update(docRef, { 
+                                acNo: bankDetails.acNo,
+                                ifscCode: bankDetails.ifscCode,
+                                bank: bankDetails.bank,
+                                branch: bankDetails.branch,
+                             });
                         });
                     }
                 }
@@ -649,7 +607,7 @@ export default function SupplierPaymentsPage() {
                     type: paymentType,
                     receiptType: paymentMethod,
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
-                    paidFor: rtgsFor === 'Supplier' ? selectedEntries.map(e => ({ srNo: e.srNo, amount: 0, cdApplied: cdEnabled })) : [],
+                    paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
                     sixRNo: sixRNo,
                     sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
                     parchiNo,
@@ -760,8 +718,6 @@ export default function SupplierPaymentsPage() {
             return;
         }
         
-        const originalSupplierStates = new Map<string, Customer>();
-
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
@@ -771,11 +727,11 @@ export default function SupplierPaymentsPage() {
                     const supplierDocsQuerySnapshot = await getDocs(q);
                     
                     if (!supplierDocsQuerySnapshot.empty) {
-                        const supplierDoc = supplierDocsQuerySnapshot.docs[0];
-                        originalSupplierStates.set(supplierDoc.id, supplierDoc.data() as Customer);
-                        const currentNetAmount = Number(supplierDoc.data().netAmount);
-                        const newNetAmount = currentNetAmount + detail.amount;
-                        transaction.update(supplierDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        const supplierDocRef = supplierDocsQuerySnapshot.docs[0].ref;
+                        const supplierDoc = await transaction.get(supplierDocRef);
+                        const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
+                        const amountToRestore = detail.amount + (detail.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                        transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
                 
@@ -1178,6 +1134,28 @@ export default function SupplierPaymentsPage() {
                                             </>
                                             ) : null
                                         }
+                                         {paymentMethod === 'RTGS' && rtgsFor === 'Supplier' && (
+                                            <>
+                                                 <div className="space-y-1">
+                                                    <Label className="text-xs">6R No.</Label>
+                                                    <Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">6R Date</Label>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-8 text-xs", !sixRDate && "text-muted-foreground")}>
+                                                                <CalendarIcon className="mr-2 h-3 w-3" />
+                                                                {sixRDate ? format(sixRDate, "PPP") : <span>Pick a date</span>}
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-0 z-50">
+                                                            <Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus />
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </Card>
                                 </div>
