@@ -31,7 +31,7 @@ const bankDetails = {
 };
 
 export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, onPrint }) => {
-    const totalAmount = payment.paidFor?.reduce((sum, item) => sum + item.amount, 0) || 0;
+    const totalAmount = payment.rtgsAmount || payment.amount || 0;
     const checkNo = payment.checkNo || payment.utrNo || payment.paymentId.replace('P', '');
 
     return (
@@ -117,19 +117,17 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, onPrint }) =>
                                 </tr>
                             </thead>
                             <tbody>
-                                {payment.paidFor?.map((item, index) => (
-                                    <tr key={index}>
-                                        <td className="border border-black p-1 text-center">{index + 1}</td>
-                                        <td className="border border-black p-1">{toTitleCase(item.supplierName || '')}</td>
-                                        <td className="border border-black p-1">{item.bankAcNo}</td>
-                                        <td className="border border-black p-1">{item.bankIfsc}</td>
-                                        <td className="border border-black p-1 text-right">{formatCurrency(item.amount)}</td>
-                                        <td className="border border-black p-1">{toTitleCase(item.bankBranch || '')}</td>
-                                        <td className="border border-black p-1">{item.bankName}</td>
-                                    </tr>
-                                ))}
+                                <tr>
+                                    <td className="border border-black p-1 text-center">1</td>
+                                    <td className="border border-black p-1">{toTitleCase(payment.supplierName || '')}</td>
+                                    <td className="border border-black p-1">{payment.bankAcNo}</td>
+                                    <td className="border border-black p-1">{payment.bankIfsc}</td>
+                                    <td className="border border-black p-1 text-right">{formatCurrency(totalAmount)}</td>
+                                    <td className="border border-black p-1">{toTitleCase(payment.bankBranch || '')}</td>
+                                    <td className="border border-black p-1">{payment.bankName}</td>
+                                </tr>
                                 {/* Fill empty rows */}
-                                {Array.from({ length: 15 - (payment.paidFor?.length || 0) }).map((_, i) => (
+                                {Array.from({ length: 14 }).map((_, i) => (
                                     <tr key={`empty-${i}`}>
                                         <td className="border border-black p-2 h-7">-</td>
                                         <td className="border border-black">-</td>
