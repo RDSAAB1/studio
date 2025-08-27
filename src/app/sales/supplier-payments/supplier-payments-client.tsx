@@ -418,9 +418,13 @@ export default function SupplierPaymentsPage() {
         base = outstandingForSelected;
         break;
       case 'full_amount': {
-        const totalOriginalAmount = selectedEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || entry.amount), 0);
-        base = totalOriginalAmount;
-        break;
+          const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
+          const pastPaymentsForSelectedEntries = paymentHistory.filter(p =>
+              p.paidFor?.some(pf => selectedSrNos.has(pf.srNo)) && !p.cdApplied
+          );
+          const pastPaidWithoutCD = pastPaymentsForSelectedEntries.reduce((sum, p) => sum + p.amount, 0);
+          base = pastPaidWithoutCD + outstandingForSelected;
+          break;
       }
       default:
         base = 0;
@@ -516,12 +520,13 @@ export default function SupplierPaymentsPage() {
         }
 
         const finalPaymentAmount = rtgsAmount || paymentAmount;
+        const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
 
-        if (finalPaymentAmount <= 0 && calculatedCdAmount <= 0) {
+        if (totalPaidAmount <= 0) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
             return;
         }
-        if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && finalPaymentAmount > totalOutstandingForSelected) {
+        if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalPaidAmount > totalOutstandingForSelected) {
             toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
             return;
         }
@@ -542,18 +547,18 @@ export default function SupplierPaymentsPage() {
                                 const supplierDocRef = supplierDocs.docs[0].ref;
                                 const supplierDoc = await transaction.get(supplierDocRef);
                                 const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
-                                transaction.update(supplierDocRef, { netAmount: currentNetAmount + detail.amount + (detail.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0) });
+                                const amountToRestore = detail.amount + (detail.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
+                                transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                             }
                         }
                     }
 
-                    let amountToDistribute = Math.round(finalPaymentAmount);
-                    let cdToDistribute = Math.round(calculatedCdAmount);
+                    let amountToDistribute = Math.round(totalPaidAmount);
                     
                     const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                     
                     for (const entryData of sortedEntries) {
-                        if (amountToDistribute <= 0 && cdToDistribute <= 0) break;
+                        if (amountToDistribute <= 0) break;
 
                         const supplierDocRef = doc(db, "suppliers", entryData.id);
                         const supplierDoc = await transaction.get(supplierDocRef);
@@ -562,11 +567,8 @@ export default function SupplierPaymentsPage() {
                         let outstanding = Number(supplierDoc.data().netAmount);
                         
                         const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
-                        const cdForThisEntry = Math.round((paymentForThisEntry / amountToDistribute) * cdToDistribute) || 0;
-                        const totalReductionForThisEntry = paymentForThisEntry + cdForThisEntry;
-                        const actualReduction = Math.min(outstanding, totalReductionForThisEntry);
 
-                        if (actualReduction > 0) {
+                        if (paymentForThisEntry > 0) {
                              paidForDetails.push({ 
                                 srNo: entryData.srNo, 
                                 amount: paymentForThisEntry, 
@@ -576,9 +578,8 @@ export default function SupplierPaymentsPage() {
                                 supplierContact: entryData.contact,
                             });
                             
-                            transaction.update(supplierDocRef, { netAmount: outstanding - actualReduction });
+                            transaction.update(supplierDocRef, { netAmount: outstanding - paymentForThisEntry });
                             amountToDistribute -= paymentForThisEntry;
-                            cdToDistribute -= cdForThisEntry;
                         }
                     }
 
@@ -737,7 +738,7 @@ export default function SupplierPaymentsPage() {
                         const supplierDocRef = supplierDocsQuerySnapshot.docs[0].ref;
                         const supplierDoc = await transaction.get(supplierDocRef);
                         const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
-                        const amountToRestore = detail.amount + (detail.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                        const amountToRestore = detail.amount;
                         transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
