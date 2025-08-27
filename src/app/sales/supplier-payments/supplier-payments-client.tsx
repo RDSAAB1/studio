@@ -1275,11 +1275,22 @@ export default function SupplierPaymentsPage() {
             </CardContent>
             <CardFooter className="p-3 pt-0">
                 <Card className="bg-muted/30 w-full p-2">
-                    <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                        <div className="flex items-center gap-2 text-xs"><p>Amount to be Paid:</p><p className="font-bold">{formatCurrency(rtgsAmount || paymentAmount)}</p></div>
-                        {cdEnabled && <div className="flex items-center gap-2 text-xs"><p>CD Amount:</p><p className="font-bold">{formatCurrency(calculatedCdAmount)}</p></div>}
-                        <Separator orientation="vertical" className="h-6 mx-2 hidden sm:block" />
-                        <div className="flex items-center gap-2 text-sm"><p className="font-semibold">Total Reduction:</p><p className="font-bold text-green-600">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</p></div>
+                     <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Amount:</span>
+                            <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
+                        </div>
+                        {cdEnabled && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">CD:</span>
+                                <span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span>
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                             <Separator orientation="vertical" className="h-5" />
+                             <span className="text-sm font-semibold">Total:</span>
+                             <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
+                        </div>
                         <div className="flex-grow"></div>
                         <Button onClick={processPayment} size="sm" className="h-8 text-xs">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
                     </CardContent>
