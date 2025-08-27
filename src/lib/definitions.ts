@@ -41,8 +41,8 @@ export type Customer = {
   ifscCode?: string;
   bank?: string;
   branch?: string;
-  grNo?: string;
-  grDate?: string;
+  sixRNo?: string;
+  sixRDate?: string;
   parchiNo?: string;
   checkNo?: string;
   utrNo?: string;
@@ -104,8 +104,8 @@ export type Payment = {
     receiptType: string;
     notes: string;
     paidFor?: PaidFor[];
-    grNo?: string;
-    grDate?: string;
+    sixRNo?: string;
+    sixRDate?: string;
     parchiNo?: string;
     utrNo?: string;
     checkNo?: string;

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -33,8 +34,8 @@ interface RtgsReportRow {
     amount: number;
     rate: number;
     weight: number;
-    grNo: string;
-    grDate: string;
+    sixRNo: string;
+    sixRDate: string;
     parchiNo: string;
 }
 
@@ -115,8 +116,8 @@ export default function RtgsReportClient() {
                             amount: pf.amount,
                             rate: p.rate || 0,
                             weight: p.quantity || 0,
-                            grNo: p.grNo || '',
-                            grDate: p.grDate || '',
+                            sixRNo: p.sixRNo || '',
+                            sixRDate: p.sixRDate || '',
                             parchiNo: p.parchiNo || '', // This is the paidFor item's parchiNo
                         });
                     });
@@ -138,8 +139,8 @@ export default function RtgsReportClient() {
                         amount: p.amount || 0,
                         rate: p.rate || 0,
                         weight: p.quantity || 0,
-                        grNo: p.grNo || '',
-                        grDate: p.grDate || '',
+                        sixRNo: p.sixRNo || '',
+                        sixRDate: p.sixRDate || '',
                         parchiNo: p.parchiNo || '',
                     });
                 }
@@ -348,8 +349,8 @@ export default function RtgsReportClient() {
                                     <TableHead className="w-[100px]">Type</TableHead>
                                     <TableHead className="w-[80px]">Rate</TableHead>
                                     <TableHead className="w-[80px]">Weight</TableHead>
-                                    <TableHead className="w-[100px]">GR No.</TableHead>
-                                    <TableHead className="w-[120px]">GR Date</TableHead>
+                                    <TableHead className="w-[100px]">6R No.</TableHead>
+                                    <TableHead className="w-[120px]">6R Date</TableHead>
                                     <TableHead className="w-[100px]">Parchi No.</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -371,8 +372,8 @@ export default function RtgsReportClient() {
                                             <TableCell className="whitespace-nowrap">{row.type}</TableCell>
                                             <TableCell className="whitespace-nowrap">{row.rate.toFixed(2)}</TableCell>
                                             <TableCell className="whitespace-nowrap">{row.weight.toFixed(2)}</TableCell>
-                                            <TableCell className="whitespace-nowrap">{row.grNo}</TableCell>
-                                            <TableCell className="whitespace-nowrap">{row.grDate ? format(new Date(row.grDate), 'dd-MMM-yy') : ''}</TableCell>
+                                            <TableCell className="whitespace-nowrap">{row.sixRNo}</TableCell>
+                                            <TableCell className="whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</TableCell>
                                             <TableCell className="whitespace-nowrap">{row.parchiNo}</TableCell>
                                         </TableRow>
                                     ))

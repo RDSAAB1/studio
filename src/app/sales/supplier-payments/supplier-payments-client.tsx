@@ -105,8 +105,8 @@ export default function SupplierPaymentsPage() {
   // RTGS specific fields
   const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
-  const [grNo, setGrNo] = useState('');
-  const [grDate, setGrDate] = useState<Date | undefined>(new Date());
+  const [sixRNo, setSixRNo] = useState('');
+  const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
@@ -452,7 +452,7 @@ export default function SupplierPaymentsPage() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
-    setGrNo('');
+    setSixRNo('');
     setParchiNo('');
     setRtgsQuantity(0);
     setRtgsRate(0);
@@ -631,8 +631,8 @@ export default function SupplierPaymentsPage() {
                     receiptType: paymentMethod,
                     notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: paidForDetails,
-                    grNo,
-                    grDate: grDate ? format(grDate, 'yyyy-MM-dd') : '',
+                    sixRNo: sixRNo,
+                    sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
                     parchiNo,
                     utrNo,
                     checkNo,
@@ -701,8 +701,8 @@ export default function SupplierPaymentsPage() {
         setSelectedEntryIds(newSelectedEntryIds);
         setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
-        setGrNo(paymentToEdit.grNo || '');
-        setGrDate(paymentToEdit.grDate ? new Date(paymentToEdit.grDate) : undefined);
+        setSixRNo(paymentToEdit.sixRNo || '');
+        setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || '');
         setRtgsQuantity(paymentToEdit.quantity || 0);
         setRtgsRate(paymentToEdit.rate || 0);
@@ -971,13 +971,13 @@ export default function SupplierPaymentsPage() {
   
   return (
     <div className="space-y-3">
-        <Card>
-             <CardContent className="p-3 flex flex-col sm:flex-row items-center gap-4">
-                <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center">
+       <Card>
+            <CardContent className="p-3 flex items-center gap-4">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <Users className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold whitespace-nowrap">Select Supplier</h3>
                 </div>
-                <div className="w-full sm:flex-1">
+                <div className="flex-1">
                     <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
                         <SelectTrigger className="h-8 text-xs">
                             <SelectValue placeholder="Search and select supplier..."/>
@@ -992,7 +992,7 @@ export default function SupplierPaymentsPage() {
                     </Select>
                 </div>
                 {selectedCustomerKey && (
-                     <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0 self-start sm:self-center">
+                     <div className="flex items-center gap-2 border-l pl-4 flex-shrink-0">
                          <div className="flex items-center gap-2">
                              <p className="text-xs text-muted-foreground font-medium">Total Outstanding:</p>
                              <p className="text-sm font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
@@ -1060,14 +1060,7 @@ export default function SupplierPaymentsPage() {
       {selectedCustomerKey && (
         <div onKeyDown={handleKeyDown}>
           <Card>
-             <CardHeader className="p-3">
-                <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold">Selected: {selectedEntryIds.size} entries</p>
-                    <Separator orientation="vertical" className="h-4"/>
-                    <p className="text-sm text-muted-foreground">Total: <span className="font-semibold text-foreground">{formatCurrency(totalOutstandingForSelected)}</span></p>
-                </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
+            <CardContent className="p-3">
               <Tabs value={paymentMethod} onValueChange={setPaymentMethod} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 h-9">
                   <TabsTrigger value="Cash">Cash</TabsTrigger>
@@ -1076,62 +1069,64 @@ export default function SupplierPaymentsPage() {
                 </TabsList>
 
                 <div className="mt-2 space-y-2">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 items-end">
-                        <div className="space-y-1">
-                            <Label className="text-xs">Payment Type</Label>
-                            <Select value={paymentType} onValueChange={setPaymentType}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Full">Full</SelectItem>
-                                    <SelectItem value="Partial">Partial</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {paymentType === 'Partial' && (
-                             <div className="space-y-1">
-                                <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
-                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
-                            </div>
-                        )}
-                        <div className="flex items-center space-x-2 pt-5">
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="flex items-center space-x-2">
-                                            <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
-                                            <Label htmlFor="cd-toggle" className={cn("text-xs", isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
-                                        </div>
-                                    </TooltipTrigger>
-                                    {isCdSwitchDisabled && (
-                                        <TooltipContent>
-                                            <p>No selected entries are eligible for CD.</p>
-                                        </TooltipContent>
-                                    )}
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                        {cdEnabled && <>
+                     <Card className="bg-muted/30 p-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-2 gap-y-2 items-end">
                             <div className="space-y-1">
-                                <Label htmlFor="cd-percent" className="text-xs">CD %</Label>
-                                <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs">CD At</Label>
-                                <Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}>
+                                <Label className="text-xs">Payment Type</Label>
+                                <Select value={paymentType} onValueChange={setPaymentType}>
                                     <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
                                     <SelectContent>
-                                        {availableCdOptions.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
-                                        ))}
+                                        <SelectItem value="Full">Full</SelectItem>
+                                        <SelectItem value="Partial">Partial</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs">CD Amount</Label>
-                                <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
+                            {paymentType === 'Partial' && (
+                                <div className="space-y-1">
+                                    <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
+                                    <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
+                                </div>
+                            )}
+                            <div className="flex items-center space-x-2 pb-1">
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="flex items-center space-x-2">
+                                                <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} disabled={isCdSwitchDisabled} />
+                                                <Label htmlFor="cd-toggle" className={cn("text-xs", isCdSwitchDisabled && 'text-muted-foreground')}>Apply CD</Label>
+                                            </div>
+                                        </TooltipTrigger>
+                                        {isCdSwitchDisabled && (
+                                            <TooltipContent>
+                                                <p>No selected entries are eligible for CD.</p>
+                                            </TooltipContent>
+                                        )}
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
-                        </>}
-                    </div>
+                            {cdEnabled && <>
+                                <div className="space-y-1">
+                                    <Label htmlFor="cd-percent" className="text-xs">CD %</Label>
+                                    <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">CD At</Label>
+                                    <Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
+                                        <SelectContent>
+                                            {availableCdOptions.map(opt => (
+                                                <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">CD Amount</Label>
+                                    <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
+                                </div>
+                            </>}
+                        </div>
+                    </Card>
                 </div>
 
                 <TabsContent value="RTGS" className="mt-2 border-t pt-2 space-y-2">
@@ -1196,15 +1191,15 @@ export default function SupplierPaymentsPage() {
                      </Dialog>
                     
                     <Card className="p-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                            <div className="p-2 border rounded-lg space-y-2">
                                 <div className="flex justify-between items-center mb-1">
-                                    <p className="text-xs font-semibold text-center">Bank Details</p>
+                                    <p className="text-xs font-semibold">Bank Details</p>
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}>
                                         <Settings className="h-4 w-4"/>
                                     </Button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-x-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     <div className="space-y-1"><Label className="text-xs">Bank</Label>
                                         <Popover>
                                         <PopoverTrigger asChild>
@@ -1263,32 +1258,29 @@ export default function SupplierPaymentsPage() {
                                         </PopoverContent>
                                         </Popover>
                                     </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-x-2">
                                      <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
                                     <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
                                 </div>
                            </div>
                            <div className="p-2 border rounded-lg space-y-2">
-                                <p className="text-xs font-semibold text-center">Document Details</p>
-                                <div className="grid grid-cols-2 gap-x-2">
-                                     <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                     <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                <p className="text-xs font-semibold">Document Details</p>
+                                 <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
+                                    <div className="space-y-1"><Label className="text-xs">RTGS Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-x-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
                                     <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                                 </div>
                            </div>
                         </div>
                          <Card className="p-2 mt-2">
-                            <p className="text-xs font-semibold text-center mb-2">GR Details</p>
                             <div className="grid grid-cols-3 gap-2">
-                                <div className="space-y-1"><Label className="text-xs">GR No.</Label><Input value={grNo} onChange={e => setGrNo(e.target.value)} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">GR Date</Label>
+                                <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
+                                <div className="space-y-1"><Label className="text-xs">6R Date</Label>
                                     <Popover>
-                                        <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal h-8 text-xs", !grDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{grDate ? format(grDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={grDate} onSelect={setGrDate} initialFocus /></PopoverContent>
+                                        <PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal h-8 text-xs", !sixRDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3 w-3" />{sixRDate ? format(sixRDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus /></PopoverContent>
                                     </Popover>
                                 </div>
                                 <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
@@ -1302,18 +1294,18 @@ export default function SupplierPaymentsPage() {
                 <Card className="bg-muted/30 w-full p-2">
                      <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                         <div className="flex items-center gap-2">
-                           <span className="text-xs text-muted-foreground">To Pay:</span>
+                           <span className="text-xs text-muted-foreground">Amount to be Paid:</span>
                            <span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span>
                         </div>
                         {cdEnabled && (
                             <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">CD:</span>
+                                <span className="text-xs text-muted-foreground">CD Amount:</span>
                                 <span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span>
                             </div>
                         )}
                         <div className="flex items-center gap-2">
                              <Separator orientation="vertical" className="h-5" />
-                             <span className="text-sm font-medium text-muted-foreground">Total:</span>
+                             <span className="text-sm font-medium text-muted-foreground">Total Reduction:</span>
                              <span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span>
                         </div>
                         <div className="flex-grow"></div>
