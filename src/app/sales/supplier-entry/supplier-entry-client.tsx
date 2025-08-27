@@ -856,7 +856,7 @@ export default function SupplierEntryClient() {
   const [isReceiptSettingsOpen, setIsReceiptSettingsOpen] = useState(false);
   const [tempReceiptSettings, setTempReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
-  const [updateAction, setUpdateAction] = useState<(() => void) | null>(null);
+  const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -1120,43 +1120,41 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-      const completeEntry: Customer = {
-          ...currentCustomer, ...values,
-          netAmount: currentCustomer.netAmount,
-          originalNetAmount: currentCustomer.originalNetAmount,
-          name: toTitleCase(values.name), so: toTitleCase(values.so),
-          weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges,
-          address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
-          variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
-          term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-      };
-      
-      try {
-          if (isEditing && completeEntry.id) {
-              if (deletePayments) {
-                  await deletePaymentsForSrNo(completeEntry.srNo);
-                  // Recalculate netAmount as if no payments were made
-                  completeEntry.netAmount = completeEntry.originalNetAmount;
-                  toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
-              }
-              const success = await updateSupplier(completeEntry.id, completeEntry);
-              if (success) {
-                  toast({ title: "Success", description: "Entry updated successfully." });
-                  if (callback) callback(completeEntry); else handleNew();
-              } else {
-                  toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
-              }
-          } else {
-              const newEntry = await addSupplier(completeEntry);
-              toast({ title: "Success", description: "New entry saved successfully." });
-              if (callback) callback(newEntry); else handleNew();
-          }
-      } catch (error) {
-          console.error("Error saving supplier:", error);
-          toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
-      }
-  };
+    const completeEntry: Customer = {
+        ...currentCustomer, ...values,
+        netAmount: currentCustomer.netAmount,
+        originalNetAmount: currentCustomer.originalNetAmount,
+        weight: currentCustomer.weight, kartaWeight: currentCustomer.kartaWeight, kartaAmount: currentCustomer.kartaAmount, netWeight: currentCustomer.netWeight, amount: currentCustomer.amount, labouryAmount: currentCustomer.labouryAmount, kanta: currentCustomer.kanta, otherCharges: currentCustomer.otherCharges,
+        name: toTitleCase(values.name), so: toTitleCase(values.so),
+        address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo),
+        variety: toTitleCase(values.variety), date: values.date.toISOString().split("T")[0],
+        term: String(values.term), customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+    };
 
+    try {
+        if (isEditing && completeEntry.id) {
+            if (deletePayments) {
+                await deletePaymentsForSrNo(completeEntry.srNo);
+                completeEntry.netAmount = completeEntry.originalNetAmount; // Reset netAmount
+                toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
+            }
+            const success = await updateSupplier(completeEntry.id, completeEntry);
+            if (success) {
+                toast({ title: "Success", description: "Entry updated successfully." });
+                if (callback) callback(completeEntry); else handleNew();
+            } else {
+                toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
+            }
+        } else {
+            const newEntry = await addSupplier(completeEntry);
+            toast({ title: "Success", description: "New entry saved successfully." });
+            if (callback) callback(newEntry); else handleNew();
+        }
+    } catch (error) {
+        console.error("Error saving supplier:", error);
+        toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
+    }
+};
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
     if (isEditing) {
