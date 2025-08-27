@@ -209,8 +209,9 @@ export default function SupplierPaymentsPage() {
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const allDueInFuture = selectedEntries.every(e => new Date(e.dueDate) > today);
-    setCdEnabled(allDueInFuture);
+    // Enable CD if at least one selected entry's due date is in the future
+    const isAnyDueInFuture = selectedEntries.some(e => new Date(e.dueDate) > today);
+    setCdEnabled(isAnyDueInFuture);
   }, [selectedEntries]);
 
   const sortedCombinations = useMemo(() => {
@@ -390,41 +391,41 @@ export default function SupplierPaymentsPage() {
       setCalculatedCdAmount(0);
       return;
     }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) > today);
+    if(eligibleEntries.length === 0) {
+        setCalculatedCdAmount(0);
+        return;
+    }
 
     let base = 0;
     const currentPaymentAmount = paymentAmount || 0;
-    const outstandingForSelected = totalOutstandingForSelected;
-
+    
+    const outstandingForEligible = Math.round(eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0));
+    
     switch (cdAt) {
-      case 'paid_amount': {
-        const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-        const pastPaymentsForSelectedEntries = paymentHistory.filter(p =>
-          p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
-        );
-
-        const paidAmountWithoutCD = pastPaymentsForSelectedEntries.reduce((sum, p) => {
-          if (!p.cdApplied) {
-            return sum + p.amount;
-          }
-          return sum;
-        }, 0);
-        base = paidAmountWithoutCD;
-        break;
-      }
       case 'payment_amount':
         base = currentPaymentAmount;
         break;
       case 'unpaid_amount':
-        base = outstandingForSelected;
+        base = outstandingForEligible;
         break;
       case 'full_amount': {
-          const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-          const pastPaymentsForSelectedEntries = paymentHistory.filter(p =>
-              p.paidFor?.some(pf => selectedSrNos.has(pf.srNo)) && !p.cdApplied
-          );
-          const pastPaidWithoutCD = pastPaymentsForSelectedEntries.reduce((sum, p) => sum + p.amount, 0);
-          base = pastPaidWithoutCD + outstandingForSelected;
-          break;
+        const eligibleSrNos = new Set(eligibleEntries.map(e => e.srNo));
+        const pastPaymentsForEligible = paymentHistory.filter(p => 
+            !p.cdApplied && p.paidFor?.some(pf => eligibleSrNos.has(pf.srNo))
+        );
+
+        const paidAmountForEligibleWithoutCD = pastPaymentsForEligible.reduce((sum, p) => {
+            const paidForTheseEntries = p.paidFor?.filter(pf => eligibleSrNos.has(pf.srNo)) || [];
+            return sum + paidForTheseEntries.reduce((innerSum, pf) => innerSum + pf.amount, 0);
+        }, 0);
+        
+        base = paidAmountForEligibleWithoutCD + outstandingForEligible;
+        break;
       }
       default:
         base = 0;
