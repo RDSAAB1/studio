@@ -11,7 +11,6 @@ interface TaxInvoiceProps {
     settings: ReceiptSettings;
     invoiceDetails: {
         companyGstin: string;
-        customerGstin: string;
         hsnCode: string;
         taxRate: number;
         isGstIncluded: boolean;
@@ -61,6 +60,22 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             str = 'Number too large';
         }
         return toTitleCase(str.trim()) + " Only";
+    };
+
+    const billToDetails = {
+        name: toTitleCase(customer.name),
+        companyName: customer.companyName ? toTitleCase(customer.companyName) : '',
+        address: toTitleCase(customer.address),
+        contact: customer.contact,
+        gstin: customer.gstin || 'N/A'
+    };
+
+    const shipToDetails = {
+        name: toTitleCase(customer.shippingName || customer.name),
+        companyName: customer.shippingCompanyName ? toTitleCase(customer.shippingCompanyName) : '',
+        address: toTitleCase(customer.shippingAddress || customer.address),
+        contact: customer.shippingContact || customer.contact,
+        gstin: customer.shippingGstin || customer.gstin || 'N/A'
     };
 
     return (
@@ -125,21 +140,19 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 <div className="grid grid-cols-2 gap-4 mt-8 mb-6">
                     <div className="border border-gray-200 p-4 rounded-lg">
                         <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Bill To</h3>
-                        <p className="font-bold text-lg">{toTitleCase(customer.name)}</p>
-                        {customer.so && <p className="text-base">S/O: {toTitleCase(customer.so)}</p>}
-                        {customer.companyName && <p className="text-base">{toTitleCase(customer.companyName)}</p>}
-                        <p className="text-base">{toTitleCase(customer.address)}</p>
-                        <p className="text-base">Phone: {customer.contact}</p>
-                        <p className="text-base">GSTIN: {invoiceDetails.customerGstin}</p>
+                        <p className="font-bold text-lg">{billToDetails.name}</p>
+                        {billToDetails.companyName && <p className="text-base">{billToDetails.companyName}</p>}
+                        <p className="text-base">{billToDetails.address}</p>
+                        <p className="text-base">Phone: {billToDetails.contact}</p>
+                        <p className="text-base">GSTIN: {billToDetails.gstin}</p>
                     </div>
                      <div className="border border-gray-200 p-4 rounded-lg">
                          <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Ship To</h3>
-                        <p className="font-bold text-lg">{toTitleCase(customer.name)}</p>
-                        {customer.so && <p className="text-base">S/O: {toTitleCase(customer.so)}</p>}
-                        {customer.companyName && <p className="text-base">{toTitleCase(customer.companyName)}</p>}
-                        <p className="text-base">{toTitleCase(customer.address)}</p>
-                        <p className="text-base">Phone: {customer.contact}</p>
-                        <p className="text-base">GSTIN: {invoiceDetails.customerGstin}</p>
+                        <p className="font-bold text-lg">{shipToDetails.name}</p>
+                        {shipToDetails.companyName && <p className="text-base">{shipToDetails.companyName}</p>}
+                        <p className="text-base">{shipToDetails.address}</p>
+                        <p className="text-base">Phone: {shipToDetails.contact}</p>
+                        <p className="text-base">GSTIN: {shipToDetails.gstin}</p>
                     </div>
                 </div>
 

@@ -59,6 +59,13 @@ export type Customer = {
   bagAmount?: number;
   isGstIncluded?: boolean;
   gstin?: string;
+  
+  // Shipping details
+  shippingName?: string;
+  shippingCompanyName?: string;
+  shippingAddress?: string;
+  shippingContact?: string;
+  shippingGstin?: string;
 };
 
 export type Transaction = {
