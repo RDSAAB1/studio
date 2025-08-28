@@ -26,10 +26,10 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     let totalInvoiceValue: number;
 
     if (isGstIncluded) {
-        totalInvoiceValue = customer.amount;
+        totalInvoiceValue = Number(customer.amount);
         taxableAmount = totalInvoiceValue / (1 + (taxRate / 100));
     } else {
-        taxableAmount = customer.amount;
+        taxableAmount = Number(customer.amount);
         totalInvoiceValue = taxableAmount * (1 + (taxRate / 100));
     }
 

@@ -18,8 +18,14 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
             <style>
                 {`
                 @media print {
-                    @page { size: A4; margin: 10mm; }
-                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    @page { 
+                        size: A4; 
+                        margin: 10mm; 
+                    }
+                    body { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                    }
                 }
                 `}
             </style>
