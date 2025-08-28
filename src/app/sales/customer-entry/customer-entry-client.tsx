@@ -1585,112 +1585,112 @@ export default function CustomerEntryClient() {
         onSelectionChange={setSelectedCustomerIds}
       />
         
-     <Dialog open={isDocumentPreviewOpen} onOpenChange={setIsDocumentPreviewOpen}>
-            <DialogContent className="max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6 p-0">
-                <div className="lg:col-span-2 order-2 lg:order-1">
-                    <ScrollArea className="max-h-[90vh]">
+      <Dialog open={isDocumentPreviewOpen} onOpenChange={setIsDocumentPreviewOpen}>
+            <DialogContent className="max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-0 p-0">
+                <div className="lg:col-span-2 order-2 lg:order-1 h-[90vh]">
+                    <ScrollArea className="h-full">
                         <div id="document-content" className="p-4 sm:p-6">
                            {renderDocument()}
                         </div>
                     </ScrollArea>
                 </div>
-                <div className="lg:col-span-1 order-1 lg:order-2 bg-muted/30 p-4 sm:p-6 border-l">
-                     <DialogHeader className="mb-4">
+                <div className="lg:col-span-1 order-1 lg:order-2 bg-muted/30 p-4 sm:p-6 border-l flex flex-col h-[90vh]">
+                     <DialogHeader className="mb-4 flex-shrink-0">
                          <DialogTitle>Edit Invoice Details</DialogTitle>
                          <DialogDescription>Make on-the-fly changes before printing.</DialogDescription>
                      </DialogHeader>
-                    <ScrollArea className="max-h-[calc(90vh-120px)] pr-3">
-                    <div className="space-y-4">
-                        <Card>
-                            <CardHeader className="p-3"><CardTitle className="text-base">Tax &amp; Invoice Info</CardTitle></CardHeader>
-                            <CardContent className="p-3 space-y-3">
-                                <div className="space-y-1">
-                                    <Label htmlFor="companyGstin" className="text-xs">Your GSTIN</Label>
-                                    <Input id="companyGstin" value={invoiceDetails.companyGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, companyGstin: e.target.value.toUpperCase()})} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="hsnCode" className="text-xs">HSN/SAC Code</Label>
-                                    <Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="taxRate" className="text-xs">Tax Rate (%)</Label>
-                                    <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" />
-                                </div>
-                                <div className="flex items-center space-x-2 pt-2">
-                                    <Switch
-                                        id="gst-included-toggle"
-                                        checked={invoiceDetails.isGstIncluded}
-                                        onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
-                                    />
-                                    <Label htmlFor="gst-included-toggle" className="text-xs font-normal">Is GST Included in Rate?</Label>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader className="p-3"><CardTitle className="text-base">Bill To Details</CardTitle></CardHeader>
-                             <CardContent className="p-3 space-y-3">
-                                <div className="space-y-1">
-                                    <Label htmlFor="edit-name" className="text-xs">Customer Name</Label>
-                                    <Input id="edit-name" name="name" value={editableInvoiceDetails.name || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
-                                </div>
-                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-so" className="text-xs">S/O (Father's Name)</Label>
-                                    <Input id="edit-so" name="so" value={editableInvoiceDetails.so || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="edit-companyName" className="text-xs">Company Name</Label>
-                                    <Input id="edit-companyName" name="companyName" value={editableInvoiceDetails.companyName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="edit-contact" className="text-xs">Contact</Label>
-                                    <Input id="edit-contact" name="contact" value={editableInvoiceDetails.contact || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="edit-address" className="text-xs">Address</Label>
-                                    <Input id="edit-address" name="address" value={editableInvoiceDetails.address || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="edit-gstin" className="text-xs">Customer's GSTIN</Label>
-                                    <Input id="edit-gstin" name="gstin" value={editableInvoiceDetails.gstin || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
-                                </div>
-                             </CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader className="p-3 flex items-center justify-between">
-                                <CardTitle className="text-base">Ship To Details</CardTitle>
-                                <div className="flex items-center space-x-2">
-                                    <Switch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} />
-                                    <Label htmlFor="same-as-billing" className="text-xs font-normal">Same as Bill To</Label>
-                                </div>
-                             </CardHeader>
-                             {!isSameAsBilling && (
-                                 <CardContent className="p-3 space-y-3">
+                    <ScrollArea className="flex-grow pr-3 -mr-3">
+                        <div className="space-y-4">
+                            <Card>
+                                <CardHeader className="p-3"><CardTitle className="text-base">Tax &amp; Invoice Info</CardTitle></CardHeader>
+                                <CardContent className="p-3 space-y-3">
                                     <div className="space-y-1">
-                                        <Label htmlFor="shippingName" className="text-xs">Name</Label>
-                                        <Input id="shippingName" name="shippingName" value={editableInvoiceDetails.shippingName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        <Label htmlFor="companyGstin" className="text-xs">Your GSTIN</Label>
+                                        <Input id="companyGstin" value={invoiceDetails.companyGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, companyGstin: e.target.value.toUpperCase()})} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor="shippingCompanyName" className="text-xs">Company Name</Label>
-                                        <Input id="shippingCompanyName" name="shippingCompanyName" value={editableInvoiceDetails.shippingCompanyName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        <Label htmlFor="hsnCode" className="text-xs">HSN/SAC Code</Label>
+                                        <Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor="shippingContact" className="text-xs">Contact</Label>
-                                        <Input id="shippingContact" name="shippingContact" value={editableInvoiceDetails.shippingContact || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        <Label htmlFor="taxRate" className="text-xs">Tax Rate (%)</Label>
+                                        <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="flex items-center space-x-2 pt-2">
+                                        <Switch
+                                            id="gst-included-toggle"
+                                            checked={invoiceDetails.isGstIncluded}
+                                            onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
+                                        />
+                                        <Label htmlFor="gst-included-toggle" className="text-xs font-normal">Is GST Included in Rate?</Label>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="p-3"><CardTitle className="text-base">Bill To Details</CardTitle></CardHeader>
+                                <CardContent className="p-3 space-y-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="edit-name" className="text-xs">Customer Name</Label>
+                                        <Input id="edit-name" name="name" value={editableInvoiceDetails.name || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor="shippingAddress" className="text-xs">Address</Label>
-                                        <Input id="shippingAddress" name="shippingAddress" value={editableInvoiceDetails.shippingAddress || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        <Label htmlFor="edit-so" className="text-xs">S/O (Father's Name)</Label>
+                                        <Input id="edit-so" name="so" value={editableInvoiceDetails.so || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor="shippingGstin" className="text-xs">GSTIN</Label>
-                                        <Input id="shippingGstin" name="shippingGstin" value={editableInvoiceDetails.shippingGstin || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        <Label htmlFor="edit-companyName" className="text-xs">Company Name</Label>
+                                        <Input id="edit-companyName" name="companyName" value={editableInvoiceDetails.companyName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
                                     </div>
-                                 </CardContent>
-                             )}
-                        </Card>
-                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="edit-contact" className="text-xs">Contact</Label>
+                                        <Input id="edit-contact" name="contact" value={editableInvoiceDetails.contact || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="edit-address" className="text-xs">Address</Label>
+                                        <Input id="edit-address" name="address" value={editableInvoiceDetails.address || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="edit-gstin" className="text-xs">Customer's GSTIN</Label>
+                                        <Input id="edit-gstin" name="gstin" value={editableInvoiceDetails.gstin || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="p-3 flex items-center justify-between">
+                                    <CardTitle className="text-base">Ship To Details</CardTitle>
+                                    <div className="flex items-center space-x-2">
+                                        <Switch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} />
+                                        <Label htmlFor="same-as-billing" className="text-xs font-normal">Same as Bill To</Label>
+                                    </div>
+                                </CardHeader>
+                                {!isSameAsBilling && (
+                                    <CardContent className="p-3 space-y-3">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="shippingName" className="text-xs">Name</Label>
+                                            <Input id="shippingName" name="shippingName" value={editableInvoiceDetails.shippingName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="shippingCompanyName" className="text-xs">Company Name</Label>
+                                            <Input id="shippingCompanyName" name="shippingCompanyName" value={editableInvoiceDetails.shippingCompanyName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="shippingContact" className="text-xs">Contact</Label>
+                                            <Input id="shippingContact" name="shippingContact" value={editableInvoiceDetails.shippingContact || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="shippingAddress" className="text-xs">Address</Label>
+                                            <Input id="shippingAddress" name="shippingAddress" value={editableInvoiceDetails.shippingAddress || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="shippingGstin" className="text-xs">GSTIN</Label>
+                                            <Input id="shippingGstin" name="shippingGstin" value={editableInvoiceDetails.shippingGstin || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                        </div>
+                                    </CardContent>
+                                )}
+                            </Card>
+                        </div>
                     </ScrollArea>
-                    <DialogFooter className="pt-4 flex-row justify-end gap-2">
+                    <DialogFooter className="pt-4 flex-row justify-end gap-2 flex-shrink-0">
                         <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
                         <Button onClick={() => handleActualPrint('document-content')}>
                             <Printer className="mr-2 h-4 w-4" /> Print
