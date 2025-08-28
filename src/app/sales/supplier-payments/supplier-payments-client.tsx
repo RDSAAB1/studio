@@ -388,6 +388,7 @@ export default function SupplierPaymentsPage() {
         today.setHours(0, 0, 0, 0);
 
         let baseAmountForCd = 0;
+        const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
 
         switch (cdAt) {
             case 'paid_amount': {
@@ -404,18 +405,18 @@ export default function SupplierPaymentsPage() {
                     }, 0);
                     return sum + timelyPaymentsSum;
                 }, 0);
-                baseAmountForCd = paidOnTimeWithoutCD;
+                
+                const eligiblePaidAmount = Math.min(paymentAmount, eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0));
+                
+                baseAmountForCd = paidOnTimeWithoutCD + eligiblePaidAmount;
                 break;
             }
             case 'unpaid_amount': {
-                const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
                 baseAmountForCd = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
                 break;
             }
              case 'full_amount': {
-                const outstandingOfEligible = selectedEntries
-                    .filter(e => new Date(e.dueDate) >= today)
-                    .reduce((sum, e) => sum + (e.netAmount || 0), 0);
+                const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
 
                 const pastTimelyPaymentsWithoutCD = selectedEntries.reduce((sum, entry) => {
                      const paymentsForThisEntry = paymentHistory.filter(p =>
@@ -550,16 +551,37 @@ export default function SupplierPaymentsPage() {
                 const tempEditingPayment = editingPayment;
                 let paidForDetails: PaidFor[] = [];
                 
+                // Fetch all necessary documents before writing
+                const supplierDocsToRead: { ref: any, id: string }[] = [];
+                
                 if (rtgsFor === 'Supplier') {
-                    // Revert old payment if editing
                     if (tempEditingPayment) {
                         for (const detail of tempEditingPayment.paidFor || []) {
                             const q = query(suppliersCollection, where("srNo", "==", detail.srNo));
-                            const supplierDocs = await getDocs(q); // getDocs is not available in transaction, need to fetch before.
+                            const supplierDocs = await getDocs(q);
                             if (!supplierDocs.empty) {
-                                const supplierDocRef = supplierDocs.docs[0].ref;
-                                const supplierDoc = await transaction.get(supplierDocRef);
-                                const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
+                                supplierDocsToRead.push({ ref: supplierDocs.docs[0].ref, id: supplierDocs.docs[0].id });
+                            }
+                        }
+                    }
+
+                    for (const entryData of selectedEntries) {
+                        supplierDocsToRead.push({ ref: doc(db, "suppliers", entryData.id), id: entryData.id });
+                    }
+                }
+
+                // Execute all reads
+                const readDocs = await Promise.all(supplierDocsToRead.map(d => transaction.get(d.ref)));
+                const readDocsMap = new Map(readDocs.map((doc, i) => [supplierDocsToRead[i].id, doc]));
+                
+                // Now, perform writes
+                if (rtgsFor === 'Supplier') {
+                    if (tempEditingPayment) {
+                        for (const detail of tempEditingPayment.paidFor || []) {
+                             const supplierDocSnapshot = Array.from(readDocsMap.values()).find(d => d.data()?.srNo === detail.srNo);
+                             if (supplierDocSnapshot) {
+                                const supplierDocRef = supplierDocSnapshot.ref;
+                                const currentNetAmount = Number(supplierDocSnapshot.data()?.netAmount) || 0;
                                 const amountToRestore = detail.amount + (detail.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
                                 transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                             }
@@ -567,18 +589,16 @@ export default function SupplierPaymentsPage() {
                     }
 
                     let amountToDistribute = Math.round(totalPaidAmount);
-                    
                     const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                     
                     for (const entryData of sortedEntries) {
                         if (amountToDistribute <= 0) break;
 
                         const supplierDocRef = doc(db, "suppliers", entryData.id);
-                        const supplierDoc = await transaction.get(supplierDocRef);
-                        if (!supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
+                        const supplierDoc = readDocsMap.get(entryData.id);
+                        if (!supplierDoc || !supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
 
                         let outstanding = Number(supplierDoc.data().netAmount);
-                        
                         const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
                         if (paymentForThisEntry > 0) {
@@ -594,27 +614,6 @@ export default function SupplierPaymentsPage() {
                             transaction.update(supplierDocRef, { netAmount: outstanding - paymentForThisEntry });
                             amountToDistribute -= paymentForThisEntry;
                         }
-                    }
-
-                    // Update bank details for the customerId if they have changed in the form
-                    const currentSupplierSummary = customerSummaryMap.get(selectedCustomerKey);
-                    if (currentSupplierSummary && (
-                        currentSupplierSummary.acNo !== bankDetails.acNo ||
-                        currentSupplierSummary.ifscCode !== bankDetails.ifscCode ||
-                        currentSupplierSummary.bank !== bankDetails.bank ||
-                        currentSupplierSummary.branch !== bankDetails.branch
-                    )) {
-                        const q = query(suppliersCollection, where('customerId', '==', selectedCustomerKey));
-                        const supplierDocsToUpdate = await getDocs(q); // This is a read outside transaction, which is not ideal but necessary here.
-                        supplierDocsToUpdate.forEach(docSnap => {
-                            const docRef = doc(db, "suppliers", docSnap.id);
-                            transaction.update(docRef, { 
-                                acNo: bankDetails.acNo,
-                                ifscCode: bankDetails.ifscCode,
-                                bank: bankDetails.bank,
-                                branch: bankDetails.branch,
-                             });
-                        });
                     }
                 }
                 
