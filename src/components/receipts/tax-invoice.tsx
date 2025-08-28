@@ -40,6 +40,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     const sgstRate = taxRate / 2;
     
     const hsnCode = invoiceDetails.hsnCode || "N/A";
+    const balanceDue = customer.netAmount;
 
     // Function to convert number to words
     const numberToWords = (num: number): string => {
@@ -66,13 +67,13 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     };
 
     return (
-        <div className="p-4 bg-white text-black font-sans text-[10px] border border-black">
+        <div className="p-8 bg-white text-black font-sans text-sm">
             <style>
                 {`
                 @media print {
                     @page {
                         size: A4;
-                        margin: 10mm;
+                        margin: 0;
                     }
                     body {
                         -webkit-print-color-adjust: exact !important;
@@ -85,124 +86,99 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 `}
             </style>
             
-            <div className="text-center font-bold mb-2">Tax Invoice</div>
-
             {/* Header */}
-            <table className="w-full mb-2">
-                <tbody>
-                    <tr>
-                        <td className="w-1/2 align-top">
-                            <h1 className="font-bold text-lg">{settings.companyName}</h1>
-                            <p>{settings.address1}, {settings.address2}</p>
-                            <p>Email: {settings.email}</p>
-                            <p>Phone: {settings.contactNo}</p>
-                            <p><span className="font-bold">GSTIN:</span> {invoiceDetails.companyGstin}</p>
-                        </td>
-                        <td className="w-1/2 align-top text-right">
-                             <p><span className="font-bold">Invoice No:</span> {customer.srNo}</p>
-                             <p><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd-MMM-yyyy")}</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            
-             {/* Customer Details */}
-            <table className="w-full mb-2 border-collapse border border-black">
-                 <thead>
-                    <tr className="bg-gray-200">
-                        <th className="p-1 text-left border-r border-black">Bill To Party</th>
-                        <th className="p-1 text-left">Ship To Party</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td className="w-1/2 p-1 border-r border-black align-top">
-                            <p className="font-bold">{toTitleCase(customer.name)}</p>
-                            <p>{toTitleCase(customer.address)}</p>
-                            <p><span className="font-bold">GSTIN:</span> {invoiceDetails.customerGstin}</p>
-                        </td>
-                         <td className="w-1/2 p-1 align-top">
-                            <p className="font-bold">{toTitleCase(customer.name)}</p>
-                            <p>{toTitleCase(customer.address)}</p>
-                             <p><span className="font-bold">GSTIN:</span> {invoiceDetails.customerGstin}</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div className="flex justify-between items-start mb-8">
+                <div>
+                    <h1 className="text-4xl font-bold text-gray-800">{settings.companyName}</h1>
+                </div>
+                <div className="text-right">
+                    <h2 className="text-2xl font-semibold text-gray-600">TAX INVOICE</h2>
+                    <p className="text-xs"><span className="font-bold">Invoice #</span> {customer.srNo}</p>
+                    <p className="text-xs"><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd MMM, yyyy")}</p>
+                    <p className="text-xs"><span className="font-bold">Due Date:</span> {format(new Date(customer.dueDate), "dd MMM, yyyy")}</p>
+                </div>
+            </div>
+
+            {/* Bill From / To */}
+            <div className="flex justify-between mb-8 text-xs">
+                <div className="w-1/2 pr-4">
+                    <h3 className="font-bold text-gray-600 mb-2">BILL FROM</h3>
+                    <p className="font-bold">{settings.companyName}</p>
+                    <p>{settings.address1}</p>
+                    <p>{settings.address2}</p>
+                    <p>Phone: {settings.contactNo}</p>
+                    <p>Email: {settings.email}</p>
+                    <p>GSTIN: {invoiceDetails.companyGstin}</p>
+                </div>
+                <div className="w-1/2 pl-4">
+                    <h3 className="font-bold text-gray-600 mb-2">BILL TO</h3>
+                    <p className="font-bold">{toTitleCase(customer.name)}</p>
+                    {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
+                    <p>{toTitleCase(customer.address)}</p>
+                    <p>Phone: {customer.contact}</p>
+                    <p>GSTIN: {invoiceDetails.customerGstin}</p>
+                </div>
+            </div>
 
             {/* Items Table */}
-            <table className="w-full border-collapse border border-black mb-2">
+            <table className="w-full text-left mb-8 text-xs">
                 <thead>
-                    <tr className="bg-gray-200">
-                        <th className="p-1 border border-black">SNo.</th>
-                        <th className="p-1 border border-black">Description of Goods</th>
-                        <th className="p-1 border border-black">HSN/SAC</th>
-                        <th className="p-1 border border-black">Qty</th>
-                        <th className="p-1 border border-black">Rate</th>
-                        <th className="p-1 border border-black">Amount</th>
+                    <tr className="bg-gray-700 text-white">
+                        <th className="p-2 font-semibold">DESCRIPTION</th>
+                        <th className="p-2 font-semibold text-right">QTY (Qtl)</th>
+                        <th className="p-2 font-semibold text-right">RATE</th>
+                        <th className="p-2 font-semibold text-right">AMOUNT</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td className="p-1 border border-black text-center">1</td>
-                        <td className="p-1 border border-black">{toTitleCase(customer.variety)}</td>
-                        <td className="p-1 border border-black text-center">{hsnCode}</td>
-                        <td className="p-1 border border-black text-right">{Number(customer.netWeight).toFixed(2)} Qtl</td>
-                        <td className="p-1 border border-black text-right">{formatCurrency(Number(customer.rate))}</td>
-                        <td className="p-1 border border-black text-right">{formatCurrency(Number(customer.amount))}</td>
-                    </tr>
-                     {/* Empty rows for spacing */}
-                    {Array.from({ length: 15 }).map((_, i) => (
-                        <tr key={i}><td className="p-1 border border-black h-6" colSpan={6}></td></tr>
-                    ))}
-                </tbody>
-                <tfoot>
-                     <tr className="font-bold">
-                        <td className="p-1 border border-black text-right" colSpan={5}>Total</td>
-                        <td className="p-1 border border-black text-right">{formatCurrency(Number(customer.amount))}</td>
-                    </tr>
-                </tfoot>
-            </table>
-
-             {/* Tax Calculation */}
-             <table className="w-full mb-2">
-                <tbody>
-                    <tr>
-                        <td className="w-2/3 align-top">
-                           <p className="font-bold">Amount in Words:</p>
-                           <p>{numberToWords(totalInvoiceValue)}</p>
-                        </td>
-                        <td className="w-1/3 align-top">
-                           <table className="w-full">
-                               <tbody>
-                                   <tr><td className="text-right pr-2">Subtotal</td><td className="text-right font-bold">{formatCurrency(taxableAmount)}</td></tr>
-                                   <tr><td className="text-right pr-2">CGST @{cgstRate}%</td><td className="text-right font-bold">{formatCurrency(cgstAmount)}</td></tr>
-                                   <tr><td className="text-right pr-2">SGST @{sgstRate}%</td><td className="text-right font-bold">{formatCurrency(sgstAmount)}</td></tr>
-                                   <tr className="border-t border-black"><td className="text-right pr-2 font-bold text-base">Grand Total</td><td className="text-right font-bold text-base">{formatCurrency(totalInvoiceValue)}</td></tr>
-                               </tbody>
-                           </table>
-                        </td>
+                    <tr className="border-b">
+                        <td className="p-2">{toTitleCase(customer.variety)} (HSN: {hsnCode})</td>
+                        <td className="p-2 text-right">{Number(customer.netWeight).toFixed(2)}</td>
+                        <td className="p-2 text-right">{formatCurrency(Number(customer.rate))}</td>
+                        <td className="p-2 text-right">{formatCurrency(taxableAmount)}</td>
                     </tr>
                 </tbody>
             </table>
 
-            {/* Footer & Signature */}
-            <div className="border-t border-black pt-2 mt-4">
-                 <p className="font-bold mb-1">Terms & Conditions:</p>
-                 <ul className="list-disc list-inside text-xs">
-                     <li>Subject to Shahjahanpur Jurisdiction only.</li>
-                     <li>Goods once sold will not be taken back.</li>
-                 </ul>
+            {/* Totals Section */}
+            <div className="flex justify-end mb-8">
+                <div className="w-2/5 text-xs">
+                    <div className="flex justify-between p-1">
+                        <span className="font-semibold text-gray-600">Subtotal:</span>
+                        <span>{formatCurrency(taxableAmount)}</span>
+                    </div>
+                    <div className="flex justify-between p-1">
+                        <span className="font-semibold text-gray-600">CGST ({cgstRate}%):</span>
+                        <span>{formatCurrency(cgstAmount)}</span>
+                    </div>
+                    <div className="flex justify-between p-1">
+                        <span className="font-semibold text-gray-600">SGST ({sgstRate}%):</span>
+                        <span>{formatCurrency(sgstAmount)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 mt-2 bg-gray-200 font-bold">
+                        <span>Total:</span>
+                        <span>{formatCurrency(totalInvoiceValue)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-red-100 text-red-700 font-bold">
+                        <span>Balance Due:</span>
+                        <span>{formatCurrency(Number(balanceDue))}</span>
+                    </div>
+                </div>
+            </div>
 
-                 <div className="flex justify-between items-end mt-16">
-                     <div className="text-center">
-                         <p className="font-bold">Receiver's Seal & Signature</p>
-                     </div>
-                     <div className="text-center">
-                        <p className="font-bold mb-8">For {settings.companyName}</p>
-                        <p className="border-t border-black pt-1">Authorised Signatory</p>
-                     </div>
-                 </div>
+            {/* Footer */}
+            <div className="flex justify-between items-end mt-16 text-xs">
+                <div className="w-3/5">
+                    <h4 className="font-bold mb-1">Notes</h4>
+                    <p className="text-gray-600 mb-4">Thank you for your business.</p>
+                    <h4 className="font-bold mb-1">Terms & Conditions</h4>
+                    <p className="text-gray-600">Payment is due within 30 days. Subject to Shahjahanpur Jurisdiction only.</p>
+                </div>
+                <div className="w-2/5 text-center">
+                    <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
+                        <p>Authorized Signature</p>
+                    </div>
+                </div>
             </div>
         </div>
     );
