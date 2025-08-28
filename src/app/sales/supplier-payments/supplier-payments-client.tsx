@@ -378,71 +378,55 @@ export default function SupplierPaymentsPage() {
   }, [selectedEntryIds, autoSetCDToggle]);
   
   useEffect(() => {
-      if (!cdEnabled) {
-          setCalculatedCdAmount(0);
-          return;
-      }
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      let baseAmountForCd = 0;
-
-      if (cdAt === 'paid_amount') {
-          // Find past payments for selected entries that were made on time and had no CD
-          const pastPaymentsOnSelectedEntries = paymentHistory.filter(p => 
-              p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || '')) && !p.cdApplied
-          );
-          
-          let eligiblePastPaymentsAmount = 0;
-          
-          pastPaymentsOnSelectedEntries.forEach(p => {
-              p.paidFor?.forEach(pf => {
-                  const entry = suppliers.find(s => s.srNo === pf.srNo);
-                  if (entry && selectedEntryIds.has(entry.id)) {
-                      const dueDate = new Date(entry.dueDate);
-                      const paymentDate = new Date(p.date);
-                      if (paymentDate <= dueDate) {
-                          eligiblePastPaymentsAmount += pf.amount;
-                      }
-                  }
-              });
-          });
-          baseAmountForCd = eligiblePastPaymentsAmount;
-      } else if (cdAt === 'unpaid_amount') {
-          // Sum of outstanding amounts of entries that are due today or in the future
-          const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-          baseAmountForCd = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-
-      } else if (cdAt === 'full_amount') {
-          // Sum of unpaid amount for eligible entries + past timely payments without CD on selected entries
-          const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-          const unpaidAmount = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-
-          const pastPaymentsOnSelectedEntries = paymentHistory.filter(p => 
-              p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || '')) && !p.cdApplied
-          );
-          
-          let eligiblePastPaymentsAmount = 0;
-          pastPaymentsOnSelectedEntries.forEach(p => {
-              p.paidFor?.forEach(pf => {
-                  const entry = suppliers.find(s => s.srNo === pf.srNo);
-                  if (entry && selectedEntryIds.has(entry.id)) {
-                      const dueDate = new Date(entry.dueDate);
-                      const paymentDate = new Date(p.date);
-                      if (paymentDate <= dueDate) {
-                          eligiblePastPaymentsAmount += pf.amount;
-                      }
-                  }
-              });
-          });
-
-          baseAmountForCd = unpaidAmount + eligiblePastPaymentsAmount;
-      }
-      
-      setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-
-  }, [cdEnabled, cdPercent, cdAt, selectedEntryIds, suppliers, paymentHistory]);
+    if (!cdEnabled) {
+      setCalculatedCdAmount(0);
+      return;
+    }
+  
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+  
+    const eligibleEntriesForCd = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+    let baseAmountForCd = 0;
+  
+    if (cdAt === 'paid_amount') {
+      const eligibleOutstanding = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+      baseAmountForCd = Math.min(paymentAmount, eligibleOutstanding);
+    } else if (cdAt === 'unpaid_amount') {
+      baseAmountForCd = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+    } else if (cdAt === 'full_amount') {
+      const unpaidOnEligible = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+      const paidOnTimeWithoutCd = paymentHistory.reduce((sum, p) => {
+        if (p.cdApplied) return sum;
+        const paidForAnySelected = p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || ''));
+        if (!paidForAnySelected) return sum;
+        
+        let timelyPaidAmount = 0;
+        p.paidFor?.forEach(pf => {
+          const entry = suppliers.find(s => s.srNo === pf.srNo);
+          if (entry && selectedEntryIds.has(entry.id)) {
+            if (new Date(p.date) <= new Date(entry.dueDate)) {
+              timelyPaidAmount += pf.amount;
+            }
+          }
+        });
+        return sum + timelyPaidAmount;
+      }, 0);
+      baseAmountForCd = unpaidOnEligible + paidOnTimeWithoutCd;
+    }
+  
+    setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
+  }, [
+    cdEnabled,
+    cdPercent,
+    cdAt,
+    paymentAmount,
+    paymentType,
+    selectedEntries,
+    paymentHistory,
+    suppliers,
+    selectedEntryIds
+  ]);
 
 
   useEffect(() => {
