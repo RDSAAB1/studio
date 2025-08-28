@@ -184,9 +184,11 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             <div className="flex-grow-0">
                 {/* Totals Section & Amount in Words */}
                 <div className="flex justify-between mb-4">
-                    <div className="w-3/5 text-xs">
-                        <p className="font-bold mb-1">Amount in Words:</p>
-                        <p className="font-semibold text-gray-700">{numberToWords(totalInvoiceValue)}</p>
+                    <div className="w-3/5 text-xs pr-4">
+                         <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
+                            <p className="font-bold mb-1 uppercase text-gray-500 text-[11px]">Amount in Words:</p>
+                            <p className="font-semibold text-gray-800">{numberToWords(totalInvoiceValue)}</p>
+                        </div>
                     </div>
                     <div className="w-2/5 text-xs">
                         <div className="flex justify-between p-1 border-b border-gray-200">
@@ -216,8 +218,13 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 <div className="border-t border-gray-300 pt-4 mt-8 text-xs">
                     <div className="flex justify-between items-end">
                         <div className="w-3/5">
-                            <h4 className="font-bold mb-1">Terms & Conditions</h4>
-                            <p className="text-gray-600">Payment is due within 30 days. Subject to Shahjahanpur Jurisdiction only.</p>
+                            <h4 className="font-bold mb-2 text-gray-600 uppercase text-[11px]">Terms & Conditions</h4>
+                            <ul className="list-disc list-inside text-gray-600 space-y-1">
+                                <li>Goods once sold will not be taken back or exchanged.</li>
+                                <li>Interest @18% p.a. will be charged on all overdue payments.</li>
+                                <li>All disputes are subject to Shahjahanpur jurisdiction only.</li>
+                                <li>Please check the goods on delivery. No claims will be entertained later.</li>
+                            </ul>
                         </div>
                         <div className="w-2/5 text-center">
                             <div className="h-12"></div>
