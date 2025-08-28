@@ -14,116 +14,127 @@ interface ChallanProps {
 export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
     
     return (
-        <div className="p-4 bg-white text-black font-sans text-[10px] border border-black printable-area">
-            <style>
+        <div className="p-6 bg-white text-black font-sans text-[12px] leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
+             <style>
                 {`
                 @media print {
-                    @page { 
-                        size: A4; 
-                        margin: 10mm; 
+                    @page {
+                        size: A4;
+                        margin: 0;
                     }
-                    body { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
+                    html, body {
+                        height: 100%;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .printable-area {
+                        color: #000 !important;
                     }
                     .printable-area * {
                         color: #000 !important;
+                        border-color: #e5e7eb !important;
                     }
-                    .printable-area .bg-gray-200 {
-                        background-color: #e5e7eb !important;
+                    .printable-area .bg-gray-800 {
+                        background-color: #1f2937 !important;
+                    }
+                     .printable-area .bg-gray-800 * {
+                        color: #fff !important;
                     }
                 }
                 `}
             </style>
             
-            <div className="text-center font-bold mb-2 text-lg">Delivery Challan</div>
+            <div className="flex-grow-0">
+                {/* Header */}
+                <div className="flex justify-between items-start mb-4">
+                    <div className="w-1/2">
+                        <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
+                        <p className="text-gray-600 text-[11px]">{settings.address1}, {settings.address2}</p>
+                        <p className="text-gray-600 text-[11px]">Phone: {settings.contactNo} | Email: {settings.email}</p>
+                    </div>
+                    <div className="text-right">
+                        <h1 className="text-3xl font-bold text-gray-800 uppercase mb-1">DELIVERY CHALLAN</h1>
+                        <div className="text-sm text-gray-700">
+                            <div className="grid grid-cols-2 text-left">
+                                <span className="font-bold pr-2">Challan #:</span>
+                                <span>{customer.srNo}</span>
+                                <span className="font-bold pr-2">Date:</span>
+                                <span>{format(new Date(customer.date), "dd MMM, yyyy")}</span>
+                                <span className="font-bold pr-2">Vehicle No:</span>
+                                <span>{customer.vehicleNo.toUpperCase()}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-            {/* Header */}
-            <table className="w-full mb-2">
-                <tbody>
-                    <tr>
-                        <td className="w-1/2 align-top">
-                            <h1 className="font-bold text-base">{settings.companyName}</h1>
-                            <p>{settings.address1}, {settings.address2}</p>
-                        </td>
-                        <td className="w-1/2 align-top text-right">
-                             <p><span className="font-bold">Challan No:</span> {customer.srNo}</p>
-                             <p><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd-MMM-yyyy")}</p>
-                             <p><span className="font-bold">Vehicle No:</span> {customer.vehicleNo.toUpperCase()}</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            
-             {/* Customer Details */}
-            <table className="w-full mb-2 border-collapse border border-black">
-                 <thead>
-                    <tr className="bg-gray-200">
-                        <th className="p-1 text-left border-r border-black">Consignor (From)</th>
-                        <th className="p-1 text-left">Consignee (To)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td className="w-1/2 p-1 border-r border-black align-top">
-                            <p className="font-bold">{settings.companyName}</p>
-                            <p>{settings.address1}</p>
-                             <p>{settings.address2}</p>
-                        </td>
-                         <td className="w-1/2 p-1 align-top">
-                            <p className="font-bold">{toTitleCase(customer.name)}</p>
-                            <p>{toTitleCase(customer.address)}</p>
-                             <p>Contact: {customer.contact}</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                {/* Consignor / Consignee Section */}
+                <div className="grid grid-cols-2 gap-4 mt-6 mb-4">
+                    <div className="border border-gray-200 p-3 rounded-lg">
+                        <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Consignor (From)</h3>
+                        <p className="font-bold text-base">{settings.companyName}</p>
+                        <p className="text-sm">{settings.address1}</p>
+                        <p className="text-sm">{settings.address2}</p>
+                    </div>
+                    <div className="border border-gray-200 p-3 rounded-lg">
+                        <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Consignee (To)</h3>
+                        <p className="font-bold text-base">{toTitleCase(customer.name)}</p>
+                        <p className="text-sm">{toTitleCase(customer.address)}</p>
+                        <p className="text-sm">Contact: {customer.contact}</p>
+                    </div>
+                </div>
+                
+                {/* Items Table */}
+                <table className="w-full text-left mb-4 print-table">
+                    <thead>
+                        <tr className="bg-gray-800 text-white uppercase text-xs">
+                            <th className="p-2 font-semibold text-center w-[5%]">#</th>
+                            <th className="p-2 font-semibold w-[65%]">Description of Goods</th>
+                            <th className="p-2 font-semibold text-center w-[15%]">Quantity (Qtl)</th>
+                            <th className="p-2 font-semibold text-center w-[15%]">No. of Bags</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr className="border-b border-gray-200">
+                            <td className="p-2 text-center border-x border-gray-200">1</td>
+                            <td className="p-2 border-x border-gray-200">
+                                <p className="font-semibold text-base">{toTitleCase(customer.variety)}</p>
+                            </td>
+                            <td className="p-2 text-center border-x border-gray-200">{Number(customer.netWeight).toFixed(2)}</td>
+                            <td className="p-2 text-center border-x border-gray-200">{customer.bags || 'N/A'}</td>
+                        </tr>
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <tr key={i} className="border-b border-gray-200"><td className="p-2 h-6 border-x border-gray-200" colSpan={4}></td></tr>
+                        ))}
+                    </tbody>
+                     <tfoot>
+                         <tr className="bg-gray-100 font-bold">
+                            <td className="p-2 text-right" colSpan={3}>Total Bags</td>
+                            <td className="p-2 text-center">{customer.bags || 'N/A'}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
 
-            {/* Items Table */}
-            <table className="w-full border-collapse border border-black mb-2">
-                <thead>
-                    <tr className="bg-gray-200">
-                        <th className="p-1 border border-black">SNo.</th>
-                        <th className="p-1 border border-black">Description of Goods</th>
-                        <th className="p-1 border border-black">Quantity</th>
-                        <th className="p-1 border border-black">No. of Bags</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td className="p-1 border border-black text-center">1</td>
-                        <td className="p-1 border border-black">{toTitleCase(customer.variety)}</td>
-                        <td className="p-1 border border-black text-right">{Number(customer.netWeight).toFixed(2)} Qtl</td>
-                        <td className="p-1 border border-black text-center">{customer.bags || 'N/A'}</td>
-                    </tr>
-                     {/* Empty rows for spacing */}
-                    {Array.from({ length: 15 }).map((_, i) => (
-                        <tr key={i}><td className="p-1 border border-black h-6" colSpan={4}></td></tr>
-                    ))}
-                </tbody>
-                 <tfoot>
-                     <tr className="font-bold">
-                        <td className="p-1 border border-black text-right" colSpan={3}>Total Bags</td>
-                        <td className="p-1 border border-black text-center">{customer.bags || 'N/A'}</td>
-                    </tr>
-                </tfoot>
-            </table>
-
-            {/* Footer & Signature */}
-            <div className="border-t border-black pt-2 mt-16">
-                 <div className="flex justify-between items-end">
-                     <div className="text-center">
-                        <p className="font-bold mb-8">Received by</p>
-                        <p className="border-t border-black pt-1">Receiver's Seal & Signature</p>
-                     </div>
-                     <div className="text-center">
-                        <p className="font-bold mb-8">For {settings.companyName}</p>
-                        <p className="border-t border-black pt-1">Authorised Signatory</p>
-                     </div>
-                 </div>
+            <div className="flex-grow-0">
+                 {/* Footer & Signature */}
+                <div className="border-t border-gray-300 pt-4 mt-4">
+                    <div className="flex justify-between items-end">
+                        <div className="w-2/5 text-center">
+                            <div className="h-16"></div>
+                            <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
+                                <p className="font-bold text-sm">Receiver's Signature</p>
+                            </div>
+                        </div>
+                        <div className="w-2/5 text-center">
+                            <div className="h-16"></div>
+                            <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
+                                <p className="font-bold text-sm">Authorised Signatory</p>
+                                <p className="text-gray-600 text-xs">For {settings.companyName}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
 }
-
-    
