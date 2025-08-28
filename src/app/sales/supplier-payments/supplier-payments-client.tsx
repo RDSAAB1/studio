@@ -888,7 +888,7 @@ export default function SupplierPaymentsPage() {
     if(selectedBranch) {
       setBankDetails(prev => ({...prev, branch: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
     }
-  };
+  }
 
   const handleAddNewBank = async () => {
     if(!newBankName.trim()) {
@@ -1101,65 +1101,64 @@ export default function SupplierPaymentsPage() {
                                 <div className="mt-2 space-y-2">
                                     <Card className="bg-muted/30 p-2">
                                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end">
-                                      <div className="space-y-1">
-                                        <Label className="text-xs">Payment ID</Label>
-                                        <Input
-                                            id="payment-id"
-                                            value={paymentId}
-                                            onChange={e => setPaymentId(e.target.value)}
-                                            onBlur={handlePaymentIdBlur}
-                                            className="h-8 text-xs font-mono" />
-                                      </div>
-                                      
-                                      {(rtgsFor === 'Supplier') && (
-                                          <>
-                                          <div className="space-y-1">
-                                              <Label className="text-xs">Payment Type</Label>
-                                              <Select value={paymentType} onValueChange={setPaymentType}>
-                                                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                  <SelectContent>
-                                                      <SelectItem value="Full">Full</SelectItem>
-                                                      <SelectItem value="Partial">Partial</SelectItem>
-                                                  </SelectContent>
-                                              </Select>
-                                          </div>
-                                          {paymentType === 'Partial' && (
-                                              <div className="space-y-1">
-                                                  <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
-                                                  <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
-                                              </div>
-                                          )}
-                                          <div className="flex items-center space-x-2 pb-1">
-                                              <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
-                                              <Label htmlFor="cd-toggle" className="text-xs">Apply CD</Label>
-                                          </div>
-                                          {cdEnabled && <>
-                                              <div className="space-y-1">
-                                                  <Label htmlFor="cd-percent" className="text-xs">CD %</Label>
-                                                  <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
-                                              </div>
-                                              <div className="space-y-1">
-                                                  <Label className="text-xs">CD At</Label>
-                                                  <Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}>
-                                                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                      <SelectContent>
-                                                          {availableCdOptions.map(opt => (
-                                                              <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
-                                                          ))}
-                                                      </SelectContent>
-                                                  </Select>
-                                              </div>
-                                              <div className="space-y-1">
-                                                  <Label className="text-xs">CD Amount</Label>
-                                                  <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
-                                              </div>
-                                          </>}
-                                          </>
+                                      { (paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
+                                        <>
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">Payment ID</Label>
+                                          <Input
+                                              id="payment-id"
+                                              value={paymentId}
+                                              onChange={e => setPaymentId(e.target.value)}
+                                              onBlur={handlePaymentIdBlur}
+                                              className="h-8 text-xs font-mono" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Payment Type</Label>
+                                            <Select value={paymentType} onValueChange={setPaymentType}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Full">Full</SelectItem>
+                                                    <SelectItem value="Partial">Partial</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        {paymentType === 'Partial' && (
+                                            <div className="space-y-1">
+                                                <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
+                                                <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
+                                            </div>
+                                        )}
+                                        <div className="flex items-center space-x-2 pb-1">
+                                            <Switch id="cd-toggle" checked={cdEnabled} onCheckedChange={setCdEnabled} />
+                                            <Label htmlFor="cd-toggle" className="text-xs">Apply CD</Label>
+                                        </div>
+                                        {cdEnabled && <>
+                                            <div className="space-y-1">
+                                                <Label htmlFor="cd-percent" className="text-xs">CD %</Label>
+                                                <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">CD At</Label>
+                                                <Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}>
+                                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {availableCdOptions.map(opt => (
+                                                            <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">CD Amount</Label>
+                                                <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
+                                            </div>
+                                        </>}
+                                        </>
                                       )}
 
                                       {paymentMethod === 'RTGS' && rtgsFor === 'Supplier' && (
-                                          <>
-                                                <div className="space-y-1">
+                                          <div className="col-span-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end">
+                                              <div className="space-y-1">
                                                   <Label className="text-xs">6R No.</Label>
                                                   <Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs" />
                                               </div>
@@ -1177,15 +1176,26 @@ export default function SupplierPaymentsPage() {
                                                       </PopoverContent>
                                                   </Popover>
                                               </div>
-                                          </>
+                                              <div className="space-y-1">
+                                                  <Label className="text-xs">UTR No.</Label>
+                                                  <Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/>
+                                              </div>
+                                          </div>
                                       )}
-                                        {paymentMethod === 'RTGS' && rtgsFor === 'Outsider' && (
-                                          <>
+                                      
+                                      {paymentMethod === 'RTGS' && rtgsFor === 'Outsider' && (
+                                          <div className="col-span-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-x-2 gap-y-2 items-end">
+                                              <div className="space-y-1">
+                                                  <Label className="text-xs">Payment ID</Label>
+                                                  <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs font-mono"/>
+                                              </div>
                                               <div className="space-y-1">
                                                   <Label className="text-xs">Amount</Label>
                                                   <Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/>
                                               </div>
-                                          </>
+                                              <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
+                                              <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
+                                          </div>
                                       )}
                                     </div>
                                 </Card>
@@ -1337,7 +1347,7 @@ export default function SupplierPaymentsPage() {
                                                  </> : null
                                                 }
                                                 <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                                <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
+                                                { rtgsFor === 'Supplier' ? null : <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div> }
                                             </div>
                                         </div>
                                     </Card>
