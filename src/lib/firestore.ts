@@ -205,9 +205,10 @@ export function getCustomersRealtime(callback: (customers: Customer[]) => void, 
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {
-    const docRef = await addDoc(customersCollection, customerData);
-    await updateDoc(docRef, { id: docRef.id });
-    return { id: docRef.id, ...customerData };
+    const docRef = doc(collection(db, 'customers'));
+    const newCustomer = { ...customerData, id: docRef.id };
+    await setDoc(docRef, newCustomer);
+    return newCustomer;
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {

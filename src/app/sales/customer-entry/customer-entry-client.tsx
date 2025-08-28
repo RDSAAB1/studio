@@ -1030,7 +1030,7 @@ export default function CustomerEntryClient() {
         return {
             ...prev, ...values,
             date: currentDate.toISOString().split("T")[0],
-            dueDate: currentDate.toISOString().split("T")[0],
+            dueDate: (values.date ? new Date(values.date) : new Date()).toISOString().split("T")[0],
             weight: parseFloat(weight.toFixed(2)),
             netWeight: parseFloat(netWeight.toFixed(2)),
             amount: parseFloat(amount.toFixed(2)),
