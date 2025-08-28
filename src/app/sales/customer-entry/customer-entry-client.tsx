@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
@@ -43,6 +43,7 @@ const formSchema = z.object({
     bags: z.coerce.number().min(0),
     name: z.string().min(1, "Name is required."),
     companyName: z.string(),
+    so: z.string().optional(),
     address: z.string(),
     contact: z.string()
       .length(10, "Contact number must be exactly 10 digits.")
@@ -128,6 +129,7 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
     const handleNameSelect = (customer: Customer) => {
         form.setValue('name', toTitleCase(customer.name));
         form.setValue('companyName', toTitleCase(customer.companyName || ''));
+        form.setValue('so', toTitleCase(customer.so || ''));
         form.setValue('address', toTitleCase(customer.address));
         form.setValue('contact', customer.contact);
         form.setValue('gstin', customer.gstin || '');
@@ -266,6 +268,14 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                                 </PopoverContent>
                             </Popover>
                             {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="so" className="text-xs">S/O (Father's Name)</Label>
+                                <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="so" control={form.control} render={({ field }) => (
+                                    <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )}/>
+                            </InputWithIcon>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="companyName" className="text-xs">Company Name</Label>
@@ -1089,7 +1099,7 @@ export default function CustomerEntryClient() {
     }
     const formValues: FormValues = {
       srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
-      name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
+      name: customerState.name, so: customerState.so || '', companyName: customerState.companyName || '', address: customerState.address,
       contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, cd: Number(customerState.cd) || 0,
@@ -1149,6 +1159,7 @@ export default function CustomerEntryClient() {
       if (foundCustomer && foundCustomer.id !== currentCustomer.id) {
         form.setValue('name', foundCustomer.name);
         form.setValue('companyName', foundCustomer.companyName || '');
+        form.setValue('so', foundCustomer.so || '');
         form.setValue('address', foundCustomer.address);
         form.setValue('gstin', foundCustomer.gstin || '');
         toast({ title: "Customer Found", description: `Details for ${toTitleCase(foundCustomer.name)} have been auto-filled.` });
@@ -1202,9 +1213,7 @@ export default function CustomerEntryClient() {
       dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       name: toTitleCase(values.name), 
       companyName: toTitleCase(values.companyName || ''),
-      so: '', 
-      kartaPercentage: 0,
-      labouryRate: 0, 
+      so: toTitleCase(values.so || ''),
       address: toTitleCase(values.address), 
       vehicleNo: toTitleCase(values.vehicleNo), 
       variety: toTitleCase(values.variety),
@@ -1623,6 +1632,10 @@ export default function CustomerEntryClient() {
                                 <div className="space-y-1">
                                     <Label htmlFor="edit-name" className="text-xs">Customer Name</Label>
                                     <Input id="edit-name" name="name" value={editableInvoiceDetails.name || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                </div>
+                                 <div className="space-y-1">
+                                    <Label htmlFor="edit-so" className="text-xs">S/O (Father's Name)</Label>
+                                    <Input id="edit-so" name="so" value={editableInvoiceDetails.so || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="edit-companyName" className="text-xs">Company Name</Label>
