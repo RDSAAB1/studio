@@ -203,10 +203,6 @@ export default function SupplierPaymentsPage() {
   }, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
-    if (selectedEntries.length === 0) {
-        setCdEnabled(false);
-        return;
-    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const isAnyDueInFuture = selectedEntries.some(e => new Date(e.dueDate) >= today);
@@ -382,61 +378,73 @@ export default function SupplierPaymentsPage() {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
   
-  useEffect(() => {
-    if (!cdEnabled) {
-      setCalculatedCdAmount(0);
-      return;
-    }
-  
-    let baseAmountForCd = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-  
-    // Filter for entries that are eligible for CD (due date is today or in the future)
-    const cdEligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-  
-    switch (cdAt) {
-      case 'paid_amount': {
-        // Calculate CD on the portion of the payment that covers eligible entries.
-        const outstandingOfEligible = cdEligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-        baseAmountForCd = Math.min(paymentAmount, outstandingOfEligible);
-        break;
-      }
-      case 'unpaid_amount': {
-        // Calculate CD only on the outstanding amount of eligible entries.
-        baseAmountForCd = cdEligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-        break;
-      }
-      case 'full_amount': {
-        // Outstanding of eligible entries
-        const outstandingOfEligible = cdEligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-        
-        // Find past payments for all selected entries (eligible or not) that were made on time and had no CD.
-        const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-        const pastTimelyPaymentsWithoutCD = paymentHistory
-          .filter(p => !p.cdApplied && p.paidFor?.some(pf => selectedSrNos.has(pf.srNo)))
-          .reduce((sum, p) => {
-            const relevantPaidFor = p.paidFor?.filter(pf => {
-              const entry = selectedEntries.find(e => e.srNo === pf.srNo);
-              return entry && new Date(p.date) <= new Date(entry.dueDate);
-            }) || [];
-            return sum + relevantPaidFor.reduce((innerSum, pf) => innerSum + pf.amount, 0);
-          }, 0);
-  
-        baseAmountForCd = outstandingOfEligible + pastTimelyPaymentsWithoutCD;
-        break;
-      }
-      case 'payment_amount': {
-        // For partial payments, CD is on the manually entered payment amount.
-        baseAmountForCd = paymentAmount;
-        break;
-      }
-      default:
-        baseAmountForCd = 0;
-    }
-  
-    setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-  }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory]);
+    useEffect(() => {
+        if (!cdEnabled) {
+            setCalculatedCdAmount(0);
+            return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let baseAmountForCd = 0;
+
+        switch (cdAt) {
+            case 'paid_amount': {
+                const paidOnTimeWithoutCD = selectedEntries.reduce((sum, entry) => {
+                    const paymentsForThisEntry = paymentHistory.filter(p =>
+                        p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied
+                    );
+                    const timelyPaymentsSum = paymentsForThisEntry.reduce((paymentSum, p) => {
+                        if (new Date(p.date) <= new Date(entry.dueDate)) {
+                            const paidForThis = p.paidFor?.find(pf => pf.srNo === entry.srNo);
+                            return paymentSum + (paidForThis?.amount || 0);
+                        }
+                        return paymentSum;
+                    }, 0);
+                    return sum + timelyPaymentsSum;
+                }, 0);
+                baseAmountForCd = paidOnTimeWithoutCD;
+                break;
+            }
+            case 'unpaid_amount': {
+                const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+                baseAmountForCd = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+                break;
+            }
+             case 'full_amount': {
+                const outstandingOfEligible = selectedEntries
+                    .filter(e => new Date(e.dueDate) >= today)
+                    .reduce((sum, e) => sum + (e.netAmount || 0), 0);
+
+                const pastTimelyPaymentsWithoutCD = selectedEntries.reduce((sum, entry) => {
+                     const paymentsForThisEntry = paymentHistory.filter(p =>
+                        p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied
+                    );
+                    const timelyPaymentsSum = paymentsForThisEntry.reduce((paymentSum, p) => {
+                        if (new Date(p.date) <= new Date(entry.dueDate)) {
+                           const paidForThis = p.paidFor?.find(pf => pf.srNo === entry.srNo);
+                           return paymentSum + (paidForThis?.amount || 0);
+                        }
+                        return paymentSum;
+                    }, 0);
+                    return sum + timelyPaymentsSum;
+                }, 0);
+
+                baseAmountForCd = outstandingOfEligible + pastTimelyPaymentsWithoutCD;
+                break;
+            }
+            case 'payment_amount': {
+                baseAmountForCd = paymentAmount;
+                break;
+            }
+            default:
+                baseAmountForCd = 0;
+        }
+
+        setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
+
+    }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory]);
 
 
   useEffect(() => {
@@ -1589,7 +1597,7 @@ export default function SupplierPaymentsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card>
-                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0 space-y-3">
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                   <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsSupplierEntry.vehicleNo.toUpperCase()} />
@@ -1792,3 +1800,5 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
+
+    
