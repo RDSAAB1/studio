@@ -9,15 +9,19 @@ import { format } from 'date-fns';
 interface TaxInvoiceProps {
     customer: Customer;
     settings: ReceiptSettings;
-    // Add other props like tax rates, HSN codes etc. later
+    invoiceDetails: {
+        companyGstin: string;
+        customerGstin: string;
+        hsnCode: string;
+        taxRate: number;
+    };
 }
 
-export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings }) => {
-    // These would eventually come from settings or item data
-    const taxRate = 18;
+export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invoiceDetails }) => {
+    const taxRate = invoiceDetails.taxRate || 0;
     const cgstRate = taxRate / 2;
     const sgstRate = taxRate / 2;
-    const hsnCode = "1006"; // Example HSN code for rice
+    const hsnCode = invoiceDetails.hsnCode || "N/A";
 
     const taxableAmount = customer.amount;
     const cgstAmount = (taxableAmount * cgstRate) / 100;
@@ -77,7 +81,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings }) =>
                             <p>{settings.address1}, {settings.address2}</p>
                             <p>Email: {settings.email}</p>
                             <p>Phone: {settings.contactNo}</p>
-                            <p><span className="font-bold">GSTIN:</span> 23ABCDE1234F1Z5</p>
+                            <p><span className="font-bold">GSTIN:</span> {invoiceDetails.companyGstin}</p>
                         </td>
                         <td className="w-1/2 align-top text-right">
                              <p><span className="font-bold">Invoice No:</span> {customer.srNo}</p>
@@ -100,12 +104,12 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings }) =>
                         <td className="w-1/2 p-1 border-r border-black align-top">
                             <p className="font-bold">{toTitleCase(customer.name)}</p>
                             <p>{toTitleCase(customer.address)}</p>
-                            <p>GSTIN: 23ABCDE1234F1Z6</p>
+                            <p><span className="font-bold">GSTIN:</span> {invoiceDetails.customerGstin}</p>
                         </td>
                          <td className="w-1/2 p-1 align-top">
                             <p className="font-bold">{toTitleCase(customer.name)}</p>
                             <p>{toTitleCase(customer.address)}</p>
-                            <p>GSTIN: 23ABCDE1234F1Z6</p>
+                             <p><span className="font-bold">GSTIN:</span> {invoiceDetails.customerGstin}</p>
                         </td>
                     </tr>
                 </tbody>
@@ -128,9 +132,9 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings }) =>
                         <td className="p-1 border border-black text-center">1</td>
                         <td className="p-1 border border-black">{toTitleCase(customer.variety)}</td>
                         <td className="p-1 border border-black text-center">{hsnCode}</td>
-                        <td className="p-1 border border-black text-right">{customer.netWeight.toFixed(2)} Qtl</td>
-                        <td className="p-1 border border-black text-right">{formatCurrency(customer.rate)}</td>
-                        <td className="p-1 border border-black text-right">{formatCurrency(customer.amount)}</td>
+                        <td className="p-1 border border-black text-right">{Number(customer.netWeight).toFixed(2)} Qtl</td>
+                        <td className="p-1 border border-black text-right">{formatCurrency(Number(customer.rate))}</td>
+                        <td className="p-1 border border-black text-right">{formatCurrency(Number(customer.amount))}</td>
                     </tr>
                      {/* Empty rows for spacing */}
                     {Array.from({ length: 10 }).map((_, i) => (
@@ -140,7 +144,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings }) =>
                 <tfoot>
                      <tr className="font-bold">
                         <td className="p-1 border border-black text-right" colSpan={5}>Total</td>
-                        <td className="p-1 border border-black text-right">{formatCurrency(customer.amount)}</td>
+                        <td className="p-1 border border-black text-right">{formatCurrency(Number(customer.amount))}</td>
                     </tr>
                 </tfoot>
             </table>

@@ -875,6 +875,12 @@ export default function CustomerEntryClient() {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
   const [isTaxInvoiceOpen, setIsTaxInvoiceOpen] = useState(false);
+  const [invoiceDetails, setInvoiceDetails] = useState({
+    companyGstin: 'YOUR_GSTIN_HERE',
+    customerGstin: '',
+    hsnCode: '1006',
+    taxRate: 18,
+  });
 
 
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
@@ -1749,17 +1755,37 @@ export default function CustomerEntryClient() {
         </AlertDialogContent>
       </AlertDialog>
 
-       <Dialog open={isTaxInvoiceOpen} onOpenChange={setIsTaxInvoiceOpen}>
+      <Dialog open={isTaxInvoiceOpen} onOpenChange={setIsTaxInvoiceOpen}>
             <DialogContent className="max-w-4xl p-0">
                 <DialogHeader className="p-4 sm:p-6 pb-0">
                     <DialogTitle>Tax Invoice</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="max-h-[80vh]">
-                    <div className="p-4 sm:p-6">
+                    <div className="p-4 sm:p-6 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="companyGstin">Your GSTIN</Label>
+                                <Input id="companyGstin" value={invoiceDetails.companyGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, companyGstin: e.target.value.toUpperCase()})} />
+                            </div>
+                             <div className="space-y-1">
+                                <Label htmlFor="customerGstin">Customer's GSTIN</Label>
+                                <Input id="customerGstin" value={invoiceDetails.customerGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, customerGstin: e.target.value.toUpperCase()})} />
+                            </div>
+                             <div className="space-y-1">
+                                <Label htmlFor="hsnCode">HSN/SAC Code</Label>
+                                <Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} />
+                            </div>
+                             <div className="space-y-1">
+                                <Label htmlFor="taxRate">Tax Rate (%)</Label>
+                                <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} />
+                            </div>
+                        </div>
+                        <Separator />
                         {detailsCustomer && receiptSettings && (
                             <TaxInvoice 
                                 customer={detailsCustomer} 
-                                settings={receiptSettings} 
+                                settings={receiptSettings}
+                                invoiceDetails={invoiceDetails}
                             />
                         )}
                     </div>
