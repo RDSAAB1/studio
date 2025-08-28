@@ -99,18 +99,19 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 </div>
             </div>
 
-            {/* Bill From / To */}
-            <div className="flex justify-between mb-8 text-xs">
-                <div className="w-1/2 pr-4">
-                    <h3 className="font-bold text-gray-600 mb-2">BILL FROM</h3>
-                    <p className="font-bold">{settings.companyName}</p>
-                    <p>{settings.address1}</p>
-                    <p>{settings.address2}</p>
-                    <p>Phone: {settings.contactNo}</p>
-                    <p>Email: {settings.email}</p>
-                    <p>GSTIN: {invoiceDetails.companyGstin}</p>
-                </div>
-                <div className="w-1/2 pl-4">
+            {/* Bill From */}
+            <div className="mb-4 text-xs">
+                <h3 className="font-bold text-gray-600 mb-2">BILL FROM</h3>
+                <p className="font-bold">{settings.companyName}</p>
+                <p>{settings.address1}</p>
+                <p>{settings.address2}</p>
+                <p>Phone: {settings.contactNo}</p>
+                <p>Email: {settings.email}</p>
+                <p>GSTIN: {invoiceDetails.companyGstin}</p>
+            </div>
+            
+            <div className="flex justify-between mb-8 text-xs border-t pt-4">
+                 <div className="w-1/2 pr-4">
                     <h3 className="font-bold text-gray-600 mb-2">BILL TO</h3>
                     <p className="font-bold">{toTitleCase(customer.name)}</p>
                     {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
@@ -118,7 +119,16 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     <p>Phone: {customer.contact}</p>
                     <p>GSTIN: {invoiceDetails.customerGstin}</p>
                 </div>
+                 <div className="w-1/2 pl-4">
+                    <h3 className="font-bold text-gray-600 mb-2">SHIP TO</h3>
+                    <p className="font-bold">{toTitleCase(customer.name)}</p>
+                    {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
+                    <p>{toTitleCase(customer.address)}</p>
+                    <p>Phone: {customer.contact}</p>
+                    <p>GSTIN: {invoiceDetails.customerGstin}</p>
+                </div>
             </div>
+
 
             {/* Items Table */}
             <table className="w-full text-left mb-8 text-xs">
@@ -137,6 +147,10 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <td className="p-2 text-right">{formatCurrency(Number(customer.rate))}</td>
                         <td className="p-2 text-right">{formatCurrency(taxableAmount)}</td>
                     </tr>
+                    {/* Fill empty rows to cover the page */}
+                    {Array.from({ length: 15 }).map((_, i) => (
+                        <tr key={i} className="border-b"><td className="p-2 h-6" colSpan={4}></td></tr>
+                    ))}
                 </tbody>
             </table>
 
@@ -167,7 +181,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             </div>
 
             {/* Footer */}
-            <div className="flex justify-between items-end mt-16 text-xs">
+            <div className="flex justify-between items-end mt-16 text-xs absolute bottom-8 w-[calc(100%-4rem)]">
                 <div className="w-3/5">
                     <h4 className="font-bold mb-1">Notes</h4>
                     <p className="text-gray-600 mb-4">Thank you for your business.</p>
