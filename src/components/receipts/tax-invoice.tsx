@@ -78,22 +78,27 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         height: 100%;
                         margin: 0;
                         padding: 0;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
                     }
-                    body { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
-                    }
-                    * {
+                    .printable-area {
                         color: #000 !important;
                     }
-                    .print-table, .print-table th, .print-table td {
+                    .printable-area * {
+                        color: #000 !important;
                         border-color: #e5e7eb !important;
+                    }
+                    .bg-gray-800 {
+                        background-color: #1f2937 !important;
+                    }
+                     .text-white {
+                        color: #fff !important;
                     }
                 }
                 `}
             </style>
             
-            <div className="flex-grow-0">
+            <div className="flex-grow-0 printable-area">
                 {/* Header */}
                  <div className="flex justify-between items-start mb-4">
                     <div className="w-1/2">
@@ -181,7 +186,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 </table>
             </div>
 
-            <div className="flex-grow-0">
+            <div className="flex-grow-0 printable-area">
                 {/* Totals Section & Amount in Words */}
                 <div className="flex justify-between mb-4">
                     <div className="w-3/5 text-xs pr-4">
@@ -239,3 +244,5 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
         </div>
     );
 }
+
+    

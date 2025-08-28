@@ -14,7 +14,7 @@ interface ChallanProps {
 export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
     
     return (
-        <div className="p-4 bg-white text-black font-sans text-[10px] border border-black">
+        <div className="p-4 bg-white text-black font-sans text-[10px] border border-black printable-area">
             <style>
                 {`
                 @media print {
@@ -26,8 +26,11 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important; 
                     }
-                    * {
+                    .printable-area * {
                         color: #000 !important;
+                    }
+                    .bg-gray-200 {
+                        background-color: #e5e7eb !important;
                     }
                 }
                 `}
@@ -122,3 +125,5 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
         </div>
     );
 }
+
+    
