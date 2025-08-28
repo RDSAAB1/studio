@@ -378,41 +378,71 @@ export default function SupplierPaymentsPage() {
   }, [selectedEntryIds, autoSetCDToggle]);
   
   useEffect(() => {
-        if (!cdEnabled) {
-            setCalculatedCdAmount(0);
-            return;
-        }
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+      if (!cdEnabled) {
+          setCalculatedCdAmount(0);
+          return;
+      }
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-        let baseAmountForCd = 0;
-        const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+      let baseAmountForCd = 0;
 
-        switch (cdAt) {
-            case 'paid_amount': {
-                const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-                baseAmountForCd = Math.min(paymentAmount, outstandingOfEligible);
-                break;
-            }
-            case 'unpaid_amount': {
-                baseAmountForCd = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-                break;
-            }
-            case 'full_amount': {
-                const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-                const pastPaymentsOnEligibleEntries = paymentHistory
-                    .filter(p => !p.cdApplied && p.paidFor?.some(pf => eligibleEntries.some(ee => ee.srNo === pf.srNo)))
-                    .reduce((sum, p) => sum + p.amount, 0);
-                baseAmountForCd = outstandingOfEligible + pastPaymentsOnEligibleEntries;
-                break;
-            }
-            default:
-                baseAmountForCd = 0;
-        }
-        
-        setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
+      if (cdAt === 'paid_amount') {
+          // Find past payments for selected entries that were made on time and had no CD
+          const pastPaymentsOnSelectedEntries = paymentHistory.filter(p => 
+              p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || '')) && !p.cdApplied
+          );
+          
+          let eligiblePastPaymentsAmount = 0;
+          
+          pastPaymentsOnSelectedEntries.forEach(p => {
+              p.paidFor?.forEach(pf => {
+                  const entry = suppliers.find(s => s.srNo === pf.srNo);
+                  if (entry && selectedEntryIds.has(entry.id)) {
+                      const dueDate = new Date(entry.dueDate);
+                      const paymentDate = new Date(p.date);
+                      if (paymentDate <= dueDate) {
+                          eligiblePastPaymentsAmount += pf.amount;
+                      }
+                  }
+              });
+          });
+          baseAmountForCd = eligiblePastPaymentsAmount;
+      } else if (cdAt === 'unpaid_amount') {
+          // Sum of outstanding amounts of entries that are due today or in the future
+          const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+          baseAmountForCd = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
 
-  }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory]);
+      } else if (cdAt === 'full_amount') {
+          // Sum of unpaid amount for eligible entries + past timely payments without CD on selected entries
+          const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+          const unpaidAmount = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+
+          const pastPaymentsOnSelectedEntries = paymentHistory.filter(p => 
+              p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || '')) && !p.cdApplied
+          );
+          
+          let eligiblePastPaymentsAmount = 0;
+          pastPaymentsOnSelectedEntries.forEach(p => {
+              p.paidFor?.forEach(pf => {
+                  const entry = suppliers.find(s => s.srNo === pf.srNo);
+                  if (entry && selectedEntryIds.has(entry.id)) {
+                      const dueDate = new Date(entry.dueDate);
+                      const paymentDate = new Date(p.date);
+                      if (paymentDate <= dueDate) {
+                          eligiblePastPaymentsAmount += pf.amount;
+                      }
+                  }
+              });
+          });
+
+          baseAmountForCd = unpaidAmount + eligiblePastPaymentsAmount;
+      }
+      
+      setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
+
+  }, [cdEnabled, cdPercent, cdAt, selectedEntryIds, suppliers, paymentHistory]);
 
 
   useEffect(() => {
@@ -518,30 +548,28 @@ export default function SupplierPaymentsPage() {
                 let paidForDetails: PaidFor[] = [];
                 
                 // --- STAGE 1: READS ---
-                const supplierDocsToRestore = new Map<string, any>();
-                const supplierDocsToPay = new Map<string, any>();
+                const supplierDocRefsToRead = new Set<string>();
 
                 if (rtgsFor === 'Supplier') {
-                    // Reads for restoring old payment amounts
                     if (tempEditingPayment) {
                         for (const detail of tempEditingPayment.paidFor || []) {
-                            const q = query(suppliersCollection, where("srNo", "==", detail.srNo));
-                            const querySnapshot = await getDocs(q); // Use getDocs, not transaction.get for queries
-                            if (!querySnapshot.empty) {
-                                const docSnap = await transaction.get(querySnapshot.docs[0].ref);
-                                supplierDocsToRestore.set(docSnap.id, docSnap);
-                            }
+                            const supplier = suppliers.find(s => s.srNo === detail.srNo);
+                            if(supplier) supplierDocRefsToRead.add(supplier.id);
                         }
                     }
-
-                    // Reads for applying new payment
-                    for (const entryData of selectedEntries) {
-                        if (!supplierDocsToPay.has(entryData.id)) { // Avoid re-reading
-                             const supplierDocRef = doc(db, "suppliers", entryData.id);
-                             const supplierDoc = await transaction.get(supplierDocRef);
-                             if (!supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
-                             supplierDocsToPay.set(entryData.id, supplierDoc);
-                        }
+                    for (const entryId of selectedEntryIds) {
+                        supplierDocRefsToRead.add(entryId);
+                    }
+                }
+                
+                const supplierDocs = new Map<string, any>();
+                for (const id of supplierDocRefsToRead) {
+                    const docRef = doc(db, "suppliers", id);
+                    const supplierDoc = await transaction.get(docRef);
+                    if (supplierDoc.exists()) {
+                        supplierDocs.set(id, supplierDoc.data());
+                    } else {
+                         throw new Error(`Supplier with ID ${id} not found.`);
                     }
                 }
                 
@@ -550,11 +578,12 @@ export default function SupplierPaymentsPage() {
                     // Restore amounts if editing
                     if (tempEditingPayment) {
                         for (const detail of tempEditingPayment.paidFor || []) {
-                             const supplierDocSnapshot = Array.from(supplierDocsToRestore.values()).find(d => d.data()?.srNo === detail.srNo);
-                             if (supplierDocSnapshot) {
-                                const currentNetAmount = Number(supplierDocSnapshot.data()?.netAmount) || 0;
+                            const supplier = suppliers.find(s => s.srNo === detail.srNo);
+                            if (supplier && supplierDocs.has(supplier.id)) {
+                                const currentNetAmount = Number(supplierDocs.get(supplier.id).netAmount) || 0;
                                 const amountToRestore = detail.amount + (detail.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
-                                transaction.update(supplierDocSnapshot.ref, { netAmount: Math.round(currentNetAmount + amountToRestore) });
+                                const supplierRef = doc(db, "suppliers", supplier.id);
+                                transaction.update(supplierRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                             }
                         }
                     }
@@ -566,9 +595,8 @@ export default function SupplierPaymentsPage() {
                     for (const entryData of sortedEntries) {
                         if (amountToDistribute <= 0) break;
 
-                        const supplierDoc = supplierDocsToPay.get(entryData.id);
-                        // We already checked for existence, so this should be safe.
-                        let outstanding = Number(supplierDoc.data().netAmount);
+                        const supplierData = supplierDocs.get(entryData.id);
+                        let outstanding = Number(supplierData.netAmount);
                         const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
                         if (paymentForThisEntry > 0) {
@@ -581,7 +609,8 @@ export default function SupplierPaymentsPage() {
                                 supplierContact: entryData.contact,
                             });
                             
-                            transaction.update(supplierDoc.ref, { netAmount: outstanding - paymentForThisEntry });
+                            const supplierRef = doc(db, "suppliers", entryData.id);
+                            transaction.update(supplierRef, { netAmount: outstanding - paymentForThisEntry });
                             amountToDistribute -= paymentForThisEntry;
                         }
                     }
@@ -707,50 +736,48 @@ export default function SupplierPaymentsPage() {
             toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
             return;
         }
-
+    
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
-                const supplierDocRefs = new Map<string, any>();
-                const supplierDocs = new Map<string, any>();
-
+    
                 // --- STAGE 1: READS ---
-                // Fetch all related supplier documents first.
-                for (const detail of paymentToDelete.paidFor || []) {
-                    if (!supplierDocRefs.has(detail.srNo)) {
-                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo));
-                        const supplierQuerySnapshot = await getDocs(q); // getDocs is fine outside transaction for initial refs
-                        if (!supplierQuerySnapshot.empty) {
-                            const docRef = supplierQuerySnapshot.docs[0].ref;
-                            supplierDocRefs.set(detail.srNo, docRef);
-                        }
+                const supplierDocRefs = new Map<string, string>(); // srNo -> docId
+                const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
+                if (srNos.length > 0) {
+                    const q = query(suppliersCollection, where('srNo', 'in', srNos));
+                    const supplierQuerySnapshot = await getDocs(q); // Use getDocs for queries
+                    supplierQuerySnapshot.forEach(doc => {
+                        supplierDocRefs.set(doc.data().srNo, doc.id);
+                    });
+                }
+    
+                const supplierDocsData = new Map<string, any>();
+                for (const [srNo, docId] of supplierDocRefs.entries()) {
+                    const docRef = doc(db, "suppliers", docId);
+                    const supplierDoc = await transaction.get(docRef);
+                    if (supplierDoc.exists()) {
+                        supplierDocsData.set(srNo, supplierDoc.data());
                     }
                 }
-                
-                // Now read them all within the transaction
-                for (const [srNo, docRef] of supplierDocRefs.entries()) {
-                     const supplierDoc = await transaction.get(docRef);
-                     if (supplierDoc.exists()) {
-                         supplierDocs.set(srNo, supplierDoc);
-                     }
-                }
-
-
+    
                 // --- STAGE 2: WRITES ---
                 // Update supplier balances
                 for (const detail of paymentToDelete.paidFor || []) {
-                    const supplierDoc = supplierDocs.get(detail.srNo);
-                    if (supplierDoc) {
-                        const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
+                    const supplierData = supplierDocsData.get(detail.srNo);
+                    if (supplierData) {
+                        const docId = supplierDocRefs.get(detail.srNo)!;
+                        const supplierDocRef = doc(db, "suppliers", docId);
+                        const currentNetAmount = Number(supplierData.netAmount) || 0;
                         const amountToRestore = detail.amount;
-                        transaction.update(supplierDoc.ref, { netAmount: Math.round(currentNetAmount + amountToRestore) });
+                        transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
-
+    
                 // Finally, delete the payment
                 transaction.delete(paymentRef);
             });
-
+    
             toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) {
                 resetPaymentForm();
