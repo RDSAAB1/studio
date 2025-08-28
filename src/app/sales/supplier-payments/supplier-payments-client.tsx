@@ -72,7 +72,6 @@ type SortDirection = 'asc' | 'desc';
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
     { value: 'unpaid_amount', label: 'CD on Unpaid Amount (Selected)' },
-    { value: 'payment_amount', label: 'CD on Payment Amount (Manual)' },
     { value: 'full_amount', label: 'CD on Full Amount' },
 ];
 
@@ -251,9 +250,9 @@ export default function SupplierPaymentsPage() {
   
   const availableCdOptions = useMemo(() => {
     if (paymentType === 'Partial') {
-      return cdOptions.filter(opt => opt.value === 'payment_amount');
+      return cdOptions.filter(opt => opt.value === 'paid_amount');
     }
-    return cdOptions.filter(opt => opt.value !== 'payment_amount');
+    return cdOptions;
   }, [paymentType]);
   
   const targetAmountForGenerator = useMemo(() => {
@@ -370,7 +369,7 @@ export default function SupplierPaymentsPage() {
 
   useEffect(() => {
     if (paymentType === 'Partial') {
-      setCdAt('payment_amount');
+      setCdAt('paid_amount');
     }
   }, [paymentType]);
 
@@ -383,43 +382,28 @@ export default function SupplierPaymentsPage() {
             setCalculatedCdAmount(0);
             return;
         }
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         let baseAmountForCd = 0;
         const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-        const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-        
-        const timelyPaymentsWithoutCD = selectedEntries.reduce((sum, entry) => {
-            const paymentsForThisEntry = paymentHistory.filter(p =>
-                p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied
-            );
-            const timelyPaymentsSum = paymentsForThisEntry.reduce((paymentSum, p) => {
-                if (new Date(p.date) <= new Date(entry.dueDate)) {
-                    const paidForThis = p.paidFor?.find(pf => pf.srNo === entry.srNo);
-                    return paymentSum + (paidForThis?.amount || 0);
-                }
-                return paymentSum;
-            }, 0);
-            return sum + timelyPaymentsSum;
-        }, 0);
 
         switch (cdAt) {
             case 'paid_amount': {
-                baseAmountForCd = timelyPaymentsWithoutCD;
+                const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+                baseAmountForCd = Math.min(paymentAmount, outstandingOfEligible);
                 break;
             }
             case 'unpaid_amount': {
-                baseAmountForCd = outstandingOfEligible;
+                baseAmountForCd = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
                 break;
             }
             case 'full_amount': {
-                baseAmountForCd = outstandingOfEligible + timelyPaymentsWithoutCD;
-                break;
-            }
-            case 'payment_amount': {
-                baseAmountForCd = paymentAmount;
+                const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+                const pastPaymentsOnEligibleEntries = paymentHistory
+                    .filter(p => !p.cdApplied && p.paidFor?.some(pf => eligibleEntries.some(ee => ee.srNo === pf.srNo)))
+                    .reduce((sum, p) => sum + p.amount, 0);
+                baseAmountForCd = outstandingOfEligible + pastPaymentsOnEligibleEntries;
                 break;
             }
             default:
@@ -723,33 +707,56 @@ export default function SupplierPaymentsPage() {
             toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
             return;
         }
-        
+
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
-                
+                const supplierDocRefs = new Map<string, any>();
+                const supplierDocs = new Map<string, any>();
+
+                // --- STAGE 1: READS ---
+                // Fetch all related supplier documents first.
                 for (const detail of paymentToDelete.paidFor || []) {
-                    const q = query(suppliersCollection, where('srNo', '==', detail.srNo));
-                    const supplierDocsQuerySnapshot = await getDocs(q);
-                    
-                    if (!supplierDocsQuerySnapshot.empty) {
-                        const supplierDocRef = supplierDocsQuerySnapshot.docs[0].ref;
-                        const supplierDoc = await transaction.get(supplierDocRef);
-                        const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
-                        const amountToRestore = detail.amount;
-                        transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
+                    if (!supplierDocRefs.has(detail.srNo)) {
+                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo));
+                        const supplierQuerySnapshot = await getDocs(q); // getDocs is fine outside transaction for initial refs
+                        if (!supplierQuerySnapshot.empty) {
+                            const docRef = supplierQuerySnapshot.docs[0].ref;
+                            supplierDocRefs.set(detail.srNo, docRef);
+                        }
                     }
                 }
                 
+                // Now read them all within the transaction
+                for (const [srNo, docRef] of supplierDocRefs.entries()) {
+                     const supplierDoc = await transaction.get(docRef);
+                     if (supplierDoc.exists()) {
+                         supplierDocs.set(srNo, supplierDoc);
+                     }
+                }
+
+
+                // --- STAGE 2: WRITES ---
+                // Update supplier balances
+                for (const detail of paymentToDelete.paidFor || []) {
+                    const supplierDoc = supplierDocs.get(detail.srNo);
+                    if (supplierDoc) {
+                        const currentNetAmount = Number(supplierDoc.data()?.netAmount) || 0;
+                        const amountToRestore = detail.amount;
+                        transaction.update(supplierDoc.ref, { netAmount: Math.round(currentNetAmount + amountToRestore) });
+                    }
+                }
+
+                // Finally, delete the payment
                 transaction.delete(paymentRef);
             });
-            
+
             toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed and outstanding amounts updated.`, duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) {
                 resetPaymentForm();
             }
         } catch (error) {
-            console.error("Error in batch deletion:", error);
+            console.error("Error deleting payment:", error);
             toast({ variant: "destructive", title: "Error", description: "Failed to delete payment or update supplier balances." });
         }
     };
