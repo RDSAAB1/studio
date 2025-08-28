@@ -880,6 +880,7 @@ export default function CustomerEntryClient() {
     customerGstin: '',
     hsnCode: '1006',
     taxRate: 18,
+    isGstIncluded: false,
   });
 
 
@@ -1218,7 +1219,8 @@ export default function CustomerEntryClient() {
         } else {
             const newEntry = await addCustomer(completeEntry);
             toast({ title: "Success", description: "New entry saved successfully." });
-            if (callback) callback(newEntry); else handleNew();
+            if (callback) callback(newEntry);
+            else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
@@ -1779,6 +1781,14 @@ export default function CustomerEntryClient() {
                                 <Label htmlFor="taxRate">Tax Rate (%)</Label>
                                 <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} />
                             </div>
+                        </div>
+                         <div className="flex items-center space-x-2">
+                            <Switch
+                                id="gst-included-toggle"
+                                checked={invoiceDetails.isGstIncluded}
+                                onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
+                            />
+                            <Label htmlFor="gst-included-toggle" className="text-sm font-normal">Is GST Included in Rate?</Label>
                         </div>
                         <Separator />
                         {detailsCustomer && receiptSettings && (

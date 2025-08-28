@@ -14,20 +14,32 @@ interface TaxInvoiceProps {
         customerGstin: string;
         hsnCode: string;
         taxRate: number;
+        isGstIncluded: boolean;
     };
 }
 
 export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invoiceDetails }) => {
     const taxRate = invoiceDetails.taxRate || 0;
+    const isGstIncluded = invoiceDetails.isGstIncluded;
+
+    let taxableAmount: number;
+    let totalInvoiceValue: number;
+
+    if (isGstIncluded) {
+        totalInvoiceValue = customer.amount;
+        taxableAmount = totalInvoiceValue / (1 + (taxRate / 100));
+    } else {
+        taxableAmount = customer.amount;
+        totalInvoiceValue = taxableAmount * (1 + (taxRate / 100));
+    }
+
+    const totalTaxAmount = totalInvoiceValue - taxableAmount;
+    const cgstAmount = totalTaxAmount / 2;
+    const sgstAmount = totalTaxAmount / 2;
     const cgstRate = taxRate / 2;
     const sgstRate = taxRate / 2;
+    
     const hsnCode = invoiceDetails.hsnCode || "N/A";
-
-    const taxableAmount = customer.amount;
-    const cgstAmount = (taxableAmount * cgstRate) / 100;
-    const sgstAmount = (taxableAmount * sgstRate) / 100;
-    const totalTaxAmount = cgstAmount + sgstAmount;
-    const totalInvoiceValue = taxableAmount + totalTaxAmount;
 
     // Function to convert number to words
     const numberToWords = (num: number): string => {

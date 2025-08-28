@@ -57,6 +57,7 @@ export type Customer = {
   bagWeightKg?: number;
   bagRate?: number;
   bagAmount?: number;
+  isGstIncluded?: boolean;
 };
 
 export type Transaction = {
