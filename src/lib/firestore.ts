@@ -163,6 +163,7 @@ export function getSuppliersRealtime(callback: (suppliers: Customer[]) => void, 
 
 export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
   const docRef = await addDoc(suppliersCollection, supplierData);
+  await updateDoc(docRef, { id: docRef.id });
   return { id: docRef.id, ...supplierData };
 }
 
@@ -203,9 +204,10 @@ export function getCustomersRealtime(callback: (customers: Customer[]) => void, 
   });
 }
 
-export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<string> {
+export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {
     const docRef = await addDoc(customersCollection, customerData);
-    return docRef.id;
+    await updateDoc(docRef, { id: docRef.id });
+    return { id: docRef.id, ...customerData };
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
@@ -224,6 +226,10 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
+    if (!id) {
+      console.error("deleteCustomer requires a valid ID.");
+      return;
+    }
     await deleteDoc(doc(db, "customers", id));
 }
 

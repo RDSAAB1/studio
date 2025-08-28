@@ -483,7 +483,7 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
                             </TableHeader>
                             <TableBody>
                                 {customers.map((customer: Customer) => (
-                                    <TableRow key={customer.id} className="h-12" data-state={selectedIds.has(customer.id) ? 'selected' : ''}>
+                                    <TableRow key={`${customer.id}-${customer.srNo}`} className="h-12" data-state={selectedIds.has(customer.id) ? 'selected' : ''}>
                                         <TableCell className="px-3 py-1">
                                             <Checkbox
                                                 checked={selectedIds.has(customer.id)}
@@ -495,7 +495,7 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
                                         <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
                                         <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
+                                        <TableCell className="px-3 py-1 text-sm">{Number(customer.netWeight).toFixed(2)}</TableCell>
                                         <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
                                         <TableCell className="text-center px-3 py-1">
                                             <div className="flex justify-center items-center gap-0">
@@ -621,11 +621,11 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
                     <tr>
                         {fields.vehicleNo && <td className="border border-black p-1">{data.vehicleNo.toUpperCase()}</td>}
                         {fields.term && <td className="border border-black p-1 text-center">{data.term}</td>}
-                        {fields.rate && <td className="border border-black p-1 text-right">{data.rate.toFixed(2)}</td>}
-                        {fields.grossWeight && <td className="border border-black p-1 text-right">{data.grossWeight.toFixed(2)}</td>}
-                        {fields.teirWeight && <td className="border border-black p-1 text-right">{data.teirWeight.toFixed(2)}</td>}
-                        {fields.weight && <td className="border border-black p-1 text-right">{data.weight.toFixed(2)}</td>}
-                        {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(data.amount)}</td>}
+                        {fields.rate && <td className="border border-black p-1 text-right">{Number(data.rate).toFixed(2)}</td>}
+                        {fields.grossWeight && <td className="border border-black p-1 text-right">{Number(data.grossWeight).toFixed(2)}</td>}
+                        {fields.teirWeight && <td className="border border-black p-1 text-right">{Number(data.teirWeight).toFixed(2)}</td>}
+                        {fields.weight && <td className="border border-black p-1 text-right">{Number(data.weight).toFixed(2)}</td>}
+                        {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(Number(data.amount))}</td>}
                     </tr>
                     {Array.from({ length: 4 }).map((_, i) => (
                         <tr key={i}><td className="border border-black p-2 h-6" colSpan={Object.values(fields).filter(v => v).length - 4}></td></tr>
@@ -641,7 +641,7 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
                     <table className="w-full border-collapse">
                         <tbody>
                             {fields.dueDate && <tr><td className="font-bold border border-black p-1">DUE DATE</td><td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td></tr>}
-                            {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td></tr>}
+                            {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{Number(data.kartaWeight).toFixed(2)}</td></tr>}
                             {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(Number(data.netAmount))}</td></tr>}
                         </tbody>
                     </table>
@@ -736,13 +736,13 @@ const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedRece
                             {fields.variety && <td className="border border-black p-1 text-center">{toTitleCase(entry.variety)}</td>}
                             {fields.vehicleNo && <td className="border border-black p-1 text-center">{entry.vehicleNo.toUpperCase()}</td>}
                             {fields.term && <td className="border border-black p-1 text-center">{entry.term}</td>}
-                            {fields.rate && <td className="border border-black p-1 text-right">{entry.rate.toFixed(2)}</td>}
-                            {fields.grossWeight && <td className="border border-black p-1 text-right">{entry.grossWeight.toFixed(2)}</td>}
-                            {fields.teirWeight && <td className="border border-black p-1 text-right">{entry.teirWeight.toFixed(2)}</td>}
-                            {fields.weight && <td className="border border-black p-1 text-right">{entry.weight.toFixed(2)}</td>}
-                            {fields.kartaWeight && <td className="border border-black p-1 text-right">{entry.kartaWeight.toFixed(2)}</td>}
-                            {fields.netWeight && <td className="border border-black p-1 text-right">{entry.netWeight.toFixed(2)}</td>}
-                            {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(entry.amount)}</td>}
+                            {fields.rate && <td className="border border-black p-1 text-right">{Number(entry.rate).toFixed(2)}</td>}
+                            {fields.grossWeight && <td className="border border-black p-1 text-right">{Number(entry.grossWeight).toFixed(2)}</td>}
+                            {fields.teirWeight && <td className="border border-black p-1 text-right">{Number(entry.teirWeight).toFixed(2)}</td>}
+                            {fields.weight && <td className="border border-black p-1 text-right">{Number(entry.weight).toFixed(2)}</td>}
+                            {fields.kartaWeight && <td className="border border-black p-1 text-right">{Number(entry.kartaWeight).toFixed(2)}</td>}
+                            {fields.netWeight && <td className="border border-black p-1 text-right">{Number(entry.netWeight).toFixed(2)}</td>}
+                            {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(Number(entry.amount))}</td>}
                             {fields.dueDate && <td className="border border-black p-1 text-center">{format(new Date(entry.dueDate), "dd-MMM-yy")}</td>}
                             {fields.netAmount && <td className="border border-black p-1 text-right font-semibold">{formatCurrency(Number(entry.netAmount))}</td>}
                         </tr>
@@ -1030,7 +1030,7 @@ export default function CustomerEntryClient() {
         return {
             ...prev, ...values,
             date: currentDate.toISOString().split("T")[0],
-            dueDate: values.date ? new Date(values.date).toISOString().split("T")[0] : prev.dueDate,
+            dueDate: currentDate.toISOString().split("T")[0],
             weight: parseFloat(weight.toFixed(2)),
             netWeight: parseFloat(netWeight.toFixed(2)),
             amount: parseFloat(amount.toFixed(2)),
@@ -1066,7 +1066,7 @@ export default function CustomerEntryClient() {
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, cd: customerState.cd || 0,
+      rate: customerState.rate || 0, cd: Number(customerState.cd) || 0,
       brokerage: Number(customerState.brokerage) || 0, kanta: Number(customerState.kanta) || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
@@ -1146,6 +1146,10 @@ export default function CustomerEntryClient() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!id) {
+      toast({ title: "Error", description: "Cannot delete entry without a valid ID.", variant: "destructive" });
+      return;
+    }
     try {
       await deleteCustomer(id);
       await deletePaymentsForSrNo(currentCustomer.srNo);
@@ -1204,8 +1208,7 @@ export default function CustomerEntryClient() {
                 }
             }
         } else {
-            const newEntryId = await addCustomer(completeEntry);
-            const newEntry = {...completeEntry, id: newEntryId};
+            const newEntry = await addCustomer(completeEntry);
             toast({ title: "Success", description: "New entry saved successfully." });
             if (callback) callback(newEntry); else handleNew();
         }
@@ -1556,9 +1559,9 @@ export default function CustomerEntryClient() {
                                 <Separator />
                                 <Table className="text-xs">
                                     <TableBody>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {detailsCustomer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{detailsCustomer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(detailsCustomer.grossWeight).toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {Number(detailsCustomer.teirWeight).toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{Number(detailsCustomer.weight).toFixed(2)} kg</TableCell></TableRow>
                                     </TableBody>
                                 </Table>
                             </CardContent>
@@ -1568,12 +1571,12 @@ export default function CustomerEntryClient() {
                              <CardContent className="p-4 pt-0">
                                 <Table className="text-xs">
                                     <TableBody>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsCustomer.rate)}</TableCell></TableRow>
-                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsCustomer.amount)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />CD</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.cd || 0)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><User size={12} />Brokerage</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.brokerage || 0)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-green-600 flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-green-600">+ {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(detailsCustomer.netWeight).toFixed(2)} kg</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(Number(detailsCustomer.rate))}</TableCell></TableRow>
+                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(Number(detailsCustomer.amount))}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />CD</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(detailsCustomer.cd) || 0)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><User size={12} />Brokerage</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(detailsCustomer.brokerage) || 0)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-green-600 flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-green-600">+ {formatCurrency(Number(detailsCustomer.kanta))}</TableCell></TableRow>
                                     </TableBody>
                                 </Table>
                              </CardContent>
@@ -1653,7 +1656,7 @@ export default function CustomerEntryClient() {
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
                 <div id="receipt-content">
-                    {receiptsToPrint.length > 0 && receiptsToPrint.map((receiptData, index) => (
+                    {receiptsToPrint.map((receiptData, index) => (
                         <div key={index} className="receipt-container">
                             {receiptSettings && <ReceiptPreview data={receiptData} settings={receiptSettings}/>}
                         </div>
