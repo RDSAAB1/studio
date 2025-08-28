@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
@@ -882,6 +882,7 @@ export default function CustomerEntryClient() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+  const [editableInvoiceDetails, setEditableInvoiceDetails] = useState<Partial<Customer>>({});
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
@@ -892,7 +893,6 @@ export default function CustomerEntryClient() {
 
   const [invoiceDetails, setInvoiceDetails] = useState({
     companyGstin: 'YOUR_GSTIN_HERE',
-    customerGstin: '',
     hsnCode: '1006',
     taxRate: 18,
     isGstIncluded: false,
@@ -1199,7 +1199,7 @@ export default function CustomerEntryClient() {
       date: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       name: toTitleCase(values.name), 
-      companyName: toTitleCase(values.companyName),
+      companyName: toTitleCase(values.companyName || ''),
       so: '', 
       kartaPercentage: 0,
       labouryRate: 0, 
@@ -1262,6 +1262,8 @@ export default function CustomerEntryClient() {
     if (isValid) {
       onSubmit(form.getValues(), (savedEntry) => {
         setDetailsCustomer(savedEntry);
+        setEditableInvoiceDetails(savedEntry);
+        setInvoiceDetails(prev => ({...prev, customerGstin: savedEntry.gstin || ''}));
         setIsDocumentPreviewOpen(true);
         handleNew();
       });
@@ -1276,6 +1278,8 @@ export default function CustomerEntryClient() {
   
   const handleShowDetails = (customer: Customer) => {
     setDetailsCustomer(customer);
+    setEditableInvoiceDetails(customer);
+    setInvoiceDetails(prev => ({...prev, customerGstin: customer.gstin || ''}));
     setDocumentType('tax-invoice'); // Default to tax-invoice for details view
     setIsDocumentPreviewOpen(true);
   }
@@ -1449,17 +1453,28 @@ export default function CustomerEntryClient() {
 
   const renderDocument = () => {
       if (!detailsCustomer || !receiptSettings) return null;
+      
+      const finalCustomerData = {
+          ...detailsCustomer,
+          ...editableInvoiceDetails,
+          gstin: invoiceDetails.customerGstin
+      };
 
       switch(documentType) {
           case 'tax-invoice':
-              return <TaxInvoice customer={detailsCustomer} settings={receiptSettings} invoiceDetails={invoiceDetails} />;
+              return <TaxInvoice customer={finalCustomerData} settings={receiptSettings} invoiceDetails={invoiceDetails} />;
           case 'bill-of-supply':
-              return <BillOfSupply customer={detailsCustomer} settings={receiptSettings} />;
+              return <BillOfSupply customer={finalCustomerData} settings={receiptSettings} />;
           case 'challan':
-              return <Challan customer={detailsCustomer} settings={receiptSettings} />;
+              return <Challan customer={finalCustomerData} settings={receiptSettings} />;
           default:
               return null;
       }
+  };
+  
+  const handleEditableDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
+      setEditableInvoiceDetails(prev => ({...prev, [name]: value}));
   };
 
   if (!isClient) {
@@ -1551,72 +1566,80 @@ export default function CustomerEntryClient() {
       />
         
      <Dialog open={isDocumentPreviewOpen} onOpenChange={setIsDocumentPreviewOpen}>
-            <DialogContent className="max-w-4xl p-0">
-                <DialogHeader className="p-4 sm:p-6 pb-0 flex flex-row items-center justify-between">
-                     <DialogTitle>
-                        {documentType === 'tax-invoice' && 'Tax Invoice Preview'}
-                        {documentType === 'bill-of-supply' && 'Bill of Supply Preview'}
-                        {documentType === 'challan' && 'Challan Preview'}
-                    </DialogTitle>
-                    <div className="flex items-center gap-2">
-                       <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                    Change Document
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => setDocumentType('tax-invoice')}>Tax Invoice</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setDocumentType('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setDocumentType('challan')}>Challan</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        <DialogClose asChild><Button variant="ghost" size="icon"><X className="h-4 w-4"/></Button></DialogClose>
-                    </div>
-                </DialogHeader>
-                <ScrollArea className="max-h-[80vh]">
-                    {documentType === 'tax-invoice' && (
-                         <div className="p-4 sm:p-6 space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <Label htmlFor="companyGstin">Your GSTIN</Label>
-                                    <Input id="companyGstin" value={invoiceDetails.companyGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, companyGstin: e.target.value.toUpperCase()})} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="customerGstin">Customer's GSTIN</Label>
-                                    <Input id="customerGstin" value={invoiceDetails.customerGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, customerGstin: e.target.value.toUpperCase()})} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="hsnCode">HSN/SAC Code</Label>
-                                    <Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="taxRate">Tax Rate (%)</Label>
-                                    <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} />
-                                </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <Switch
-                                    id="gst-included-toggle"
-                                    checked={invoiceDetails.isGstIncluded}
-                                    onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
-                                />
-                                <Label htmlFor="gst-included-toggle" className="text-sm font-normal">Is GST Included in Rate?</Label>
-                            </div>
-                            <Separator />
+            <DialogContent className="max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6 p-0">
+                <div className="lg:col-span-2 order-2 lg:order-1">
+                    <ScrollArea className="max-h-[90vh]">
+                        <div id="document-content" className="p-4 sm:p-6">
+                           {renderDocument()}
                         </div>
-                    )}
-                    <div id="document-content">
-                       {renderDocument()}
+                    </ScrollArea>
+                </div>
+                <div className="lg:col-span-1 order-1 lg:order-2 bg-muted/30 p-4 sm:p-6 border-l">
+                     <DialogHeader className="mb-4">
+                         <DialogTitle>Edit Invoice Details</DialogTitle>
+                         <DialogDescription>Make on-the-fly changes before printing.</DialogDescription>
+                     </DialogHeader>
+                    <ScrollArea className="max-h-[calc(90vh-120px)] pr-3">
+                    <div className="space-y-4">
+                        <Card>
+                            <CardHeader className="p-3"><CardTitle className="text-base">Tax &amp; Invoice Info</CardTitle></CardHeader>
+                            <CardContent className="p-3 space-y-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="companyGstin" className="text-xs">Your GSTIN</Label>
+                                    <Input id="companyGstin" value={invoiceDetails.companyGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, companyGstin: e.target.value.toUpperCase()})} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="hsnCode" className="text-xs">HSN/SAC Code</Label>
+                                    <Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="taxRate" className="text-xs">Tax Rate (%)</Label>
+                                    <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" />
+                                </div>
+                                <div className="flex items-center space-x-2 pt-2">
+                                    <Switch
+                                        id="gst-included-toggle"
+                                        checked={invoiceDetails.isGstIncluded}
+                                        onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
+                                    />
+                                    <Label htmlFor="gst-included-toggle" className="text-xs font-normal">Is GST Included in Rate?</Label>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader className="p-3"><CardTitle className="text-base">Bill To / Ship To Details</CardTitle></CardHeader>
+                             <CardContent className="p-3 space-y-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-name" className="text-xs">Customer Name</Label>
+                                    <Input id="edit-name" name="name" value={editableInvoiceDetails.name || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-companyName" className="text-xs">Company Name</Label>
+                                    <Input id="edit-companyName" name="companyName" value={editableInvoiceDetails.companyName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-contact" className="text-xs">Contact</Label>
+                                    <Input id="edit-contact" name="contact" value={editableInvoiceDetails.contact || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-address" className="text-xs">Address</Label>
+                                    <Input id="edit-address" name="address" value={editableInvoiceDetails.address || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="customerGstin" className="text-xs">Customer's GSTIN</Label>
+                                    <Input id="customerGstin" value={invoiceDetails.customerGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, customerGstin: e.target.value.toUpperCase()})} className="h-8 text-xs" />
+                                </div>
+                             </CardContent>
+                        </Card>
                     </div>
-                </ScrollArea>
-                <DialogFooter className="p-4 sm:p-6 pt-0">
-                    <Button variant="outline" onClick={() => setIsDocumentPreviewOpen(false)}>Close</Button>
-                    <Button onClick={() => handleActualPrint('document-content')}>
-                        <Printer className="mr-2 h-4 w-4" /> Print
-                    </Button>
-                </DialogFooter>
+                    </ScrollArea>
+                    <DialogFooter className="pt-4 flex-row justify-end gap-2">
+                        <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                        <Button onClick={() => handleActualPrint('document-content')}>
+                            <Printer className="mr-2 h-4 w-4" /> Print
+                        </Button>
+                    </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
       
