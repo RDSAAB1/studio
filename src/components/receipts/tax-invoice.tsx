@@ -103,17 +103,17 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 </div>
                 
                 {/* Details Section */}
-                <div className="flex justify-between mt-4 mb-4 text-xs border-y py-2">
-                    <div className="w-1/2 pr-4 space-y-1">
-                        <h3 className="font-bold text-gray-500 mb-1 text-[11px] uppercase tracking-wider">Bill To</h3>
+                <div className="grid grid-cols-2 gap-4 mt-4 mb-4 text-xs">
+                    <div className="border p-2 rounded-lg">
+                        <h3 className="font-bold text-gray-500 mb-2 text-[11px] uppercase tracking-wider">Bill To</h3>
                         <p className="font-bold">{toTitleCase(customer.name)}</p>
                         {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
                         <p>{toTitleCase(customer.address)}</p>
                         <p>Phone: {customer.contact}</p>
                         <p>GSTIN: {invoiceDetails.customerGstin}</p>
                     </div>
-                    <div className="w-1/2 pl-4 border-l space-y-1">
-                         <h3 className="font-bold text-gray-500 mb-1 text-[11px] uppercase tracking-wider">Ship To</h3>
+                     <div className="border p-2 rounded-lg">
+                         <h3 className="font-bold text-gray-500 mb-2 text-[11px] uppercase tracking-wider">Ship To</h3>
                         <p className="font-bold">{toTitleCase(customer.name)}</p>
                         {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
                         <p>{toTitleCase(customer.address)}</p>
@@ -122,7 +122,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     </div>
                 </div>
                 
-                <div className="flex justify-between mb-4 text-xs">
+                <div className="flex justify-between mb-4 text-xs p-2 border rounded-lg">
                      <p><span className="font-bold">Invoice #</span> {customer.srNo}</p>
                      <p><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd MMM, yyyy")}</p>
                      <p><span className="font-bold">Vehicle No:</span> {customer.vehicleNo.toUpperCase()}</p>
