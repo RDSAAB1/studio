@@ -968,24 +968,28 @@ export default function CustomerEntryClient() {
         .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
         .reduce((sum, p) => {
             const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
+            // Deduct both the payment amount and the associated CD amount
             return sum + (paidForDetail?.amount || 0) + (paymentHistory.find(ph => ph.paymentId === p.paymentId)?.cdAmount || 0);
         }, 0);
       
     const netAmount = originalNetAmount - totalPaidForThisEntry;
 
-    setCurrentCustomer(prev => ({
-      ...prev, ...values,
-      date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
-      dueDate: values.date.toISOString().split("T")[0],
-      weight: parseFloat(weight.toFixed(2)),
-      netWeight: parseFloat(weight.toFixed(2)),
-      amount: parseFloat(amount.toFixed(2)),
-      brokerage: parseFloat(brokerage.toFixed(2)),
-      cd: parseFloat(cd.toFixed(2)),
-      kanta: parseFloat(kanta.toFixed(2)),
-      originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
-      netAmount: parseFloat(netAmount.toFixed(2)),
-    }));
+    setCurrentCustomer(prev => {
+        const currentDate = values.date instanceof Date ? values.date : new Date(prev.date);
+        return {
+            ...prev, ...values,
+            date: currentDate.toISOString().split("T")[0],
+            dueDate: currentDate.toISOString().split("T")[0], // For customer, dueDate is same as date
+            weight: parseFloat(weight.toFixed(2)),
+            netWeight: parseFloat(weight.toFixed(2)),
+            amount: parseFloat(amount.toFixed(2)),
+            brokerage: parseFloat(brokerage.toFixed(2)),
+            cd: parseFloat(cd.toFixed(2)),
+            kanta: parseFloat(kanta.toFixed(2)),
+            originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
+            netAmount: parseFloat(netAmount.toFixed(2)),
+        }
+    });
   }, [form, paymentHistory]);
   
   useEffect(() => {
@@ -1109,12 +1113,12 @@ export default function CustomerEntryClient() {
       ...currentCustomer,
       ...values,
       date: values.date.toISOString().split("T")[0],
-      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(currentCustomer.term) || 0))).toISOString().split("T")[0],
+      dueDate: values.date.toISOString().split("T")[0],
       name: toTitleCase(values.name), 
       companyName: toTitleCase(values.companyName),
-      so: '', // S/O is not used for customer
-      kartaPercentage: 0, // Not used
-      labouryRate: 0, // Not used
+      so: '', 
+      kartaPercentage: 0,
+      labouryRate: 0, 
       address: toTitleCase(values.address), 
       vehicleNo: toTitleCase(values.vehicleNo), 
       variety: toTitleCase(values.variety),
