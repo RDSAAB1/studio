@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
@@ -34,6 +34,8 @@ import { addCustomer, deleteCustomer, getCustomersRealtime, updateCustomer, getP
 import { formatCurrency } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 import { TaxInvoice } from "@/components/receipts/tax-invoice";
+import { BillOfSupply } from "@/components/receipts/bill-of-supply";
+import { Challan } from "@/components/receipts/challan";
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -61,6 +63,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
+type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan';
 
 const getInitialFormState = (lastVariety?: string): Customer => {
   const today = new Date();
@@ -874,7 +877,9 @@ export default function CustomerEntryClient() {
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const receiptRef = useRef<HTMLDivElement>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
-  const [isTaxInvoiceOpen, setIsTaxInvoiceOpen] = useState(false);
+  const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
+  const [documentType, setDocumentType] = useState<DocumentType>('tax-invoice');
+
   const [invoiceDetails, setInvoiceDetails] = useState({
     companyGstin: 'YOUR_GSTIN_HERE',
     customerGstin: '',
@@ -1240,11 +1245,13 @@ export default function CustomerEntryClient() {
     executeSubmit(values, false, callback);
   };
 
-  const handleSaveAndPrint = async () => {
+  const handleSaveAndPrint = async (docType: DocumentType) => {
+    setDocumentType(docType);
     const isValid = await form.trigger();
     if (isValid) {
       onSubmit(form.getValues(), (savedEntry) => {
-        handlePrint([savedEntry]);
+        setDetailsCustomer(savedEntry);
+        setIsDocumentPreviewOpen(true);
         handleNew();
       });
     } else {
@@ -1258,6 +1265,8 @@ export default function CustomerEntryClient() {
   
   const handleShowDetails = (customer: Customer) => {
     setDetailsCustomer(customer);
+    setDocumentType('tax-invoice'); // Default to tax-invoice for details view
+    setIsDocumentPreviewOpen(true);
   }
 
   const handleCapitalizeOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -1427,6 +1436,21 @@ export default function CustomerEntryClient() {
     }
   };
 
+  const renderDocument = () => {
+      if (!detailsCustomer || !receiptSettings) return null;
+
+      switch(documentType) {
+          case 'tax-invoice':
+              return <TaxInvoice customer={detailsCustomer} settings={receiptSettings} invoiceDetails={invoiceDetails} />;
+          case 'bill-of-supply':
+              return <BillOfSupply customer={detailsCustomer} settings={receiptSettings} />;
+          case 'challan':
+              return <Challan customer={detailsCustomer} settings={receiptSettings} />;
+          default:
+              return null;
+      }
+  };
+
   if (!isClient) {
     return null;
   }
@@ -1461,16 +1485,26 @@ export default function CustomerEntryClient() {
             
             <CalculatedSummary currentCustomer={currentCustomer} />
 
-            <div className="flex justify-start space-x-2 pt-4">
+            <div className="flex justify-start items-center space-x-2 pt-4">
               <Button type="submit" size="sm">
                 {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
               </Button>
-              <Button type="button" onClick={handleSaveAndPrint} size="sm">
-                <Printer className="mr-2 h-4 w-4"/> Save & Print
-              </Button>
+               <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                            <Printer className="mr-2 h-4 w-4"/> Save & Print <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleSaveAndPrint('tax-invoice')}>Tax Invoice</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleSaveAndPrint('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleSaveAndPrint('challan')}>Challan</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
               <Button type="button" variant="outline" onClick={handleNew} size="sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
               </Button>
+               <div className="flex-grow"></div>
               <Button type="button" variant="ghost" size="icon" onClick={handleOpenReceiptSettings}>
                 <Settings className="h-5 w-5" />
               </Button>
@@ -1505,157 +1539,75 @@ export default function CustomerEntryClient() {
         onSelectionChange={setSelectedCustomerIds}
       />
         
-      <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
-        <DialogContent className="max-w-4xl p-0">
-          {detailsCustomer && (
-            <>
-            <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
-                <div>
-                    <DialogTitle className="text-base font-semibold">Details for SR No: {detailsCustomer.srNo}</DialogTitle>
-                </div>
-                <div className="flex items-center gap-2">
-                     <Button variant="outline" size="sm" onClick={() => setIsTaxInvoiceOpen(true)}>
-                        <Printer className="mr-2 h-4 w-4" /> Print Invoice
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8">
-                                <Settings className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}>
-                                <DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="compact"><LayoutList className="mr-2 h-4 w-4" />Compact</DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="grid"><LayoutGrid className="mr-2 h-4 w-4" />Grid</DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="step-by-step"><StepForward className="mr-2 h-4 w-4" />Step-by-Step</DropdownMenuRadioItem>
-                            </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <DialogClose asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button>
-                    </DialogClose>
-                </div>
-            </DialogHeader>
-            <ScrollArea className="max-h-[85vh]">
-              <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
-                {activeLayout === 'classic' && (
-                  <div className="space-y-4">
-                    <Card>
-                        <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
-                            <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full">
-                                <p className="text-xs text-muted-foreground">SR No.</p>
-                                <p className="text-2xl font-bold font-mono text-primary">{detailsCustomer.srNo}</p>
-                            </div>
-                            <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" />
-                            <Separator orientation="horizontal" className="w-full md:hidden" />
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
-                                <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
-                                <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
-                                <DetailItem icon={<UserSquare size={14} />} label="Company Name" value={toTitleCase(detailsCustomer.companyName || '')} />
-                                <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                                <DetailItem icon={<Boxes size={14} />} label="Bags" value={detailsCustomer.bags || 0} />
-                                <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-1 sm:col-span-2" />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card>
-                            <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight</CardTitle></CardHeader>
-                            <CardContent className="p-4 pt-0 space-y-3">
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                  <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={detailsCustomer.vehicleNo.toUpperCase()} />
-                                  <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(detailsCustomer.variety)} />
-                                  <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={detailsCustomer.paymentType} />
-                                </div>
-                                <Separator />
-                                <Table className="text-xs">
-                                    <TableBody>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(detailsCustomer.grossWeight).toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {Number(detailsCustomer.teirWeight).toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{Number(detailsCustomer.weight).toFixed(2)} kg</TableCell></TableRow>
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
-                             <CardContent className="p-4 pt-0">
-                                <Table className="text-xs">
-                                    <TableBody>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(detailsCustomer.netWeight).toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(Number(detailsCustomer.rate))}</TableCell></TableRow>
-                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(Number(detailsCustomer.amount))}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />CD</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(detailsCustomer.cd) || 0)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><User size={12} />Brokerage</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(detailsCustomer.brokerage) || 0)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-green-600 flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-green-600">+ {formatCurrency(Number(detailsCustomer.kanta))}</TableCell></TableRow>
-                                    </TableBody>
-                                </Table>
-                             </CardContent>
-                        </Card>
+     <Dialog open={isDocumentPreviewOpen} onOpenChange={setIsDocumentPreviewOpen}>
+            <DialogContent className="max-w-4xl p-0">
+                <DialogHeader className="p-4 sm:p-6 pb-0 flex flex-row items-center justify-between">
+                     <DialogTitle>
+                        {documentType === 'tax-invoice' && 'Tax Invoice Preview'}
+                        {documentType === 'bill-of-supply' && 'Bill of Supply Preview'}
+                        {documentType === 'challan' && 'Challan Preview'}
+                    </DialogTitle>
+                    <div className="flex items-center gap-2">
+                       <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    Change Document
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => setDocumentType('tax-invoice')}>Tax Invoice</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setDocumentType('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setDocumentType('challan')}>Challan</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <DialogClose asChild><Button variant="ghost" size="icon"><X className="h-4 w-4"/></Button></DialogClose>
                     </div>
-
-                    <Card className="border-primary/50 bg-primary/5 text-center">
-                         <CardContent className="p-3">
-                            <p className="text-sm text-primary/80 font-medium">Original Total</p>
-                            <p className="text-2xl font-bold text-primary/90 font-mono">
-                                {formatCurrency(Number(detailsCustomer.originalNetAmount))}
-                            </p>
-                            <Separator className="my-2"/>
-                            <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
-                            <p className="text-3xl font-bold text-destructive font-mono">
-                                {formatCurrency(Number(detailsCustomer.netAmount))}
-                            </p>
-                         </CardContent>
-                    </Card>
-
-                    <Card className="mt-4">
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-0">
-                            {paymentsForDetailsEntry.length > 0 ? (
-                                <Table className="text-sm">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="p-2 text-xs">Payment ID</TableHead>
-                                            <TableHead className="p-2 text-xs">Date</TableHead>
-                                            <TableHead className="p-2 text-xs">Type</TableHead>
-                                            <TableHead className="p-2 text-xs">CD Applied</TableHead>
-                                            <TableHead className="p-2 text-xs text-right">CD Amount</TableHead>
-                                            <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {paymentsForDetailsEntry.map((payment, index) => {
-                                             const paidForThis = payment.paidFor?.find(pf => pf.srNo === detailsCustomer?.srNo);
-                                             return (
-                                                <TableRow key={payment.id || index}>
-                                                    <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
-                                                    <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                    <TableCell className="p-2">{payment.type}</TableCell>
-                                                    <TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell>
-                                                    <TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell>
-                                                    <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
-                                                </TableRow>
-                                             );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            ) : (
-                                <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
-                            )}
-                        </CardContent>
-                    </Card>  
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+                </DialogHeader>
+                <ScrollArea className="max-h-[80vh]">
+                    {documentType === 'tax-invoice' && (
+                         <div className="p-4 sm:p-6 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="companyGstin">Your GSTIN</Label>
+                                    <Input id="companyGstin" value={invoiceDetails.companyGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, companyGstin: e.target.value.toUpperCase()})} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="customerGstin">Customer's GSTIN</Label>
+                                    <Input id="customerGstin" value={invoiceDetails.customerGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, customerGstin: e.target.value.toUpperCase()})} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="hsnCode">HSN/SAC Code</Label>
+                                    <Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="taxRate">Tax Rate (%)</Label>
+                                    <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} />
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="gst-included-toggle"
+                                    checked={invoiceDetails.isGstIncluded}
+                                    onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
+                                />
+                                <Label htmlFor="gst-included-toggle" className="text-sm font-normal">Is GST Included in Rate?</Label>
+                            </div>
+                            <Separator />
+                        </div>
+                    )}
+                    <div id="document-content">
+                       {renderDocument()}
+                    </div>
+                </ScrollArea>
+                <DialogFooter className="p-4 sm:p-6 pt-0">
+                    <Button variant="outline" onClick={() => setIsDocumentPreviewOpen(false)}>Close</Button>
+                    <Button onClick={() => handleActualPrint('document-content')}>
+                        <Printer className="mr-2 h-4 w-4" /> Print
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       
       <Dialog open={receiptsToPrint.length > 0 || !!consolidatedReceiptData} onOpenChange={(open) => {
           if (!open) {
@@ -1756,58 +1708,6 @@ export default function CustomerEntryClient() {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={isTaxInvoiceOpen} onOpenChange={setIsTaxInvoiceOpen}>
-            <DialogContent className="max-w-4xl p-0">
-                <DialogHeader className="p-4 sm:p-6 pb-0">
-                    <DialogTitle>Tax Invoice</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="max-h-[80vh]">
-                    <div className="p-4 sm:p-6 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="companyGstin">Your GSTIN</Label>
-                                <Input id="companyGstin" value={invoiceDetails.companyGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, companyGstin: e.target.value.toUpperCase()})} />
-                            </div>
-                             <div className="space-y-1">
-                                <Label htmlFor="customerGstin">Customer's GSTIN</Label>
-                                <Input id="customerGstin" value={invoiceDetails.customerGstin} onChange={(e) => setInvoiceDetails({...invoiceDetails, customerGstin: e.target.value.toUpperCase()})} />
-                            </div>
-                             <div className="space-y-1">
-                                <Label htmlFor="hsnCode">HSN/SAC Code</Label>
-                                <Input id="hsnCode" value={invoiceDetails.hsnCode} onChange={(e) => setInvoiceDetails({...invoiceDetails, hsnCode: e.target.value})} />
-                            </div>
-                             <div className="space-y-1">
-                                <Label htmlFor="taxRate">Tax Rate (%)</Label>
-                                <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} />
-                            </div>
-                        </div>
-                         <div className="flex items-center space-x-2">
-                            <Switch
-                                id="gst-included-toggle"
-                                checked={invoiceDetails.isGstIncluded}
-                                onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
-                            />
-                            <Label htmlFor="gst-included-toggle" className="text-sm font-normal">Is GST Included in Rate?</Label>
-                        </div>
-                        <Separator />
-                        {detailsCustomer && receiptSettings && (
-                            <TaxInvoice 
-                                customer={detailsCustomer} 
-                                settings={receiptSettings}
-                                invoiceDetails={invoiceDetails}
-                            />
-                        )}
-                    </div>
-                </ScrollArea>
-                <DialogFooter className="p-4 sm:p-6 pt-0">
-                    <Button variant="outline" onClick={() => setIsTaxInvoiceOpen(false)}>Close</Button>
-                    <Button>
-                        <Printer className="mr-2 h-4 w-4" /> Print
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
     </>
   );
 }
