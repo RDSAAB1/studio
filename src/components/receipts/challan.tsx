@@ -91,7 +91,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
                         <td className="p-1 border border-black text-center">{customer.bags || 'N/A'}</td>
                     </tr>
                      {/* Empty rows for spacing */}
-                    {Array.from({ length: 12 }).map((_, i) => (
+                    {Array.from({ length: 15 }).map((_, i) => (
                         <tr key={i}><td className="p-1 border border-black h-6" colSpan={4}></td></tr>
                     ))}
                 </tbody>
@@ -104,7 +104,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
             </table>
 
             {/* Footer & Signature */}
-            <div className="border-t border-black pt-2 mt-8">
+            <div className="border-t border-black pt-2 mt-16">
                  <div className="flex justify-between items-end">
                      <div className="text-center">
                         <p className="font-bold mb-8">Received by</p>

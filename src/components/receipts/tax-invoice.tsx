@@ -149,7 +149,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <td className="p-1 border border-black text-right">{formatCurrency(Number(customer.amount))}</td>
                     </tr>
                      {/* Empty rows for spacing */}
-                    {Array.from({ length: 10 }).map((_, i) => (
+                    {Array.from({ length: 15 }).map((_, i) => (
                         <tr key={i}><td className="p-1 border border-black h-6" colSpan={6}></td></tr>
                     ))}
                 </tbody>
@@ -184,14 +184,14 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             </table>
 
             {/* Footer & Signature */}
-            <div className="border-t border-black pt-2">
+            <div className="border-t border-black pt-2 mt-4">
                  <p className="font-bold mb-1">Terms & Conditions:</p>
                  <ul className="list-disc list-inside text-xs">
                      <li>Subject to Shahjahanpur Jurisdiction only.</li>
                      <li>Goods once sold will not be taken back.</li>
                  </ul>
 
-                 <div className="flex justify-between items-end mt-8">
+                 <div className="flex justify-between items-end mt-16">
                      <div className="text-center">
                          <p className="font-bold">Receiver's Seal & Signature</p>
                      </div>

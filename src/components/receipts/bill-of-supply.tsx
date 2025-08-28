@@ -115,7 +115,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         <td className="p-1 border border-black text-right">{formatCurrency(totalAmount)}</td>
                     </tr>
                      {/* Empty rows for spacing */}
-                    {Array.from({ length: 10 }).map((_, i) => (
+                    {Array.from({ length: 15 }).map((_, i) => (
                         <tr key={i}><td className="p-1 border border-black h-6" colSpan={5}></td></tr>
                     ))}
                 </tbody>
@@ -133,7 +133,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                 <p>{numberToWords(totalAmount)}</p>
              </div>
 
-            <div className="border-t border-black pt-2 mt-8">
+            <div className="border-t border-black pt-2 mt-16">
                  <div className="flex justify-between items-end">
                      <div className="text-center">
                          <p className="font-bold">Receiver's Seal & Signature</p>
