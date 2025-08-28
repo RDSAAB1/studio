@@ -382,25 +382,10 @@ export default function SupplierPaymentsPage() {
         setCalculatedCdAmount(0);
         return;
     }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const eligibleEntriesForCd = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-
     let baseAmountForCd = 0;
 
     switch (cdAt) {
         case 'paid_amount':
-            const eligibleOutstanding = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-            baseAmountForCd = Math.min(paymentAmount, eligibleOutstanding);
-            break;
-        case 'unpaid_amount':
-            baseAmountForCd = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-            break;
-        case 'full_amount':
-            const unpaidOnEligible = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-            
             const paidOnTimeWithoutCd = paymentHistory.reduce((sum, p) => {
                 if (p.cdApplied) return sum;
 
@@ -418,13 +403,37 @@ export default function SupplierPaymentsPage() {
                 });
                 return sum + timelyPaidAmount;
             }, 0);
-            
-            baseAmountForCd = unpaidOnEligible + paidOnTimeWithoutCd;
+            baseAmountForCd = paidOnTimeWithoutCd;
+            break;
+
+        case 'unpaid_amount':
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const eligibleEntriesForCd = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+            baseAmountForCd = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+            break;
+
+        case 'full_amount':
+            const unpaidOnEligible = selectedEntries.filter(e => new Date(e.dueDate) >= new Date()).reduce((sum, e) => sum + (e.netAmount || 0), 0);
+            const paidOnTime = paymentHistory.reduce((sum, p) => {
+                if (p.cdApplied) return sum;
+                const paidForAnySelected = p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || ''));
+                if (!paidForAnySelected) return sum;
+                let timelyPaidAmount = 0;
+                p.paidFor?.forEach(pf => {
+                    const entry = suppliers.find(s => s.srNo === pf.srNo);
+                    if (entry && selectedEntryIds.has(entry.id) && new Date(p.date) <= new Date(entry.dueDate)) {
+                        timelyPaidAmount += pf.amount;
+                    }
+                });
+                return sum + timelyPaidAmount;
+            }, 0);
+            baseAmountForCd = unpaidOnEligible + paidOnTime;
             break;
     }
 
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-  }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, suppliers, selectedEntryIds]);
+}, [cdEnabled, cdPercent, cdAt, selectedEntries, paymentHistory, suppliers, selectedEntryIds]);
 
 
   useEffect(() => {
@@ -1626,7 +1635,7 @@ export default function SupplierPaymentsPage() {
                             <CardContent className="p-4 pt-0">
                             <Table className="text-xs">
                                 <TableBody>
-                                    <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={14} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsSupplierEntry.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsSupplierEntry.netWeight.toFixed(2)} kg</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsSupplierEntry.rate)}</TableCell></TableRow>
                                     <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsSupplierEntry.amount)}</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsSupplierEntry.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.kartaAmount)}</TableCell></TableRow>
