@@ -33,6 +33,7 @@ import { Separator } from "@/components/ui/separator";
 import { addCustomer, deleteCustomer, getCustomersRealtime, updateCustomer, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo } from "@/lib/firestore";
 import { formatCurrency } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
+import { TaxInvoice } from "@/components/receipts/tax-invoice";
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -873,6 +874,7 @@ export default function CustomerEntryClient() {
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const receiptRef = useRef<HTMLDivElement>(null);
   const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
+  const [isTaxInvoiceOpen, setIsTaxInvoiceOpen] = useState(false);
 
 
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
@@ -1171,8 +1173,8 @@ export default function CustomerEntryClient() {
     const completeEntry: Customer = {
       ...currentCustomer,
       ...values,
-      date: (values.date instanceof Date ? values.date : new Date()).toISOString().split("T")[0],
-      dueDate: (values.date instanceof Date ? values.date : new Date()).toISOString().split("T")[0],
+      date: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
+      dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       name: toTitleCase(values.name), 
       companyName: toTitleCase(values.companyName),
       so: '', 
@@ -1504,6 +1506,9 @@ export default function CustomerEntryClient() {
                     <DialogTitle className="text-base font-semibold">Details for SR No: {detailsCustomer.srNo}</DialogTitle>
                 </div>
                 <div className="flex items-center gap-2">
+                     <Button variant="outline" size="sm" onClick={() => setIsTaxInvoiceOpen(true)}>
+                        <Printer className="mr-2 h-4 w-4" /> Print Invoice
+                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="icon" className="h-8 w-8">
@@ -1743,6 +1748,30 @@ export default function CustomerEntryClient() {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+       <Dialog open={isTaxInvoiceOpen} onOpenChange={setIsTaxInvoiceOpen}>
+            <DialogContent className="max-w-4xl p-0">
+                <DialogHeader className="p-4 sm:p-6 pb-0">
+                    <DialogTitle>Tax Invoice</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="max-h-[80vh]">
+                    <div className="p-4 sm:p-6">
+                        {detailsCustomer && receiptSettings && (
+                            <TaxInvoice 
+                                customer={detailsCustomer} 
+                                settings={receiptSettings} 
+                            />
+                        )}
+                    </div>
+                </ScrollArea>
+                <DialogFooter className="p-4 sm:p-6 pt-0">
+                    <Button variant="outline" onClick={() => setIsTaxInvoiceOpen(false)}>Close</Button>
+                    <Button>
+                        <Printer className="mr-2 h-4 w-4" /> Print
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </>
   );
 }
