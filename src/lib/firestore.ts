@@ -193,7 +193,7 @@ export async function deleteSupplier(id: string): Promise<void> {
 // --- Customer Functions ---
 
 export function getCustomersRealtime(callback: (customers: Customer[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(customersCollection, orderBy("customerId", "asc"));
+  const q = query(customersCollection, orderBy("srNo", "asc"));
   return onSnapshot(q, (querySnapshot) => {
     const customers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
     callback(customers);

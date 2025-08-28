@@ -1,3 +1,4 @@
+
 "use client";
 
 import PlaceholderPage from "@/components/placeholder-page";
@@ -22,7 +23,7 @@ export default function SalesReportsPage() {
   const [totalTransactions, setTotalTransactions] = useState(0);
 
   useEffect(() => {
-    const salesCollectionRef = collection(db, "suppliers"); // Assuming supplier data is used for sales reports
+    const salesCollectionRef = collection(db, "customers"); // Changed to customers collection
     const q = query(salesCollectionRef, orderBy("date", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {

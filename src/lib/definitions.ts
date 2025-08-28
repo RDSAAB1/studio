@@ -31,7 +31,6 @@ export type Customer = {
   paymentType: string;
   customerId: string;
   searchValue?: string;
-  otherCharges?: number;
   
   // Fields from RTGS form
   fatherName?: string;

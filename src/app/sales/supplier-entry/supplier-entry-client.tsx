@@ -50,8 +50,7 @@ const formSchema = z.object({
     rate: z.coerce.number().min(0),
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
-    kanta: z.coerce.number().min(0), // Assuming kanta is a fixed cost per entry, not related to weight
-    otherCharges: z.coerce.number().min(0), // Added for flexibility
+    kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required")
 });
 
@@ -66,7 +65,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     id: "", srNo: 'S----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, otherCharges: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
   };
 };
@@ -357,16 +356,10 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                 <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 md:col-span-2">
                             <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                                 <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
-                            </InputWithIcon>
-                        </div>
-                         <div className="space-y-1">
-                            <Label htmlFor="otherCharges" className="text-xs">Other Charges</Label>
-                                <InputWithIcon icon={<CircleDollarSign className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="otherCharges" control={form.control} render={({ field }) => (<Input id="otherCharges" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                    </CardContent>
@@ -976,9 +969,8 @@ export default function SupplierEntryClient() {
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
-    const otherCharges = values.otherCharges || 0;
     
-    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount - otherCharges;
+    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
 
     const totalPaidForThisEntry = paymentHistory
         .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
@@ -997,7 +989,7 @@ export default function SupplierEntryClient() {
       weight: parseFloat(weight.toFixed(2)), kartaWeight: parseFloat(kartaWeight.toFixed(2)),
       kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
       amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
-      kanta: parseFloat(kanta.toFixed(2)), otherCharges: parseFloat(otherCharges.toFixed(2)), 
+      kanta: parseFloat(kanta.toFixed(2)), 
       originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
       netAmount: parseFloat(netAmount.toFixed(2)),
     }));
@@ -1027,7 +1019,6 @@ export default function SupplierEntryClient() {
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
       labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
-      otherCharges: customerState.otherCharges || 0,
       paymentType: customerState.paymentType || 'Full',
     };
     setCurrentCustomer(customerState);
