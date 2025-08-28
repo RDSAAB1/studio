@@ -1101,7 +1101,7 @@ export default function SupplierPaymentsPage() {
                                 <div className="mt-2 space-y-2">
                                     <Card className="bg-muted/30 p-2">
                                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end">
-                                      {rtgsFor === 'Supplier' && (
+                                      {rtgsFor === 'Supplier' ? (
                                         <>
                                           <div className="space-y-1">
                                             <Label className="text-xs">Payment ID</Label>
@@ -1154,21 +1154,12 @@ export default function SupplierPaymentsPage() {
                                               </div>
                                           </>}
                                         </>
-                                      )}
+                                      ) : null}
 
                                       {paymentMethod === 'RTGS' && rtgsFor === 'Outsider' && (
-                                          <div className="col-span-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-x-2 gap-y-2 items-end">
-                                              <div className="space-y-1">
-                                                  <Label className="text-xs">Payment ID</Label>
-                                                  <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs font-mono"/>
-                                              </div>
-                                              <div className="space-y-1">
-                                                  <Label className="text-xs">Amount</Label>
-                                                  <Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/>
-                                              </div>
-                                              <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                              <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
-                                          </div>
+                                            <div className="col-span-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-x-2 gap-y-2 items-end">
+                                               {/* Fields moved to the other card */}
+                                            </div>
                                       )}
                                     </div>
                                     </Card>
@@ -1269,7 +1260,7 @@ export default function SupplierPaymentsPage() {
                                         </DialogContent>
                                     </Dialog>
                                     
-                                        <Card className="p-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
+                                    <Card className="p-2 grid grid-cols-1 lg:grid-cols-2 gap-2">
                                         <div className="p-2 border rounded-lg space-y-2">
                                             <div className="flex justify-between items-center mb-1">
                                                 <p className="text-xs font-semibold">Bank Details</p>
@@ -1346,10 +1337,16 @@ export default function SupplierPaymentsPage() {
                                                  <>
                                                     <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                                                     <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                                                 </> : null
+                                                    <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
+                                                    <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
+                                                 </> :
+                                                  <>
+                                                    <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs font-mono"/></div>
+                                                    <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs"/></div>
+                                                    <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
+                                                    <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
+                                                </>
                                                 }
-                                                <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                                                { rtgsFor === 'Supplier' ? null : <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div> }
                                             </div>
                                         </div>
                                     </Card>
