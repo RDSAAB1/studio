@@ -95,11 +95,24 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             
             <div className="flex-grow-0">
                 {/* Header */}
-                <div className="text-center mb-4">
-                    <h1 className="text-2xl font-bold text-gray-800">{settings.companyName}</h1>
-                    <p className="text-xs">{settings.address1}, {settings.address2}</p>
-                    <p className="text-xs">GSTIN: {invoiceDetails.companyGstin}</p>
-                    <h2 className="text-xl font-semibold text-gray-600 mt-2">TAX INVOICE</h2>
+                 <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="border p-2 rounded-lg">
+                         <h3 className="font-bold text-gray-500 mb-2 text-[11px] uppercase tracking-wider">Bill From</h3>
+                         <p className="font-bold text-lg">{settings.companyName}</p>
+                         <p>{settings.address1}, {settings.address2}</p>
+                         <p>GSTIN: {invoiceDetails.companyGstin}</p>
+                         <p>Phone: {settings.contactNo}</p>
+                         <p>Email: {settings.email}</p>
+                    </div>
+                     <div className="text-right">
+                        <h2 className="text-3xl font-bold text-gray-800 uppercase mb-2">Tax Invoice</h2>
+                        <div className="text-xs">
+                             <p><span className="font-bold">Invoice #</span> {customer.srNo}</p>
+                             <p><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd MMM, yyyy")}</p>
+                             <p><span className="font-bold">Vehicle No:</span> {customer.vehicleNo.toUpperCase()}</p>
+                             <p><span className="font-bold">Due Date:</span> {format(new Date(customer.dueDate), "dd MMM, yyyy")}</p>
+                        </div>
+                    </div>
                 </div>
                 
                 {/* Details Section */}
@@ -121,14 +134,6 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <p>GSTIN: {invoiceDetails.customerGstin}</p>
                     </div>
                 </div>
-                
-                <div className="flex justify-between mb-4 text-xs p-2 border rounded-lg">
-                     <p><span className="font-bold">Invoice #</span> {customer.srNo}</p>
-                     <p><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd MMM, yyyy")}</p>
-                     <p><span className="font-bold">Vehicle No:</span> {customer.vehicleNo.toUpperCase()}</p>
-                     <p><span className="font-bold">Due Date:</span> {format(new Date(customer.dueDate), "dd MMM, yyyy")}</p>
-                </div>
-
 
                 {/* Items Table */}
                 <table className="w-full text-left mb-4 text-[10px] print-table">
@@ -197,7 +202,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                             <span>{formatCurrency(totalTaxAmount)}</span>
                         </div>
                         <div className="flex justify-between p-2 mt-1 bg-gray-200 font-bold">
-                            <span>Invoice Total:</span>
+                            <span>Balance Due:</span>
                             <span>{formatCurrency(totalInvoiceValue)}</span>
                         </div>
                     </div>
