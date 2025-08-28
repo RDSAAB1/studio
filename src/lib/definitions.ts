@@ -54,6 +54,9 @@ export type Customer = {
   brokerage?: number;
   cd?: number;
   isBrokerageIncluded?: boolean;
+  bagWeightKg?: number;
+  bagRate?: number;
+  bagAmount?: number;
 };
 
 export type Transaction = {

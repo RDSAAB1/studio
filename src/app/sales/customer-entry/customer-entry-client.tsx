@@ -54,6 +54,8 @@ const formSchema = z.object({
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
     isBrokerageIncluded: z.boolean(),
+    bagWeightKg: z.coerce.number().min(0),
+    bagRate: z.coerce.number().min(0),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -67,8 +69,9 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     id: "", srNo: 'C----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
     name: '', so: '', companyName: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, cd: 0, isBrokerageIncluded: false,
+    bagWeightKg: 0, bagRate: 0, bagAmount: 0
   };
 };
 
@@ -195,6 +198,12 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                                 </div>
                             )}
                         />
+                         <div className="space-y-1">
+                            <Label htmlFor="bagRate" className="text-xs">Bag Rate</Label>
+                                <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="bagRate" type="number" {...form.register('bagRate')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
+                            </InputWithIcon>
+                        </div>
                     </CardContent>
                 </SectionCard>
 
@@ -332,6 +341,12 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                                 <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10"/>)} />
                             </InputWithIcon>
                         </div>
+                         <div className="space-y-1">
+                            <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
+                                <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
+                            </InputWithIcon>
+                        </div>
                     </CardContent>
                 </SectionCard>
                 
@@ -398,12 +413,16 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
 
 const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: { currentCustomer: Customer }) {
     const summaryFields = useMemo(() => {
-        const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
+        const avgWeightPerBag = (currentCustomer.bags && currentCustomer.bags > 0) ? ((currentCustomer.weight * 100) / currentCustomer.bags).toFixed(2) : '0.00';
         return [
-          { label: "Due Date", value: dueDate }, { label: "Weight", value: currentCustomer.weight },
-          { label: "Brokerage Amt", value: formatCurrency(currentCustomer.brokerage || 0) }, { label: "CD Amount", value: formatCurrency(currentCustomer.cd || 0) },
-          { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Kanta", value: formatCurrency(currentCustomer.kanta || 0) },
-          { label: "Amount", value: formatCurrency(currentCustomer.amount) }, { label: "Net Amount", value: formatCurrency(Number(currentCustomer.netAmount)), isBold: true },
+          { label: "Weight", value: `${currentCustomer.weight.toFixed(2)} Qtl` },
+          { label: "Net Weight", value: `${currentCustomer.netWeight.toFixed(2)} Qtl`},
+          { label: "Avg Wt/Bag", value: `${avgWeightPerBag} kg` },
+          { label: "Bag Amount", value: formatCurrency(currentCustomer.bagAmount || 0) },
+          { label: "Brokerage Amt", value: formatCurrency(currentCustomer.brokerage || 0) }, 
+          { label: "CD Amount", value: formatCurrency(currentCustomer.cd || 0) },
+          { label: "Amount", value: formatCurrency(currentCustomer.amount) }, 
+          { label: "Net Amount", value: formatCurrency(Number(currentCustomer.netAmount)), isBold: true },
         ];
       }, [currentCustomer]);
 
@@ -972,8 +991,13 @@ export default function CustomerEntryClient() {
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
+    
+    const bagWeightKg = Number(values.bagWeightKg) || 0;
+    const bagWeightQuintals = bagWeightKg / 100;
+    const netWeight = weight - bagWeightQuintals;
+    
     const rate = values.rate || 0;
-    const amount = weight * rate;
+    const amount = netWeight * rate;
     
     const brokerageRate = Number(values.brokerage) || 0;
     const brokerageAmount = brokerageRate * weight;
@@ -983,7 +1007,11 @@ export default function CustomerEntryClient() {
     
     const kanta = Number(values.kanta) || 0;
     
-    let originalNetAmount = amount + kanta - cdAmount;
+    const bags = Number(values.bags) || 0;
+    const bagRate = Number(values.bagRate) || 0;
+    const bagAmount = bags * bagRate;
+
+    let originalNetAmount = amount + kanta + bagAmount - cdAmount;
     if (!values.isBrokerageIncluded) {
         originalNetAmount -= brokerageAmount;
     }
@@ -998,17 +1026,18 @@ export default function CustomerEntryClient() {
     const netAmount = originalNetAmount - totalPaidForThisEntry;
 
     setCurrentCustomer(prev => {
-        const currentDate = values.date instanceof Date ? values.date : new Date(prev.date);
+        const currentDate = values.date instanceof Date ? values.date : (prev.date ? new Date(prev.date) : new Date());
         return {
             ...prev, ...values,
             date: currentDate.toISOString().split("T")[0],
-            dueDate: values.date ? new Date(values.date).toISOString().split("T")[0] : prev.dueDate, // For customer, dueDate is same as date
+            dueDate: values.date ? new Date(values.date).toISOString().split("T")[0] : prev.dueDate,
             weight: parseFloat(weight.toFixed(2)),
-            netWeight: parseFloat(weight.toFixed(2)),
+            netWeight: parseFloat(netWeight.toFixed(2)),
             amount: parseFloat(amount.toFixed(2)),
             brokerage: parseFloat(brokerageAmount.toFixed(2)),
             cd: parseFloat(cdAmount.toFixed(2)),
             kanta: parseFloat(kanta.toFixed(2)),
+            bagAmount: parseFloat(bagAmount.toFixed(2)),
             originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
             netAmount: parseFloat(netAmount.toFixed(2)),
         }
@@ -1038,9 +1067,11 @@ export default function CustomerEntryClient() {
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, cd: customerState.cd || 0,
-      brokerage: customerState.brokerage || 0, kanta: customerState.kanta || 50,
+      brokerage: Number(customerState.brokerage) || 0, kanta: Number(customerState.kanta) || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
+      bagWeightKg: customerState.bagWeightKg || 0,
+      bagRate: customerState.bagRate || 0,
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -1136,8 +1167,8 @@ export default function CustomerEntryClient() {
     const completeEntry: Customer = {
       ...currentCustomer,
       ...values,
-      date: values.date ? new Date(values.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-      dueDate: values.date ? new Date(values.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      date: (values.date instanceof Date ? values.date : new Date()).toISOString().split("T")[0],
+      dueDate: (values.date instanceof Date ? values.date : new Date()).toISOString().split("T")[0],
       name: toTitleCase(values.name), 
       companyName: toTitleCase(values.companyName),
       so: '', 
@@ -1147,6 +1178,7 @@ export default function CustomerEntryClient() {
       vehicleNo: toTitleCase(values.vehicleNo), 
       variety: toTitleCase(values.variety),
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+      term: '0',
     };
 
     try {
