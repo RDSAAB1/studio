@@ -402,6 +402,9 @@ export default function SupplierPaymentsPage() {
     const outstandingForEligible = Math.round(eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0));
     
     switch (cdAt) {
+        case 'paid_amount':
+            base = Math.min(currentPaymentAmount, outstandingForEligible);
+            break;
         case 'payment_amount':
             base = currentPaymentAmount;
             break;
