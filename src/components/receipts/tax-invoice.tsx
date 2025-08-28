@@ -38,8 +38,6 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     const totalTaxAmount = totalInvoiceValue - taxableAmount;
     const cgstAmount = totalTaxAmount / 2;
     const sgstAmount = totalTaxAmount / 2;
-    const cgstRate = taxRate / 2;
-    const sgstRate = taxRate / 2;
     
     const hsnCode = invoiceDetails.hsnCode || "N/A";
 
@@ -66,7 +64,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     };
 
     return (
-        <div className="p-8 bg-white text-black font-sans text-[10px] leading-snug flex flex-col justify-between min-h-[29.7cm]">
+        <div className="p-8 bg-white text-black font-sans text-xs leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
             <style>
                 {`
                 @media print {
@@ -78,8 +76,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         height: 100%;
                         margin: 0;
                         padding: 0;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
+                        font-size: 12px; /* Ensure base font size for printing */
                     }
                     .printable-area {
                         color: #000 !important;
@@ -94,22 +91,25 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     .printable-area .bg-gray-800 * {
                         color: #fff !important;
                     }
+                    .printable-area .text-white * {
+                        color: #fff !important;
+                    }
                 }
                 `}
             </style>
             
-            <div className="flex-grow-0 printable-area">
+            <div className="flex-grow-0">
                 {/* Header */}
                  <div className="flex justify-between items-start mb-4">
                     <div className="w-1/2">
                          <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
-                         <p className="text-xs text-gray-600">{settings.address1}, {settings.address2}</p>
-                         <p className="text-xs text-gray-600">GSTIN: {invoiceDetails.companyGstin}</p>
-                         <p className="text-xs text-gray-600">Phone: {settings.contactNo} | Email: {settings.email}</p>
+                         <p className="text-gray-600">{settings.address1}, {settings.address2}</p>
+                         <p className="text-gray-600">GSTIN: {invoiceDetails.companyGstin}</p>
+                         <p className="text-gray-600">Phone: {settings.contactNo} | Email: {settings.email}</p>
                     </div>
                      <div className="text-right">
                         <h1 className="text-4xl font-bold text-gray-800 uppercase mb-2">TAX INVOICE</h1>
-                        <div className="text-xs text-gray-700">
+                        <div className="text-sm text-gray-700">
                             <div className="grid grid-cols-2 text-left">
                                 <span className="font-bold pr-2">Invoice #:</span>
                                 <span>{customer.srNo}</span>
@@ -125,18 +125,18 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 </div>
                 
                 {/* Bill To / Ship To Section */}
-                <div className="grid grid-cols-2 gap-4 mt-8 mb-4 text-xs">
-                    <div className="border border-gray-200 p-2 rounded-lg">
-                        <h3 className="font-bold text-gray-500 mb-2 text-[11px] uppercase tracking-wider">Bill To</h3>
-                        <p className="font-bold">{toTitleCase(customer.name)}</p>
+                <div className="grid grid-cols-2 gap-4 mt-8 mb-4">
+                    <div className="border border-gray-200 p-3 rounded-lg">
+                        <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider">Bill To</h3>
+                        <p className="font-bold text-sm">{toTitleCase(customer.name)}</p>
                         {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
                         <p>{toTitleCase(customer.address)}</p>
                         <p>Phone: {customer.contact}</p>
                         <p>GSTIN: {invoiceDetails.customerGstin}</p>
                     </div>
-                     <div className="border border-gray-200 p-2 rounded-lg">
-                         <h3 className="font-bold text-gray-500 mb-2 text-[11px] uppercase tracking-wider">Ship To</h3>
-                        <p className="font-bold">{toTitleCase(customer.name)}</p>
+                     <div className="border border-gray-200 p-3 rounded-lg">
+                         <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider">Ship To</h3>
+                        <p className="font-bold text-sm">{toTitleCase(customer.name)}</p>
                         {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
                         <p>{toTitleCase(customer.address)}</p>
                         <p>Phone: {customer.contact}</p>
@@ -145,74 +145,57 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 </div>
 
                 {/* Items Table */}
-                <table className="w-full text-left mb-4 text-[10px] print-table">
+                <table className="w-full text-left mb-4 print-table">
                     <thead>
-                        <tr className="bg-gray-800 text-white uppercase">
-                            <th className="p-2 font-semibold text-center">#</th>
-                            <th className="p-2 font-semibold">Item & Description</th>
-                            <th className="p-2 font-semibold text-center">HSN/SAC</th>
-                            <th className="p-2 font-semibold text-center">Qty (Qtl)</th>
-                            <th className="p-2 font-semibold text-right">Rate</th>
-                            <th className="p-2 font-semibold text-right">Taxable Value</th>
-                            <th className="p-2 font-semibold text-center">CGST</th>
-                            <th className="p-2 font-semibold text-center">SGST</th>
-                            <th className="p-2 font-semibold text-right">Total</th>
+                        <tr className="bg-gray-800 text-white uppercase text-sm">
+                            <th className="p-3 font-semibold text-center w-[5%]">#</th>
+                            <th className="p-3 font-semibold w-[45%]">Item & Description</th>
+                            <th className="p-3 font-semibold text-center w-[15%]">Qty (Qtl)</th>
+                            <th className="p-3 font-semibold text-right w-[15%]">Rate</th>
+                            <th className="p-3 font-semibold text-right w-[20%]">Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr className="border-b border-gray-200">
-                            <td className="p-2 text-center border-x border-gray-200">1</td>
-                            <td className="p-2 border-x border-gray-200">{toTitleCase(customer.variety)}</td>
-                            <td className="p-2 text-center border-x border-gray-200">{hsnCode}</td>
-                            <td className="p-2 text-center border-x border-gray-200">{Number(customer.netWeight).toFixed(2)}</td>
-                            <td className="p-2 text-right border-x border-gray-200">{formatCurrency(rate)}</td>
-                            <td className="p-2 text-right border-x border-gray-200">{formatCurrency(taxableAmount)}</td>
-                            <td className="p-2 text-center border-x border-gray-200">{cgstRate.toFixed(1)}%</td>
-                            <td className="p-2 text-center border-x border-gray-200">{sgstRate.toFixed(1)}%</td>
-                            <td className="p-2 text-right border-x border-gray-200">{formatCurrency(totalInvoiceValue)}</td>
+                            <td className="p-3 text-center border-x border-gray-200">1</td>
+                            <td className="p-3 border-x border-gray-200">
+                                <p className="font-semibold">{toTitleCase(customer.variety)}</p>
+                                <p className="text-gray-600 text-xs">HSN/SAC: {hsnCode}</p>
+                            </td>
+                            <td className="p-3 text-center border-x border-gray-200">{Number(customer.netWeight).toFixed(2)}</td>
+                            <td className="p-3 text-right border-x border-gray-200">{formatCurrency(rate)}</td>
+                            <td className="p-3 text-right border-x border-gray-200">{formatCurrency(taxableAmount)}</td>
                         </tr>
                         {Array.from({ length: 10 }).map((_, i) => (
-                            <tr key={i} className="border-b border-gray-200"><td className="p-2 h-6 border-x border-gray-200" colSpan={9}></td></tr>
+                            <tr key={i} className="border-b border-gray-200"><td className="p-3 h-8 border-x border-gray-200" colSpan={5}></td></tr>
                         ))}
                     </tbody>
-                    <tfoot className="border-t-2 border-gray-400">
-                        <tr className="font-bold">
-                            <td colSpan={5} className="p-2 text-right">Total</td>
-                            <td className="p-2 text-right">{formatCurrency(taxableAmount)}</td>
-                            <td colSpan={2} className="p-2 text-center">{formatCurrency(totalTaxAmount)}</td>
-                            <td className="p-2 text-right">{formatCurrency(totalInvoiceValue)}</td>
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
 
-            <div className="flex-grow-0 printable-area">
+            <div className="flex-grow-0">
                 {/* Totals Section & Amount in Words */}
                 <div className="flex justify-between mb-4">
-                    <div className="w-3/5 text-xs pr-4">
-                         <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
-                            <p className="font-bold mb-1 uppercase text-gray-500 text-[11px]">Amount in Words:</p>
+                    <div className="w-3/5 pr-4">
+                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                            <p className="font-bold mb-1 uppercase text-gray-500">Amount in Words:</p>
                             <p className="font-semibold text-gray-800">{numberToWords(totalInvoiceValue)}</p>
                         </div>
                     </div>
-                    <div className="w-2/5 text-xs">
-                        <div className="flex justify-between p-1 border-b border-gray-200">
+                    <div className="w-2/5">
+                        <div className="flex justify-between p-2 border-b border-gray-200">
                             <span className="font-semibold text-gray-600">Taxable Amount:</span>
-                            <span>{formatCurrency(taxableAmount)}</span>
+                            <span className="font-semibold">{formatCurrency(taxableAmount)}</span>
                         </div>
-                        <div className="flex justify-between p-1 border-b border-gray-200">
-                            <span className="font-semibold text-gray-600">CGST ({cgstRate}%):</span>
+                        <div className="flex justify-between p-2 border-b border-gray-200">
+                            <span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span>
                             <span>{formatCurrency(cgstAmount)}</span>
                         </div>
-                        <div className="flex justify-between p-1 border-b border-gray-200">
-                            <span className="font-semibold text-gray-600">SGST ({sgstRate}%):</span>
+                        <div className="flex justify-between p-2 border-b border-gray-200">
+                            <span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span>
                             <span>{formatCurrency(sgstAmount)}</span>
                         </div>
-                        <div className="flex justify-between p-1 border-b border-gray-200">
-                            <span className="font-semibold text-gray-600">Total Tax:</span>
-                            <span>{formatCurrency(totalTaxAmount)}</span>
-                        </div>
-                        <div className="flex justify-between p-2 mt-1 bg-gray-800 text-white font-bold rounded-lg">
+                        <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-lg">
                             <span>Balance Due:</span>
                             <span>{formatCurrency(totalInvoiceValue)}</span>
                         </div>
@@ -220,11 +203,11 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 </div>
 
                 {/* Footer */}
-                <div className="border-t border-gray-300 pt-4 mt-8 text-xs">
+                <div className="border-t border-gray-300 pt-4 mt-8">
                     <div className="flex justify-between items-end">
                         <div className="w-3/5">
-                            <h4 className="font-bold mb-2 text-gray-600 uppercase text-[11px]">Terms & Conditions</h4>
-                            <ul className="list-disc list-inside text-gray-600 space-y-1">
+                            <h4 className="font-bold mb-2 text-gray-600 uppercase">Terms & Conditions</h4>
+                            <ul className="list-disc list-inside text-gray-600 space-y-1 text-xs">
                                 <li>Goods once sold will not be taken back or exchanged.</li>
                                 <li>Interest @18% p.a. will be charged on all overdue payments.</li>
                                 <li>All disputes are subject to Shahjahanpur jurisdiction only.</li>
@@ -232,7 +215,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                             </ul>
                         </div>
                         <div className="w-2/5 text-center">
-                            <div className="h-12"></div>
+                            <div className="h-16"></div>
                             <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
                                 <p className="font-bold">Authorised Signatory</p>
                                 <p className="text-gray-600">For {settings.companyName}</p>
