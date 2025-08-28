@@ -54,7 +54,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                     .printable-area * {
                         color: #000 !important;
                     }
-                    .bg-gray-200 {
+                    .printable-area .bg-gray-200 {
                         background-color: #e5e7eb !important;
                     }
                 }

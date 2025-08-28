@@ -78,8 +78,8 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         height: 100%;
                         margin: 0;
                         padding: 0;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
                     .printable-area {
                         color: #000 !important;
@@ -88,10 +88,10 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         color: #000 !important;
                         border-color: #e5e7eb !important;
                     }
-                    .bg-gray-800 {
+                    .printable-area .bg-gray-800 {
                         background-color: #1f2937 !important;
                     }
-                     .text-white {
+                    .printable-area .bg-gray-800 * {
                         color: #fff !important;
                     }
                 }
@@ -244,5 +244,3 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
         </div>
     );
 }
-
-    

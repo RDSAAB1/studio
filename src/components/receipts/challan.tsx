@@ -29,7 +29,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
                     .printable-area * {
                         color: #000 !important;
                     }
-                    .bg-gray-200 {
+                    .printable-area .bg-gray-200 {
                         background-color: #e5e7eb !important;
                     }
                 }
