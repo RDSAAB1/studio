@@ -23,7 +23,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer, Search } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer, Search, Briefcase, Boxes } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns"
@@ -36,9 +36,9 @@ import { useDebounce } from "@/hooks/use-debounce";
 const formSchema = z.object({
     srNo: z.string(),
     date: z.date(),
-    term: z.coerce.number().min(0),
+    bags: z.coerce.number().min(0),
     name: z.string().min(1, "Name is required."),
-    so: z.string(),
+    companyName: z.string(),
     address: z.string(),
     contact: z.string()
       .length(10, "Contact number must be exactly 10 digits.")
@@ -48,8 +48,8 @@ const formSchema = z.object({
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
     rate: z.coerce.number().min(0),
-    kartaPercentage: z.coerce.number().min(0),
-    labouryRate: z.coerce.number().min(0),
+    cd: z.coerce.number().min(0),
+    brokerage: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required")
 });
@@ -63,10 +63,10 @@ const getInitialFormState = (lastVariety?: string): Customer => {
 
   return {
     id: "", srNo: 'C----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
-    name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
-    weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
+    name: '', so: '', companyName: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+    labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
+    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, cd: 0
   };
 };
 
@@ -117,7 +117,7 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
     
     const handleNameSelect = (customer: Customer) => {
         form.setValue('name', toTitleCase(customer.name));
-        form.setValue('so', toTitleCase(customer.so));
+        form.setValue('companyName', toTitleCase(customer.companyName || ''));
         form.setValue('address', toTitleCase(customer.address));
         form.setValue('contact', customer.contact);
         setIsNamePopoverOpen(false);
@@ -166,9 +166,9 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="term" className="text-xs">Term (Days)</Label>
-                                <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
-                                <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
+                            <Label htmlFor="bags" className="text-xs">Bags</Label>
+                                <InputWithIcon icon={<Boxes className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="bags" type="number" {...form.register('bags')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
                          <Controller
@@ -251,9 +251,9 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="so" className="text-xs">S/O</Label>
-                                <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="so" control={form.control} render={({ field }) => (
+                            <Label htmlFor="companyName" className="text-xs">Company Name</Label>
+                                <InputWithIcon icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="companyName" control={form.control} render={({ field }) => (
                                     <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
                                 )}/>
                             </InputWithIcon>
@@ -345,15 +345,15 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
+                            <Label htmlFor="cd" className="text-xs">CD</Label>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                                <Controller name="cd" control={form.control} render={({ field }) => (<Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="labouryRate" className="text-xs">Laboury</Label>
+                            <Label htmlFor="brokerage" className="text-xs">Brokerage</Label>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="labouryRate" control={form.control} render={({ field }) => (<Input id="labouryRate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                                <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1 md:col-span-2">
@@ -385,8 +385,8 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
         const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
         return [
           { label: "Due Date", value: dueDate }, { label: "Weight", value: currentCustomer.weight },
-          { label: "Karta Weight", value: currentCustomer.kartaWeight }, { label: "Karta Amount", value: formatCurrency(currentCustomer.kartaAmount) },
-          { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Laboury Amount", value: formatCurrency(currentCustomer.labouryAmount) },
+          { label: "Brokerage Amt", value: formatCurrency(currentCustomer.brokerage || 0) }, { label: "CD Amount", value: formatCurrency(currentCustomer.cd || 0) },
+          { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Kanta", value: formatCurrency(currentCustomer.kanta || 0) },
           { label: "Amount", value: formatCurrency(currentCustomer.amount) }, { label: "Net Amount", value: formatCurrency(Number(currentCustomer.netAmount)), isBold: true },
         ];
       }, [currentCustomer]);
@@ -953,24 +953,16 @@ export default function CustomerEntryClient() {
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
     const values = {...form.getValues(), ...data};
-    const date = values.date;
-    const termDays = Number(values.term) || 0;
-    const newDueDate = new Date(date);
-    newDueDate.setDate(newDueDate.getDate() + termDays);
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
-    const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
-    const kartaWeight = weight * (kartaPercentage / 100);
-    const kartaAmount = kartaWeight * rate;
-    const netWeight = weight - kartaWeight;
-    const amount = netWeight * rate;
-    const labouryRate = values.labouryRate || 0;
-    const labouryAmount = weight * labouryRate;
+    const amount = weight * rate;
+    const brokerage = values.brokerage || 0;
+    const cd = values.cd || 0;
     const kanta = values.kanta || 0;
     
-    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
+    const originalNetAmount = amount - brokerage - cd - kanta;
 
     const totalPaidForThisEntry = paymentHistory
         .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
@@ -984,10 +976,12 @@ export default function CustomerEntryClient() {
     setCurrentCustomer(prev => ({
       ...prev, ...values,
       date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
-      term: String(values.term), dueDate: newDueDate.toISOString().split("T")[0],
-      weight: parseFloat(weight.toFixed(2)), kartaWeight: parseFloat(kartaWeight.toFixed(2)),
-      kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
-      amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
+      dueDate: values.date.toISOString().split("T")[0],
+      weight: parseFloat(weight.toFixed(2)),
+      netWeight: parseFloat(weight.toFixed(2)),
+      amount: parseFloat(amount.toFixed(2)),
+      brokerage: parseFloat(brokerage.toFixed(2)),
+      cd: parseFloat(cd.toFixed(2)),
       kanta: parseFloat(kanta.toFixed(2)),
       originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
       netAmount: parseFloat(netAmount.toFixed(2)),
@@ -1012,12 +1006,12 @@ export default function CustomerEntryClient() {
         formDate = today;
     }
     const formValues: FormValues = {
-      srNo: customerState.srNo, date: formDate, term: Number(customerState.term) || 0,
-      name: customerState.name, so: customerState.so, address: customerState.address,
+      srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
+      name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
-      labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
+      rate: customerState.rate || 0, cd: customerState.cd || 0,
+      brokerage: customerState.brokerage || 0, kanta: customerState.kanta || 50,
       paymentType: customerState.paymentType || 'Full',
     };
     setCurrentCustomer(customerState);
@@ -1069,7 +1063,7 @@ export default function CustomerEntryClient() {
       const foundCustomer = customers.find(c => c.contact === contactValue);
       if (foundCustomer && foundCustomer.id !== currentCustomer.id) {
         form.setValue('name', foundCustomer.name);
-        form.setValue('so', foundCustomer.so);
+        form.setValue('companyName', foundCustomer.companyName || '');
         form.setValue('address', foundCustomer.address);
         toast({ title: "Customer Found", description: `Details for ${toTitleCase(foundCustomer.name)} have been auto-filled.` });
       }
@@ -1115,9 +1109,15 @@ export default function CustomerEntryClient() {
       ...currentCustomer,
       ...values,
       date: values.date.toISOString().split("T")[0],
-      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
-      term: String(values.term),
-      name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
+      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(currentCustomer.term) || 0))).toISOString().split("T")[0],
+      name: toTitleCase(values.name), 
+      companyName: toTitleCase(values.companyName),
+      so: '', // S/O is not used for customer
+      kartaPercentage: 0, // Not used
+      labouryRate: 0, // Not used
+      address: toTitleCase(values.address), 
+      vehicleNo: toTitleCase(values.vehicleNo), 
+      variety: toTitleCase(values.variety),
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
@@ -1190,7 +1190,7 @@ export default function CustomerEntryClient() {
   const handleCapitalizeOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const field = e.target.name as keyof FormValues;
     const value = e.target.value;
-    form.setValue(field, toTitleCase(value));
+    form.setValue(field, toTitleCase(value) as any);
   };
   
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -1476,9 +1476,9 @@ export default function CustomerEntryClient() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
                                 <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(detailsCustomer.name)} />
                                 <DetailItem icon={<Phone size={14} />} label="Contact" value={detailsCustomer.contact} />
-                                <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(detailsCustomer.so)} />
+                                <DetailItem icon={<UserSquare size={14} />} label="Company Name" value={toTitleCase(detailsCustomer.companyName || '')} />
                                 <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(detailsCustomer.date), "PPP")} />
-                                <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(detailsCustomer.dueDate), "PPP")} />
+                                <DetailItem icon={<Boxes size={14} />} label="Bags" value={detailsCustomer.bags || 0} />
                                 <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(detailsCustomer.address)} className="col-span-1 sm:col-span-2" />
                             </div>
                         </CardContent>
@@ -1511,9 +1511,8 @@ export default function CustomerEntryClient() {
                                         <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
                                         <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsCustomer.rate)}</TableCell></TableRow>
                                         <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsCustomer.amount)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kartaAmount)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsCustomer.labouryRate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.labouryAmount)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />CD</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.cd || 0)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><User size={12} />Brokerage</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.brokerage || 0)}</TableCell></TableRow>
                                         <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
                                     </TableBody>
                                 </Table>

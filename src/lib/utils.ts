@@ -13,8 +13,8 @@ export function toTitleCase(str: string) {
   );
 }
 
-export function formatSrNo(num: number | string) {
-  return 'S' + String(num).padStart(5, '0');
+export function formatSrNo(num: number | string, prefix: 'S' | 'C' = 'S') {
+  return prefix + String(num).padStart(5, '0');
 }
 
 export function formatPaymentId(num: number | string) {

@@ -47,6 +47,12 @@ export type Customer = {
   utrNo?: string;
   rtgsAmount?: number;
   payments?: Payment[]; // To track which payments have been applied
+
+  // New fields for Customer Entry
+  bags?: number;
+  companyName?: string;
+  brokerage?: number;
+  cd?: number;
 };
 
 export type Transaction = {
