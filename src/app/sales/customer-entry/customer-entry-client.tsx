@@ -958,8 +958,8 @@ export default function CustomerEntryClient() {
     const weight = grossWeight - teirWeight;
     const rate = values.rate || 0;
     const amount = weight * rate;
-    const brokerage = values.brokerage || 0;
-    const cd = values.cd || 0;
+    const brokerage = Number(values.brokerage) || 0;
+    const cd = Number(values.cd) || 0;
     const kanta = values.kanta || 0;
     
     const originalNetAmount = amount - brokerage - cd - kanta;
@@ -979,7 +979,7 @@ export default function CustomerEntryClient() {
         return {
             ...prev, ...values,
             date: currentDate.toISOString().split("T")[0],
-            dueDate: currentDate.toISOString().split("T")[0], // For customer, dueDate is same as date
+            dueDate: values.date ? new Date(values.date).toISOString().split("T")[0] : prev.dueDate, // For customer, dueDate is same as date
             weight: parseFloat(weight.toFixed(2)),
             netWeight: parseFloat(weight.toFixed(2)),
             amount: parseFloat(amount.toFixed(2)),
