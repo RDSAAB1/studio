@@ -27,12 +27,10 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     let rate = Number(customer.rate) || 0;
 
     if (isGstIncluded) {
-        // If rate includes GST, we need to calculate the base price
         const baseRate = rate / (1 + (taxRate / 100));
         taxableAmount = Number(customer.netWeight) * baseRate;
         totalInvoiceValue = taxableAmount * (1 + (taxRate / 100));
     } else {
-        // If rate is exclusive of GST
         taxableAmount = Number(customer.netWeight) * rate;
         totalInvoiceValue = taxableAmount * (1 + (taxRate / 100));
     }
@@ -44,9 +42,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     const sgstRate = taxRate / 2;
     
     const hsnCode = invoiceDetails.hsnCode || "N/A";
-    const balanceDue = customer.netAmount;
 
-    // Function to convert number to words
     const numberToWords = (num: number): string => {
         const a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
         const b = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
@@ -99,21 +95,16 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             
             <div className="flex-grow-0">
                 {/* Header */}
-                <div className="flex justify-between items-start pb-4 border-b">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-800">{settings.companyName}</h1>
-                        <p className="text-xs">{settings.address1}, {settings.address2}</p>
-                        <p className="text-xs">GSTIN: {invoiceDetails.companyGstin}</p>
-                    </div>
-                    <div className="text-right">
-                        <h2 className="text-xl font-semibold text-gray-600">TAX INVOICE</h2>
-                        <p className="text-xs"><span className="font-bold">Invoice #</span> {customer.srNo}</p>
-                        <p className="text-xs"><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd MMM, yyyy")}</p>
-                    </div>
+                <div className="text-center mb-4">
+                    <h1 className="text-2xl font-bold text-gray-800">{settings.companyName}</h1>
+                    <p className="text-xs">{settings.address1}, {settings.address2}</p>
+                    <p className="text-xs">GSTIN: {invoiceDetails.companyGstin}</p>
+                    <h2 className="text-xl font-semibold text-gray-600 mt-2">TAX INVOICE</h2>
                 </div>
                 
-                <div className="flex justify-between mt-4 mb-4 text-xs border-b pb-4">
-                    <div className="w-1/2 pr-4">
+                {/* Details Section */}
+                <div className="flex justify-between mt-4 mb-4 text-xs border-y py-2">
+                    <div className="w-1/2 pr-4 space-y-1">
                         <h3 className="font-bold text-gray-500 mb-1 text-[11px] uppercase tracking-wider">Bill To</h3>
                         <p className="font-bold">{toTitleCase(customer.name)}</p>
                         {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
@@ -121,8 +112,8 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <p>Phone: {customer.contact}</p>
                         <p>GSTIN: {invoiceDetails.customerGstin}</p>
                     </div>
-                    <div className="w-1/2 pl-4">
-                        <h3 className="font-bold text-gray-500 mb-1 text-[11px] uppercase tracking-wider">Ship To</h3>
+                    <div className="w-1/2 pl-4 border-l space-y-1">
+                         <h3 className="font-bold text-gray-500 mb-1 text-[11px] uppercase tracking-wider">Ship To</h3>
                         <p className="font-bold">{toTitleCase(customer.name)}</p>
                         {customer.companyName && <p>{toTitleCase(customer.companyName)}</p>}
                         <p>{toTitleCase(customer.address)}</p>
@@ -130,6 +121,14 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <p>GSTIN: {invoiceDetails.customerGstin}</p>
                     </div>
                 </div>
+                
+                <div className="flex justify-between mb-4 text-xs">
+                     <p><span className="font-bold">Invoice #</span> {customer.srNo}</p>
+                     <p><span className="font-bold">Date:</span> {format(new Date(customer.date), "dd MMM, yyyy")}</p>
+                     <p><span className="font-bold">Vehicle No:</span> {customer.vehicleNo.toUpperCase()}</p>
+                     <p><span className="font-bold">Due Date:</span> {format(new Date(customer.dueDate), "dd MMM, yyyy")}</p>
+                </div>
+
 
                 {/* Items Table */}
                 <table className="w-full text-left mb-4 text-[10px] print-table">
@@ -158,8 +157,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                             <td className="p-2 text-center border">{sgstRate.toFixed(1)}%</td>
                             <td className="p-2 text-right border">{formatCurrency(totalInvoiceValue)}</td>
                         </tr>
-                        {/* Fill empty rows to cover the page */}
-                        {Array.from({ length: 15 }).map((_, i) => (
+                        {Array.from({ length: 10 }).map((_, i) => (
                             <tr key={i} className="border-b"><td className="p-2 h-6 border" colSpan={9}></td></tr>
                         ))}
                     </tbody>
@@ -223,5 +221,4 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             </div>
         </div>
     );
-
-    
+}
