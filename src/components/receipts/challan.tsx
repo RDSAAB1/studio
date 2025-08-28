@@ -26,6 +26,9 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important; 
                     }
+                    * {
+                        color: #000 !important;
+                    }
                 }
                 `}
             </style>

@@ -19,7 +19,7 @@ interface TaxInvoiceProps {
 }
 
 export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invoiceDetails }) => {
-    const taxRate = invoiceDetails.taxRate || 0;
+    const taxRate = Number(invoiceDetails.taxRate) || 0;
     const isGstIncluded = invoiceDetails.isGstIncluded;
 
     let taxableAmount: number;
@@ -77,6 +77,9 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     body {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
+                    }
+                    * {
+                        color: #000 !important;
                     }
                 }
                 `}

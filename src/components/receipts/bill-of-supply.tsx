@@ -51,6 +51,9 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important; 
                     }
+                    * {
+                        color: #000 !important;
+                    }
                 }
                 `}
             </style>
