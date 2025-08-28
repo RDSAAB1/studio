@@ -47,6 +47,7 @@ const formSchema = z.object({
     contact: z.string()
       .length(10, "Contact number must be exactly 10 digits.")
       .regex(/^\d+$/, "Contact number must only contain digits."),
+    gstin: z.string().optional(),
     vehicleNo: z.string(),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.coerce.number().min(0),
@@ -71,7 +72,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
 
   return {
     id: "", srNo: 'C----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
-    name: '', so: '', companyName: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    name: '', so: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, cd: 0, isBrokerageIncluded: false,
@@ -129,6 +130,7 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
         form.setValue('companyName', toTitleCase(customer.companyName || ''));
         form.setValue('address', toTitleCase(customer.address));
         form.setValue('contact', customer.contact);
+        form.setValue('gstin', customer.gstin || '');
         setIsNamePopoverOpen(false);
     };
 
@@ -282,7 +284,15 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             </InputWithIcon>
                                 {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
                         </div>
-                            <div className="space-y-1">
+                        <div className="space-y-1">
+                            <Label htmlFor="gstin" className="text-xs">GSTIN</Label>
+                            <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="gstin" control={form.control} render={({ field }) => (
+                                    <Input {...field} className="h-9 text-sm pl-10" />
+                                )}/>
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
                             <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="address" control={form.control} render={({ field }) => (
@@ -1078,7 +1088,7 @@ export default function CustomerEntryClient() {
     const formValues: FormValues = {
       srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
-      contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
+      contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, cd: Number(customerState.cd) || 0,
       brokerage: Number(customerState.brokerage) || 0, kanta: Number(customerState.kanta) || 0,
@@ -1138,6 +1148,7 @@ export default function CustomerEntryClient() {
         form.setValue('name', foundCustomer.name);
         form.setValue('companyName', foundCustomer.companyName || '');
         form.setValue('address', foundCustomer.address);
+        form.setValue('gstin', foundCustomer.gstin || '');
         toast({ title: "Customer Found", description: `Details for ${toTitleCase(foundCustomer.name)} have been auto-filled.` });
       }
     }
