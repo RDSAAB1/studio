@@ -378,7 +378,7 @@ export default function SupplierPaymentsPage() {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
   
-    useEffect(() => {
+  useEffect(() => {
         if (!cdEnabled) {
             setCalculatedCdAmount(0);
             return;
@@ -389,50 +389,33 @@ export default function SupplierPaymentsPage() {
 
         let baseAmountForCd = 0;
         const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+        const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+        
+        const timelyPaymentsWithoutCD = selectedEntries.reduce((sum, entry) => {
+            const paymentsForThisEntry = paymentHistory.filter(p =>
+                p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied
+            );
+            const timelyPaymentsSum = paymentsForThisEntry.reduce((paymentSum, p) => {
+                if (new Date(p.date) <= new Date(entry.dueDate)) {
+                    const paidForThis = p.paidFor?.find(pf => pf.srNo === entry.srNo);
+                    return paymentSum + (paidForThis?.amount || 0);
+                }
+                return paymentSum;
+            }, 0);
+            return sum + timelyPaymentsSum;
+        }, 0);
 
         switch (cdAt) {
             case 'paid_amount': {
-                const paidOnTimeWithoutCD = selectedEntries.reduce((sum, entry) => {
-                    const paymentsForThisEntry = paymentHistory.filter(p =>
-                        p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied
-                    );
-                    const timelyPaymentsSum = paymentsForThisEntry.reduce((paymentSum, p) => {
-                        if (new Date(p.date) <= new Date(entry.dueDate)) {
-                            const paidForThis = p.paidFor?.find(pf => pf.srNo === entry.srNo);
-                            return paymentSum + (paidForThis?.amount || 0);
-                        }
-                        return paymentSum;
-                    }, 0);
-                    return sum + timelyPaymentsSum;
-                }, 0);
-                
-                const eligiblePaidAmount = Math.min(paymentAmount, eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0));
-                
-                baseAmountForCd = paidOnTimeWithoutCD + eligiblePaidAmount;
+                baseAmountForCd = timelyPaymentsWithoutCD;
                 break;
             }
             case 'unpaid_amount': {
-                baseAmountForCd = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+                baseAmountForCd = outstandingOfEligible;
                 break;
             }
-             case 'full_amount': {
-                const outstandingOfEligible = eligibleEntries.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-
-                const pastTimelyPaymentsWithoutCD = selectedEntries.reduce((sum, entry) => {
-                     const paymentsForThisEntry = paymentHistory.filter(p =>
-                        p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied
-                    );
-                    const timelyPaymentsSum = paymentsForThisEntry.reduce((paymentSum, p) => {
-                        if (new Date(p.date) <= new Date(entry.dueDate)) {
-                           const paidForThis = p.paidFor?.find(pf => pf.srNo === entry.srNo);
-                           return paymentSum + (paidForThis?.amount || 0);
-                        }
-                        return paymentSum;
-                    }, 0);
-                    return sum + timelyPaymentsSum;
-                }, 0);
-
-                baseAmountForCd = outstandingOfEligible + pastTimelyPaymentsWithoutCD;
+            case 'full_amount': {
+                baseAmountForCd = outstandingOfEligible + timelyPaymentsWithoutCD;
                 break;
             }
             case 'payment_amount': {
@@ -442,10 +425,10 @@ export default function SupplierPaymentsPage() {
             default:
                 baseAmountForCd = 0;
         }
-
+        
         setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
 
-    }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory]);
+  }, [cdEnabled, paymentAmount, cdPercent, cdAt, selectedEntries, paymentHistory]);
 
 
   useEffect(() => {
@@ -522,7 +505,6 @@ export default function SupplierPaymentsPage() {
     setSelectedEntryIds(newSet);
   };
 
-
     const processPayment = async () => {
         if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
             toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
@@ -551,53 +533,57 @@ export default function SupplierPaymentsPage() {
                 const tempEditingPayment = editingPayment;
                 let paidForDetails: PaidFor[] = [];
                 
-                // Fetch all necessary documents before writing
-                const supplierDocsToRead: { ref: any, id: string }[] = [];
-                
+                // --- STAGE 1: READS ---
+                const supplierDocsToRestore = new Map<string, any>();
+                const supplierDocsToPay = new Map<string, any>();
+
                 if (rtgsFor === 'Supplier') {
+                    // Reads for restoring old payment amounts
                     if (tempEditingPayment) {
                         for (const detail of tempEditingPayment.paidFor || []) {
                             const q = query(suppliersCollection, where("srNo", "==", detail.srNo));
-                            const supplierDocs = await getDocs(q);
-                            if (!supplierDocs.empty) {
-                                supplierDocsToRead.push({ ref: supplierDocs.docs[0].ref, id: supplierDocs.docs[0].id });
+                            const querySnapshot = await getDocs(q); // Use getDocs, not transaction.get for queries
+                            if (!querySnapshot.empty) {
+                                const docSnap = await transaction.get(querySnapshot.docs[0].ref);
+                                supplierDocsToRestore.set(docSnap.id, docSnap);
                             }
                         }
                     }
 
+                    // Reads for applying new payment
                     for (const entryData of selectedEntries) {
-                        supplierDocsToRead.push({ ref: doc(db, "suppliers", entryData.id), id: entryData.id });
+                        if (!supplierDocsToPay.has(entryData.id)) { // Avoid re-reading
+                             const supplierDocRef = doc(db, "suppliers", entryData.id);
+                             const supplierDoc = await transaction.get(supplierDocRef);
+                             if (!supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
+                             supplierDocsToPay.set(entryData.id, supplierDoc);
+                        }
                     }
                 }
-
-                // Execute all reads
-                const readDocs = await Promise.all(supplierDocsToRead.map(d => transaction.get(d.ref)));
-                const readDocsMap = new Map(readDocs.map((doc, i) => [supplierDocsToRead[i].id, doc]));
                 
-                // Now, perform writes
+                // --- STAGE 2: WRITES ---
                 if (rtgsFor === 'Supplier') {
+                    // Restore amounts if editing
                     if (tempEditingPayment) {
                         for (const detail of tempEditingPayment.paidFor || []) {
-                             const supplierDocSnapshot = Array.from(readDocsMap.values()).find(d => d.data()?.srNo === detail.srNo);
+                             const supplierDocSnapshot = Array.from(supplierDocsToRestore.values()).find(d => d.data()?.srNo === detail.srNo);
                              if (supplierDocSnapshot) {
-                                const supplierDocRef = supplierDocSnapshot.ref;
                                 const currentNetAmount = Number(supplierDocSnapshot.data()?.netAmount) || 0;
                                 const amountToRestore = detail.amount + (detail.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
-                                transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
+                                transaction.update(supplierDocSnapshot.ref, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                             }
                         }
                     }
 
+                    // Apply new payment
                     let amountToDistribute = Math.round(totalPaidAmount);
                     const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                     
                     for (const entryData of sortedEntries) {
                         if (amountToDistribute <= 0) break;
 
-                        const supplierDocRef = doc(db, "suppliers", entryData.id);
-                        const supplierDoc = readDocsMap.get(entryData.id);
-                        if (!supplierDoc || !supplierDoc.exists()) throw new Error(`Supplier with ID ${entryData.id} not found.`);
-
+                        const supplierDoc = supplierDocsToPay.get(entryData.id);
+                        // We already checked for existence, so this should be safe.
                         let outstanding = Number(supplierDoc.data().netAmount);
                         const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
@@ -611,7 +597,7 @@ export default function SupplierPaymentsPage() {
                                 supplierContact: entryData.contact,
                             });
                             
-                            transaction.update(supplierDocRef, { netAmount: outstanding - paymentForThisEntry });
+                            transaction.update(supplierDoc.ref, { netAmount: outstanding - paymentForThisEntry });
                             amountToDistribute -= paymentForThisEntry;
                         }
                     }
@@ -1799,5 +1785,3 @@ export default function SupplierPaymentsPage() {
     </div>
   );
 }
-
-    
