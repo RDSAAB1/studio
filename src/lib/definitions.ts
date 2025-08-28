@@ -53,6 +53,7 @@ export type Customer = {
   companyName?: string;
   brokerage?: number;
   cd?: number;
+  isBrokerageIncluded?: boolean;
 };
 
 export type Transaction = {

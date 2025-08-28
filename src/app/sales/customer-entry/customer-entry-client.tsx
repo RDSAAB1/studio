@@ -21,9 +21,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 
 
-import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer, Search, Briefcase, Boxes } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Info, Settings, Plus, ChevronsUpDown, Check, Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, ArrowRight, LayoutGrid, LayoutList, Rows3, StepForward, X, Server, Hourglass, InfoIcon, UserCog, PackageSearch, CircleDollarSign, Receipt, Printer, Search, Briefcase, Boxes, RefreshCw } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns"
@@ -51,7 +52,8 @@ const formSchema = z.object({
     cd: z.coerce.number().min(0),
     brokerage: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
-    paymentType: z.string().min(1, "Payment type is required")
+    paymentType: z.string().min(1, "Payment type is required"),
+    isBrokerageIncluded: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -66,7 +68,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     name: '', so: '', companyName: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 0, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, cd: 0
+    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, cd: 0, isBrokerageIncluded: false,
   };
 };
 
@@ -345,22 +347,36 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="cd" className="text-xs">CD</Label>
+                            <Label htmlFor="cd" className="text-xs">CD %</Label>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="cd" control={form.control} render={({ field }) => (<Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="brokerage" className="text-xs">Brokerage</Label>
+                            <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
-                        <div className="space-y-1 md:col-span-2">
+                        <div className="space-y-1">
                             <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                                 <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
+                        </div>
+                        <div className="flex items-center space-x-2 pt-4">
+                            <Controller
+                                name="isBrokerageIncluded"
+                                control={form.control}
+                                render={({ field }) => (
+                                    <Switch
+                                        id="brokerage-toggle"
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                    />
+                                )}
+                            />
+                            <Label htmlFor="brokerage-toggle" className="text-sm font-normal">Include Brokerage in Net Amount</Label>
                         </div>
                    </CardContent>
                 </SectionCard>
@@ -958,17 +974,24 @@ export default function CustomerEntryClient() {
     const weight = grossWeight - teirWeight;
     const rate = values.rate || 0;
     const amount = weight * rate;
-    const brokerage = Number(values.brokerage) || 0;
-    const cd = Number(values.cd) || 0;
-    const kanta = values.kanta || 0;
     
-    const originalNetAmount = amount - brokerage - cd - kanta;
+    const brokerageRate = Number(values.brokerage) || 0;
+    const brokerageAmount = brokerageRate * weight;
+
+    const cdPercentage = Number(values.cd) || 0;
+    const cdAmount = (amount * cdPercentage) / 100;
+    
+    const kanta = Number(values.kanta) || 0;
+    
+    let originalNetAmount = amount + kanta - cdAmount;
+    if (!values.isBrokerageIncluded) {
+        originalNetAmount -= brokerageAmount;
+    }
 
     const totalPaidForThisEntry = paymentHistory
         .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
         .reduce((sum, p) => {
             const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-            // Deduct both the payment amount and the associated CD amount
             return sum + (paidForDetail?.amount || 0) + (paymentHistory.find(ph => ph.paymentId === p.paymentId)?.cdAmount || 0);
         }, 0);
       
@@ -983,8 +1006,8 @@ export default function CustomerEntryClient() {
             weight: parseFloat(weight.toFixed(2)),
             netWeight: parseFloat(weight.toFixed(2)),
             amount: parseFloat(amount.toFixed(2)),
-            brokerage: parseFloat(brokerage.toFixed(2)),
-            cd: parseFloat(cd.toFixed(2)),
+            brokerage: parseFloat(brokerageAmount.toFixed(2)),
+            cd: parseFloat(cdAmount.toFixed(2)),
             kanta: parseFloat(kanta.toFixed(2)),
             originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
             netAmount: parseFloat(netAmount.toFixed(2)),
@@ -1017,6 +1040,7 @@ export default function CustomerEntryClient() {
       rate: customerState.rate || 0, cd: customerState.cd || 0,
       brokerage: customerState.brokerage || 0, kanta: customerState.kanta || 50,
       paymentType: customerState.paymentType || 'Full',
+      isBrokerageIncluded: customerState.isBrokerageIncluded || false,
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -1112,8 +1136,8 @@ export default function CustomerEntryClient() {
     const completeEntry: Customer = {
       ...currentCustomer,
       ...values,
-      date: values.date.toISOString().split("T")[0],
-      dueDate: values.date.toISOString().split("T")[0],
+      date: values.date ? new Date(values.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      dueDate: values.date ? new Date(values.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
       name: toTitleCase(values.name), 
       companyName: toTitleCase(values.companyName),
       so: '', 
@@ -1517,7 +1541,7 @@ export default function CustomerEntryClient() {
                                         <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsCustomer.amount)}</TableCell></TableRow>
                                         <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />CD</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.cd || 0)}</TableCell></TableRow>
                                         <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><User size={12} />Brokerage</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.brokerage || 0)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
+                                        <TableRow><TableCell className="text-muted-foreground p-1 text-green-600 flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-green-600">+ {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
                                     </TableBody>
                                 </Table>
                              </CardContent>
