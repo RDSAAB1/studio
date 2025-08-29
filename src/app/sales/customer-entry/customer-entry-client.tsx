@@ -462,6 +462,7 @@ export default function CustomerEntryClient() {
   
   const handleShowDetails = (customer: Customer) => {
     setDetailsCustomer(customer);
+    setIsDocumentPreviewOpen(true);
   }
 
   const handlePrint = (entriesToPrint: Customer[]) => {
@@ -558,6 +559,7 @@ export default function CustomerEntryClient() {
         selectedIds={selectedCustomerIds}
         onSelectionChange={setSelectedCustomerIds}
         onSearch={setSearchTerm}
+        entryType="Customer"
       />
         
       <DocumentPreviewDialog
