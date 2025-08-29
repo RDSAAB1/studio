@@ -89,13 +89,13 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                              <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                                className="relative w-40 h-10 flex items-center justify-center rounded-full bg-secondary/50 shadow-inner focus:outline-none"
+                                className="relative w-40 h-10 flex items-center rounded-full bg-secondary/50 p-1 focus:outline-none"
                                 >
-                                <span className={cn("absolute left-4 text-xs font-semibold transition-colors", isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Include</span>
-                                <span className={cn("absolute right-4 text-xs font-semibold transition-colors", !isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Exclude</span>
+                                <span className="absolute left-6 text-xs font-semibold transition-colors" style={{ color: isBrokerageIncluded ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))'}}>Include</span>
+                                <span className="absolute right-6 text-xs font-semibold transition-colors" style={{ color: !isBrokerageIncluded ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))'}}>Exclude</span>
                                 <div className={cn(
-                                    "absolute left-1 top-1 w-[88px] h-8 bg-primary rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out",
-                                    !isBrokerageIncluded && "translate-x-[calc(100%-8px)] !bg-destructive"
+                                    "absolute w-[calc(50%+4px)] h-10 top-0 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out",
+                                    isBrokerageIncluded ? "left-0 -ml-1 bg-primary" : "left-1/2 -ml-1 bg-destructive"
                                 )}>
                                     <span className="text-sm font-bold text-primary-foreground">Brokerage</span>
                                 </div>

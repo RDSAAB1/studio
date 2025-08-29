@@ -241,16 +241,16 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                  <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-base flex items-center gap-2"><Truck className="h-4 w-4"/>Shipping Details</h3>
                     <div className="flex items-center justify-center pt-2">
-                        <button
+                       <button
                             type="button"
                             onClick={() => setIsSameAsBilling(!isSameAsBilling)}
-                            className="relative w-40 h-10 flex items-center justify-center rounded-full bg-secondary/50 shadow-inner focus:outline-none"
+                            className="relative w-40 h-10 flex items-center rounded-full bg-secondary/50 p-1 focus:outline-none"
                             >
                             <span className={cn("absolute left-6 text-xs font-semibold transition-colors", isSameAsBilling ? 'text-primary-foreground' : 'text-muted-foreground')}>Same</span>
                             <span className={cn("absolute right-3 text-xs font-semibold transition-colors", !isSameAsBilling ? 'text-primary-foreground' : 'text-muted-foreground')}>Different</span>
-                             <div className={cn(
-                                "absolute left-1 top-1 w-[88px] h-8 bg-primary rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out",
-                                !isSameAsBilling && "translate-x-[calc(100%-8px)] !bg-destructive"
+                            <div className={cn(
+                                "absolute w-[calc(50%+4px)] h-10 top-0 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out",
+                                isSameAsBilling ? 'left-0 -ml-1 bg-primary' : 'left-1/2 -ml-1 bg-destructive'
                             )}>
                                 <span className="text-sm font-bold text-primary-foreground">Shipment</span>
                             </div>
