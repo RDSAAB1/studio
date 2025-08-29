@@ -7,7 +7,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Banknote, Scale, Percent, User, HandCoins } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Banknote, Scale, Percent, User, HandCoins, MoreVertical } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 
@@ -57,14 +57,19 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         ))}
                     </div>
                     <div className="flex flex-col justify-start items-stretch space-y-2 border-t lg:border-t-0 lg:border-l pt-3 lg:pt-0 lg:pl-3">
-                        <Button onClick={onSave} size="sm" className="h-8">
-                            {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" className="h-8">
+                                    Actions <MoreVertical className="ml-auto h-4 w-4 shrink-0" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onClick={onSave}>{isEditing ? "Update" : "Save"}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={onNew}>New / Clear</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm" variant="outline" className="h-8">
                             <Printer className="mr-2 h-4 w-4"/> Save & Print
-                        </Button>
-                        <Button type="button" variant="outline" onClick={onNew} size="sm" className="h-8">
-                            <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                         </Button>
                     </div>
                 </CardContent>
@@ -93,10 +98,22 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                 {/* Right Side: Actions */}
                 <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
-                        <Button onClick={onSave} size="sm" className="h-7">
-                            {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
-                        </Button>
-                        <DropdownMenu>
+                         <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" className="h-7">
+                                    Actions <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onClick={onSave}>
+                                    {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={onNew}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> New
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-7">
                                     <Printer className="mr-2 h-4 w-4"/> Print <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
@@ -108,9 +125,6 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                                 <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Challan</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button type="button" variant="outline" onClick={onNew} size="sm" className="h-7">
-                            <PlusCircle className="mr-2 h-4 w-4" /> New
-                        </Button>
                     </div>
 
                     {isCustomerForm && onBrokerageToggle && (
