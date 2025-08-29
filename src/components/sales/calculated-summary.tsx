@@ -76,32 +76,22 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
     const avgWeightPerBag = (customer.bags && customer.bags > 0) ? ((customer.weight * 100) / customer.bags).toFixed(2) : '0.00';
     return (
         <Card>
-            <CardContent className="p-3 space-y-3">
-                {/* Row 1: Calculations */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                     <div className="space-y-2 p-3 rounded-lg bg-muted/30">
-                        <h4 className="font-semibold text-sm border-b pb-1 mb-2">Weight & Bags</h4>
-                        <SummaryItem label="Final Weight (Qtl)" value={customer.weight.toFixed(2)} icon={<Scale size={14} />} />
-                        <SummaryItem label="Net Weight (Qtl)" value={customer.netWeight.toFixed(2)} icon={<Scale size={14} />} />
-                        <SummaryItem label="Avg Wt./Bag (Kg)" value={`${avgWeightPerBag}`} icon={<Scale size={14} />} />
-                    </div>
-                    <div className="space-y-2 p-3 rounded-lg bg-muted/30">
-                         <h4 className="font-semibold text-sm border-b pb-1 mb-2">Deductions</h4>
-                        <SummaryItem label="Bag Amount" value={formatCurrency(customer.bagAmount || 0)} icon={<HandCoins size={14} />} />
-                        <SummaryItem label="Brokerage Amount" value={formatCurrency(customer.brokerage || 0)} icon={<User size={14}/>} />
-                        <SummaryItem label="CD Amount" value={formatCurrency(customer.cd || 0)} icon={<Percent size={14} />} />
-                    </div>
-                    <div className="space-y-2 p-3 rounded-lg bg-muted/30">
-                         <h4 className="font-semibold text-sm border-b pb-1 mb-2">Totals</h4>
-                        <SummaryItem label="Total Amount" value={formatCurrency(customer.amount)} icon={<Banknote size={14} />} />
-                        <SummaryItem label="Net Amount" value={formatCurrency(Number(customer.netAmount))} icon={<Banknote size={14}/>} isBold isLarge />
-                    </div>
+            <CardContent className="p-3 flex flex-col md:flex-row items-center justify-between gap-3">
+                {/* Left Side: Calculations */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-2 flex-1">
+                    <SummaryItem label="Final Wt (Qtl)" value={customer.weight.toFixed(2)} icon={<Scale size={14} />} />
+                    <SummaryItem label="Net Wt (Qtl)" value={customer.netWeight.toFixed(2)} icon={<Scale size={14} />} />
+                    <SummaryItem label="Bag Amount" value={formatCurrency(customer.bagAmount || 0)} icon={<HandCoins size={14} />} />
+                    <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} icon={<User size={14}/>} />
+                    <SummaryItem label="CD Amount" value={formatCurrency(customer.cd || 0)} icon={<Percent size={14} />} />
+                    <SummaryItem label="Total Amount" value={formatCurrency(customer.amount)} icon={<Banknote size={14} />} />
+                    <SummaryItem label="Net Amount" value={formatCurrency(Number(customer.netAmount))} icon={<Banknote size={14}/>} isBold isLarge />
                 </div>
-
-                <Separator />
                 
-                {/* Row 2: Actions */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                <Separator orientation="vertical" className="h-10 mx-3 hidden md:block" />
+
+                {/* Right Side: Actions */}
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
                         <Button onClick={onSave} size="sm" className="h-7">
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
@@ -109,7 +99,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-7">
-                                    <Printer className="mr-2 h-4 w-4"/> Save & Print <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
+                                    <Printer className="mr-2 h-4 w-4"/> Print <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
@@ -119,12 +109,12 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                             </DropdownMenuContent>
                         </DropdownMenu>
                         <Button type="button" variant="outline" onClick={onNew} size="sm" className="h-7">
-                            <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
+                            <PlusCircle className="mr-2 h-4 w-4" /> New
                         </Button>
                     </div>
 
                     {isCustomerForm && onBrokerageToggle && (
-                        <div className="flex items-center justify-center">
+                         <div className="flex items-center justify-center pt-2 sm:pt-0">
                            <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
