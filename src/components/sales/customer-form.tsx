@@ -19,12 +19,14 @@ import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { OptionsManagerDialog } from "./options-manager-dialog";
 import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Weight, Boxes, Briefcase, PackageSearch, Wallet, Settings, InfoIcon } from "lucide-react";
 
-const SectionCard = ({ title, icon, children, className }: { title: string, icon: React.ReactNode, children: React.ReactNode, className?: string }) => (
+const SectionCard = ({ title, icon, children, className }: { title?: string, icon?: React.ReactNode, children: React.ReactNode, className?: string }) => (
     <Card className={cn("bg-card/60 backdrop-blur-sm border-white/10", className)}>
-        <CardHeader className="pb-4 pt-5">
-            <CardTitle className="flex items-center gap-2 text-lg">{icon}{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
+        {title && (
+            <CardHeader className="pb-4 pt-5">
+                <CardTitle className="flex items-center gap-2 text-lg">{icon}{title}</CardTitle>
+            </CardHeader>
+        )}
+        <CardContent className={cn(!title && "pt-4")}>
             {children}
         </CardContent>
     </Card>
@@ -93,38 +95,65 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
 
     return (
         <>
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <SectionCard icon={<InfoIcon className="h-5 w-5" />}>
+                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <Controller name="date" control={form.control} render={({ field }) => (
+                        <div className="space-y-1">
+                            <Label className="text-xs">Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm",!field.value && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 z-[51]">
+                                <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus/>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    )} />
+                    <div className="space-y-1">
+                        <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                        <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                            <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm pl-10" />
+                        </InputWithIcon>
+                    </div>
+                     <Controller name="variety" control={form.control} render={({ field }) => (
+                        <div className="space-y-1">
+                            <Label className="text-xs flex items-center gap-2"><Wheat className="h-3 w-3"/>Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
+                            <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select or add variety..." searchPlaceholder="Search variety..." emptyPlaceholder="No variety found."/>
+                            {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                        </div>
+                    )} />
+                     <Controller name="paymentType" control={form.control} render={({ field }) => (
+                        <div className="space-y-1">
+                            <Label className="text-xs flex items-center gap-2"><Wallet className="h-3 w-3"/>Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
+                            <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select or add type..." searchPlaceholder="Search type..." emptyPlaceholder="No type found."/>
+                            {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
+                        </div>
+                    )} />
+                    <div className="space-y-1">
+                        <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
+                        <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
+                            <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
+                        </InputWithIcon>
+                    </div>
+                </div>
+            </SectionCard>
+            
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
                 {/* Left Side */}
                 <div className="lg:col-span-3 space-y-4">
-                    <SectionCard title="Basic Info" icon={<InfoIcon className="h-5 w-5" />}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <Controller name="date" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Date</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm",!field.value && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0 z-[51]">
-                                        <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus/>
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            )} />
-                            <div className="space-y-1">
-                                <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
-                                <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm pl-10" />
-                                </InputWithIcon>
-                            </div>
-                        </div>
-                    </SectionCard>
-
-                    <SectionCard title="Customer Details" icon={<User className="h-5 w-5" />}>
+                     <SectionCard title="Customer Details" icon={<User className="h-5 w-5" />}>
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                             <div className="space-y-1">
+                                <Label htmlFor="contact" className="text-xs">Contact</Label>
+                                <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
+                                    <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-9 text-sm pl-10" /> )}/>
+                                </InputWithIcon>
+                                {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
+                            </div>
                             <div className="space-y-1">
                                 <Label htmlFor="name" className="text-xs">Name</Label>
                                 <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
@@ -147,23 +176,16 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                     <Controller name="companyName" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
-                             <div className="space-y-1">
-                                <Label htmlFor="contact" className="text-xs">Contact</Label>
-                                <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-9 text-sm pl-10" /> )}/>
-                                </InputWithIcon>
-                                {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
-                            </div>
                             <div className="space-y-1">
-                                <Label htmlFor="gstin" className="text-xs">GSTIN</Label>
-                                <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="gstin" control={form.control} render={({ field }) => ( <Input {...field} className="h-9 text-sm pl-10" /> )}/>
-                                </InputWithIcon>
-                            </div>
-                             <div className="space-y-1 sm:col-span-2">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
+                                </InputWithIcon>
+                            </div>
+                             <div className="space-y-1 sm:col-span-2">
+                                <Label htmlFor="gstin" className="text-xs">GSTIN</Label>
+                                <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                                    <Controller name="gstin" control={form.control} render={({ field }) => ( <Input {...field} className="h-9 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                         </div>
@@ -172,22 +194,15 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
 
                 {/* Right Side */}
                 <div className="lg:col-span-2 space-y-4">
-                     <SectionCard title="Transaction & Weight" icon={<PackageSearch className="h-5 w-5" />}>
+                     <SectionCard title="Weight & Calculations" icon={<PackageSearch className="h-5 w-5" />}>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
-                                <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
+                             <div className="space-y-1">
+                                <Label htmlFor="rate" className="text-xs">Rate</Label>
+                                <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
+                                    <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                                 </InputWithIcon>
                             </div>
-                             <Controller name="variety" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs flex items-center gap-2"><Wheat className="h-3 w-3"/>Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                    <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select or add variety..." searchPlaceholder="Search variety..." emptyPlaceholder="No variety found."/>
-                                    {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
-                                </div>
-                            )} />
-                             <div className="space-y-1">
+                            <div className="space-y-1">
                                 <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
                                 <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
                                     <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
@@ -199,6 +214,12 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                     <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10"/>)} />
                                 </InputWithIcon>
                             </div>
+                             <div className="space-y-1">
+                                <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
+                                <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
+                                    <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
+                                </InputWithIcon>
+                            </div>
                             <div className="space-y-1">
                                 <Label htmlFor="bags" className="text-xs">Bags</Label>
                                 <InputWithIcon icon={<Boxes className="h-4 w-4 text-muted-foreground" />}>
@@ -206,32 +227,9 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
-                                <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
-                                <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
-                                </InputWithIcon>
-                            </div>
-                        </div>
-                    </SectionCard>
-
-                    <SectionCard title="Financial Details" icon={<Banknote className="h-5 w-5" />}>
-                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                             <div className="space-y-1">
-                                <Label htmlFor="rate" className="text-xs">Rate</Label>
-                                <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
-                                </InputWithIcon>
-                            </div>
-                             <div className="space-y-1">
                                 <Label htmlFor="bagRate" className="text-xs">Bag Rate</Label>
                                 <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
                                     <Input id="bagRate" type="number" {...form.register('bagRate')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
-                                </InputWithIcon>
-                            </div>
-                             <div className="space-y-1">
-                                <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
-                                <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                                 </InputWithIcon>
                             </div>
                              <div className="space-y-1">
@@ -241,18 +239,17 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </InputWithIcon>
                             </div>
                              <div className="space-y-1">
+                                <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
+                                <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                    <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                                </InputWithIcon>
+                            </div>
+                             <div className="space-y-1">
                                 <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                                 <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
                                     <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                                 </InputWithIcon>
                             </div>
-                             <Controller name="paymentType" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs flex items-center gap-2"><Wallet className="h-3 w-3"/>Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                    <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select or add type..." searchPlaceholder="Search type..." emptyPlaceholder="No type found."/>
-                                    {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
-                                </div>
-                            )} />
                         </div>
                     </SectionCard>
                 </div>
