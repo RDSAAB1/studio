@@ -543,6 +543,7 @@ export default function CustomerEntryClient() {
                 onSaveAndPrint={handleSaveAndPrint}
                 onNew={handleNew}
                 isEditing={isEditing}
+                isCustomerForm={true}
                 isBrokerageIncluded={form.watch('isBrokerageIncluded')}
                 onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
             />
@@ -599,3 +600,4 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+
