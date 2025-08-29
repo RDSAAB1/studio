@@ -390,46 +390,62 @@ export default function SupplierPaymentsPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-    if (eligibleEntries.length === 0 && cdAt !== 'paid_amount') {
-        setCalculatedCdAmount(0);
-        return;
-    }
-
     let baseAmountForCd = 0;
+    
+    if (cdAt === 'paid_amount') {
+        if (paymentType === 'Partial') {
+            baseAmountForCd = paymentAmount;
+        } else {
+             // Logic for "CD on past payments for selected entries that were paid on time but didn't get CD"
+            let totalEligiblePaidAmount = 0;
+            const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
 
-    switch(cdAt) {
-        case 'paid_amount': {
-            if (paymentType === 'Partial') {
-                baseAmountForCd = paymentAmount;
-            } else {
-                 const eligibleSelectedSrNos = new Set(eligibleEntries.map(e => e.srNo));
-                 const paymentsForSelectedEntries = paymentHistory.filter(p => p.paidFor?.some(pf => eligibleSelectedSrNos.has(pf.srNo)));
-                 
-                 let totalPaidWithoutCD = 0;
-                 eligibleEntries.forEach(entry => {
-                    const paymentsForThisEntry = paymentsForSelectedEntries.filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied);
-                    paymentsForThisEntry.forEach(p => {
-                        const paidDetail = p.paidFor?.find(pf => pf.srNo === entry.srNo);
-                        if (paidDetail) {
-                            totalPaidWithoutCD += paidDetail.amount;
+            // Find all payments that are associated with the currently selected entries
+            const paymentsForSelectedEntries = paymentHistory.filter(p => 
+                p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
+            );
+
+            paymentsForSelectedEntries.forEach(p => {
+                // If the payment itself didn't have CD applied
+                if (!p.cdApplied) {
+                    p.paidFor?.forEach(pf => {
+                        const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
+                        // Check if this part of the payment was for a selected entry and was paid on time
+                        if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
+                            totalEligiblePaidAmount += pf.amount;
                         }
                     });
-                 });
-                baseAmountForCd = totalPaidWithoutCD;
+                }
+            });
+            baseAmountForCd = totalEligiblePaidAmount;
+        }
+    } else if (cdAt === 'unpaid_amount') {
+        // Only consider outstanding amounts of entries that are eligible for CD (due date in future)
+        const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+        baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
+    } else if (cdAt === 'full_amount') {
+        // Sum of eligible outstanding amounts + eligible past paid amounts (without CD)
+        const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+        const eligibleOutstanding = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
+
+        let eligiblePaid = 0;
+        const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
+        const paymentsForSelectedEntries = paymentHistory.filter(p => 
+            p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
+        );
+
+        paymentsForSelectedEntries.forEach(p => {
+            if (!p.cdApplied) {
+                p.paidFor?.forEach(pf => {
+                    const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
+                    if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
+                        eligiblePaid += pf.amount;
+                    }
+                });
             }
-            break;
-        }
-        case 'unpaid_amount': {
-            baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-            break;
-        }
-        case 'full_amount': {
-            baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
-            break;
-        }
-        default:
-            baseAmountForCd = 0;
+        });
+        
+        baseAmountForCd = eligibleOutstanding + eligiblePaid;
     }
 
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
