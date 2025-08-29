@@ -86,18 +86,28 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     </Button>
                     {isCustomerForm && onBrokerageToggle && (
                         <div className="flex items-center justify-center pt-2">
-                             <button
+                           <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                                className="relative w-40 h-10 flex items-center rounded-full bg-secondary/50 p-1 focus:outline-none"
+                                className={cn(
+                                    "relative w-48 h-10 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
+                                    isBrokerageIncluded ? 'bg-primary/20' : 'bg-secondary'
+                                )}
                                 >
-                                <span className="absolute left-6 text-xs font-semibold transition-colors" style={{ color: isBrokerageIncluded ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))'}}>Include</span>
-                                <span className="absolute right-6 text-xs font-semibold transition-colors" style={{ color: !isBrokerageIncluded ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))'}}>Exclude</span>
-                                <div className={cn(
-                                    "absolute w-[calc(50%+4px)] h-10 top-0 rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out",
-                                    isBrokerageIncluded ? "left-0 -ml-1 bg-primary" : "left-1/2 -ml-1 bg-destructive"
-                                )}>
-                                    <span className="text-sm font-bold text-primary-foreground">Brokerage</span>
+                                <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Include</span>
+                                <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Exclude</span>
+                                <div
+                                    className={cn(
+                                        "absolute w-[calc(50%+12px)] h-10 top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card",
+                                        isBrokerageIncluded ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                                        isBrokerageIncluded ? 'bg-primary' : 'bg-destructive'
+                                    )}>
+                                        <span className="text-sm font-bold text-primary-foreground">Brokerage</span>
+                                    </div>
                                 </div>
                             </button>
                         </div>
