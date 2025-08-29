@@ -7,7 +7,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Check } from "lucide-react";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 
@@ -86,33 +86,36 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
                     {isCustomerForm && onBrokerageToggle && (
-                         <button
-                            type="button"
-                            onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                            className={cn(
-                                "relative inline-flex items-center h-9 w-full rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                                isBrokerageIncluded ? "bg-primary" : "bg-muted"
-                            )}
-                            role="switch"
-                            aria-checked={isBrokerageIncluded}
-                        >
-                            <span className="sr-only">Include Brokerage</span>
-                            <span
-                                className={cn(
-                                    "absolute inset-y-0 flex items-center justify-center w-1/2 text-xs font-semibold pointer-events-none transition-transform duration-300 ease-in-out",
-                                    isBrokerageIncluded ? "translate-x-full text-primary-foreground" : "translate-x-0 text-muted-foreground"
-                                )}
-                            >
-                                {isBrokerageIncluded ? "Include Brokerage" : "Exclude Brokerage"}
-                            </span>
-                            <span
-                                aria-hidden="true"
-                                className={cn(
-                                    "pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 inline-block h-7 w-7 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
-                                    isBrokerageIncluded ? "translate-x-[calc(100%-0.5rem)]" : "translate-x-0"
-                                )}
-                            />
-                        </button>
+                         <div className="flex items-center justify-between rounded-lg bg-muted p-1">
+                            <span className="pl-2 text-sm font-medium">Brokerage</span>
+                            <div className="relative flex w-[140px] items-center rounded-md">
+                                <button
+                                    type="button"
+                                    onClick={() => onBrokerageToggle(true)}
+                                    className="flex-1 text-xs px-2 py-1 z-10"
+                                >
+                                    Include
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onBrokerageToggle(false)}
+                                    className="flex-1 text-xs px-2 py-1 z-10"
+                                >
+                                    Exclude
+                                </button>
+                                <div className={cn(
+                                    "absolute h-full w-1/2 rounded bg-primary/20 transition-transform duration-300 ease-in-out",
+                                    isBrokerageIncluded ? "translate-x-0" : "translate-x-full"
+                                )}>
+                                    <div className={cn(
+                                         "h-full w-full rounded text-sm flex items-center justify-center font-semibold",
+                                         isBrokerageIncluded ? "text-primary-foreground bg-primary" : "text-primary-foreground bg-secondary"
+                                    )}>
+                                       {isBrokerageIncluded ? "Include" : "Exclude"}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </CardContent>
