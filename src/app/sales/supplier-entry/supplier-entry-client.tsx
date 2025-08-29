@@ -998,7 +998,7 @@ export default function SupplierEntryClient() {
     const kanta = values.kanta || 0;
     const cdAmount = values.cd || 0;
     
-    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount - cdAmount;
+    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
 
     const totalPaidForThisEntry = paymentHistory
         .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
@@ -1008,7 +1008,7 @@ export default function SupplierEntryClient() {
             return sum + (paidForDetail?.amount || 0) + (paymentHistory.find(ph => ph.paymentId === p.paymentId)?.cdAmount || 0);
         }, 0);
       
-    const netAmount = originalNetAmount - totalPaidForThisEntry;
+    const netAmount = originalNetAmount - totalPaidForThisEntry - cdAmount;
 
     setCurrentCustomer(prev => ({
       ...prev, ...values,
