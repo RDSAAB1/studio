@@ -442,7 +442,6 @@ export default function CustomerEntryClient() {
   };
 
   const handleSaveAndPrint = async (docType: DocumentType) => {
-    setDocumentType(docType);
     const isValid = await form.trigger();
     if (isValid) {
       onSubmit(form.getValues(), (savedEntry) => {

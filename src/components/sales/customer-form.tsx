@@ -20,14 +20,9 @@ import { OptionsManagerDialog } from "./options-manager-dialog";
 import { Separator } from "@/components/ui/separator";
 import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Weight, Boxes, Briefcase, PackageSearch, Wallet, Settings, InfoIcon } from "lucide-react";
 
-const SectionCard = ({ title, icon, children, className }: { title?: string, icon?: React.ReactNode, children: React.ReactNode, className?: string }) => (
+const SectionCard = ({ icon, children, className }: { icon?: React.ReactNode, children: React.ReactNode, className?: string }) => (
     <Card className={cn("bg-card/60 backdrop-blur-sm border-white/10", className)}>
-        {title && (
-            <CardHeader className="pb-4 pt-5">
-                <CardTitle className="flex items-center gap-2 text-lg">{icon}{title}</CardTitle>
-            </CardHeader>
-        )}
-        <CardContent className={cn(!title && "pt-4")}>
+        <CardContent className="pt-4">
             {children}
         </CardContent>
     </Card>
@@ -96,7 +91,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
 
     return (
         <>
-            <SectionCard icon={<InfoIcon className="h-5 w-5" />}>
+            <SectionCard>
                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     {/* Row 1 */}
                     <Controller name="date" control={form.control} render={({ field }) => (
@@ -240,10 +235,10 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                     </div>
                 </div>
 
-                <Separator className="my-4"/>
+                <Separator className="my-2"/>
 
                 <div className="flex items-center justify-between">
-                     <h3 className="font-semibold text-lg flex items-center gap-2"><Truck className="h-5 w-5"/>Shipping Details</h3>
+                     <h3 className="font-semibold text-base flex items-center gap-2"><Truck className="h-4 w-4"/>Shipping Details</h3>
                     <div className="flex items-center space-x-2">
                         <Switch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} />
                         <Label htmlFor="same-as-billing" className="text-sm font-normal">Same as Bill To</Label>
@@ -251,7 +246,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 </div>
 
                 {!isSameAsBilling && (
-                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="pt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="shippingName" className="text-xs">Shipping Name</Label>
                         <Input id="shippingName" {...form.register('shippingName')} className="h-9 text-sm" />
