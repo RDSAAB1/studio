@@ -55,7 +55,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
             <CardContent className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
                 <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
                     {summaryFields.map(item => (
-                        <div key={item.label} className="space-y-0">
+                        <div key={item.label}>
                             <p className="text-xs text-muted-foreground">{item.label}</p>
                             <p className={cn("text-sm font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
                         </div>
