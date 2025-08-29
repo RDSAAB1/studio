@@ -86,27 +86,32 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
                     {isCustomerForm && onBrokerageToggle && (
-                         <button
-                            type="button"
-                            onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                            className={cn(
-                                "relative inline-flex items-center h-10 w-full rounded-full p-1 transition-colors duration-300 ease-in-out",
-                                isBrokerageIncluded ? "bg-green-500/20" : "bg-red-500/20"
-                            )}
-                            >
-                            <span
+                         <div className="space-y-1 pt-1">
+                            <Label className="text-xs text-muted-foreground">Brokerage</Label>
+                            <button
+                                type="button"
+                                onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                                 className={cn(
-                                "absolute left-1 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md transition-transform duration-300 ease-in-out",
-                                isBrokerageIncluded ? "translate-x-full" : "translate-x-0",
-                                isBrokerageIncluded ? "translate-x-[calc(100%-0.5rem)]" : "translate-x-0"
+                                "relative inline-flex h-8 w-44 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                                isBrokerageIncluded ? "bg-primary" : "bg-destructive"
                                 )}
-                                style={{ width: 'calc(50% - 0.25rem)'}}
                             >
-                               {isBrokerageIncluded ? <Check className="h-5 w-5 text-green-600"/> : <X className="h-5 w-5 text-red-600"/>}
-                            </span>
-                            <span className="flex-1 text-center text-sm font-semibold text-green-700">{isBrokerageIncluded ? "Include Brokerage" : ""}</span>
-                            <span className="flex-1 text-center text-sm font-semibold text-red-700">{!isBrokerageIncluded ? "Exclude Brokerage" : ""}</span>
-                        </button>
+                                <span className="sr-only">Toggle Brokerage</span>
+                                <span
+                                aria-hidden="true"
+                                className={cn(
+                                    "pointer-events-none absolute inline-block h-6 w-24 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
+                                    isBrokerageIncluded ? "translate-x-full" : "translate-x-0"
+                                )}
+                                />
+                                <span className="absolute inset-y-0 left-0 flex items-center justify-center w-1/2 text-xs font-semibold text-primary-foreground">
+                                    Exclude
+                                </span>
+                                <span className="absolute inset-y-0 right-0 flex items-center justify-center w-1/2 text-xs font-semibold text-primary-foreground">
+                                    Include
+                                </span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </CardContent>
