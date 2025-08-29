@@ -446,6 +446,7 @@ export default function CustomerEntryClient() {
     if (isValid) {
       onSubmit(form.getValues(), (savedEntry) => {
         setDetailsCustomer(savedEntry);
+        setDocumentType(docType);
         setIsDocumentPreviewOpen(true);
         handleNew();
       });

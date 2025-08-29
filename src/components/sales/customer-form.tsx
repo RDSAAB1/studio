@@ -136,8 +136,11 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
                         </InputWithIcon>
                     </div>
-                    
-                    {/* Row 2 */}
+                 </div>
+
+                 <Separator className="my-2" />
+
+                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="contact" className="text-xs">Contact</Label>
                         <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
@@ -173,10 +176,11 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
                         </InputWithIcon>
                     </div>
+                </div>
+                
+                <Separator className="my-2" />
 
-                    <Separator className="col-span-full my-1" />
-
-                    {/* Row 3 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="rate" className="text-xs">Rate</Label>
                         <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
@@ -207,8 +211,6 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <Input id="bags" type="number" {...form.register('bags')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
                         </InputWithIcon>
                     </div>
-
-                    {/* Row 4 */}
                     <div className="space-y-1">
                         <Label htmlFor="bagRate" className="text-xs">Bag Rate</Label>
                         <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
@@ -269,7 +271,6 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                     </div>
                 </div>
                 )}
-
             </SectionCard>
         
         <OptionsManagerDialog
