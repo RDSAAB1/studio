@@ -16,9 +16,8 @@ import { format } from "date-fns";
 import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
 import { EntryTable } from "@/components/sales/entry-table";
-import { DetailsDialog } from "@/components/sales/details-dialog";
-import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
+import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
 import { Hourglass } from "lucide-react";
@@ -463,7 +462,7 @@ export default function CustomerEntryClient() {
   const handleShowDetails = (customer: Customer) => {
     setDetailsCustomer(customer);
     setIsDocumentPreviewOpen(true);
-  }
+  };
 
   const handlePrint = (entriesToPrint: Customer[]) => {
     if (!entriesToPrint || entriesToPrint.length === 0) {
