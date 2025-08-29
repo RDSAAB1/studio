@@ -1000,13 +1000,15 @@ export default function SupplierEntryClient() {
     
     const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
 
+    // Calculate total paid amount for this specific SR No, including any CD applied during those payments.
     const totalPaidForThisEntry = paymentHistory
-        .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
-        .reduce((sum, p) => {
-            const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-            // Deduct both the payment amount and the associated CD amount
-            return sum + (paidForDetail?.amount || 0) + (paymentHistory.find(ph => ph.paymentId === p.paymentId)?.cdAmount || 0);
-        }, 0);
+      .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
+      .reduce((sum, p) => {
+          const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
+          // The amount in paidFor already represents the reduction from outstanding.
+          // The payment object itself holds the breakdown of cash paid vs cd.
+          return sum + (paidForDetail?.amount || 0);
+      }, 0);
       
     const netAmount = originalNetAmount - totalPaidForThisEntry - cdAmount;
 
