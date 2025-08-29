@@ -43,7 +43,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [customerSummary, setCustomerSummary] = useState<Map<string, CustomerSummary>>(new Map());
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
 
@@ -57,7 +56,7 @@ export default function CustomerPaymentsPage() {
 
   const [paymentIdCounter, setPaymentIdCounter] = useState(0);
 
-  const updateCustomerSummary = useCallback(() => {
+  const customerSummary = useMemo(() => {
     const newSummary = new Map<string, CustomerSummary>();
     customers.forEach(entry => {
       if (!entry.name || !entry.contact) return;
@@ -67,7 +66,7 @@ export default function CustomerPaymentsPage() {
           name: entry.name,
           contact: entry.contact,
           totalOutstanding: 0,
-          paymentHistory: customerSummary.get(key)?.paymentHistory || [],
+          paymentHistory: [], // This will be populated if you fetch payment history
           outstandingEntryIds: [],
         });
       }
@@ -77,8 +76,8 @@ export default function CustomerPaymentsPage() {
         data.outstandingEntryIds.push(entry.id);
       }
     });
-    setCustomerSummary(newSummary);
-  }, [customers, customerSummary]);
+    return newSummary;
+  }, [customers]);
 
    const isInitialLoad = useRef(true);
 
@@ -137,11 +136,7 @@ export default function CustomerPaymentsPage() {
 
     // Clean up listener on unmount
     return () => unsubscribe();
-  }, []); // Empty dependency array means this runs once on mount
-
-    useEffect(() => {
-        updateCustomerSummary();
-    }, [customers, updateCustomerSummary]);
+  }, [toast]); // Empty dependency array means this runs once on mount
 
     // Preserve selected customer and entries on data update
   const handleCustomerSelect = (key: string) => {
