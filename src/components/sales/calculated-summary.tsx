@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Pen, PlusCircle, Save, Printer, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
+import { Label } from "@/components/ui/label";
 
 interface CalculatedSummaryProps {
     customer: Customer;
@@ -51,7 +52,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
     return (
         <Card className="bg-card/60 backdrop-blur-sm border-white/10">
              <CardContent className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
-                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
+                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2">
                      {summaryFields.map(item => (
                         <div key={item.label} className="leading-tight">
                             <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -85,25 +86,28 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
                     {isCustomerForm && onBrokerageToggle && (
-                         <button
-                            type="button"
-                            onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                            className={cn(
-                                "relative inline-flex h-8 w-full items-center rounded-md border p-1 cursor-pointer transition-colors duration-300 ease-in-out",
-                                isBrokerageIncluded ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border"
-                            )}
-                        >
-                            <span
+                         <div className="flex items-center space-x-2 pt-1">
+                            <button
+                                type="button"
                                 className={cn(
-                                    "absolute flex items-center justify-center w-[calc(50%-4px)] h-6 rounded-sm bg-background text-foreground shadow-sm transition-transform duration-300 ease-in-out z-10",
-                                    isBrokerageIncluded ? "translate-x-[calc(100%)]" : "translate-x-0"
+                                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                                    isBrokerageIncluded ? "bg-primary" : "bg-input"
                                 )}
+                                role="switch"
+                                aria-checked={isBrokerageIncluded}
+                                onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                             >
-                                <span className="text-xs font-semibold">Brokerage</span>
-                            </span>
-                            <span className="w-1/2 text-center text-xs font-medium">Include</span>
-                            <span className="w-1/2 text-center text-xs font-medium">Exclude</span>
-                        </button>
+                                <span className="sr-only">Include Brokerage</span>
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out",
+                                        isBrokerageIncluded ? "translate-x-5" : "translate-x-0"
+                                    )}
+                                />
+                            </button>
+                            <Label htmlFor="brokerage-toggle" className="text-sm font-normal">Include Brokerage</Label>
+                        </div>
                     )}
                 </div>
             </CardContent>
