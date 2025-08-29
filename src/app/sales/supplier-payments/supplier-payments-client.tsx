@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
@@ -15,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
@@ -595,11 +595,23 @@ export default function SupplierPaymentsPage() {
                         setRtgsFor(newType);
                         resetPaymentForm(newType === 'Outsider');
                     }}
-                    className={cn( "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20' )} >
-                    <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground')}>Outsider</span>
-                    <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground')}>Supplier</span>
-                    <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", rtgsFor === 'Outsider' ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
-                        <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", rtgsFor === 'Outsider' ? 'bg-primary' : 'bg-secondary' )}>
+                    className={cn(
+                        "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'
+                    )}
+                >
+                    <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground')}>Supplier</span>
+                    <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground')}>Outsider</span>
+                    <div
+                        className={cn(
+                            "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
+                            rtgsFor === 'Outsider' ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]'
+                        )}
+                    >
+                        <div className={cn(
+                            "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                            rtgsFor === 'Outsider' ? 'bg-primary' : 'bg-secondary'
+                        )}>
                             <span className="text-sm font-bold text-primary-foreground">For</span>
                         </div>
                     </div>
@@ -691,7 +703,7 @@ export default function SupplierPaymentsPage() {
             entries={suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
             selectedIds={selectedEntryIds}
             onSelect={handleEntrySelect}
-            onSelectAll={(checked) => {
+            onSelectAll={(checked: boolean) => {
                 const newSet = new Set<string>();
                 const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
                 if(checked) outstandingEntries.forEach(e => newSet.add(e.id));
@@ -723,8 +735,8 @@ export default function SupplierPaymentsPage() {
         isOpen={isBankSettingsOpen}
         onOpenChange={setIsBankSettingsOpen}
         banks={banks}
-        onAddBank={async (name) => { await addBank(name); toast({title: 'Bank Added'}); }}
-        onAddBranch={async (branch) => { await addBankBranch(branch); toast({title: 'Branch Added'}); }}
+        onAddBank={async (name: string) => { await addBank(name); toast({title: 'Bank Added'}); }}
+        onAddBranch={async (branch: any) => { await addBankBranch(branch); toast({title: 'Branch Added'}); }}
       />
     </div>
   );
