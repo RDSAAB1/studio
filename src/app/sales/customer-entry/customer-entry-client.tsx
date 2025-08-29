@@ -43,7 +43,6 @@ const formSchema = z.object({
     bags: z.coerce.number().min(0),
     name: z.string().min(1, "Name is required."),
     companyName: z.string().optional(),
-    so: z.string().optional(),
     address: z.string(),
     contact: z.string()
       .length(10, "Contact number must be exactly 10 digits.")
@@ -61,6 +60,11 @@ const formSchema = z.object({
     isBrokerageIncluded: z.boolean(),
     bagWeightKg: z.coerce.number().min(0),
     bagRate: z.coerce.number().min(0),
+    shippingName: z.string().optional(),
+    shippingCompanyName: z.string().optional(),
+    shippingAddress: z.string().optional(),
+    shippingContact: z.string().optional(),
+    shippingGstin: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -96,7 +100,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleFocus, lastVariety, setLastVariety, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers }: any) {
+const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCapitalizeOnBlur, handleContactBlur, varietyOptions, paymentTypeOptions, handleFocus, lastVariety, setLastVariety, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers, isSameAsBilling, setIsSameAsBilling }: any) {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -129,7 +133,6 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
     const handleNameSelect = (customer: Customer) => {
         form.setValue('name', toTitleCase(customer.name));
         form.setValue('companyName', toTitleCase(customer.companyName || ''));
-        form.setValue('so', toTitleCase(customer.so || ''));
         form.setValue('address', toTitleCase(customer.address));
         form.setValue('contact', customer.contact);
         form.setValue('gstin', customer.gstin || '');
@@ -138,221 +141,228 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
 
     return (
         <>
-            <SectionCard>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg"><UserCog className="h-5 w-5" />Customer & Basic Info</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                     <Controller name="date" control={form.control} render={({ field }) => (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <SectionCard className="lg:col-span-1">
+                     <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                         <Controller name="date" control={form.control} render={({ field }) => (
+                            <div className="space-y-1">
+                                <Label className="text-xs">Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                        "w-full justify-start text-left font-normal h-9 text-sm",
+                                        !field.value && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 z-[51]">
+                                    <CalendarComponent
+                                        mode="single"
+                                        selected={field.value}
+                                        onSelect={(date) => field.onChange(date || new Date())}
+                                        initialFocus
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        )} />
                         <div className="space-y-1">
-                            <Label className="text-xs">Date</Label>
-                            <Popover>
+                            <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
+                            <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm pl-10" />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="name" className="text-xs">Name</Label>
+                            <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                                 <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                    "w-full justify-start text-left font-normal h-9 text-sm",
-                                    !field.value && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                </Button>
+                                    <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                        <Input
+                                            id="name"
+                                            value={form.watch('name')}
+                                            onChange={handleNameChange}
+                                            onBlur={(e) => {
+                                                handleCapitalizeOnBlur(e);
+                                                setTimeout(() => setIsNamePopoverOpen(false), 150); // Delay hiding
+                                            }}
+                                            autoComplete="off"
+                                            className="h-9 text-sm pl-10"
+                                            name="name"
+                                            onFocus={e => {
+                                                if (e.target.value.length > 1 && nameSuggestions.length > 0) {
+                                                    setIsNamePopoverOpen(true);
+                                                }
+                                            }}
+                                        />
+                                    </InputWithIcon>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 z-[51]">
-                                <CalendarComponent
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={(date) => field.onChange(date || new Date())}
-                                    initialFocus
-                                />
+                                <PopoverContent 
+                                    className="w-[--radix-popover-trigger-width] p-0" 
+                                    align="start" 
+                                    onOpenAutoFocus={(e) => e.preventDefault()}
+                                >
+                                    <Command>
+                                        <CommandList>
+                                            <CommandEmpty>No customers found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {nameSuggestions.map((s) => (
+                                                    <CommandItem
+                                                        key={s.id}
+                                                        value={`${s.name} ${s.contact}`}
+                                                        onSelect={() => handleNameSelect(s)}
+                                                    >
+                                                        {toTitleCase(s.name)} ({s.contact})
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
                                 </PopoverContent>
                             </Popover>
+                            {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                         </div>
-                    )} />
-                    <div className="space-y-1">
-                        <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
-                        <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                            <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-9 text-sm pl-10" />
-                        </InputWithIcon>
-                    </div>
-                     <div className="space-y-1">
-                        <Label htmlFor="name" className="text-xs">Name</Label>
-                        <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input
-                                        id="name"
-                                        value={form.watch('name')}
-                                        onChange={handleNameChange}
-                                        onBlur={(e) => {
-                                            handleCapitalizeOnBlur(e);
-                                            setTimeout(() => setIsNamePopoverOpen(false), 150); // Delay hiding
-                                        }}
-                                        autoComplete="off"
-                                        className="h-9 text-sm pl-10"
-                                        name="name"
-                                        onFocus={e => {
-                                            if (e.target.value.length > 1 && nameSuggestions.length > 0) {
-                                                setIsNamePopoverOpen(true);
-                                            }
-                                        }}
-                                    />
-                                </InputWithIcon>
-                            </PopoverTrigger>
-                            <PopoverContent 
-                                className="w-[--radix-popover-trigger-width] p-0" 
-                                align="start" 
-                                onOpenAutoFocus={(e) => e.preventDefault()}
-                            >
-                                <Command>
-                                    <CommandList>
-                                        <CommandEmpty>No customers found.</CommandEmpty>
-                                        <CommandGroup>
-                                            {nameSuggestions.map((s) => (
-                                                <CommandItem
-                                                    key={s.id}
-                                                    value={`${s.name} ${s.contact}`}
-                                                    onSelect={() => handleNameSelect(s)}
-                                                >
-                                                    {toTitleCase(s.name)} ({s.contact})
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                        {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="companyName" className="text-xs">Company Name</Label>
-                            <InputWithIcon icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="companyName" control={form.control} render={({ field }) => (
-                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                            )}/>
-                        </InputWithIcon>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="contact" className="text-xs">Contact</Label>
-                        <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="contact" control={form.control} render={({ field }) => (
-                                <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-9 text-sm pl-10" />
-                            )}/>
-                        </InputWithIcon>
-                            {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="address" className="text-xs">Address</Label>
-                            <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="address" control={form.control} render={({ field }) => (
-                                    <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                            )}/>
-                        </InputWithIcon>
-                    </div>
-                </CardContent>
-            </SectionCard>
-
-            <SectionCard>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg"><PackageSearch className="h-5 w-5" />Transaction &amp; Financials</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                     <div className="space-y-1">
-                        <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
-                        <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="vehicleNo" control={form.control} render={({ field }) => (
-                            <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
-                            )}/>
-                        </InputWithIcon>
-                    </div>
-                    <Controller
-                        name="variety"
-                        control={form.control}
-                        render={({ field }) => (
                         <div className="space-y-1">
-                            <Label className="text-xs">Variety</Label>
-                            <div className="flex items-center gap-2">
-                            <DynamicCombobox
-                                options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
-                                value={field.value}
-                                onChange={(val) => {
-                                    form.setValue("variety", val);
-                                    setLastVariety(val);
-                                }}
-                                onAdd={(newVal) => handleAddOption('varieties', newVal)}
-                                placeholder="Select or add variety..."
-                                searchPlaceholder="Search variety..."
-                                emptyPlaceholder="No variety found."
-                            />
-                                <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-9 w-9 shrink-0"><Settings className="h-4 w-4"/></Button>
-                                </div>
-                            {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                            <Label htmlFor="companyName" className="text-xs">Company Name</Label>
+                                <InputWithIcon icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="companyName" control={form.control} render={({ field }) => (
+                                    <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )}/>
+                            </InputWithIcon>
                         </div>
-                        )}
-                    />
-                    <div className="space-y-1">
-                        <Label htmlFor="bags" className="text-xs">Bags</Label>
-                            <InputWithIcon icon={<Boxes className="h-4 w-4 text-muted-foreground" />}>
-                            <Input id="bags" type="number" {...form.register('bags')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
-                        </InputWithIcon>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
-                            <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
-                        </InputWithIcon>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
-                            <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10"/>)} />
-                        </InputWithIcon>
-                    </div>
-                     <div className="space-y-1">
-                        <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
-                            <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
-                            <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
-                        </InputWithIcon>
-                    </div>
-
-                    <div className="space-y-1">
-                        <Label htmlFor="rate" className="text-xs">Rate</Label>
-                            <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
-                        </InputWithIcon>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="cd" className="text-xs">CD %</Label>
-                            <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="cd" control={form.control} render={({ field }) => (<Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
-                        </InputWithIcon>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
-                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
-                        </InputWithIcon>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="kanta" className="text-xs">Kanta</Label>
-                            <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
-                        </InputWithIcon>
-                    </div>
-                     <div className="space-y-1">
-                        <Label htmlFor="bagRate" className="text-xs">Bag Rate</Label>
-                            <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
-                            <Input id="bagRate" type="number" {...form.register('bagRate')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
-                        </InputWithIcon>
-                    </div>
-                     <Controller
-                        name="paymentType"
-                        control={form.control}
-                        render={({ field }) => (
+                        <div className="space-y-1">
+                            <Label htmlFor="contact" className="text-xs">Contact</Label>
+                            <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="contact" control={form.control} render={({ field }) => (
+                                    <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-9 text-sm pl-10" />
+                                )}/>
+                            </InputWithIcon>
+                                {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="address" className="text-xs">Address</Label>
+                                <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="address" control={form.control} render={({ field }) => (
+                                        <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )}/>
+                            </InputWithIcon>
+                        </div>
+                         <div className="space-y-1">
+                            <Label htmlFor="gstin" className="text-xs">GSTIN</Label>
+                                <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="gstin" control={form.control} render={({ field }) => (
+                                        <Input {...field} className="h-9 text-sm pl-10" />
+                                )}/>
+                            </InputWithIcon>
+                        </div>
+                    </CardContent>
+                </SectionCard>
+                <SectionCard className="lg:col-span-2">
+                     <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg"><PackageSearch className="h-5 w-5" />Weight & Financials</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
+                            <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="vehicleNo" control={form.control} render={({ field }) => (
+                                <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" />
+                                )}/>
+                            </InputWithIcon>
+                        </div>
+                        <Controller
+                            name="variety"
+                            control={form.control}
+                            render={({ field }) => (
                             <div className="space-y-1">
-                                <Label className="text-xs">Payment Type</Label>
-                                <div className="flex items-center gap-2">
+                                <Label className="text-xs flex items-center gap-2">
+                                    <Wheat className="h-3 w-3"/>Variety
+                                    <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button>
+                                </Label>
+                                <DynamicCombobox
+                                    options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
+                                    value={field.value}
+                                    onChange={(val) => {
+                                        form.setValue("variety", val);
+                                        setLastVariety(val);
+                                    }}
+                                    onAdd={(newVal) => handleAddOption('varieties', newVal)}
+                                    placeholder="Select or add variety..."
+                                    searchPlaceholder="Search variety..."
+                                    emptyPlaceholder="No variety found."
+                                />
+                                {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
+                            </div>
+                            )}
+                        />
+                        <div className="space-y-1">
+                            <Label htmlFor="bags" className="text-xs">Bags</Label>
+                                <InputWithIcon icon={<Boxes className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="bags" type="number" {...form.register('bags')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="grossWeight" className="text-xs">Gross Wt.</Label>
+                                <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="grossWeight" control={form.control} render={({ field }) => (<Input id="grossWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="teirWeight" className="text-xs">Teir Wt.</Label>
+                                <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="teirWeight" control={form.control} render={({ field }) => (<Input id="teirWeight" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10"/>)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="bagWeightKg" className="text-xs">Bag Wt. (kg)</Label>
+                                <InputWithIcon icon={<Weight className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="bagWeightKg" type="number" {...form.register('bagWeightKg')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
+                            </InputWithIcon>
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="rate" className="text-xs">Rate</Label>
+                                <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="rate" control={form.control} render={({ field }) => (<Input id="rate" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="cd" className="text-xs">CD %</Label>
+                                <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="cd" control={form.control} render={({ field }) => (<Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
+                                <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="kanta" className="text-xs">Kanta</Label>
+                                <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="bagRate" className="text-xs">Bag Rate</Label>
+                                <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="bagRate" type="number" {...form.register('bagRate')} onFocus={handleFocus} className="h-9 text-sm pl-10" />
+                            </InputWithIcon>
+                        </div>
+                        <Controller
+                            name="paymentType"
+                            control={form.control}
+                            render={({ field }) => (
+                                <div className="space-y-1">
+                                    <Label className="text-xs flex items-center gap-2">
+                                        <Wallet className="h-3 w-3"/>Payment Type
+                                         <Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button>
+                                    </Label>
                                     <DynamicCombobox
                                         options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
                                         value={field.value}
@@ -362,28 +372,46 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
                                         searchPlaceholder="Search type..."
                                         emptyPlaceholder="No type found."
                                     />
-                                    <Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-9 w-9 shrink-0"><Settings className="h-4 w-4"/></Button>
+                                    {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                                 </div>
-                                {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
-                            </div>
-                        )}
-                    />
-                    <div className="flex items-center space-x-2 pt-6">
-                        <Controller
-                            name="isBrokerageIncluded"
-                            control={form.control}
-                            render={({ field }) => (
-                                <Switch
-                                    id="brokerage-toggle"
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                />
                             )}
                         />
-                        <Label htmlFor="brokerage-toggle" className="text-sm font-normal">Include Brokerage in Net Amount</Label>
-                    </div>
-                </CardContent>
-            </SectionCard>
+                    </CardContent>
+                </SectionCard>
+            </div>
+             <SectionCard className="mt-4">
+                    <CardHeader className="flex flex-row items-center justify-between p-3">
+                        <CardTitle className="text-lg">Shipping Details</CardTitle>
+                        <div className="flex items-center space-x-2">
+                            <Switch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} />
+                            <Label htmlFor="same-as-billing" className="text-sm font-normal">Same as Bill To</Label>
+                        </div>
+                    </CardHeader>
+                    {!isSameAsBilling && (
+                    <CardContent className="pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <Label htmlFor="shippingName" className="text-xs">Shipping Name</Label>
+                            <Input id="shippingName" {...form.register('shippingName')} className="h-9 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="shippingCompanyName" className="text-xs">Shipping Company Name</Label>
+                            <Input id="shippingCompanyName" {...form.register('shippingCompanyName')} className="h-9 text-sm" />
+                        </div>
+                         <div className="space-y-1">
+                            <Label htmlFor="shippingContact" className="text-xs">Shipping Contact</Label>
+                            <Input id="shippingContact" {...form.register('shippingContact')} className="h-9 text-sm" />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <Label htmlFor="shippingAddress" className="text-xs">Shipping Address</Label>
+                            <Input id="shippingAddress" {...form.register('shippingAddress')} className="h-9 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="shippingGstin" className="text-xs">Shipping GSTIN</Label>
+                            <Input id="shippingGstin" {...form.register('shippingGstin')} className="h-9 text-sm" />
+                        </div>
+                    </CardContent>
+                    )}
+                </SectionCard>
         
         <OptionsManagerDialog
             isOpen={isManageOptionsOpen}
@@ -399,7 +427,7 @@ const CustomerForm = memo(function CustomerForm({ form, handleSrNoBlur, handleCa
 });
 
 
-const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: { currentCustomer: Customer }) {
+const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer, onSave, onSaveAndPrint, onNew, isEditing, isBrokerageIncluded, onBrokerageToggle }: { currentCustomer: Customer, onSave: any, onSaveAndPrint: any, onNew: any, isEditing: boolean, isBrokerageIncluded: boolean, onBrokerageToggle: any }) {
     const summaryFields = useMemo(() => {
         const avgWeightPerBag = (currentCustomer.bags && currentCustomer.bags > 0) ? ((currentCustomer.weight * 100) / currentCustomer.bags).toFixed(2) : '0.00';
         return [
@@ -416,13 +444,44 @@ const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: {
 
     return (
         <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-            <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-2">
-            {summaryFields.map(item => (
-                <div key={item.label}>
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-                <p className={cn("text-sm font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
+            <CardContent className="p-4 space-y-3">
+                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-2">
+                    {summaryFields.map(item => (
+                        <div key={item.label}>
+                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                        <p className={cn("text-sm font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
+                        </div>
+                    ))}
                 </div>
-            ))}
+                 <div className="flex justify-start items-center space-x-2 pt-2 border-t border-dashed">
+                      <Button onClick={onSave} size="sm">
+                        {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+                      </Button>
+                       <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    <Printer className="mr-2 h-4 w-4"/> Save & Print <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('tax-invoice')}>Tax Invoice</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Challan</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                      <Button type="button" variant="outline" onClick={onNew} size="sm">
+                        <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
+                      </Button>
+                      <div className="flex-grow"></div>
+                       <div className="flex items-center space-x-2">
+                        <Switch
+                            id="brokerage-toggle"
+                            checked={isBrokerageIncluded}
+                            onCheckedChange={onBrokerageToggle}
+                        />
+                        <Label htmlFor="brokerage-toggle" className="text-sm font-normal">Include Brokerage in Net Amount</Label>
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );
@@ -446,85 +505,101 @@ const CustomerTable = memo(function CustomerTable({ customers, onEdit, onDelete,
     };
 
     return (
-        <div className="mt-6 min-h-[200px]">
-            <Card>
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="px-3 py-2 text-xs w-10">
-                                         <Checkbox
-                                            checked={selectedIds.size > 0 && selectedIds.size === customers.length}
-                                            onCheckedChange={handleSelectAll}
-                                            aria-label="Select all rows"
-                                        />
-                                    </TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">SR No.</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Date</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Name</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Variety</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Net Weight</TableHead>
-                                    <TableHead className="text-right px-3 py-2 text-xs">Net Amount</TableHead>
-                                    <TableHead className="text-center px-3 py-2 text-xs">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {customers.map((customer: Customer) => (
-                                    <TableRow key={`${customer.id}-${customer.srNo}`} className="h-12" data-state={selectedIds.has(customer.id) ? 'selected' : ''}>
-                                        <TableCell className="px-3 py-1">
-                                            <Checkbox
-                                                checked={selectedIds.has(customer.id)}
-                                                onCheckedChange={() => handleRowSelect(customer.id)}
-                                                aria-label={`Select row ${customer.srNo}`}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="font-mono px-3 py-1 text-sm">{customer.srNo}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{Number(customer.netWeight).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
-                                        <TableCell className="text-center px-3 py-1">
-                                            <div className="flex justify-center items-center gap-0">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([customer])}>
-                                                    <Printer className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(customer)}>
-                                                    <Info className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(customer.id)}>
-                                                    <Pen className="h-4 w-4" />
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                                                        <Trash className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                        This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => onDelete(customer.id)}>Continue</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-3">
+                <CardTitle className="text-base">Customer Entry History</CardTitle>
+                <div className="flex items-center gap-2">
+                     <div className="relative w-full max-w-sm">
+                        <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
+                            <Input
+                                placeholder="Search by SR No, Name, or Contact..."
+                                onChange={(e) => onPrint(e.target.value)}
+                                className="h-8 pl-10 text-xs"
+                            />
+                        </InputWithIcon>
                     </div>
-                </CardContent>
-            </Card>
-        </div>
+                    <Button onClick={() => onPrint(customers.filter((c: Customer) => selectedIds.has(c.id)))} disabled={selectedIds.size === 0} size="sm" variant="outline">
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print Selected ({selectedIds.size})
+                    </Button>
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="px-3 py-2 text-xs w-10">
+                                        <Checkbox
+                                        checked={selectedIds.size > 0 && selectedIds.size === customers.length}
+                                        onCheckedChange={handleSelectAll}
+                                        aria-label="Select all rows"
+                                    />
+                                </TableHead>
+                                <TableHead className="px-3 py-2 text-xs">SR No.</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Date</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Name</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Variety</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Net Weight</TableHead>
+                                <TableHead className="text-right px-3 py-2 text-xs">Net Amount</TableHead>
+                                <TableHead className="text-center px-3 py-2 text-xs">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {customers.map((customer: Customer) => (
+                                <TableRow key={`${customer.id}-${customer.srNo}`} className="h-12" data-state={selectedIds.has(customer.id) ? 'selected' : ''}>
+                                    <TableCell className="px-3 py-1">
+                                        <Checkbox
+                                            checked={selectedIds.has(customer.id)}
+                                            onCheckedChange={() => handleRowSelect(customer.id)}
+                                            aria-label={`Select row ${customer.srNo}`}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="font-mono px-3 py-1 text-sm">{customer.srNo}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{Number(customer.netWeight).toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
+                                    <TableCell className="text-center px-3 py-1">
+                                        <div className="flex justify-center items-center gap-0">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([customer])}>
+                                                <Printer className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(customer)}>
+                                                <Info className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(customer.id)}>
+                                                <Pen className="h-4 w-4" />
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                                    <Trash className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => onDelete(customer.id)}>Continue</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
     );
 });
 
@@ -1063,7 +1138,7 @@ export default function CustomerEntryClient() {
     }
     const formValues: FormValues = {
       srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
-      name: customerState.name, so: customerState.so || '', companyName: customerState.companyName || '', address: customerState.address,
+      name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
       contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, cd: Number(customerState.cd) || 0,
@@ -1072,6 +1147,11 @@ export default function CustomerEntryClient() {
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
       bagWeightKg: customerState.bagWeightKg || 0,
       bagRate: customerState.bagRate || 0,
+      shippingName: customerState.shippingName || '',
+      shippingCompanyName: customerState.shippingCompanyName || '',
+      shippingAddress: customerState.shippingAddress || '',
+      shippingContact: customerState.shippingContact || '',
+      shippingGstin: customerState.shippingGstin || '',
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -1123,7 +1203,6 @@ export default function CustomerEntryClient() {
       if (foundCustomer && foundCustomer.id !== currentCustomer.id) {
         form.setValue('name', foundCustomer.name);
         form.setValue('companyName', foundCustomer.companyName || '');
-        form.setValue('so', foundCustomer.so || '');
         form.setValue('address', foundCustomer.address);
         form.setValue('gstin', foundCustomer.gstin || '');
         toast({ title: "Customer Found", description: `Details for ${toTitleCase(foundCustomer.name)} have been auto-filled.` });
@@ -1177,7 +1256,6 @@ export default function CustomerEntryClient() {
       dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       name: toTitleCase(values.name), 
       companyName: toTitleCase(values.companyName || ''),
-      so: toTitleCase(values.so || ''),
       address: toTitleCase(values.address), 
       vehicleNo: toTitleCase(values.vehicleNo), 
       variety: toTitleCase(values.variety),
@@ -1491,54 +1569,22 @@ export default function CustomerEntryClient() {
                 handleUpdateOption={handleUpdateOption}
                 handleDeleteOption={handleDeleteOption}
                 allCustomers={safeCustomers}
+                isSameAsBilling={isSameAsBilling}
+                setIsSameAsBilling={setIsSameAsBilling}
             />
             
-            <CalculatedSummary currentCustomer={currentCustomer} />
-
-            <div className="flex justify-start items-center space-x-2 pt-4">
-              <Button type="submit" size="sm">
-                {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
-              </Button>
-               <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                            <Printer className="mr-2 h-4 w-4"/> Save & Print <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleSaveAndPrint('tax-invoice')}>Tax Invoice</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleSaveAndPrint('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleSaveAndPrint('challan')}>Challan</DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-              <Button type="button" variant="outline" onClick={handleNew} size="sm">
-                <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
-              </Button>
-               <div className="flex-grow"></div>
-              <Button type="button" variant="ghost" size="icon" onClick={handleOpenReceiptSettings}>
-                <Settings className="h-5 w-5" />
-              </Button>
-            </div>
+            <CalculatedSummary 
+              currentCustomer={currentCustomer}
+              onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+              onSaveAndPrint={handleSaveAndPrint}
+              onNew={handleNew}
+              isEditing={isEditing}
+              isBrokerageIncluded={form.watch('isBrokerageIncluded')}
+              onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
+            />
         </form>
       </FormProvider>      
       
-      <div className="flex justify-between items-center mt-6 mb-2">
-        <div className="relative w-full max-w-sm">
-            <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
-                <Input
-                    placeholder="Search by SR No, Name, or Contact..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-9 pl-10"
-                />
-            </InputWithIcon>
-        </div>
-        <Button onClick={() => handlePrint(customers.filter(c => selectedCustomerIds.has(c.id)))} disabled={selectedCustomerIds.size === 0}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print Selected ({selectedCustomerIds.size})
-        </Button>
-      </div>
-
       <CustomerTable 
         customers={filteredCustomers} 
         onEdit={handleEdit} 
@@ -1717,7 +1763,7 @@ export default function CustomerEntryClient() {
                           <div className="space-y-1"><Label>Address 1</Label><Input value={tempReceiptSettings.address1} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address1: e.target.value})} /></div>
                           <div className="space-y-1"><Label>Address 2</Label><Input value={tempReceiptSettings.address2} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address2: e.target.value})} /></div>
                           <div className="space-y-1"><Label>Contact No.</Label><Input value={tempReceiptSettings.contactNo} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, contactNo: e.target.value})} /></div>
-                          <div className="space-y-1"><Label>Email</Label><Input value={tempReceiptSettings.email} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, email: e.target.value})} /></div>
+                          <div className="space-y-1"><Label>Email</Label><Input value={tempReceiptSettings.email} type="email" value={tempReceiptSettings.email} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, email: e.target.value})} /></div>
                       </div>
                       <div className="space-y-4">
                           <h3 className="font-semibold text-lg border-b pb-2">Visible Fields</h3>

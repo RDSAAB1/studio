@@ -51,7 +51,8 @@ const formSchema = z.object({
     kartaPercentage: z.coerce.number().min(0),
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
-    paymentType: z.string().min(1, "Payment type is required")
+    paymentType: z.string().min(1, "Payment type is required"),
+    cd: z.coerce.number().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -66,7 +67,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: ''
+    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', cd: 0
   };
 };
 
@@ -128,10 +129,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6">
                 <SectionCard>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg"><InfoIcon className="h-5 w-5"/>Basic Info</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                          <Controller name="date" control={form.control} render={({ field }) => (
                             <div className="space-y-1">
                                 <Label className="text-xs">Date</Label>
@@ -176,19 +174,19 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             control={form.control}
                             render={({ field }) => (
                                 <div className="space-y-1">
-                                    <Label className="text-xs">Payment Type</Label>
-                                    <div className="flex items-center gap-2">
-                                        <DynamicCombobox
-                                            options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
-                                            value={field.value}
-                                            onChange={(val) => form.setValue("paymentType", val)}
-                                            onAdd={(newVal) => handleAddOption('paymentTypes', newVal)}
-                                            placeholder="Select or add type..."
-                                            searchPlaceholder="Search type..."
-                                            emptyPlaceholder="No type found."
-                                        />
-                                        <Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-9 w-9 shrink-0"><Settings className="h-4 w-4"/></Button>
-                                    </div>
+                                     <Label className="text-xs flex items-center gap-2">
+                                        <Wallet className="h-3 w-3"/>Payment Type
+                                         <Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button>
+                                    </Label>
+                                    <DynamicCombobox
+                                        options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
+                                        value={field.value}
+                                        onChange={(val) => form.setValue("paymentType", val)}
+                                        onAdd={(newVal) => handleAddOption('paymentTypes', newVal)}
+                                        placeholder="Select or add type..."
+                                        searchPlaceholder="Search type..."
+                                        emptyPlaceholder="No type found."
+                                    />
                                     {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                                 </div>
                             )}
@@ -197,10 +195,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                 </SectionCard>
 
                 <SectionCard>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg"><UserCog className="h-5 w-5" />Supplier Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <Label htmlFor="name" className="text-xs">Name</Label>
                             <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
@@ -281,10 +276,7 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
             
             <div className="space-y-6">
                 <SectionCard>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg"><PackageSearch className="h-5 w-5" />Transaction &amp; Weight</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div className="space-y-1">
                             <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                             <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
@@ -298,8 +290,10 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             control={form.control}
                             render={({ field }) => (
                             <div className="space-y-1">
-                                <Label className="text-xs">Variety</Label>
-                                <div className="flex items-center gap-2">
+                                 <Label className="text-xs flex items-center gap-2">
+                                    <Wheat className="h-3 w-3"/>Variety
+                                    <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button>
+                                </Label>
                                 <DynamicCombobox
                                     options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))}
                                     value={field.value}
@@ -312,8 +306,6 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                                     searchPlaceholder="Search variety..."
                                     emptyPlaceholder="No variety found."
                                 />
-                                 <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-9 w-9 shrink-0"><Settings className="h-4 w-4"/></Button>
-                                 </div>
                                 {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                             </div>
                             )}
@@ -334,8 +326,8 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                 </SectionCard>
                 
                 <SectionCard>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg"><CircleDollarSign className="h-5 w-5" />Financial Details</CardTitle>
+                     <CardHeader className="pt-6 pb-2">
+                        <CardTitle className="text-base">Financial Details</CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -348,6 +340,12 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
                             <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
                                 <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="kartaPercentage" control={form.control} render={({ field }) => (<Input id="kartaPercentage" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
+                            </InputWithIcon>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="cd" className="text-xs">CD (Cash Discount)</Label>
+                            <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="cd" control={form.control} render={({ field }) => (<Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-9 text-sm pl-10" />)} />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
@@ -380,32 +378,45 @@ const SupplierForm = memo(function SupplierForm({ form, handleSrNoBlur, handleCa
 });
 
 
-const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer }: { currentCustomer: Customer }) {
+const CalculatedSummary = memo(function CalculatedSummary({ currentCustomer, onSave, onSaveAndPrint, onNew, isEditing }: { currentCustomer: Customer, onSave: any, onSaveAndPrint: any, onNew: any, isEditing: boolean }) {
     const summaryFields = useMemo(() => {
         const dueDate = currentCustomer.dueDate ? format(new Date(currentCustomer.dueDate), "PPP") : '-';
         return [
-          { label: "Due Date", value: dueDate }, { label: "Weight", value: currentCustomer.weight },
-          { label: "Karta Weight", value: currentCustomer.kartaWeight }, { label: "Karta Amount", value: formatCurrency(currentCustomer.kartaAmount) },
-          { label: "Net Weight", value: currentCustomer.netWeight }, { label: "Laboury Amount", value: formatCurrency(currentCustomer.labouryAmount) },
+          { label: "Due Date", value: dueDate }, { label: "Weight", value: currentCustomer.weight.toFixed(2) },
+          { label: "Karta Weight", value: currentCustomer.kartaWeight.toFixed(2) }, { label: "Karta Amount", value: formatCurrency(currentCustomer.kartaAmount) },
+          { label: "Net Weight", value: currentCustomer.netWeight.toFixed(2) }, { label: "Laboury Amount", value: formatCurrency(currentCustomer.labouryAmount) },
           { label: "Amount", value: formatCurrency(currentCustomer.amount) }, { label: "Net Amount", value: formatCurrency(Number(currentCustomer.netAmount)), isBold: true },
         ];
       }, [currentCustomer]);
 
     return (
         <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-            <CardContent className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-2">
-            {summaryFields.map(item => (
-                <div key={item.label}>
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-                <p className={cn("text-sm font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
+            <CardContent className="p-4 space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-2">
+                    {summaryFields.map(item => (
+                        <div key={item.label}>
+                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                        <p className={cn("text-sm font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
+                        </div>
+                    ))}
                 </div>
-            ))}
+                 <div className="flex justify-start space-x-2 pt-2 border-t border-dashed">
+                    <Button onClick={onSave} size="sm">
+                        {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+                    </Button>
+                    <Button type="button" onClick={onSaveAndPrint} size="sm">
+                        <Printer className="mr-2 h-4 w-4"/> Save & Print
+                    </Button>
+                    <Button type="button" variant="outline" onClick={onNew} size="sm">
+                        <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
+                    </Button>
+                </div>
             </CardContent>
         </Card>
     );
 });
 
-const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete, onShowDetails, onPrint, selectedIds, onSelectionChange }: any) {
+const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete, onShowDetails, onPrint, selectedIds, onSelectionChange, onSearch }: any) {
     
     const handleSelectAll = (checked: boolean) => {
         const allCustomerIds = customers.map((c: Customer) => c.id);
@@ -423,85 +434,101 @@ const SupplierTable = memo(function SupplierTable({ customers, onEdit, onDelete,
     };
 
     return (
-        <div className="mt-6 min-h-[200px]">
-            <Card>
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="px-3 py-2 text-xs w-10">
-                                         <Checkbox
-                                            checked={selectedIds.size > 0 && selectedIds.size === customers.length}
-                                            onCheckedChange={handleSelectAll}
-                                            aria-label="Select all rows"
-                                        />
-                                    </TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">SR No.</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Date</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Name</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Variety</TableHead>
-                                    <TableHead className="px-3 py-2 text-xs">Net Weight</TableHead>
-                                    <TableHead className="text-right px-3 py-2 text-xs">Net Amount</TableHead>
-                                    <TableHead className="text-center px-3 py-2 text-xs">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {customers.map((customer: Customer) => (
-                                    <TableRow key={customer.id} className="h-12" data-state={selectedIds.has(customer.id) ? 'selected' : ''}>
-                                        <TableCell className="px-3 py-1">
-                                            <Checkbox
-                                                checked={selectedIds.has(customer.id)}
-                                                onCheckedChange={() => handleRowSelect(customer.id)}
-                                                aria-label={`Select row ${customer.srNo}`}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="font-mono px-3 py-1 text-sm">{customer.srNo}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
-                                        <TableCell className="px-3 py-1 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
-                                        <TableCell className="text-center px-3 py-1">
-                                            <div className="flex justify-center items-center gap-0">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([customer])}>
-                                                    <Printer className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(customer)}>
-                                                    <Info className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(customer.id)}>
-                                                    <Pen className="h-4 w-4" />
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                                                        <Trash className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                        This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => onDelete(customer.id)}>Continue</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-3">
+                <CardTitle className="text-base">Entry History</CardTitle>
+                <div className="flex items-center gap-2">
+                     <div className="relative w-full max-w-sm">
+                        <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
+                            <Input
+                                placeholder="Search by SR No, Name, or Contact..."
+                                onChange={(e) => onSearch(e.target.value)}
+                                className="h-8 pl-10 text-xs"
+                            />
+                        </InputWithIcon>
                     </div>
-                </CardContent>
-            </Card>
-        </div>
+                    <Button onClick={() => onPrint(customers.filter((c: Customer) => selectedIds.has(c.id)))} disabled={selectedIds.size === 0} size="sm" variant="outline">
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print Selected ({selectedIds.size})
+                    </Button>
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="px-3 py-2 text-xs w-10">
+                                        <Checkbox
+                                        checked={selectedIds.size > 0 && selectedIds.size === customers.length}
+                                        onCheckedChange={handleSelectAll}
+                                        aria-label="Select all rows"
+                                    />
+                                </TableHead>
+                                <TableHead className="px-3 py-2 text-xs">SR No.</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Date</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Name</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Variety</TableHead>
+                                <TableHead className="px-3 py-2 text-xs">Net Weight</TableHead>
+                                <TableHead className="text-right px-3 py-2 text-xs">Net Amount</TableHead>
+                                <TableHead className="text-center px-3 py-2 text-xs">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {customers.map((customer: Customer) => (
+                                <TableRow key={customer.id} className="h-12" data-state={selectedIds.has(customer.id) ? 'selected' : ''}>
+                                    <TableCell className="px-3 py-1">
+                                        <Checkbox
+                                            checked={selectedIds.has(customer.id)}
+                                            onCheckedChange={() => handleRowSelect(customer.id)}
+                                            aria-label={`Select row ${customer.srNo}`}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="font-mono px-3 py-1 text-sm">{customer.srNo}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{format(new Date(customer.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.name)}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{toTitleCase(customer.variety)}</TableCell>
+                                    <TableCell className="px-3 py-1 text-sm">{customer.netWeight.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(customer.netAmount))}</TableCell>
+                                    <TableCell className="text-center px-3 py-1">
+                                        <div className="flex justify-center items-center gap-0">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([customer])}>
+                                                <Printer className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(customer)}>
+                                                <Info className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(customer.id)}>
+                                                <Pen className="h-4 w-4" />
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                                    <Trash className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the entry for {toTitleCase(customer.name)} (SR No: {customer.srNo}).
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => onDelete(customer.id)}>Continue</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
     );
 });
 
@@ -586,11 +613,11 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
                     <tr>
                         {fields.vehicleNo && <td className="border border-black p-1">{data.vehicleNo.toUpperCase()}</td>}
                         {fields.term && <td className="border border-black p-1 text-center">{data.term}</td>}
-                        {fields.rate && <td className="border border-black p-1 text-right">{data.rate.toFixed(2)}</td>}
-                        {fields.grossWeight && <td className="border border-black p-1 text-right">{data.grossWeight.toFixed(2)}</td>}
-                        {fields.teirWeight && <td className="border border-black p-1 text-right">{data.teirWeight.toFixed(2)}</td>}
-                        {fields.weight && <td className="border border-black p-1 text-right">{data.weight.toFixed(2)}</td>}
-                        {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(data.amount)}</td>}
+                        {fields.rate && <td className="border border-black p-1 text-right">{Number(data.rate).toFixed(2)}</td>}
+                        {fields.grossWeight && <td className="border border-black p-1 text-right">{Number(data.grossWeight).toFixed(2)}</td>}
+                        {fields.teirWeight && <td className="border border-black p-1 text-right">{Number(data.teirWeight).toFixed(2)}</td>}
+                        {fields.weight && <td className="border border-black p-1 text-right">{Number(data.weight).toFixed(2)}</td>}
+                        {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(Number(data.amount))}</td>}
                     </tr>
                     {Array.from({ length: 4 }).map((_, i) => (
                         <tr key={i}><td className="border border-black p-2 h-6" colSpan={Object.values(fields).filter(v => v).length - 4}></td></tr>
@@ -606,7 +633,7 @@ const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptS
                     <table className="w-full border-collapse">
                         <tbody>
                             {fields.dueDate && <tr><td className="font-bold border border-black p-1">DUE DATE</td><td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td></tr>}
-                            {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{data.kartaWeight.toFixed(2)}</td></tr>}
+                            {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{Number(data.kartaWeight).toFixed(2)}</td></tr>}
                             {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(Number(data.netAmount))}</td></tr>}
                         </tbody>
                     </table>
@@ -701,13 +728,13 @@ const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedRece
                             {fields.variety && <td className="border border-black p-1 text-center">{toTitleCase(entry.variety)}</td>}
                             {fields.vehicleNo && <td className="border border-black p-1 text-center">{entry.vehicleNo.toUpperCase()}</td>}
                             {fields.term && <td className="border border-black p-1 text-center">{entry.term}</td>}
-                            {fields.rate && <td className="border border-black p-1 text-right">{entry.rate.toFixed(2)}</td>}
-                            {fields.grossWeight && <td className="border border-black p-1 text-right">{entry.grossWeight.toFixed(2)}</td>}
-                            {fields.teirWeight && <td className="border border-black p-1 text-right">{entry.teirWeight.toFixed(2)}</td>}
-                            {fields.weight && <td className="border border-black p-1 text-right">{entry.weight.toFixed(2)}</td>}
-                            {fields.kartaWeight && <td className="border border-black p-1 text-right">{entry.kartaWeight.toFixed(2)}</td>}
-                            {fields.netWeight && <td className="border border-black p-1 text-right">{entry.netWeight.toFixed(2)}</td>}
-                            {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(entry.amount)}</td>}
+                            {fields.rate && <td className="border border-black p-1 text-right">{Number(entry.rate).toFixed(2)}</td>}
+                            {fields.grossWeight && <td className="border border-black p-1 text-right">{Number(entry.grossWeight).toFixed(2)}</td>}
+                            {fields.teirWeight && <td className="border border-black p-1 text-right">{Number(entry.teirWeight).toFixed(2)}</td>}
+                            {fields.weight && <td className="border border-black p-1 text-right">{Number(entry.weight).toFixed(2)}</td>}
+                            {fields.kartaWeight && <td className="border border-black p-1 text-right">{Number(entry.kartaWeight).toFixed(2)}</td>}
+                            {fields.netWeight && <td className="border border-black p-1 text-right">{Number(entry.netWeight).toFixed(2)}</td>}
+                            {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(Number(entry.amount))}</td>}
                             {fields.dueDate && <td className="border border-black p-1 text-center">{format(new Date(entry.dueDate), "dd-MMM-yy")}</td>}
                             {fields.netAmount && <td className="border border-black p-1 text-right font-semibold">{formatCurrency(Number(entry.netAmount))}</td>}
                         </tr>
@@ -969,8 +996,9 @@ export default function SupplierEntryClient() {
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
+    const cdAmount = values.cd || 0;
     
-    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
+    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount - cdAmount;
 
     const totalPaidForThisEntry = paymentHistory
         .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
@@ -990,6 +1018,7 @@ export default function SupplierEntryClient() {
       kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
       amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
       kanta: parseFloat(kanta.toFixed(2)), 
+      cd: parseFloat(cdAmount.toFixed(2)),
       originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
       netAmount: parseFloat(netAmount.toFixed(2)),
     }));
@@ -1020,6 +1049,7 @@ export default function SupplierEntryClient() {
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
       labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
       paymentType: customerState.paymentType || 'Full',
+      cd: customerState.cd || 0,
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -1191,7 +1221,7 @@ export default function SupplierEntryClient() {
   const handleCapitalizeOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const field = e.target.name as keyof FormValues;
     const value = e.target.value;
-    form.setValue(field, toTitleCase(value));
+    form.setValue(field, toTitleCase(value) as any);
   };
   
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -1387,42 +1417,16 @@ export default function SupplierEntryClient() {
                 allSuppliers={safeCustomers}
             />
             
-            <CalculatedSummary currentCustomer={currentCustomer} />
-
-            <div className="flex justify-start space-x-2 pt-4">
-              <Button type="submit" size="sm">
-                {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
-              </Button>
-              <Button type="button" onClick={handleSaveAndPrint} size="sm">
-                <Printer className="mr-2 h-4 w-4"/> Save & Print
-              </Button>
-              <Button type="button" variant="outline" onClick={handleNew} size="sm">
-                <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
-              </Button>
-              <Button type="button" variant="ghost" size="icon" onClick={handleOpenReceiptSettings}>
-                <Settings className="h-5 w-5" />
-              </Button>
-            </div>
+            <CalculatedSummary 
+                currentCustomer={currentCustomer}
+                onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+                onSaveAndPrint={handleSaveAndPrint}
+                onNew={handleNew}
+                isEditing={isEditing}
+            />
         </form>
       </FormProvider>      
       
-      <div className="flex justify-between items-center mt-6 mb-2">
-        <div className="relative w-full max-w-sm">
-            <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
-                <Input
-                    placeholder="Search by SR No, Name, or Contact..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="h-9 pl-10"
-                />
-            </InputWithIcon>
-        </div>
-        <Button onClick={() => handlePrint(customers.filter(c => selectedSupplierIds.has(c.id)))} disabled={selectedSupplierIds.size === 0}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print Selected ({selectedSupplierIds.size})
-        </Button>
-      </div>
-
       <SupplierTable 
         customers={filteredCustomers} 
         onEdit={handleEdit} 
@@ -1431,6 +1435,7 @@ export default function SupplierEntryClient() {
         onPrint={handlePrint}
         selectedIds={selectedSupplierIds}
         onSelectionChange={setSelectedSupplierIds}
+        onSearch={setSearchTerm}
       />
         
       <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
@@ -1505,20 +1510,21 @@ export default function SupplierEntryClient() {
                             </CardContent>
                         </Card>
                         <Card>
-                             <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
-                             <CardContent className="p-4 pt-0">
-                                <Table className="text-xs">
-                                    <TableBody>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsCustomer.rate)}</TableCell></TableRow>
-                                        <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsCustomer.amount)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kartaAmount)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsCustomer.labouryRate.toFixed(2)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.labouryAmount)}</TableCell></TableRow>
-                                        <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
-                                    </TableBody>
-                                </Table>
-                             </CardContent>
+                            <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-0">
+                            <Table className="text-xs">
+                                <TableBody>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{detailsCustomer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(detailsCustomer.rate)}</TableCell></TableRow>
+                                    <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(detailsCustomer.amount)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({detailsCustomer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kartaAmount)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsCustomer.labouryRate.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.labouryAmount)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.kanta)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsCustomer.cd || 0)}</TableCell></TableRow>
+                                </TableBody>
+                            </Table>
+                            </CardContent>
                         </Card>
                     </div>
 
@@ -1630,7 +1636,7 @@ export default function SupplierEntryClient() {
                           <div className="space-y-1"><Label>Address 1</Label><Input value={tempReceiptSettings.address1} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address1: e.target.value})} /></div>
                           <div className="space-y-1"><Label>Address 2</Label><Input value={tempReceiptSettings.address2} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, address2: e.target.value})} /></div>
                           <div className="space-y-1"><Label>Contact No.</Label><Input value={tempReceiptSettings.contactNo} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, contactNo: e.target.value})} /></div>
-                          <div className="space-y-1"><Label>Email</Label><Input value={tempReceiptSettings.email} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, email: e.target.value})} /></div>
+                          <div className="space-y-1"><Label>Email</Label><Input type="email" value={tempReceiptSettings.email} onChange={(e) => setTempReceiptSettings({...tempReceiptSettings, email: e.target.value})} /></div>
                       </div>
                       <div className="space-y-4">
                           <h3 className="font-semibold text-lg border-b pb-2">Visible Fields</h3>
