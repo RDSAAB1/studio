@@ -51,7 +51,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
     return (
         <Card className="bg-card/60 backdrop-blur-sm border-white/10">
              <CardContent className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
-                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2">
+                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
                      {summaryFields.map(item => (
                         <div key={item.label} className="leading-tight">
                             <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -85,36 +85,28 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
                     {isCustomerForm && onBrokerageToggle && (
-                        <div className="flex items-center justify-center h-8 w-full rounded-md border bg-input p-1">
-                            <button
-                                type="button"
-                                onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
+                         <button
+                            type="button"
+                            onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
+                            className={cn(
+                                "relative inline-flex h-8 w-full items-center rounded-md border bg-input p-1 cursor-pointer transition-colors duration-300 ease-in-out",
+                                isBrokerageIncluded ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border"
+                            )}
+                        >
+                            <span className="absolute left-2.5 z-10 text-sm font-medium">
+                                Brokerage:
+                            </span>
+                            <span
                                 className={cn(
-                                "relative inline-flex w-full h-full items-center rounded-md",
-                                isBrokerageIncluded ? "justify-end" : "justify-start"
+                                    "absolute flex items-center justify-center w-[calc(50%-4px)] h-6 rounded-sm bg-background text-foreground shadow-sm transition-transform duration-300 ease-in-out",
+                                    isBrokerageIncluded ? "translate-x-[calc(100%-8px)]" : "translate-x-0"
                                 )}
                             >
-                                <span className="absolute left-3 text-sm font-medium text-muted-foreground z-10">
-                                Brokerage
+                                <span className="text-xs font-semibold">
+                                    {isBrokerageIncluded ? "Include" : "Exclude"}
                                 </span>
-                                <span
-                                className={cn(
-                                    "absolute w-1/2 h-full rounded-md transition-transform duration-200 ease-in-out flex items-center justify-center text-xs font-semibold",
-                                    isBrokerageIncluded ? "translate-x-0 bg-primary text-primary-foreground" : "-translate-x-full bg-muted text-muted-foreground"
-                                )}
-                                >
-                                {isBrokerageIncluded ? "Include" : ""}
-                                </span>
-                                <span
-                                className={cn(
-                                    "absolute w-1/2 h-full rounded-md transition-transform duration-200 ease-in-out flex items-center justify-center text-xs font-semibold",
-                                    !isBrokerageIncluded ? "translate-x-0 bg-primary text-primary-foreground" : "translate-x-full bg-muted text-muted-foreground"
-                                )}
-                                >
-                                {!isBrokerageIncluded ? "Exclude" : ""}
-                                </span>
-                            </button>
-                        </div>
+                            </span>
+                        </button>
                     )}
                 </div>
             </CardContent>
