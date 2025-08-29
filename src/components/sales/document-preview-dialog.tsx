@@ -15,6 +15,7 @@ import { Printer, ChevronsUpDown } from "lucide-react";
 import { TaxInvoice } from "@/components/receipts/tax-invoice";
 import { BillOfSupply } from "@/components/receipts/bill-of-supply";
 import { Challan } from "@/components/receipts/challan";
+import { cn } from "@/lib/utils";
 
 interface DocumentPreviewDialogProps {
     isOpen: boolean;
@@ -169,12 +170,30 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" />
                                     </div>
                                     <div className="flex items-center space-x-2 pt-2">
-                                        <Switch
-                                            id="gst-included-toggle"
-                                            checked={invoiceDetails.isGstIncluded}
-                                            onCheckedChange={(checked) => setInvoiceDetails({...invoiceDetails, isGstIncluded: checked})}
-                                        />
-                                        <Label htmlFor="gst-included-toggle" className="text-xs font-normal">Is GST Included in Rate?</Label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setInvoiceDetails({...invoiceDetails, isGstIncluded: !invoiceDetails.isGstIncluded})}
+                                            className={cn(
+                                                "relative w-48 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
+                                                invoiceDetails.isGstIncluded ? 'bg-primary/20' : 'bg-secondary/20'
+                                            )}
+                                            >
+                                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", invoiceDetails.isGstIncluded ? 'text-primary' : 'text-muted-foreground')}>Included</span>
+                                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !invoiceDetails.isGstIncluded ? 'text-secondary-foreground' : 'text-muted-foreground')}>Excluded</span>
+                                            <div
+                                                className={cn(
+                                                    "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
+                                                    invoiceDetails.isGstIncluded ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
+                                                )}
+                                            >
+                                                <div className={cn(
+                                                        "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                                                        invoiceDetails.isGstIncluded ? 'bg-primary' : 'bg-secondary'
+                                                    )}>
+                                                    <span className="text-sm font-bold text-primary-foreground">GST</span>
+                                                </div>
+                                            </div>
+                                        </button>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -207,8 +226,30 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                 <CardHeader className="p-3 flex items-center justify-between">
                                     <CardTitle className="text-base">Ship To Details</CardTitle>
                                     <div className="flex items-center space-x-2">
-                                        <Switch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} />
-                                        <Label htmlFor="same-as-billing" className="text-xs font-normal">Same as Bill To</Label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsSameAsBilling(!isSameAsBilling)}
+                                            className={cn(
+                                                "relative w-48 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
+                                                isSameAsBilling ? 'bg-primary/20' : 'bg-secondary/20'
+                                            )}
+                                            >
+                                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", isSameAsBilling ? 'text-primary' : 'text-muted-foreground')}>Same</span>
+                                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !isSameAsBilling ? 'text-secondary-foreground' : 'text-muted-foreground')}>Different</span>
+                                            <div
+                                                className={cn(
+                                                    "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
+                                                    isSameAsBilling ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
+                                                )}
+                                            >
+                                                <div className={cn(
+                                                        "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                                                        isSameAsBilling ? 'bg-primary' : 'bg-secondary'
+                                                    )}>
+                                                    <span className="text-sm font-bold text-primary-foreground">Shipment</span>
+                                                </div>
+                                            </div>
+                                        </button>
                                     </div>
                                 </CardHeader>
                                 {!isSameAsBilling && (
