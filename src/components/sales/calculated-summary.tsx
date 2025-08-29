@@ -80,9 +80,9 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
     // Customer Form Summary
     return (
         <Card>
-            <CardContent className="p-3 flex flex-col md:flex-row items-center justify-between gap-3">
-                {/* Left Side: Calculations */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-2 flex-1">
+            <CardContent className="p-3 space-y-3">
+                {/* Row 1: Summary */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-x-4 gap-y-2">
                     <SummaryItem label="Final Wt (Qtl)" value={customer.weight.toFixed(2)} icon={<Scale size={14} />} />
                     <SummaryItem label="Net Wt (Qtl)" value={customer.netWeight.toFixed(2)} icon={<Scale size={14} />} />
                     <SummaryItem label="Bag Amount" value={formatCurrency(customer.bagAmount || 0)} icon={<HandCoins size={14} />} />
@@ -92,10 +92,10 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     <SummaryItem label="Net Amount" value={formatCurrency(Number(customer.netAmount))} icon={<Banknote size={14}/>} isBold isLarge />
                 </div>
                 
-                <Separator orientation="vertical" className="h-10 mx-3 hidden md:block" />
+                <Separator/>
 
-                {/* Right Side: Actions */}
-                <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
+                {/* Row 2: Actions and Toggle */}
+                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                         <Button onClick={onSave} size="sm" className="h-7">
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
@@ -118,7 +118,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     </div>
 
                     {isCustomerForm && onBrokerageToggle && (
-                         <div className="flex items-center justify-center pt-2">
+                         <div className="flex items-center justify-center pt-2 sm:pt-0">
                            <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
