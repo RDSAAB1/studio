@@ -164,13 +164,13 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         </Popover>
                         {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                     </div>
-                    <div className="space-y-1 lg:col-span-2">
+                    <div className="space-y-1">
                         <Label htmlFor="companyName" className="text-xs">Company Name</Label>
                         <InputWithIcon icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}>
                             <Controller name="companyName" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
                         </InputWithIcon>
                     </div>
-                     <div className="space-y-1">
+                     <div className="space-y-1 lg:col-span-2">
                         <Label htmlFor="address" className="text-xs">Address</Label>
                         <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                         <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
