@@ -52,16 +52,26 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
 
     return (
         <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-            <CardContent className="p-2 space-y-2">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-3 gap-y-0">
+            <CardContent className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2">
                     {summaryFields.map(item => (
                         <div key={item.label} className="space-y-0">
                             <p className="text-xs text-muted-foreground">{item.label}</p>
                             <p className={cn("text-sm font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
                         </div>
                     ))}
+                     {isCustomerForm && (
+                        <div className="flex items-center space-x-2 col-span-full">
+                            <Switch
+                                id="brokerage-toggle"
+                                checked={isBrokerageIncluded}
+                                onCheckedChange={onBrokerageToggle}
+                            />
+                            <Label htmlFor="brokerage-toggle" className="text-xs font-normal">Include Brokerage in Net Amount</Label>
+                        </div>
+                    )}
                 </div>
-                <div className="flex justify-start items-center space-x-2 pt-1">
+                <div className="flex lg:flex-col justify-start items-center lg:items-stretch lg:justify-center space-x-2 lg:space-x-0 lg:space-y-2 border-t lg:border-t-0 lg:border-l pt-3 lg:pt-0 lg:pl-3">
                     <Button onClick={onSave} size="sm">
                         {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                     </Button>
@@ -79,24 +89,13 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
-                         <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm">
+                         <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm" variant="outline">
                             <Printer className="mr-2 h-4 w-4"/> Save & Print
                         </Button>
                     )}
                     <Button type="button" variant="outline" onClick={onNew} size="sm">
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
-                    <div className="flex-grow"></div>
-                    {isCustomerForm && (
-                        <div className="flex items-center space-x-2">
-                            <Switch
-                                id="brokerage-toggle"
-                                checked={isBrokerageIncluded}
-                                onCheckedChange={onBrokerageToggle}
-                            />
-                            <Label htmlFor="brokerage-toggle" className="text-sm font-normal">Include Brokerage in Net Amount</Label>
-                        </div>
-                    )}
                 </div>
             </CardContent>
         </Card>
