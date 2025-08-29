@@ -178,7 +178,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                     </div>
                 </div>
                 
-                <Separator className="my-2" />
+                <Separator className="my-2"/>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
