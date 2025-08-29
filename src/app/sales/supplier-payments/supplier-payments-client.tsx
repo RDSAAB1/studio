@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -600,8 +601,8 @@ export default function SupplierPaymentsPage() {
                         rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'
                     )}
                 >
-                    <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground')}>Supplier</span>
                     <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground')}>Outsider</span>
+                    <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground')}>Supplier</span>
                     <div
                         className={cn(
                             "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
