@@ -85,35 +85,20 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
                     {isCustomerForm && onBrokerageToggle && (
-                        <div className="flex items-center space-x-2 pt-2">
+                        <div className="flex items-center justify-center pt-2">
                              <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                                className={cn(
-                                    "relative inline-flex items-center h-8 w-40 cursor-pointer rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none shadow-inner",
-                                    isBrokerageIncluded ? "bg-primary/20" : "bg-secondary"
-                                )}
+                                className="relative w-40 h-10 flex items-center justify-center rounded-full bg-secondary/50 shadow-inner focus:outline-none"
                                 >
-                                <span className="sr-only">Toggle Brokerage</span>
-                                <span className={cn(
-                                    "absolute left-2 text-xs font-semibold transition-opacity",
-                                    isBrokerageIncluded ? "opacity-100 text-primary" : "opacity-50"
+                                <span className={cn("absolute left-4 text-xs font-semibold transition-colors", isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Include</span>
+                                <span className={cn("absolute right-4 text-xs font-semibold transition-colors", !isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Exclude</span>
+                                <div className={cn(
+                                    "absolute left-1 top-1 w-[88px] h-8 bg-primary rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out",
+                                    !isBrokerageIncluded && "translate-x-[calc(100%-8px)] !bg-destructive"
                                 )}>
-                                    Include
-                                </span>
-                                <span className={cn(
-                                    "absolute right-2 text-xs font-semibold transition-opacity",
-                                    !isBrokerageIncluded ? "opacity-100 text-secondary-foreground" : "opacity-50"
-                                )}>
-                                    Exclude
-                                </span>
-                                <span
-                                    aria-hidden="true"
-                                    className={cn(
-                                        "pointer-events-none inline-block h-6 w-20 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
-                                        isBrokerageIncluded ? "translate-x-0" : "translate-x-[calc(100%-0.2rem)]"
-                                    )}
-                                ></span>
+                                    <span className="text-sm font-bold text-primary-foreground">Brokerage</span>
+                                </div>
                             </button>
                         </div>
                     )}

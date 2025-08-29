@@ -239,36 +239,21 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 <Separator className="my-2"/>
 
                  <div className="flex items-center justify-between">
-                     <h3 className="font-semibold text-base flex items-center gap-2"><Truck className="h-4 w-4"/>Shipping Details</h3>
-                    <div className="flex items-center space-x-2">
-                         <button
+                    <h3 className="font-semibold text-base flex items-center gap-2"><Truck className="h-4 w-4"/>Shipping Details</h3>
+                    <div className="flex items-center justify-center pt-2">
+                        <button
                             type="button"
                             onClick={() => setIsSameAsBilling(!isSameAsBilling)}
-                            className={cn(
-                                "relative inline-flex items-center h-8 w-48 cursor-pointer rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none shadow-inner",
-                                isSameAsBilling ? "bg-primary/20" : "bg-secondary"
-                            )}
+                            className="relative w-40 h-10 flex items-center justify-center rounded-full bg-secondary/50 shadow-inner focus:outline-none"
                             >
-                            <span className="sr-only">Toggle Shipment</span>
-                            <span className={cn(
-                                "absolute left-2 text-xs font-semibold transition-opacity",
-                                isSameAsBilling ? "opacity-100 text-primary" : "opacity-50"
+                            <span className={cn("absolute left-6 text-xs font-semibold transition-colors", isSameAsBilling ? 'text-primary-foreground' : 'text-muted-foreground')}>Same</span>
+                            <span className={cn("absolute right-3 text-xs font-semibold transition-colors", !isSameAsBilling ? 'text-primary-foreground' : 'text-muted-foreground')}>Different</span>
+                             <div className={cn(
+                                "absolute left-1 top-1 w-[88px] h-8 bg-primary rounded-full shadow-md flex items-center justify-center transition-transform duration-300 ease-in-out",
+                                !isSameAsBilling && "translate-x-[calc(100%-8px)] !bg-destructive"
                             )}>
-                                Same Shipment
-                            </span>
-                            <span className={cn(
-                                "absolute right-2 text-xs font-semibold transition-opacity",
-                                !isSameAsBilling ? "opacity-100 text-secondary-foreground" : "opacity-50"
-                            )}>
-                                Different
-                            </span>
-                            <span
-                                aria-hidden="true"
-                                className={cn(
-                                    "pointer-events-none inline-block h-6 w-24 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
-                                    isSameAsBilling ? "translate-x-0" : "translate-x-[calc(100%-0.2rem)]"
-                                )}
-                            ></span>
+                                <span className="text-sm font-bold text-primary-foreground">Shipment</span>
+                            </div>
                         </button>
                     </div>
                 </div>
