@@ -386,24 +386,55 @@ export default function SupplierPaymentsPage() {
         setCalculatedCdAmount(0);
         return;
     }
-    
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+    if (eligibleEntries.length === 0 && cdAt !== 'paid_amount') {
+        setCalculatedCdAmount(0);
+        return;
+    }
+
     let baseAmountForCd = 0;
+
     switch(cdAt) {
-        case 'paid_amount':
-            baseAmountForCd = paymentAmount;
+        case 'paid_amount': {
+            if (paymentType === 'Partial') {
+                baseAmountForCd = paymentAmount;
+            } else {
+                 const eligibleSelectedSrNos = new Set(eligibleEntries.map(e => e.srNo));
+                 const paymentsForSelectedEntries = paymentHistory.filter(p => p.paidFor?.some(pf => eligibleSelectedSrNos.has(pf.srNo)));
+                 
+                 let totalPaidWithoutCD = 0;
+                 eligibleEntries.forEach(entry => {
+                    const paymentsForThisEntry = paymentsForSelectedEntries.filter(p => p.paidFor?.some(pf => pf.srNo === entry.srNo) && !p.cdApplied);
+                    paymentsForThisEntry.forEach(p => {
+                        const paidDetail = p.paidFor?.find(pf => pf.srNo === entry.srNo);
+                        if (paidDetail) {
+                            totalPaidWithoutCD += paidDetail.amount;
+                        }
+                    });
+                 });
+                baseAmountForCd = totalPaidWithoutCD;
+            }
             break;
-        case 'unpaid_amount':
-            baseAmountForCd = totalOutstandingForSelected;
+        }
+        case 'unpaid_amount': {
+            baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
             break;
-        case 'full_amount':
-            baseAmountForCd = totalOriginalAmountForSelected;
+        }
+        case 'full_amount': {
+            baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
             break;
+        }
         default:
             baseAmountForCd = 0;
     }
 
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-  }, [cdEnabled, cdPercent, cdAt, paymentAmount, totalOutstandingForSelected, totalOriginalAmountForSelected]);
+
+}, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentType]);
 
 
   useEffect(() => {
