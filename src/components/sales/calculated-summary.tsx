@@ -86,20 +86,31 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
                      {isCustomerForm && onBrokerageToggle && (
-                        <div className="space-y-1 pt-1">
-                            <div
+                        <div className="flex items-center space-x-3 pt-2">
+                           <button
+                                type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                                className="relative w-44 h-8 flex items-center cursor-pointer rounded-full bg-muted p-1 transition-colors duration-300"
+                                className={cn(
+                                    "relative inline-flex flex-shrink-0 h-7 w-[160px] border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-inner",
+                                    isBrokerageIncluded ? "bg-primary" : "bg-secondary"
+                                )}
+                            >
+                                <span className="sr-only">Toggle Brokerage</span>
+                                <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-primary-foreground">
+                                    <span className={cn("transition-opacity duration-200", isBrokerageIncluded ? 'opacity-100' : 'opacity-50')}>Include</span>
+                                    <span className="w-10"></span>
+                                    <span className={cn("transition-opacity duration-200", !isBrokerageIncluded ? 'opacity-100' : 'opacity-50')}>Exclude</span>
+                                </span>
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        "pointer-events-none inline-block h-6 w-[80px] rounded-full bg-background shadow-lg transform ring-0 transition ease-in-out duration-200 flex items-center justify-center text-xs font-bold",
+                                        isBrokerageIncluded ? "translate-x-0 bg-primary-foreground text-primary" : "translate-x-[74px] bg-secondary-foreground text-secondary"
+                                    )}
                                 >
-                                <span className="absolute w-1/2 text-center text-xs text-muted-foreground z-0 left-0 transition-opacity">Include</span>
-                                <span className="absolute w-1/2 text-center text-xs text-muted-foreground z-0 right-0 transition-opacity">Exclude</span>
-                                <div className={cn(
-                                    "absolute w-1/2 h-full top-0 flex items-center justify-center rounded-full transition-transform duration-300 ease-in-out",
-                                    isBrokerageIncluded ? 'translate-x-0 bg-primary' : 'translate-x-full bg-destructive'
-                                )}>
-                                    <span className="text-xs font-semibold text-primary-foreground">Brokerage</span>
-                                </div>
-                            </div>
+                                    Brokerage
+                                </span>
+                            </button>
                         </div>
                     )}
                 </div>
