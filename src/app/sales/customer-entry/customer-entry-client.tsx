@@ -47,10 +47,10 @@ const formSchema = z.object({
     bagWeightKg: z.coerce.number().min(0),
     bagRate: z.coerce.number().min(0),
     shippingName: z.string().optional(),
-    shippingCompanyName: z_string().optional(),
-    shippingAddress: z_string().optional(),
-    shippingContact: z_string().optional(),
-    shippingGstin: z_string().optional(),
+    shippingCompanyName: z.string().optional(),
+    shippingAddress: z.string().optional(),
+    shippingContact: z.string().optional(),
+    shippingGstin: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -601,5 +601,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-
-    
