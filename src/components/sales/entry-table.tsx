@@ -101,6 +101,9 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                     <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(entry.netAmount))}</TableCell>
                                     <TableCell className="text-center px-3 py-1">
                                         <div className="flex justify-center items-center gap-0">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([entry])}>
+                                                <Printer className="h-4 w-4" />
+                                            </Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
                                                 <Info className="h-4 w-4" />
                                             </Button>
