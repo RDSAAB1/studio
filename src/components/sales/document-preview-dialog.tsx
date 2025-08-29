@@ -170,16 +170,16 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         <Input id="taxRate" type="number" value={invoiceDetails.taxRate} onChange={(e) => setInvoiceDetails({...invoiceDetails, taxRate: Number(e.target.value)})} className="h-8 text-xs" />
                                     </div>
                                     <div className="flex items-center space-x-2 pt-2">
-                                        <button
+                                       <button
                                             type="button"
                                             onClick={() => setInvoiceDetails({...invoiceDetails, isGstIncluded: !invoiceDetails.isGstIncluded})}
                                             className={cn(
-                                                "relative w-48 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
+                                                "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                                 invoiceDetails.isGstIncluded ? 'bg-primary/20' : 'bg-secondary/20'
                                             )}
                                             >
                                             <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", invoiceDetails.isGstIncluded ? 'text-primary' : 'text-muted-foreground')}>Included</span>
-                                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !invoiceDetails.isGstIncluded ? 'text-secondary-foreground' : 'text-muted-foreground')}>Excluded</span>
+                                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !invoiceDetails.isGstIncluded ? 'text-primary' : 'text-muted-foreground')}>Excluded</span>
                                             <div
                                                 className={cn(
                                                     "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
@@ -230,21 +230,21 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                             type="button"
                                             onClick={() => setIsSameAsBilling(!isSameAsBilling)}
                                             className={cn(
-                                                "relative w-48 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
-                                                isSameAsBilling ? 'bg-primary/20' : 'bg-secondary/20'
+                                                "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
+                                                !isSameAsBilling ? 'bg-primary/20' : 'bg-secondary/20'
                                             )}
                                             >
-                                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", isSameAsBilling ? 'text-primary' : 'text-muted-foreground')}>Same</span>
-                                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !isSameAsBilling ? 'text-secondary-foreground' : 'text-muted-foreground')}>Different</span>
+                                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !isSameAsBilling ? 'text-primary' : 'text-muted-foreground')}>Different</span>
+                                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", isSameAsBilling ? 'text-primary' : 'text-muted-foreground')}>Same</span>
                                             <div
                                                 className={cn(
                                                     "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
-                                                    isSameAsBilling ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
+                                                    !isSameAsBilling ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
                                                 )}
                                             >
                                                 <div className={cn(
                                                         "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
-                                                        isSameAsBilling ? 'bg-primary' : 'bg-secondary'
+                                                        !isSameAsBilling ? 'bg-primary' : 'bg-secondary'
                                                     )}>
                                                     <span className="text-sm font-bold text-primary-foreground">Shipment</span>
                                                 </div>

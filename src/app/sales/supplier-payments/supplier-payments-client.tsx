@@ -1015,12 +1015,33 @@ export default function SupplierPaymentsPage() {
         {paymentMethod === 'RTGS' && (
             <div className="flex items-center space-x-2 p-2">
                 <Label htmlFor="rtgs-for-toggle" className="text-sm font-medium">RTGS For:</Label>
-                <Switch id="rtgs-for-toggle" checked={rtgsFor === 'Outsider'} onCheckedChange={(checked) => {
-                    const newType = checked ? 'Outsider' : 'Supplier';
-                    setRtgsFor(newType);
-                    resetPaymentForm(newType === 'Outsider');
-                }} />
-                <Label htmlFor="rtgs-for-toggle" className="text-sm">{rtgsFor}</Label>
+                 <button
+                    type="button"
+                    onClick={() => {
+                        const newType = rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier';
+                        setRtgsFor(newType);
+                        resetPaymentForm(newType === 'Outsider');
+                    }}
+                    className={cn(
+                        "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'
+                    )}
+                    >
+                    <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground')}>Outsider</span>
+                    <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground')}>Supplier</span>
+                    <div
+                        className={cn(
+                            "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
+                            rtgsFor === 'Outsider' ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]'
+                        )}
+                    >
+                        <div className={cn(
+                                "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                                rtgsFor === 'Outsider' ? 'bg-primary' : 'bg-secondary'
+                            )}>
+                        </div>
+                    </div>
+                </button>
             </div>
         )}
 
@@ -1546,7 +1567,7 @@ export default function SupplierPaymentsPage() {
                         setSelectedEntryIds(newSet);
                     }}
                     checked={selectedEntryIds.size > 0 && selectedEntryIds.size === suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0).length}
-                        /></TableHead>
+                         /></TableHead>
                     <TableHead>SR No</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Due Date</TableHead>

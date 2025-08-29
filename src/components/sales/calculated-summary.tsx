@@ -90,7 +90,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                                 className={cn(
-                                    "relative w-48 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                    "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                     isBrokerageIncluded ? 'bg-primary/20' : 'bg-secondary/20'
                                 )}
                                 >
