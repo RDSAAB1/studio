@@ -85,18 +85,34 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
                     {isCustomerForm && onBrokerageToggle && (
-                         <div className="flex items-center justify-between h-8 w-full rounded-md border bg-input p-1">
-                            <span className="text-sm font-medium px-2 text-muted-foreground">Brokerage</span>
+                        <div className="flex items-center justify-center h-8 w-full rounded-md border bg-input p-1">
                             <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                                 className={cn(
-                                    "relative inline-flex h-6 w-[80px] shrink-0 cursor-pointer items-center justify-center rounded-sm border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-input",
-                                    isBrokerageIncluded ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                                "relative inline-flex w-full h-full items-center rounded-md",
+                                isBrokerageIncluded ? "justify-end" : "justify-start"
                                 )}
                             >
-                                <span className={cn("text-xs font-semibold", isBrokerageIncluded ? 'opacity-100' : 'opacity-0')}>Include</span>
-                                <span className={cn("text-xs font-semibold absolute", isBrokerageIncluded ? 'opacity-0' : 'opacity-100')}>Exclude</span>
+                                <span className="absolute left-3 text-sm font-medium text-muted-foreground z-10">
+                                Brokerage
+                                </span>
+                                <span
+                                className={cn(
+                                    "absolute w-1/2 h-full rounded-md transition-transform duration-200 ease-in-out flex items-center justify-center text-xs font-semibold",
+                                    isBrokerageIncluded ? "translate-x-0 bg-primary text-primary-foreground" : "-translate-x-full bg-muted text-muted-foreground"
+                                )}
+                                >
+                                {isBrokerageIncluded ? "Include" : ""}
+                                </span>
+                                <span
+                                className={cn(
+                                    "absolute w-1/2 h-full rounded-md transition-transform duration-200 ease-in-out flex items-center justify-center text-xs font-semibold",
+                                    !isBrokerageIncluded ? "translate-x-0 bg-primary text-primary-foreground" : "translate-x-full bg-muted text-muted-foreground"
+                                )}
+                                >
+                                {!isBrokerageIncluded ? "Exclude" : ""}
+                                </span>
                             </button>
                         </div>
                     )}
