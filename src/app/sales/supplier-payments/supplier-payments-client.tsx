@@ -200,6 +200,10 @@ export default function SupplierPaymentsPage() {
   const totalOutstandingForSelected = useMemo(() => {
     return Math.round(selectedEntries.reduce((acc, entry) => acc + (entry.netAmount || 0), 0));
   }, [selectedEntries]);
+
+  const totalOriginalAmountForSelected = useMemo(() => {
+      return Math.round(selectedEntries.reduce((acc, entry) => acc + (entry.originalNetAmount || 0), 0));
+  }, [selectedEntries]);
   
   const autoSetCDToggle = useCallback(() => {
     const today = new Date();
@@ -379,41 +383,27 @@ export default function SupplierPaymentsPage() {
   
   useEffect(() => {
     if (!cdEnabled) {
-      setCalculatedCdAmount(0);
-      return;
+        setCalculatedCdAmount(0);
+        return;
     }
+    
     let baseAmountForCd = 0;
-  
-    switch (cdAt) {
-      case 'paid_amount':
-        // For partial payments, CD is on the amount being paid *now*.
-        // For full payments, it's on the total outstanding of eligible entries.
-        if (paymentType === 'Partial') {
-          baseAmountForCd = paymentAmount;
-        } else {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const eligibleEntriesForCd = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-            baseAmountForCd = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-        }
-        break;
-  
-      case 'unpaid_amount': {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const eligibleEntriesForCd = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-        baseAmountForCd = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-        break;
-      }
-      
-      case 'full_amount': {
-        baseAmountForCd = totalOutstandingForSelected;
-        break;
-      }
+    switch(cdAt) {
+        case 'paid_amount':
+            baseAmountForCd = paymentAmount;
+            break;
+        case 'unpaid_amount':
+            baseAmountForCd = totalOutstandingForSelected;
+            break;
+        case 'full_amount':
+            baseAmountForCd = totalOriginalAmountForSelected;
+            break;
+        default:
+            baseAmountForCd = 0;
     }
-  
+
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-  }, [cdEnabled, cdPercent, cdAt, selectedEntries, paymentAmount, paymentType, totalOutstandingForSelected]);
+  }, [cdEnabled, cdPercent, cdAt, paymentAmount, totalOutstandingForSelected, totalOriginalAmountForSelected]);
 
 
   useEffect(() => {
