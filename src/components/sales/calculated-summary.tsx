@@ -97,21 +97,12 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                 {/* Right Side: Actions */}
                 <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
-                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button size="sm" className="h-7">
-                                    Actions <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuItem onClick={onSave}>
-                                    {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onNew}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> New
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button onClick={onSave} size="sm" className="h-7">
+                            {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+                        </Button>
+                         <Button onClick={onNew} size="sm" variant="outline" className="h-7">
+                            <PlusCircle className="mr-2 h-4 w-4" /> New
+                        </Button>
                          <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-7">
