@@ -144,7 +144,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
             
             <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
                 {/* Left Side */}
-                <div className="lg:col-span-3 space-y-4">
+                <div className="lg:col-span-2 space-y-4">
                      <SectionCard title="Customer Details" icon={<User className="h-5 w-5" />}>
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              <div className="space-y-1">
@@ -170,22 +170,16 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </Popover>
                                 {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                             </div>
-                             <div className="space-y-1">
+                             <div className="space-y-1 sm:col-span-2">
                                 <Label htmlFor="companyName" className="text-xs">Company Name</Label>
                                 <InputWithIcon icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}>
                                     <Controller name="companyName" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 sm:col-span-2">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-9 text-sm pl-10" /> )}/>
-                                </InputWithIcon>
-                            </div>
-                             <div className="space-y-1 sm:col-span-2">
-                                <Label htmlFor="gstin" className="text-xs">GSTIN</Label>
-                                <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="gstin" control={form.control} render={({ field }) => ( <Input {...field} className="h-9 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                         </div>
@@ -193,9 +187,9 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 </div>
 
                 {/* Right Side */}
-                <div className="lg:col-span-2 space-y-4">
+                <div className="lg:col-span-3 space-y-4">
                      <SectionCard title="Weight & Calculations" icon={<PackageSearch className="h-5 w-5" />}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                              <div className="space-y-1">
                                 <Label htmlFor="rate" className="text-xs">Rate</Label>
                                 <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
