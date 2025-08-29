@@ -38,7 +38,12 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     useEffect(() => {
         if (customer) {
             setEditableInvoiceDetails(customer);
-            setIsSameAsBilling(true);
+            setIsSameAsBilling(
+                !customer.shippingName &&
+                !customer.shippingAddress &&
+                !customer.shippingContact &&
+                !customer.shippingGstin
+            );
         }
     }, [customer]);
 
@@ -97,12 +102,12 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             gstin: editableInvoiceDetails.gstin,
         };
 
-        if (!isSameAsBilling) {
-            finalCustomerData.shippingName = editableInvoiceDetails.shippingName;
-            finalCustomerData.shippingCompanyName = editableInvoiceDetails.shippingCompanyName;
-            finalCustomerData.shippingAddress = editableInvoiceDetails.shippingAddress;
-            finalCustomerData.shippingContact = editableInvoiceDetails.shippingContact;
-            finalCustomerData.shippingGstin = editableInvoiceDetails.shippingGstin;
+        if (isSameAsBilling) {
+            finalCustomerData.shippingName = finalCustomerData.name;
+            finalCustomerData.shippingCompanyName = finalCustomerData.companyName;
+            finalCustomerData.shippingAddress = finalCustomerData.address;
+            finalCustomerData.shippingContact = finalCustomerData.contact;
+            finalCustomerData.shippingGstin = finalCustomerData.gstin;
         }
 
         switch(documentType) {
@@ -149,7 +154,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     <ScrollArea className="flex-grow pr-3 -mr-3">
                         <div className="space-y-4">
                             <Card>
-                                <CardHeader className="p-3"><CardTitle className="text-base">Tax &amp; Invoice Info</CardTitle></CardHeader>
+                                <CardHeader className="p-3"><CardTitle className="text-base">Tax & Invoice Info</CardTitle></CardHeader>
                                 <CardContent className="p-3 space-y-3">
                                     <div className="space-y-1">
                                         <Label htmlFor="companyGstin" className="text-xs">Your GSTIN</Label>
@@ -191,6 +196,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                     <div className="space-y-1">
                                         <Label htmlFor="edit-address" className="text-xs">Address</Label>
                                         <Input id="edit-address" name="address" value={editableInvoiceDetails.address || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="edit-gstin" className="text-xs">GSTIN</Label>
+                                        <Input id="edit-gstin" name="gstin" value={editableInvoiceDetails.gstin || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -240,3 +249,5 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
+
+  

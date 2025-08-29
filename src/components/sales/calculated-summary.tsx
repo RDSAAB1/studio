@@ -79,7 +79,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
-                         <Button type="button" onClick={onSaveAndPrint} size="sm">
+                         <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm">
                             <Printer className="mr-2 h-4 w-4"/> Save & Print
                         </Button>
                     )}
@@ -102,3 +102,5 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
         </Card>
     );
 };
+
+    
