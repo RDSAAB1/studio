@@ -90,21 +90,21 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                                 className={cn(
-                                    "relative w-48 h-10 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out",
-                                    isBrokerageIncluded ? 'bg-primary/20' : 'bg-secondary'
+                                    "relative w-48 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                    isBrokerageIncluded ? 'bg-primary/20' : 'bg-secondary/20'
                                 )}
                                 >
-                                <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Include</span>
-                                <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>Exclude</span>
+                                <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", isBrokerageIncluded ? 'text-primary' : 'text-muted-foreground')}>Include</span>
+                                <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", !isBrokerageIncluded ? 'text-primary' : 'text-muted-foreground')}>Exclude</span>
                                 <div
                                     className={cn(
-                                        "absolute w-[calc(50%+12px)] h-10 top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card",
+                                        "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
                                         isBrokerageIncluded ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
                                     )}
                                 >
                                     <div className={cn(
                                         "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
-                                        isBrokerageIncluded ? 'bg-primary' : 'bg-destructive'
+                                        isBrokerageIncluded ? 'bg-primary' : 'bg-secondary'
                                     )}>
                                         <span className="text-sm font-bold text-primary-foreground">Brokerage</span>
                                     </div>
