@@ -379,61 +379,41 @@ export default function SupplierPaymentsPage() {
   
   useEffect(() => {
     if (!cdEnabled) {
-        setCalculatedCdAmount(0);
-        return;
+      setCalculatedCdAmount(0);
+      return;
     }
     let baseAmountForCd = 0;
-
+  
     switch (cdAt) {
-        case 'paid_amount':
-            const paidOnTimeWithoutCd = paymentHistory.reduce((sum, p) => {
-                if (p.cdApplied) return sum;
-
-                const paidForAnySelected = p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || ''));
-                if (!paidForAnySelected) return sum;
-
-                let timelyPaidAmount = 0;
-                p.paidFor?.forEach(pf => {
-                    const entry = suppliers.find(s => s.srNo === pf.srNo);
-                    if (entry && selectedEntryIds.has(entry.id)) {
-                        if (new Date(p.date) <= new Date(entry.dueDate)) {
-                            timelyPaidAmount += pf.amount;
-                        }
-                    }
-                });
-                return sum + timelyPaidAmount;
-            }, 0);
-            baseAmountForCd = paidOnTimeWithoutCd;
-            break;
-
-        case 'unpaid_amount':
+      case 'paid_amount':
+        // For partial payments, CD is on the amount being paid *now*.
+        // For full payments, it's on the total outstanding of eligible entries.
+        if (paymentType === 'Partial') {
+          baseAmountForCd = paymentAmount;
+        } else {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const eligibleEntriesForCd = selectedEntries.filter(e => new Date(e.dueDate) >= today);
             baseAmountForCd = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
-            break;
-
-        case 'full_amount':
-            const unpaidOnEligible = selectedEntries.filter(e => new Date(e.dueDate) >= new Date()).reduce((sum, e) => sum + (e.netAmount || 0), 0);
-            const paidOnTime = paymentHistory.reduce((sum, p) => {
-                if (p.cdApplied) return sum;
-                const paidForAnySelected = p.paidFor?.some(pf => selectedEntryIds.has(suppliers.find(s => s.srNo === pf.srNo)?.id || ''));
-                if (!paidForAnySelected) return sum;
-                let timelyPaidAmount = 0;
-                p.paidFor?.forEach(pf => {
-                    const entry = suppliers.find(s => s.srNo === pf.srNo);
-                    if (entry && selectedEntryIds.has(entry.id) && new Date(p.date) <= new Date(entry.dueDate)) {
-                        timelyPaidAmount += pf.amount;
-                    }
-                });
-                return sum + timelyPaidAmount;
-            }, 0);
-            baseAmountForCd = unpaidOnEligible + paidOnTime;
-            break;
+        }
+        break;
+  
+      case 'unpaid_amount': {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const eligibleEntriesForCd = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+        baseAmountForCd = eligibleEntriesForCd.reduce((sum, e) => sum + (e.netAmount || 0), 0);
+        break;
+      }
+      
+      case 'full_amount': {
+        baseAmountForCd = totalOutstandingForSelected;
+        break;
+      }
     }
-
+  
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-}, [cdEnabled, cdPercent, cdAt, selectedEntries, paymentHistory, suppliers, selectedEntryIds]);
+  }, [cdEnabled, cdPercent, cdAt, selectedEntries, paymentAmount, paymentType, totalOutstandingForSelected]);
 
 
   useEffect(() => {
@@ -1642,6 +1622,7 @@ export default function SupplierPaymentsPage() {
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {detailsSupplierEntry.labouryRate.toFixed(2)}</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.labouryAmount)}</TableCell></TableRow>
                                     <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.kanta)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(detailsSupplierEntry.cd || 0)}</TableCell></TableRow>
                                 </TableBody>
                             </Table>
                             </CardContent>
@@ -1664,7 +1645,7 @@ export default function SupplierPaymentsPage() {
 
                     <Card className="mt-4">
                         <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment History</CardTitle>
+                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-0">
                             {paymentsForDetailsEntry.length > 0 ? (
