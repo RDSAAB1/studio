@@ -97,7 +97,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     return (
         <>
             <SectionCard icon={<InfoIcon className="h-5 w-5" />}>
-                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     {/* Row 1 */}
                     <Controller name="date" control={form.control} render={({ field }) => (
                         <div className="space-y-1">
@@ -251,7 +251,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 </div>
 
                 {!isSameAsBilling && (
-                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="shippingName" className="text-xs">Shipping Name</Label>
                         <Input id="shippingName" {...form.register('shippingName')} className="h-9 text-sm" />
