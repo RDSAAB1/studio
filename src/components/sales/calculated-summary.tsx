@@ -89,23 +89,20 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                             type="button"
                             onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                             className={cn(
-                                "relative inline-flex h-8 w-full items-center rounded-md border bg-input p-1 cursor-pointer transition-colors duration-300 ease-in-out",
+                                "relative inline-flex h-8 w-full items-center rounded-md border p-1 cursor-pointer transition-colors duration-300 ease-in-out",
                                 isBrokerageIncluded ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border"
                             )}
                         >
-                            <span className="absolute left-2.5 z-10 text-sm font-medium">
-                                Brokerage:
-                            </span>
                             <span
                                 className={cn(
-                                    "absolute flex items-center justify-center w-[calc(50%-4px)] h-6 rounded-sm bg-background text-foreground shadow-sm transition-transform duration-300 ease-in-out",
-                                    isBrokerageIncluded ? "translate-x-[calc(100%-8px)]" : "translate-x-0"
+                                    "absolute flex items-center justify-center w-[calc(50%-4px)] h-6 rounded-sm bg-background text-foreground shadow-sm transition-transform duration-300 ease-in-out z-10",
+                                    isBrokerageIncluded ? "translate-x-[calc(100%)]" : "translate-x-0"
                                 )}
                             >
-                                <span className="text-xs font-semibold">
-                                    {isBrokerageIncluded ? "Include" : "Exclude"}
-                                </span>
+                                <span className="text-xs font-semibold">Brokerage</span>
                             </span>
+                            <span className="w-1/2 text-center text-xs font-medium">Include</span>
+                            <span className="w-1/2 text-center text-xs font-medium">Exclude</span>
                         </button>
                     )}
                 </div>
