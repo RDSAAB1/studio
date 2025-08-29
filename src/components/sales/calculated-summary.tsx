@@ -52,7 +52,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
     return (
         <Card className="bg-card/60 backdrop-blur-sm border-white/10">
              <CardContent className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
-                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
+                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2">
                      {summaryFields.map(item => (
                         <div key={item.label} className="leading-tight">
                             <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -92,24 +92,34 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                                 className={cn(
-                                "relative inline-flex h-8 w-44 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                                isBrokerageIncluded ? "bg-primary" : "bg-destructive"
+                                    "relative inline-flex h-6 w-36 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                                    isBrokerageIncluded ? "bg-primary" : "bg-destructive"
                                 )}
-                            >
+                                >
                                 <span className="sr-only">Toggle Brokerage</span>
-                                <span
-                                aria-hidden="true"
-                                className={cn(
-                                    "pointer-events-none absolute inline-block h-6 w-24 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
-                                    isBrokerageIncluded ? "translate-x-full" : "translate-x-0"
-                                )}
-                                />
-                                <span className="absolute inset-y-0 left-0 flex items-center justify-center w-1/2 text-xs font-semibold text-primary-foreground">
-                                    Exclude
-                                </span>
-                                <span className="absolute inset-y-0 right-0 flex items-center justify-center w-1/2 text-xs font-semibold text-primary-foreground">
+                                 <span
+                                    className={cn(
+                                        "absolute inset-0 flex items-center justify-center text-xs font-semibold text-primary-foreground transition-opacity",
+                                        isBrokerageIncluded ? "opacity-100" : "opacity-0"
+                                    )}
+                                >
                                     Include
                                 </span>
+                                <span
+                                     className={cn(
+                                        "absolute inset-0 flex items-center justify-center text-xs font-semibold text-primary-foreground transition-opacity",
+                                        !isBrokerageIncluded ? "opacity-100" : "opacity-0"
+                                    )}
+                                >
+                                    Exclude
+                                </span>
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        "pointer-events-none absolute inline-block h-5 w-5 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
+                                        isBrokerageIncluded ? "translate-x-30" : "translate-x-0"
+                                    )}
+                                />
                             </button>
                         </div>
                     )}
