@@ -7,8 +7,6 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Pen, PlusCircle, Save, Printer, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 
@@ -86,30 +84,21 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     <Button type="button" variant="outline" onClick={onNew} size="sm" className="h-8">
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
-                     {isCustomerForm && onBrokerageToggle && (
-                        <button
-                            type="button"
-                            onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
-                            className={cn(
-                                "relative inline-flex items-center h-8 w-full shrink-0 cursor-pointer rounded-md border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                                isBrokerageIncluded ? "bg-primary" : "bg-input"
-                            )}
-                        >
-                            <span className="sr-only">Toggle Brokerage</span>
-                            <span
-                                aria-hidden="true"
+                    {isCustomerForm && onBrokerageToggle && (
+                         <div className="flex items-center justify-between h-8 w-full rounded-md border bg-input p-1">
+                            <span className="text-sm font-medium px-2 text-muted-foreground">Brokerage</span>
+                            <button
+                                type="button"
+                                onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                                 className={cn(
-                                    "pointer-events-none absolute h-full w-1/2 rounded-sm bg-background shadow-lg ring-0 transition duration-200 ease-in-out",
-                                    isBrokerageIncluded ? "translate-x-full" : "translate-x-0"
+                                    "relative inline-flex h-6 w-[80px] shrink-0 cursor-pointer items-center justify-center rounded-sm border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-input",
+                                    isBrokerageIncluded ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                                 )}
-                            />
-                            <span className={cn("absolute left-0 w-1/2 text-center text-xs font-semibold transition-colors", isBrokerageIncluded ? 'text-muted-foreground' : 'text-primary-foreground')}>
-                                Exclude
-                            </span>
-                             <span className={cn("absolute right-0 w-1/2 text-center text-xs font-semibold transition-colors", isBrokerageIncluded ? 'text-primary-foreground' : 'text-muted-foreground')}>
-                                Include
-                            </span>
-                        </button>
+                            >
+                                <span className={cn("text-xs font-semibold", isBrokerageIncluded ? 'opacity-100' : 'opacity-0')}>Include</span>
+                                <span className={cn("text-xs font-semibold absolute", isBrokerageIncluded ? 'opacity-0' : 'opacity-100')}>Exclude</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </CardContent>
