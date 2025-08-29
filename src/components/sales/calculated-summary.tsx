@@ -78,7 +78,6 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
     }
     
     // Customer Form Summary
-    const avgWeightPerBag = (customer.bags && customer.bags > 0) ? ((customer.weight * 100) / customer.bags).toFixed(2) : '0.00';
     return (
         <Card>
             <CardContent className="p-3 flex flex-col md:flex-row items-center justify-between gap-3">
@@ -96,7 +95,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                 <Separator orientation="vertical" className="h-10 mx-3 hidden md:block" />
 
                 {/* Right Side: Actions */}
-                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
                          <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -128,7 +127,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     </div>
 
                     {isCustomerForm && onBrokerageToggle && (
-                         <div className="flex items-center justify-center pt-2 sm:pt-0">
+                         <div className="flex items-center justify-center pt-2">
                            <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
