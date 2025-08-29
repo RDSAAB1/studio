@@ -7,9 +7,8 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Check, X } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
-import { Label } from "@/components/ui/label";
 
 interface CalculatedSummaryProps {
     customer: Customer;
@@ -85,31 +84,36 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     <Button type="button" variant="outline" onClick={onNew} size="sm" className="h-8">
                         <PlusCircle className="mr-2 h-4 w-4" /> New / Clear
                     </Button>
-                     {isCustomerForm && onBrokerageToggle && (
-                        <div className="flex items-center space-x-3 pt-2">
-                           <button
+                    {isCustomerForm && onBrokerageToggle && (
+                        <div className="flex items-center space-x-2 pt-2">
+                             <button
                                 type="button"
                                 onClick={() => onBrokerageToggle(!isBrokerageIncluded)}
                                 className={cn(
-                                    "relative inline-flex flex-shrink-0 h-7 w-[160px] border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-inner",
-                                    isBrokerageIncluded ? "bg-primary" : "bg-secondary"
+                                    "relative inline-flex items-center h-8 w-40 cursor-pointer rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none shadow-inner",
+                                    isBrokerageIncluded ? "bg-primary/20" : "bg-secondary"
                                 )}
-                            >
+                                >
                                 <span className="sr-only">Toggle Brokerage</span>
-                                <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-primary-foreground">
-                                    <span className={cn("transition-opacity duration-200", isBrokerageIncluded ? 'opacity-100' : 'opacity-50')}>Include</span>
-                                    <span className="w-10"></span>
-                                    <span className={cn("transition-opacity duration-200", !isBrokerageIncluded ? 'opacity-100' : 'opacity-50')}>Exclude</span>
+                                <span className={cn(
+                                    "absolute left-2 text-xs font-semibold transition-opacity",
+                                    isBrokerageIncluded ? "opacity-100 text-primary" : "opacity-50"
+                                )}>
+                                    Include
+                                </span>
+                                <span className={cn(
+                                    "absolute right-2 text-xs font-semibold transition-opacity",
+                                    !isBrokerageIncluded ? "opacity-100 text-secondary-foreground" : "opacity-50"
+                                )}>
+                                    Exclude
                                 </span>
                                 <span
                                     aria-hidden="true"
                                     className={cn(
-                                        "pointer-events-none inline-block h-6 w-[80px] rounded-full bg-background shadow-lg transform ring-0 transition ease-in-out duration-200 flex items-center justify-center text-xs font-bold",
-                                        isBrokerageIncluded ? "translate-x-0 bg-primary-foreground text-primary" : "translate-x-[74px] bg-secondary-foreground text-secondary"
+                                        "pointer-events-none inline-block h-6 w-20 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
+                                        isBrokerageIncluded ? "translate-x-0" : "translate-x-[calc(100%-0.2rem)]"
                                     )}
-                                >
-                                    Brokerage
-                                </span>
+                                ></span>
                             </button>
                         </div>
                     )}

@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -239,11 +238,38 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
 
                 <Separator className="my-2"/>
 
-                <div className="flex items-center justify-between">
+                 <div className="flex items-center justify-between">
                      <h3 className="font-semibold text-base flex items-center gap-2"><Truck className="h-4 w-4"/>Shipping Details</h3>
                     <div className="flex items-center space-x-2">
-                        <Switch id="same-as-billing" checked={isSameAsBilling} onCheckedChange={setIsSameAsBilling} />
-                        <Label htmlFor="same-as-billing" className="text-sm font-normal">Same as Bill To</Label>
+                         <button
+                            type="button"
+                            onClick={() => setIsSameAsBilling(!isSameAsBilling)}
+                            className={cn(
+                                "relative inline-flex items-center h-8 w-48 cursor-pointer rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none shadow-inner",
+                                isSameAsBilling ? "bg-primary/20" : "bg-secondary"
+                            )}
+                            >
+                            <span className="sr-only">Toggle Shipment</span>
+                            <span className={cn(
+                                "absolute left-2 text-xs font-semibold transition-opacity",
+                                isSameAsBilling ? "opacity-100 text-primary" : "opacity-50"
+                            )}>
+                                Same Shipment
+                            </span>
+                            <span className={cn(
+                                "absolute right-2 text-xs font-semibold transition-opacity",
+                                !isSameAsBilling ? "opacity-100 text-secondary-foreground" : "opacity-50"
+                            )}>
+                                Different
+                            </span>
+                            <span
+                                aria-hidden="true"
+                                className={cn(
+                                    "pointer-events-none inline-block h-6 w-24 transform rounded-full bg-background shadow-lg ring-0 transition-transform duration-300 ease-in-out",
+                                    isSameAsBilling ? "translate-x-0" : "translate-x-[calc(100%-0.2rem)]"
+                                )}
+                            ></span>
+                        </button>
                     </div>
                 </div>
 
