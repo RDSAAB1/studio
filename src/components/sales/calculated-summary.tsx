@@ -52,8 +52,8 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
 
     return (
         <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-            <CardContent className="p-3 space-y-2">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-4 gap-y-1">
+            <CardContent className="p-2 space-y-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-x-3 gap-y-1">
                     {summaryFields.map(item => (
                         <div key={item.label}>
                             <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -61,7 +61,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                         </div>
                     ))}
                 </div>
-                <div className="flex justify-start items-center space-x-2 pt-2 border-t border-dashed">
+                <div className="flex justify-start items-center space-x-2">
                     <Button onClick={onSave} size="sm">
                         {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                     </Button>
