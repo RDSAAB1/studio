@@ -21,7 +21,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
 
-import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; // Assuming firebase.ts is in lib
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -108,10 +108,11 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 
 export default function IncomeExpenseClient() {
   const { toast } = useToast();
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("history");
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'ascending' | 'descending' } | null>(null);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -198,37 +199,33 @@ export default function IncomeExpenseClient() {
   };
 
   const onSubmit = async (values: TransactionFormValues) => {
-    setLoading(true); // Show loading while saving
+    setLoading(true);
     try {
       const transactionData: TransactionFormData = {
         ...values,
         date: format(values.date, "yyyy-MM-dd"), // Save date as string
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
-        // isRecurring handled by values
       };
 
       if (isEditing) {
         // Update existing transaction
-        await setDoc(doc(db, "transactions", isEditing), transactionData);
+        await setDoc(doc(db, "transactions", isEditing), transactionData, { merge: true });
         toast({ title: "Success", description: "Transaction updated successfully." });
       } else {
         // Add new transaction with a new ID
-        const newDocRef = doc(collection(db, "transactions"));
-        await setDoc(newDocRef, { ...transactionData, id: newDocRef.id });
+        await addDoc(collection(db, "transactions"), transactionData);
         toast({ title: "Success", description: "New transaction saved successfully." });
       }
-    if (isEditing) {
-      setTransactions(prev => prev.map(t => t.id === isEditing ? { ...transactionData, id: isEditing } : t));
-      toast({ title: "Success", description: "Transaction updated successfully." });
-    } else {
-      const newId = String(Date.now());
-      setTransactions(prev => [{ ...transactionData, id: newId }, ...prev]);
-      toast({ title: "Success", description: "New transaction saved successfully." });
+      setIsEditing(null);
+      form.reset(getInitialFormState([])); // Reset with empty initial state to clear form
+      setActiveTab("history");
+    } catch (error) {
+        console.error("Error saving transaction: ", error);
+        toast({ title: "Error", description: "Failed to save transaction.", variant: "destructive" });
+    } finally {
+        setLoading(false);
     }
-    setIsEditing(null);
-    form.reset(getInitialFormState(transactions));
-    setActiveTab("history");
   };
 
   const requestSort = (key: keyof Transaction) => {
