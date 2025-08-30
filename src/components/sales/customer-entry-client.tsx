@@ -62,46 +62,14 @@ const getInitialFormState = (lastVariety?: string): Customer => {
   const dateStr = today.toISOString().split('T')[0];
 
   return {
-    id: "",
-    srNo: 'C----',
-    date: dateStr,
-    term: '0',
-    dueDate: dateStr,
-    name: '',
-    so: '',
-    companyName: '',
-    address: '',
-    contact: '',
-    gstin: '',
-    vehicleNo: '',
-    variety: lastVariety || '',
-    grossWeight: 0,
-    teirWeight: 0,
-    weight: 0,
-    rate: 0,
-    amount: 0,
-    bags: 0,
-    bagWeightKg: 0,
-    bagRate: 0,
-    bagAmount: 0,
-    kanta: 0,
-    brokerage: 0,
-    brokerageRate: 0,
-    cd: 0,
-    cdRate: 0,
-    isBrokerageIncluded: false,
-    netWeight: 0,
-    originalNetAmount: 0,
-    netAmount: 0,
-    barcode: '',
-    receiptType: 'Cash',
-    paymentType: 'Full',
-    customerId: '',
-    kartaPercentage: 0,
-    kartaWeight: 0,
-    kartaAmount: 0,
-    labouryRate: 0,
-    labouryAmount: 0,
+    id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
+    name: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
+    kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
+    netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
+    receiptType: 'Cash', paymentType: 'Full', customerId: '',
+    // Explicitly set supplier fields to undefined or 0
+    so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
   };
 };
 
@@ -425,41 +393,78 @@ export default function CustomerEntryClient() {
   };
 
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    const completeEntry: Customer = {
-      ...currentCustomer,
-      id: currentCustomer.srNo,
-      name: toTitleCase(currentCustomer.name), 
-      companyName: toTitleCase(currentCustomer.companyName || ''),
-      address: toTitleCase(currentCustomer.address), 
-      vehicleNo: toTitleCase(currentCustomer.vehicleNo), 
-      variety: toTitleCase(currentCustomer.variety),
-      customerId: `${toTitleCase(currentCustomer.name).toLowerCase()}|${currentCustomer.contact.toLowerCase()}`,
+    // Construct a clean object with only the fields relevant to the customer
+    const cleanEntry = {
+        // IDs and Dates
+        id: currentCustomer.srNo,
+        srNo: currentCustomer.srNo,
+        date: currentCustomer.date,
+        dueDate: currentCustomer.dueDate,
+        term: currentCustomer.term,
+        customerId: `${toTitleCase(currentCustomer.name).toLowerCase()}|${currentCustomer.contact.toLowerCase()}`,
+
+        // Customer Info
+        name: toTitleCase(currentCustomer.name),
+        companyName: toTitleCase(currentCustomer.companyName || ''),
+        address: toTitleCase(currentCustomer.address),
+        contact: currentCustomer.contact,
+        gstin: currentCustomer.gstin || '',
+
+        // Shipping Info
+        shippingName: toTitleCase(currentCustomer.shippingName || ''),
+        shippingCompanyName: toTitleCase(currentCustomer.shippingCompanyName || ''),
+        shippingAddress: currentCustomer.shippingAddress || '',
+        shippingContact: currentCustomer.shippingContact || '',
+        shippingGstin: currentCustomer.shippingGstin || '',
+
+        // Transaction Info
+        vehicleNo: toTitleCase(currentCustomer.vehicleNo),
+        variety: toTitleCase(currentCustomer.variety),
+        paymentType: currentCustomer.paymentType,
+        receiptType: currentCustomer.receiptType,
+        
+        // Weight Info
+        grossWeight: currentCustomer.grossWeight,
+        teirWeight: currentCustomer.teirWeight,
+        weight: currentCustomer.weight,
+        bags: currentCustomer.bags,
+        bagWeightKg: currentCustomer.bagWeightKg,
+        netWeight: currentCustomer.netWeight,
+        
+        // Financial Info
+        rate: currentCustomer.rate,
+        amount: currentCustomer.amount,
+        bagRate: currentCustomer.bagRate,
+        bagAmount: currentCustomer.bagAmount,
+        kanta: currentCustomer.kanta,
+        brokerage: currentCustomer.brokerage,
+        brokerageRate: currentCustomer.brokerageRate,
+        isBrokerageIncluded: currentCustomer.isBrokerageIncluded,
+        cd: currentCustomer.cd,
+        cdRate: currentCustomer.cdRate,
+        originalNetAmount: currentCustomer.originalNetAmount,
+        netAmount: currentCustomer.netAmount,
+        
+        // Misc
+        barcode: currentCustomer.barcode,
     };
 
-    // Explicitly delete supplier-specific fields
-    delete (completeEntry as any).so;
-    delete (completeEntry as any).kartaPercentage;
-    delete (completeEntry as any).kartaWeight;
-    delete (completeEntry as any).kartaAmount;
-    delete (completeEntry as any).labouryRate;
-    delete (completeEntry as any).labouryAmount;
-
     try {
-        if (isEditing && currentCustomer.id && currentCustomer.id !== completeEntry.id) {
-          await deleteCustomer(currentCustomer.id);
+        if (isEditing && currentCustomer.id && currentCustomer.id !== cleanEntry.id) {
+            await deleteCustomer(currentCustomer.id);
         }
 
         if (deletePayments) {
-            await deletePaymentsForSrNo(completeEntry.srNo);
-            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+            await deletePaymentsForSrNo(cleanEntry.srNo);
+            const updatedEntry = { ...cleanEntry, netAmount: cleanEntry.originalNetAmount };
             toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
-            const savedEntry = await addCustomer(updatedEntry);
+            await addCustomer(updatedEntry);
             toast({ title: "Success", description: "Entry updated successfully." });
-            if (callback) callback(savedEntry); else handleNew();
+            if (callback) callback(updatedEntry as Customer); else handleNew();
         } else {
-            const savedEntry = await addCustomer(completeEntry);
+            await addCustomer(cleanEntry);
             toast({ title: "Success", description: `Entry ${isEditing ? 'updated' : 'saved'} successfully.` });
-            if (callback) callback(savedEntry); else handleNew();
+            if (callback) callback(cleanEntry as Customer); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
