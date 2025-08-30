@@ -68,7 +68,6 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '',
-    // Explicitly set supplier fields to undefined
     so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
   };
 };
@@ -393,42 +392,59 @@ export default function CustomerEntryClient() {
   };
 
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    // Start with the calculated state, then override with form values.
     const formValues = form.getValues();
-    const dataToSave: Partial<Customer> = {
-        ...currentCustomer,
-        ...formValues,
+    const calculatedValues = currentCustomer;
+
+    const dataToSave = {
+        // Form fields
         id: formValues.srNo,
         srNo: formValues.srNo,
-        date: formValues.date.toISOString().split("T")[0],
-        dueDate: formValues.date.toISOString().split("T")[0],
+        date: formValues.date.toISOString().split('T')[0],
+        term: '0', 
+        dueDate: formValues.date.toISOString().split('T')[0],
         name: toTitleCase(formValues.name),
-        companyName: toTitleCase(formValues.companyName || ''),
+        so: '',
         address: toTitleCase(formValues.address),
+        contact: formValues.contact,
         vehicleNo: toTitleCase(formValues.vehicleNo),
         variety: toTitleCase(formValues.variety),
+        grossWeight: formValues.grossWeight,
+        teirWeight: formValues.teirWeight,
+        rate: formValues.rate,
+        paymentType: formValues.paymentType,
+        barcode: '',
+        receiptType: 'Cash',
         customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
-        // These fields must come from the calculated state (currentCustomer)
-        weight: currentCustomer.weight,
-        netWeight: currentCustomer.netWeight,
-        amount: currentCustomer.amount,
-        brokerage: currentCustomer.brokerage,
-        brokerageRate: currentCustomer.brokerageRate,
-        cd: currentCustomer.cd,
-        cdRate: currentCustomer.cdRate,
-        bagAmount: currentCustomer.bagAmount,
-        originalNetAmount: currentCustomer.originalNetAmount,
-        netAmount: currentCustomer.netAmount,
+        
+        // Customer-specific form fields
+        bags: formValues.bags,
+        companyName: toTitleCase(formValues.companyName || ''),
+        gstin: formValues.gstin,
+        isBrokerageIncluded: formValues.isBrokerageIncluded,
+        bagWeightKg: formValues.bagWeightKg,
+        bagRate: formValues.bagRate,
+        
+        // Shipping details
+        shippingName: toTitleCase(formValues.shippingName || ''),
+        shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
+        shippingAddress: toTitleCase(formValues.shippingAddress || ''),
+        shippingContact: formValues.shippingContact,
+        shippingGstin: formValues.shippingGstin,
+
+        // Calculated values
+        weight: calculatedValues.weight,
+        netWeight: calculatedValues.netWeight,
+        amount: calculatedValues.amount,
+        kanta: calculatedValues.kanta,
+        bagAmount: calculatedValues.bagAmount,
+        brokerage: calculatedValues.brokerage,
+        brokerageRate: calculatedValues.brokerageRate,
+        cd: calculatedValues.cd,
+        cdRate: calculatedValues.cdRate,
+        originalNetAmount: calculatedValues.originalNetAmount,
+        netAmount: calculatedValues.netAmount,
     };
     
-    // Explicitly remove supplier-only fields
-    delete dataToSave.so;
-    delete dataToSave.kartaPercentage;
-    delete dataToSave.kartaWeight;
-    delete dataToSave.kartaAmount;
-    delete dataToSave.labouryRate;
-    delete dataToSave.labouryAmount;
-
     try {
         if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.id) {
             await deleteCustomer(currentCustomer.id);
@@ -515,7 +531,7 @@ export default function CustomerEntryClient() {
         const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
         
         setConsolidatedReceiptData({
-            supplier: { // This should be customer, but the definition is shared.
+            supplier: { 
                 name: customer.name,
                 so: customer.so,
                 address: customer.address,
@@ -531,7 +547,7 @@ export default function CustomerEntryClient() {
 
   const handleOpenPrintPreview = (customer: Customer) => {
     setDocumentPreviewCustomer(customer);
-    setDocumentType('tax-invoice'); // Default to tax-invoice
+    setDocumentType('tax-invoice'); 
     setIsDocumentPreviewOpen(true);
   };
 
