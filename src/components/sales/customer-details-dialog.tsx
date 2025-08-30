@@ -11,12 +11,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes } from "lucide-react";
 
 interface CustomerDetailsDialogProps {
     customer: Customer | null;
     onOpenChange: (isOpen: boolean) => void;
     onPrint: (customer: Customer) => void;
+    paymentHistory: Payment[];
 }
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -29,8 +31,17 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint }: CustomerDetailsDialogProps) => {
+export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, paymentHistory }: CustomerDetailsDialogProps) => {
     if (!customer) return null;
+
+    const paymentsForDetailsEntry = paymentHistory.filter(p => 
+      p.paidFor?.some(pf => pf.srNo === customer?.srNo)
+    );
+
+    const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
+
+    const displayBrokerageAmount = (customer.weight || 0) * (customer.brokerage || 0);
+    const displayCdAmount = (customer.amount || 0) * ((customer.cd || 0) / 100);
 
     return (
         <Dialog open={!!customer} onOpenChange={onOpenChange}>
@@ -76,15 +87,16 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint }: Custo
                                         <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} />
                                         <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} />
                                         <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} />
+                                        <DetailItem icon={<Boxes size={14} />} label="Bags" value={customer.bags || 0} />
                                     </div>
                                     <Separator />
                                     <table className="w-full text-xs">
                                         <tbody>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{customer.grossWeight.toFixed(2)} kg</td></tr>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {customer.teirWeight.toFixed(2)} kg</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{customer.weight.toFixed(2)} kg</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less)</td><td className="text-right font-semibold">- {(Number(customer.bagWeightKg) || 0).toFixed(2)} kg</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{customer.netWeight.toFixed(2)} kg</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{customer.weight.toFixed(2)} Qtl</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less) ({customer.bags} @ {(customer.bagWeightKg || 0).toFixed(2)}kg)</td><td className="text-right font-semibold">- {totalBagWeightKg.toFixed(2)} kg</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{customer.netWeight.toFixed(2)} Qtl</td></tr>
                                         </tbody>
                                     </table>
                                 </CardContent>
@@ -94,13 +106,13 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint }: Custo
                                 <CardContent className="p-4 pt-0">
                                     <table className="w-full text-xs">
                                         <tbody>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{customer.netWeight.toFixed(2)} kg</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{customer.netWeight.toFixed(2)} Qtl</td></tr>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(customer.rate)}</td></tr>
                                             <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({customer.bags} @ {formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount || 0)}</td></tr>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD ({((Number(customer.cd) || 0) / customer.amount * 100).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.cd || 0)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.brokerage || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{(customer.cd || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerage || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount)}</td></tr>
                                         </tbody>
                                     </table>
                                 </CardContent>
@@ -116,6 +128,45 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint }: Custo
                                 <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p>
                             </CardContent>
                         </Card>
+
+                         <Card className="mt-4">
+                                <CardHeader className="p-4 pb-2">
+                                    <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0">
+                                    {paymentsForDetailsEntry.length > 0 ? (
+                                        <Table className="text-sm">
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead className="p-2 text-xs">Payment ID</TableHead>
+                                                    <TableHead className="p-2 text-xs">Date</TableHead>
+                                                    <TableHead className="p-2 text-xs">Type</TableHead>
+                                                    <TableHead className="p-2 text-xs">CD Applied</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">CD Amount</TableHead>
+                                                    <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {paymentsForDetailsEntry.map((payment, index) => {
+                                                    const paidForThis = payment.paidFor?.find(pf => pf.srNo === customer?.srNo);
+                                                    return (
+                                                        <TableRow key={payment.id || index}>
+                                                            <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
+                                                            <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
+                                                            <TableCell className="p-2">{payment.type}</TableCell>
+                                                            <TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell>
+                                                            <TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell>
+                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    ) : (
+                                        <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
+                                    )}
+                                </CardContent>
+                            </Card>  
                     </div>
                 </ScrollArea>
             </DialogContent>
