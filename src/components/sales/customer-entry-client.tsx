@@ -201,9 +201,11 @@ export default function CustomerEntryClient() {
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
     
-    const bagWeightKg = Number(values.bagWeightKg) || 0;
-    const bagWeightQuintals = bagWeightKg / 100;
-    const netWeight = weight - bagWeightQuintals;
+    const bags = Number(values.bags) || 0;
+    const bagWeightPerBagKg = Number(values.bagWeightKg) || 0;
+    const totalBagWeightKg = bags * bagWeightPerBagKg;
+    const totalBagWeightQuintals = totalBagWeightKg / 100;
+    const netWeight = weight - totalBagWeightQuintals;
     
     const rate = values.rate || 0;
     const amount = netWeight * rate;
@@ -216,7 +218,6 @@ export default function CustomerEntryClient() {
     
     const kanta = Number(values.kanta) || 0;
     
-    const bags = Number(values.bags) || 0;
     const bagRate = Number(values.bagRate) || 0;
     const bagAmount = bags * bagRate;
 

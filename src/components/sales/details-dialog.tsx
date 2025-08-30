@@ -44,6 +44,8 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
       p.paidFor?.some(pf => pf.srNo === customer?.srNo)
     );
     
+    const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
+
     return (
         <Dialog open={isOpen ?? !!customer} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0">
@@ -58,20 +60,10 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                             </Button>
                         )}
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="icon" className="h-8 w-8">
-                                    <Settings className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}>
-                                    <DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem>
-                                </DropdownMenuRadioGroup>
-                            </DropdownMenuContent>
+                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent><DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}><DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuContent>
                         </DropdownMenu>
-                        <DialogClose asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button>
-                        </DialogClose>
+                        <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button></DialogClose>
                     </div>
                 </DialogHeader>
                 <ScrollArea className="max-h-[85vh]">
@@ -80,12 +72,8 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                         <div className="space-y-4">
                             <Card>
                                 <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
-                                    <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full">
-                                        <p className="text-xs text-muted-foreground">SR No.</p>
-                                        <p className="text-2xl font-bold font-mono text-primary">{customer.srNo}</p>
-                                    </div>
-                                    <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" />
-                                    <Separator orientation="horizontal" className="w-full md:hidden" />
+                                    <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full"><p className="text-xs text-muted-foreground">SR No.</p><p className="text-2xl font-bold font-mono text-primary">{customer.srNo}</p></div>
+                                    <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" /><Separator orientation="horizontal" className="w-full md:hidden" />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
                                         <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(customer.name)} />
                                         <DetailItem icon={<Phone size={14} />} label="Contact" value={customer.contact} />
@@ -101,39 +89,31 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                 <Card>
                                     <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0 space-y-3">
-                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                            <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} />
-                                            <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} />
-                                            <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} />
-                                        </div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2"><DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} /><DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} /><DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} /></div>
                                         <Separator />
-                                        <Table className="text-xs">
-                                            <TableBody>
-                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{customer.grossWeight.toFixed(2)} kg</td></tr>
-                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {customer.teirWeight.toFixed(2)} kg</td></tr>
-                                                <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{customer.weight.toFixed(2)} kg</td></tr>
-                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less)</td><td className="text-right font-semibold">- {(Number(customer.bagWeightKg) || 0).toFixed(2)} kg</td></tr>
-                                                <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{customer.netWeight.toFixed(2)} kg</td></tr>
-                                            </TableBody>
-                                        </Table>
+                                        <Table className="text-xs"><TableBody>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{customer.grossWeight.toFixed(2)} kg</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {customer.teirWeight.toFixed(2)} kg</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{customer.weight.toFixed(2)} Qtl</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less) ({customer.bags} @ {customer.bagWeightKg}kg)</td><td className="text-right font-semibold">- {totalBagWeightKg.toFixed(2)} kg</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{customer.netWeight.toFixed(2)} Qtl</td></tr>
+                                        </TableBody></Table>
                                     </CardContent>
                                 </Card>
                                 <Card>
                                     <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0">
-                                        <Table className="text-xs">
-                                            <TableBody>
-                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{customer.netWeight.toFixed(2)} kg</td></tr>
-                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(customer.rate)}</td></tr>
-                                                <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
-                                                {customer.bagAmount != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount (@{formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount)}</td></tr>}
-                                                {customer.kanta != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>}
-                                                {customer.cd != null && customer.cd > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{customer.cdRate?.toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.cd)}</td></tr>}
-                                                {customer.brokerage != null && customer.brokerage > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerageRate || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.brokerage)}</td></tr>}
-                                                {customer.kartaAmount != null && customer.kartaAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta (@{customer.kartaPercentage}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.kartaAmount)}</td></tr>}
-                                                {customer.labouryAmount != null && customer.labouryAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (@{customer.labouryRate.toFixed(2)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.labouryAmount)}</td></tr>}
-                                            </TableBody>
-                                        </Table>
+                                        <Table className="text-xs"><TableBody>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{customer.netWeight.toFixed(2)} Qtl</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(customer.rate)}</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
+                                            {customer.bagAmount != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({customer.bags} @ {formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount)}</td></tr>}
+                                            {customer.kanta != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>}
+                                            {customer.cd != null && customer.cd > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{customer.cdRate?.toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.cd)}</td></tr>}
+                                            {customer.brokerage != null && customer.brokerage > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerageRate || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.brokerage)}</td></tr>}
+                                            {customer.kartaAmount != null && customer.kartaAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta (@{customer.kartaPercentage}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.kartaAmount)}</td></tr>}
+                                            {customer.labouryAmount != null && customer.labouryAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (@{customer.labouryRate.toFixed(2)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.labouryAmount)}</td></tr>}
+                                        </TableBody></Table>
                                     </CardContent>
                                 </Card>
                             </div>
