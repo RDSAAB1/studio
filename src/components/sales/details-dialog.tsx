@@ -13,15 +13,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight } from "lucide-react";
+import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer } from "lucide-react";
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
 interface DetailsDialogProps {
-    isOpen: boolean;
+    isOpen?: boolean;
     onOpenChange: (isOpen: boolean) => void;
     customer: Customer | null;
-    paymentHistory: Payment[];
+    paymentHistory?: Payment[];
+    onPrint?: (customer: Customer) => void;
 }
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -29,12 +30,12 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
         {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
         <div>
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="font-semibold text-sm">{String(value)}</p>
+            <p className="font-semibold text-sm break-words">{String(value) || '-'}</p>
         </div>
     </div>
 );
 
-export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory }: DetailsDialogProps) => {
+export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory = [], onPrint }: DetailsDialogProps) => {
     const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
 
     if (!customer) return null;
@@ -44,13 +45,18 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory }
     );
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <Dialog open={isOpen ?? !!customer} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0">
                 <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
                     <div>
                         <DialogTitle className="text-base font-semibold">Details for SR No: {customer.srNo}</DialogTitle>
                     </div>
                     <div className="flex items-center gap-2">
+                        {onPrint && (
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onPrint(customer)}>
+                                <Printer className="h-4 w-4" />
+                            </Button>
+                        )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="icon" className="h-8 w-8">
@@ -60,9 +66,6 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory }
                             <DropdownMenuContent>
                                 <DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}>
                                     <DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem>
-                                    <DropdownMenuRadioItem value="compact"><LayoutList className="mr-2 h-4 w-4" />Compact</DropdownMenuRadioItem>
-                                    <DropdownMenuRadioItem value="grid"><LayoutGrid className="mr-2 h-4 w-4" />Grid</DropdownMenuRadioItem>
-                                    <DropdownMenuRadioItem value="step-by-step"><StepForward className="mr-2 h-4 w-4" />Step-by-Step</DropdownMenuRadioItem>
                                 </DropdownMenuRadioGroup>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -86,7 +89,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory }
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
                                         <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(customer.name)} />
                                         <DetailItem icon={<Phone size={14} />} label="Contact" value={customer.contact} />
-                                        <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(customer.so)} />
+                                        <DetailItem icon={<UserSquare size={14} />} label={customer.companyName ? "Company Name" : "S/O"} value={toTitleCase(customer.companyName || customer.so || '')} />
                                         <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(customer.date), "PPP")} />
                                         <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(customer.dueDate), "PPP")} />
                                         <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(customer.address)} className="col-span-1 sm:col-span-2" />
@@ -96,12 +99,12 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory }
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Card>
-                                    <CardHeader className="p-4"><CardTitle className="text-base">Transaction &amp; Weight</CardTitle></CardHeader>
+                                    <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0 space-y-3">
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                        <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} />
-                                        <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} />
-                                        <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} />
+                                            <DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} />
+                                            <DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} />
+                                            <DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} />
                                         </div>
                                         <Separator />
                                         <Table className="text-xs">
@@ -116,18 +119,19 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory }
                                 <Card>
                                     <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0">
-                                    <Table className="text-xs">
-                                        <TableBody>
-                                            <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                            <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(customer.rate)}</TableCell></TableRow>
-                                            <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(customer.amount)}</TableCell></TableRow>
-                                            <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({customer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kartaAmount)}</TableCell></TableRow>
-                                            <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {customer.labouryRate.toFixed(2)}</TableCell></TableRow>
-                                            <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.labouryAmount)}</TableCell></TableRow>
-                                            <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kanta)}</TableCell></TableRow>
-                                            <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.cd || 0)}</TableCell></TableRow>
-                                        </TableBody>
-                                    </Table>
+                                        <Table className="text-xs">
+                                            <TableBody>
+                                                <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.netWeight.toFixed(2)} kg</TableCell></TableRow>
+                                                <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(customer.rate)}</TableCell></TableRow>
+                                                <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(customer.amount)}</TableCell></TableRow>
+                                                {customer.kartaAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({customer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kartaAmount)}</TableCell></TableRow>}
+                                                {customer.labouryAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {customer.labouryRate.toFixed(2)}</TableCell></TableRow>}
+                                                {customer.labouryAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.labouryAmount)}</TableCell></TableRow>}
+                                                {customer.kanta > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kanta)}</TableCell></TableRow>}
+                                                {customer.bagAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-green-600 flex items-center gap-2"><HandCoins size={12} />Bag Amount</TableCell><TableCell className="text-right font-semibold p-1 text-green-600">+ {formatCurrency(customer.bagAmount)}</TableCell></TableRow>}
+                                                {customer.cd > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.cd || 0)}</TableCell></TableRow>}
+                                            </TableBody>
+                                        </Table>
                                     </CardContent>
                                 </Card>
                             </div>

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
-import { toTitleCase, formatSrNo, formatCurrency } from "@/lib/utils";
+import { toTitleCase, formatSrNo, formatCurrency, cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -31,9 +31,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Info, Pen, Printer, Trash2 } from "lucide-react";
+import { Info, Pen, Printer, Trash2, Loader2, ChevronsUpDown, Check, RefreshCw } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -42,8 +42,11 @@ import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
 import type { ReceiptSettings } from "@/lib/definitions";
 import { Separator } from "@/components/ui/separator";
-import { DetailsDialog } from "@/components/sales/details-dialog";
+import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { OutstandingEntriesDialog } from "@/components/sales/supplier-payments/outstanding-entries-dialog";
 
 
 export default function CustomerPaymentsPage() {
@@ -63,15 +66,15 @@ export default function CustomerPaymentsPage() {
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<Payment | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Customer | null>(null);
-
+  const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
+  const [openCombobox, setOpenCombobox] = useState(false);
 
   const customerSummary = useMemo(() => {
     const newSummary = new Map<string, CustomerSummary>();
     customers.forEach(entry => {
-      if (!entry.name || !entry.contact) return;
-      const key = entry.customerId || `${entry.name.toLowerCase()}|${entry.contact.toLowerCase()}`;
-      if (!newSummary.has(key)) {
-        newSummary.set(key, {
+      if (!entry.customerId) return;
+      if (!newSummary.has(entry.customerId)) {
+        newSummary.set(entry.customerId, {
           name: entry.name,
           contact: entry.contact,
           totalOutstanding: 0,
@@ -79,10 +82,10 @@ export default function CustomerPaymentsPage() {
           outstandingEntryIds: [],
         } as CustomerSummary);
       }
-      const data = newSummary.get(key)!;
+      const data = newSummary.get(entry.customerId)!;
       const receivableAmount = parseFloat(String(entry.netAmount)) || 0;
+      data.totalOutstanding += receivableAmount;
       if (receivableAmount > 0) {
-        data.totalOutstanding += receivableAmount;
         data.outstandingEntryIds.push(entry.id);
       }
     });
@@ -143,7 +146,6 @@ export default function CustomerPaymentsPage() {
     };
     fetchSettings();
 
-
     return () => {
         unsubscribeCustomers();
         unsubscribePayments();
@@ -156,6 +158,7 @@ export default function CustomerPaymentsPage() {
     setPaymentAmount(0);
     setPaymentType('Full');
     setEditingPayment(null);
+    setIsOutstandingModalOpen(true); // Automatically open modal
   };
 
   const handleEntrySelect = (entryId: string) => {
@@ -213,11 +216,11 @@ export default function CustomerPaymentsPage() {
                 id: tempEditingPayment ? tempEditingPayment.id : receiptNo,
                 paymentId: tempEditingPayment ? tempEditingPayment.paymentId : receiptNo,
                 customerId: selectedCustomerKey,
-                date: new Date().toISOString(),
+                date: new Date().toISOString().split('T')[0],
                 amount: paymentAmount,
                 type: paymentType,
                 receiptType: 'Cash', // Placeholder, could be a form field
-                notes: `Received payment for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
+                notes: selectedEntries.map(e => e.srNo).join(', '),
                 paidFor: [],
                 cdAmount: 0, 
                 cdApplied: false,
@@ -253,6 +256,7 @@ export default function CustomerPaymentsPage() {
         setPaymentAmount(0);
         setPaymentType('Full');
         setEditingPayment(null);
+        setReceiptNo(getNextReceiptNo(paymentHistory));
 
     } catch(error) {
         console.error("Error processing payment:", error);
@@ -297,7 +301,6 @@ export default function CustomerPaymentsPage() {
   };
 
   const handlePrintPayment = (payment: Payment) => {
-    // This is a placeholder for printing. We need to create a receipt component.
     const customer = customers.find(c => c.customerId === payment.customerId);
     if(customer) {
         const receiptData = { ...customer, netAmount: payment.amount, originalNetAmount: payment.amount, date: payment.date };
@@ -313,156 +316,136 @@ export default function CustomerPaymentsPage() {
         const entry = customers.find(c => c.srNo === paidForSrNos[0]);
         if (entry) {
             setDetailsEntry(entry);
-        } else {
-            setPaymentDetails(payment);
+            return;
         }
-    } else {
-        setPaymentDetails(payment);
     }
+    setPaymentDetails(payment);
   };
+  
+  const handleConfirmSelection = () => {
+    if (selectedEntryIds.size === 0) {
+      toast({ variant: "destructive", title: "No Entries Selected", description: "Please select entries to pay." });
+      return;
+    }
+    setIsOutstandingModalOpen(false);
+  }
+
+  const handleCancelSelection = () => {
+    setIsOutstandingModalOpen(false);
+    setSelectedCustomerKey(null);
+    setSelectedEntryIds(new Set());
+  }
 
   const receivableEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && (parseFloat(String(c.netAmount)) || 0) > 0) : [];
   const customerPayments = selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey) : [];
   
   if (loading) {
     return (
-        <div className="space-y-8 p-4">
-            <Card><CardHeader><CardTitle><Skeleton className="h-6 w-1/4" /></CardTitle></CardHeader><CardContent><Skeleton className="h-10 w-1/2" /></CardContent></Card>
-            <Card><CardHeader><CardTitle><Skeleton className="h-6 w-1/3" /></CardTitle></CardHeader><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>
+        <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-4 text-muted-foreground">Loading Customer Data...</span>
         </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader><CardTitle>Select Customer</CardTitle></CardHeader>
-        <CardContent>
-            <Select onValueChange={handleCustomerSelect} value={selectedCustomerKey || ''}>
-                <SelectTrigger className="w-full md:w-1/2">
-                    <SelectValue placeholder="Select a customer to receive payments" />
-                </SelectTrigger>
-                <SelectContent>
-                    {Array.from(customerSummary.entries()).map(([key, data]) => (
-                    <SelectItem key={key} value={key}>
-                        {toTitleCase(data.name)} ({data.contact}) - Receivable: {formatCurrency(data.totalOutstanding)}
-                    </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+    <div className="space-y-6">
+       <Card>
+        <CardContent className="p-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Customer:</Label>
+            <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={openCombobox} className="h-9 text-sm flex-1 justify-between font-normal">
+                      {selectedCustomerKey ? `${toTitleCase(customerSummary.get(selectedCustomerKey)?.name || '')} (${customerSummary.get(selectedCustomerKey)?.contact || ''})` : "Search and select customer..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-50">
+                    <Command>
+                        <CommandInput placeholder="Search by name or contact..." />
+                        <CommandList>
+                            <CommandEmpty>No customer found.</CommandEmpty>
+                            <CommandGroup>
+                                {Array.from(customerSummary.entries()).map(([key, data]) => (
+                                    <CommandItem key={key} value={`${data.name} ${data.contact}`} onSelect={() => { handleCustomerSelect(key); setOpenCombobox(false); }}>
+                                      <Check className={cn("mr-2 h-4 w-4", selectedCustomerKey === key ? "opacity-100" : "opacity-0")}/>{toTitleCase(data.name)} ({data.contact}) - bal: {formatCurrency(data.totalOutstanding)}
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
+          </div>
         </CardContent>
       </Card>
 
       {selectedCustomerKey && (
         <>
           <Card>
-            <CardHeader><CardTitle>Receivable Entries</CardTitle></CardHeader>
-            <CardContent>
-                <div className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead><Checkbox onCheckedChange={(checked) => {
-                            const newSet = new Set<string>();
-                            if(checked) {
-                                receivableEntries.forEach(e => newSet.add(e.id));
-                            }
-                            setSelectedEntryIds(newSet);
-                        }}
-                        checked={selectedEntryIds.size > 0 && selectedEntryIds.size === receivableEntries.length}
-                         /></TableHead>
-                        <TableHead>SR No</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right">Amount Receivable</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {receivableEntries.map(entry => (
-                        <TableRow key={entry.id} data-state={selectedEntryIds.has(entry.id) ? "selected" : ""}>
-                        <TableCell><Checkbox checked={selectedEntryIds.has(entry.id)} onCheckedChange={() => handleEntrySelect(entry.id)} /></TableCell>
-                        <TableCell>{entry.srNo}</TableCell>
-                        <TableCell>{entry.date}</TableCell>
-                        <TableCell>{entry.dueDate}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(parseFloat(String(entry.netAmount)))}</TableCell>
-                        </TableRow>
-                    ))}
-                     {receivableEntries.length === 0 && (
-                        <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground h-24">No receivable entries found for this customer.</TableCell>
-                        </TableRow>
-                     )}
-                    </TableBody>
-                </Table>
-                </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-              <CardHeader><CardTitle>{editingPayment ? `Editing Payment ${editingPayment.paymentId}` : "Receive Payment"}</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
-                  <div className="p-4 border rounded-lg bg-card/30">
-                      <p className="text-muted-foreground">Total Receivable for Selected Entries:</p>
-                      <p className="text-2xl font-bold text-primary">{formatCurrency(totalReceivableForSelected)}</p>
+              <CardContent className="p-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 border rounded-lg bg-card/30">
+                      <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground">Total Receivable for Selected Entries</p>
+                          <p className="text-xl font-bold text-primary">{formatCurrency(totalReceivableForSelected)}</p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)}><RefreshCw className="mr-2 h-3 w-3"/>Change Selection</Button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="receipt-no">Receipt No.</Label>
-                        <Input id="receipt-no" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} readOnly={!!editingPayment} />
+                        <Label htmlFor="receipt-no" className="text-xs">Receipt No.</Label>
+                        <Input id="receipt-no" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} readOnly={!!editingPayment} className="h-9 text-sm"/>
                       </div>
                       <div className="space-y-2">
-                        <Label>Payment Type</Label>
-                        <Select value={paymentType} onValueChange={setPaymentType}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Full">Full</SelectItem>
-                                <SelectItem value="Partial">Partial</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <Label className="text-xs">Payment Type</Label>
+                        <Select value={paymentType} onValueChange={setPaymentType}><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Full">Full</SelectItem><SelectItem value="Partial">Partial</SelectItem></SelectContent></Select>
                       </div>
                       <div className="space-y-2">
-                          <Label htmlFor="payment-amount">Payment Amount</Label>
-                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} />
+                          <Label htmlFor="payment-amount" className="text-xs">Payment Amount</Label>
+                          <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-9 text-sm"/>
                       </div>
+                      <Button onClick={processPayment} disabled={selectedEntryIds.size === 0} className="self-end h-9">
+                        {editingPayment ? 'Update Payment' : 'Receive Payment'}
+                      </Button>
                   </div>
-                  <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>
-                    {editingPayment ? 'Update Payment' : 'Receive Payment'}
-                  </Button>
                    {editingPayment && <Button variant="outline" onClick={() => { setEditingPayment(null); setSelectedEntryIds(new Set()); setPaymentAmount(0); }}>Cancel Edit</Button>}
               </CardContent>
           </Card>
           
           <Card>
-            <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Payment History for {toTitleCase(customerSummary.get(selectedCustomerKey)?.name || '')}</CardTitle></CardHeader>
              <CardContent>
                 {customerPayments.length > 0 ? (
                 <div className="overflow-x-auto">
                 <Table>
-                    <TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Notes</TableHead><TableHead className="text-center">Actions</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-center">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                     {customerPayments.map(p => (
                         <TableRow key={p.id}>
-                        <TableCell className="font-mono">{p.paymentId}</TableCell>
-                        <TableCell>{p.date}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.paymentId}</TableCell>
+                        <TableCell className="text-xs">{new Date(p.date).toLocaleDateString()}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{p.notes}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(p)}><Info className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}><Pen className="h-4 w-4" /></Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore outstanding amounts.</AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeletePayment(p.id)}>Continue</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePrintPayment(p)}><Printer className="h-4 w-4" /></Button>
+                            <div className="flex justify-center items-center gap-0">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowDetails(p)}><Info className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}><Pen className="h-4 w-4" /></Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore outstanding amounts.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => p.id && handleDeletePayment(p.id)}>Continue</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePrintPayment(p)}><Printer className="h-4 w-4" /></Button>
+                            </div>
                         </TableCell>
                         </TableRow>
                     ))}
@@ -484,11 +467,10 @@ export default function CustomerPaymentsPage() {
         isCustomer={true}
       />
 
-    <DetailsDialog 
-        isOpen={!!detailsEntry} 
-        onOpenChange={() => setDetailsEntry(null)}
+    <CustomerDetailsDialog 
         customer={detailsEntry}
-        paymentHistory={paymentHistory.filter(p => p.paidFor?.some(pf => pf.srNo === detailsEntry?.srNo))}
+        onOpenChange={() => setDetailsEntry(null)}
+        onPrint={() => { if(detailsEntry) { setReceiptsToPrint([detailsEntry]); setDetailsEntry(null); } }}
     />
       
     <PaymentDetailsDialog
@@ -497,7 +479,21 @@ export default function CustomerPaymentsPage() {
         customers={customers}
     />
 
-
+     <OutstandingEntriesDialog
+        isOpen={isOutstandingModalOpen}
+        onOpenChange={setIsOutstandingModalOpen}
+        customerName={toTitleCase(customerSummary.get(selectedCustomerKey || '')?.name || '')}
+        entries={receivableEntries}
+        selectedIds={selectedEntryIds}
+        onSelect={handleEntrySelect}
+        onSelectAll={(checked: boolean) => {
+            const newSet = new Set<string>();
+            if(checked) receivableEntries.forEach(e => newSet.add(e.id));
+            setSelectedEntryIds(newSet);
+        }}
+        onConfirm={handleConfirmSelection}
+        onCancel={handleCancelSelection}
+    />
     </div>
   );
 }

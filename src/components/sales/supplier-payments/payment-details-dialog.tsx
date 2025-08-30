@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { format } from "date-fns";
 import { formatCurrency, toTitleCase } from "@/lib/utils";
 import { Banknote, Percent, Calendar as CalendarIcon, Receipt, Hash } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Info } from "lucide-react";
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
     <div className="flex items-start gap-3">
@@ -18,7 +20,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-export const PaymentDetailsDialog = ({ payment, customers, onOpenChange }: any) => {
+export const PaymentDetailsDialog = ({ payment, customers, onOpenChange, onShowEntryDetails }: any) => {
     if (!payment) return null;
 
     return (
@@ -44,6 +46,7 @@ export const PaymentDetailsDialog = ({ payment, customers, onOpenChange }: any) 
                             <TableHead>SR No</TableHead>
                             <TableHead>Customer Name</TableHead>
                             <TableHead className="text-right">Amount Paid</TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -54,6 +57,11 @@ export const PaymentDetailsDialog = ({ payment, customers, onOpenChange }: any) 
                                     <TableCell>{pf.srNo}</TableCell>
                                     <TableCell>{customer ? toTitleCase(customer.name) : 'N/A'}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowEntryDetails(customer)}>
+                                            <Info className="h-4 w-4" />
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
                             )
                         })}
