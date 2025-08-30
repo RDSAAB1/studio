@@ -40,8 +40,8 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
 
     const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
 
-    const displayBrokerageAmount = customer.brokerage;
-    const displayCdAmount = customer.cd;
+    const displayBrokerageAmount = (customer.weight || 0) * (customer.brokerageRate || 0);
+    const displayCdAmount = (customer.amount || 0) * ((customer.cdRate || 0) / 100);
 
     return (
         <Dialog open={!!customer} onOpenChange={onOpenChange}>
