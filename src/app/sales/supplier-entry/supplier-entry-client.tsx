@@ -291,8 +291,9 @@ export default function SupplierEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
+        const currentId = isEditing ? currentSupplier.id : "";
         const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum) };
+        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum), id: currentId };
         resetFormToState(currentState);
     }
   }

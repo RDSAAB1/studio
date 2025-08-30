@@ -325,8 +325,9 @@ export default function CustomerEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
+        const currentId = isEditing ? currentCustomer.id : "";
         const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum, 'C') };
+        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum, 'C'), id: currentId };
         resetFormToState(currentState);
     }
   }
