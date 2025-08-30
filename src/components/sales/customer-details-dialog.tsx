@@ -34,8 +34,8 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, paymentHistory }: CustomerDetailsDialogProps) => {
     if (!customer) return null;
 
-    const paymentsForDetailsEntry = (paymentHistory || []).filter(p => 
-      p.paidFor?.some(pf => pf.srNo === customer?.srNo)
+    const paymentsForDetailsEntry = (paymentHistory || []).filter(p =>
+      p.paidFor?.some(pf => pf.srNo === customer.srNo)
     );
 
     const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
