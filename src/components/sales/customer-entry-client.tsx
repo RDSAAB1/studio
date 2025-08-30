@@ -389,8 +389,7 @@ export default function CustomerEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    // This is the fix. Merge the full `currentCustomer` state (which has all calculations)
-    // with the latest form values. This ensures calculated fields are not lost.
+    // Correctly merge the full calculated state with the latest form values.
     const completeEntry: Customer = {
       ...currentCustomer,
       ...values,
