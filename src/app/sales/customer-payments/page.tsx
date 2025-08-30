@@ -41,6 +41,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
 import type { ReceiptSettings } from "@/lib/definitions";
+import { Separator } from "@/components/ui/separator";
+
+const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
+    <div className="flex items-start gap-3">
+        {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
+        <div>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="font-semibold text-sm break-words">{String(value) || '-'}</p>
+        </div>
+    </div>
+);
+
 
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
@@ -465,25 +477,42 @@ export default function CustomerPaymentsPage() {
       />
       
     <Dialog open={!!paymentDetails} onOpenChange={() => setPaymentDetails(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
             <DialogHeader>
                 <DialogTitle>Payment Details: {paymentDetails?.paymentId}</DialogTitle>
             </DialogHeader>
             {paymentDetails && (
-                <div className="space-y-4">
-                    <p>Amount: {formatCurrency(paymentDetails.amount)} on {new Date(paymentDetails.date).toLocaleDateString()}</p>
-                    <h4 className="font-semibold">Paid for entries:</h4>
-                    <Table>
-                        <TableHeader><TableRow><TableHead>SR No</TableHead><TableHead>Amount Paid</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {paymentDetails.paidFor?.map(pf => (
-                                <TableRow key={pf.srNo}>
-                                    <TableCell>{pf.srNo}</TableCell>
-                                    <TableCell>{formatCurrency(pf.amount)}</TableCell>
+                <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <DetailItem label="Payment Date" value={new Date(paymentDetails.date).toLocaleDateString()} />
+                        <DetailItem label="Total Amount Paid" value={formatCurrency(paymentDetails.amount)} />
+                        <DetailItem label="Payment Type" value={paymentDetails.type} />
+                        <DetailItem label="Payment Method" value={paymentDetails.receiptType} />
+                    </div>
+                    <Separator />
+                    <h4 className="font-semibold">Entries Paid in this Transaction</h4>
+                    <div className="border rounded-lg max-h-64 overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>SR No</TableHead>
+                                    <TableHead className="text-right">Amount Paid</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {paymentDetails.paidFor?.length ? paymentDetails.paidFor.map(pf => (
+                                    <TableRow key={pf.srNo}>
+                                        <TableCell>{pf.srNo}</TableCell>
+                                        <TableCell className="text-right font-semibold">{formatCurrency(pf.amount)}</TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={2} className="text-center text-muted-foreground py-4">No entries found for this payment.</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </div>
             )}
         </DialogContent>
@@ -492,3 +521,5 @@ export default function CustomerPaymentsPage() {
     </div>
   );
 }
+
+    
