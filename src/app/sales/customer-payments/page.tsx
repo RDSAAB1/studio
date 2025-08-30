@@ -42,6 +42,8 @@ import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
 import type { ReceiptSettings } from "@/lib/definitions";
 import { Separator } from "@/components/ui/separator";
+import { DetailsDialog } from "@/components/sales/supplier-payments/details-dialog";
+
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
     <div className="flex items-start gap-3">
@@ -67,9 +69,10 @@ export default function CustomerPaymentsPage() {
   
   const [loading, setLoading] = useState(true);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
-  const [receiptsToPrint, setReceiptsToPrint] = useState<Payment[]>([]);
+  const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<Payment | null>(null);
+  const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
 
   const customerSummary = useMemo(() => {
     const newSummary = new Map<string, CustomerSummary>();
@@ -325,6 +328,14 @@ export default function CustomerPaymentsPage() {
     )
   }
 
+  const handleShowEntryDetails = (srNo: string) => {
+    const entry = customers.find(c => c.srNo === srNo);
+    if (entry) {
+        setDetailsSupplierEntry(entry);
+    }
+  };
+
+
   return (
     <div className="space-y-8">
       <Card>
@@ -497,6 +508,7 @@ export default function CustomerPaymentsPage() {
                                 <TableRow>
                                     <TableHead>SR No</TableHead>
                                     <TableHead className="text-right">Amount Paid</TableHead>
+                                    <TableHead className="text-center">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -504,10 +516,15 @@ export default function CustomerPaymentsPage() {
                                     <TableRow key={pf.srNo}>
                                         <TableCell>{pf.srNo}</TableCell>
                                         <TableCell className="text-right font-semibold">{formatCurrency(pf.amount)}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowEntryDetails(pf.srNo)}>
+                                                <Info className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
                                 )) : (
                                     <TableRow>
-                                        <TableCell colSpan={2} className="text-center text-muted-foreground py-4">No entries found for this payment.</TableCell>
+                                        <TableCell colSpan={3} className="text-center text-muted-foreground py-4">No entries found for this payment.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
@@ -517,6 +534,14 @@ export default function CustomerPaymentsPage() {
             )}
         </DialogContent>
     </Dialog>
+    
+    <DetailsDialog 
+        isOpen={!!detailsSupplierEntry} 
+        onOpenChange={() => setDetailsSupplierEntry(null)} 
+        customer={detailsSupplierEntry} 
+        paymentHistory={paymentHistory} 
+    />
+
 
     </div>
   );
