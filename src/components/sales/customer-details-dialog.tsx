@@ -18,7 +18,7 @@ interface CustomerDetailsDialogProps {
     customer: Customer | null;
     onOpenChange: (isOpen: boolean) => void;
     onPrint: (customer: Customer) => void;
-    paymentHistory: Payment[];
+    paymentHistory?: Payment[];
 }
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -34,14 +34,14 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, paymentHistory }: CustomerDetailsDialogProps) => {
     if (!customer) return null;
 
-    const paymentsForDetailsEntry = paymentHistory.filter(p => 
+    const paymentsForDetailsEntry = (paymentHistory || []).filter(p => 
       p.paidFor?.some(pf => pf.srNo === customer?.srNo)
     );
 
     const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
 
-    const displayBrokerageAmount = (customer.weight || 0) * (customer.brokerage || 0);
-    const displayCdAmount = (customer.amount || 0) * ((customer.cd || 0) / 100);
+    const displayBrokerageAmount = customer.brokerage;
+    const displayCdAmount = customer.cd;
 
     return (
         <Dialog open={!!customer} onOpenChange={onOpenChange}>
@@ -111,8 +111,8 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                             <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({customer.bags} @ {formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount || 0)}</td></tr>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{(customer.cd || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerage || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{(customer.cdRate || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerageRate || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount || 0)}</td></tr>
                                         </tbody>
                                     </table>
                                 </CardContent>
