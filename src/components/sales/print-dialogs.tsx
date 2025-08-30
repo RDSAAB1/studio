@@ -14,9 +14,10 @@ interface ReceiptPrintDialogProps {
     receipts: Customer[];
     settings: ReceiptSettings | null;
     onOpenChange: (open: boolean) => void;
+    isCustomer?: boolean;
 }
 
-export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange }: ReceiptPrintDialogProps) => {
+export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustomer = false }: ReceiptPrintDialogProps) => {
     const { toast } = useToast();
     const contentRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +69,7 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange }: Receipt
                     <div ref={contentRef}>
                         {receipts.map((receiptData, index) => (
                             <div key={index} className="receipt-container">
-                                {settings && <ReceiptPreview data={receiptData} settings={settings}/>}
+                                {settings && <ReceiptPreview data={receiptData} settings={settings} isCustomer={isCustomer}/>}
                             </div>
                         ))}
                     </div>
@@ -87,9 +88,10 @@ interface ConsolidatedReceiptPrintDialogProps {
     data: ConsolidatedReceiptData | null;
     settings: ReceiptSettings | null;
     onOpenChange: (open: boolean) => void;
+    isCustomer?: boolean;
 }
 
-export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange }: ConsolidatedReceiptPrintDialogProps) => {
+export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, isCustomer = false }: ConsolidatedReceiptPrintDialogProps) => {
     const { toast } = useToast();
     const contentRef = useRef<HTMLDivElement>(null);
 
@@ -141,7 +143,7 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange }:
                     <div ref={contentRef}>
                         {data && settings && (
                             <div className="receipt-container">
-                                <ConsolidatedReceiptPreview data={data} settings={settings} />
+                                <ConsolidatedReceiptPreview data={data} settings={settings} isCustomer={isCustomer}/>
                             </div>
                         )}
                     </div>

@@ -465,6 +465,50 @@ export default function CustomerEntryClient() {
     setDetailsCustomer(customer);
   };
 
+  const handlePrint = (entriesToPrint: Customer[]) => {
+    if (!entriesToPrint || entriesToPrint.length === 0) {
+        toast({
+            title: "No Selection",
+            description: "Please select one or more entries to print.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    if (entriesToPrint.length === 1) {
+        setReceiptsToPrint(entriesToPrint);
+        setConsolidatedReceiptData(null);
+    } else {
+        const firstCustomerId = entriesToPrint[0].customerId;
+        const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
+
+        if (!allSameCustomer) {
+            toast({
+                title: "Multiple Customers Selected",
+                description: "Consolidated receipts can only be printed for a single customer at a time.",
+                variant: "destructive",
+            });
+            return;
+        }
+        
+        const customer = entriesToPrint[0];
+        const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
+        
+        setConsolidatedReceiptData({
+            supplier: { // This should be customer, but the definition is shared.
+                name: customer.name,
+                so: customer.so,
+                address: customer.address,
+                contact: customer.contact,
+            },
+            entries: entriesToPrint,
+            totalAmount: totalAmount,
+            date: format(new Date(), "dd-MMM-yy"),
+        });
+        setReceiptsToPrint([]);
+    }
+  };
+
   const handleOpenPrintPreview = (customer: Customer) => {
     setDocumentPreviewCustomer(customer);
     setDocumentType('tax-invoice'); // Default to tax-invoice
@@ -518,6 +562,7 @@ export default function CustomerEntryClient() {
         onEdit={handleEdit} 
         onDelete={handleDelete} 
         onShowDetails={handleShowDetails}
+        onPrint={handlePrint}
         selectedIds={selectedCustomerIds}
         onSelectionChange={setSelectedCustomerIds}
         onSearch={setSearchTerm}
@@ -539,6 +584,20 @@ export default function CustomerEntryClient() {
         receiptSettings={receiptSettings}
       />
       
+       <ReceiptPrintDialog
+        receipts={receiptsToPrint}
+        settings={receiptSettings}
+        onOpenChange={() => setReceiptsToPrint([])}
+        isCustomer={true}
+      />
+      
+      <ConsolidatedReceiptPrintDialog
+        data={consolidatedReceiptData}
+        settings={receiptSettings}
+        onOpenChange={() => setConsolidatedReceiptData(null)}
+        isCustomer={true}
+      />
+
       <UpdateConfirmDialog
         isOpen={isUpdateConfirmOpen}
         onOpenChange={setIsUpdateConfirmOpen}

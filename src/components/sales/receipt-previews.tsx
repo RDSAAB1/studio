@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import type { Customer, ReceiptSettings, ConsolidatedReceiptData, ReceiptFieldSettings } from '@/lib/definitions';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 
-export const ReceiptPreview = ({ data, settings }: { data: Customer; settings: ReceiptSettings; }) => {
+export const ReceiptPreview = ({ data, settings, isCustomer = false }: { data: Customer; settings: ReceiptSettings; isCustomer?: boolean }) => {
     const { fields } = settings;
     return (
         <div className="text-black bg-white font-sans p-4">
@@ -96,7 +96,7 @@ export const ReceiptPreview = ({ data, settings }: { data: Customer; settings: R
                     <table className="w-full border-collapse">
                         <tbody>
                             {fields.dueDate && <tr><td className="font-bold border border-black p-1">DUE DATE</td><td className="border border-black p-1 text-right">{format(new Date(data.dueDate), "dd-MMM-yy")}</td></tr>}
-                            {fields.kartaWeight && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{Number(data.kartaWeight).toFixed(2)}</td></tr>}
+                            {fields.kartaWeight && !isCustomer && <tr><td className="font-bold border border-black p-1">KARTA</td><td className="border border-black p-1 text-right">{Number(data.kartaWeight).toFixed(2)}</td></tr>}
                             {fields.netAmount && <tr><td className="font-bold border border-black p-1">NET AMOUNT</td><td className="border border-black p-1 text-right font-bold">{formatCurrency(Number(data.netAmount))}</td></tr>}
                         </tbody>
                     </table>
@@ -106,7 +106,7 @@ export const ReceiptPreview = ({ data, settings }: { data: Customer; settings: R
     );
 };
 
-export const ConsolidatedReceiptPreview = ({ data, settings }: { data: ConsolidatedReceiptData; settings: ReceiptSettings }) => {
+export const ConsolidatedReceiptPreview = ({ data, settings, isCustomer = false }: { data: ConsolidatedReceiptData; settings: ReceiptSettings, isCustomer?: boolean }) => {
     const { fields } = settings;
     
     const visibleColumns: (keyof ReceiptFieldSettings)[] = [
@@ -114,7 +114,10 @@ export const ConsolidatedReceiptPreview = ({ data, settings }: { data: Consolida
         'teirWeight', 'weight', 'kartaWeight', 'netWeight', 'amount', 'dueDate', 'netAmount'
     ];
 
-    const colspan = visibleColumns.filter(key => fields[key]).length;
+    const colspan = visibleColumns.filter(key => {
+        if (isCustomer && key === 'kartaWeight') return false;
+        return fields[key];
+    }).length;
 
     return (
         <div className="text-black bg-white font-sans p-4">
@@ -155,7 +158,7 @@ export const ConsolidatedReceiptPreview = ({ data, settings }: { data: Consolida
                             <tbody>
                                 <tr><td className="font-bold pr-2">DATE</td><td>{data.date}</td></tr>
                                 <tr><td className="font-bold pr-2">NAME</td><td>{toTitleCase(data.supplier.name)}</td></tr>
-                                <tr><td className="font-bold pr-2">S/O</td><td>{toTitleCase(data.supplier.so)}</td></tr>
+                                {data.supplier.so && !isCustomer && <tr><td className="font-bold pr-2">S/O</td><td>{toTitleCase(data.supplier.so)}</td></tr>}
                                 <tr><td className="font-bold pr-2">CONTACT</td><td>{data.supplier.contact}</td></tr>
                                 <tr><td className="font-bold pr-2">ADDRESS</td><td>{toTitleCase(data.supplier.address)}</td></tr>
                             </tbody>
@@ -176,7 +179,7 @@ export const ConsolidatedReceiptPreview = ({ data, settings }: { data: Consolida
                         {fields.grossWeight && <td className="border border-black p-1 text-center">Gross Wt.</td>}
                         {fields.teirWeight && <td className="border border-black p-1 text-center">Teir Wt.</td>}
                         {fields.weight && <td className="border border-black p-1 text-center">Weight</td>}
-                        {fields.kartaWeight && <td className="border border-black p-1 text-center">Karta Wt.</td>}
+                        {fields.kartaWeight && !isCustomer && <td className="border border-black p-1 text-center">Karta Wt.</td>}
                         {fields.netWeight && <td className="border border-black p-1 text-center">Net Wt.</td>}
                         {fields.amount && <td className="border border-black p-1 text-center">Amount</td>}
                         {fields.dueDate && <td className="border border-black p-1 text-center">Due Date</td>}
@@ -195,7 +198,7 @@ export const ConsolidatedReceiptPreview = ({ data, settings }: { data: Consolida
                             {fields.grossWeight && <td className="border border-black p-1 text-right">{Number(entry.grossWeight).toFixed(2)}</td>}
                             {fields.teirWeight && <td className="border border-black p-1 text-right">{Number(entry.teirWeight).toFixed(2)}</td>}
                             {fields.weight && <td className="border border-black p-1 text-right">{Number(entry.weight).toFixed(2)}</td>}
-                            {fields.kartaWeight && <td className="border border-black p-1 text-right">{Number(entry.kartaWeight).toFixed(2)}</td>}
+                            {fields.kartaWeight && !isCustomer && <td className="border border-black p-1 text-right">{Number(entry.kartaWeight).toFixed(2)}</td>}
                             {fields.netWeight && <td className="border border-black p-1 text-right">{Number(entry.netWeight).toFixed(2)}</td>}
                             {fields.amount && <td className="border border-black p-1 text-right">{formatCurrency(Number(entry.amount))}</td>}
                             {fields.dueDate && <td className="border border-black p-1 text-center">{format(new Date(entry.dueDate), "dd-MMM-yy")}</td>}
