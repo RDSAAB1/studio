@@ -109,9 +109,11 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                         <Separator />
                                         <Table className="text-xs">
                                             <TableBody>
-                                                <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.grossWeight.toFixed(2)} kg</TableCell></TableRow>
-                                                <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {customer.teirWeight.toFixed(2)} kg</TableCell></TableRow>
-                                                <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{customer.weight.toFixed(2)} kg</TableCell></TableRow>
+                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{customer.grossWeight.toFixed(2)} kg</td></tr>
+                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {customer.teirWeight.toFixed(2)} kg</td></tr>
+                                                <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{customer.weight.toFixed(2)} kg</td></tr>
+                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less)</td><td className="text-right font-semibold">- {(Number(customer.bagWeightKg) || 0).toFixed(2)} kg</td></tr>
+                                                <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{customer.netWeight.toFixed(2)} kg</td></tr>
                                             </TableBody>
                                         </Table>
                                     </CardContent>
@@ -121,15 +123,15 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                     <CardContent className="p-4 pt-0">
                                         <Table className="text-xs">
                                             <TableBody>
-                                                <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.netWeight.toFixed(2)} kg</TableCell></TableRow>
-                                                <TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(customer.rate)}</TableCell></TableRow>
-                                                <TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(customer.amount)}</TableCell></TableRow>
-                                                {customer.kartaAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({customer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kartaAmount)}</TableCell></TableRow>}
-                                                {customer.labouryAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {customer.labouryRate.toFixed(2)}</TableCell></TableRow>}
-                                                {customer.labouryAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.labouryAmount)}</TableCell></TableRow>}
-                                                {customer.kanta > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kanta)}</TableCell></TableRow>}
-                                                {customer.bagAmount > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-green-600 flex items-center gap-2"><HandCoins size={12} />Bag Amount</TableCell><TableCell className="text-right font-semibold p-1 text-green-600">+ {formatCurrency(customer.bagAmount)}</TableCell></TableRow>}
-                                                {customer.cd > 0 && <TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.cd || 0)}</TableCell></TableRow>}
+                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{customer.netWeight.toFixed(2)} kg</td></tr>
+                                                <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(customer.rate)}</td></tr>
+                                                <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
+                                                {customer.bagAmount != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount)}</td></tr>}
+                                                {customer.kanta != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>}
+                                                {customer.cd != null && customer.cd > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD ({((Number(customer.cd) || 0) / customer.amount * 100).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.cd)}</td></tr>}
+                                                {customer.brokerage != null && customer.brokerage > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.brokerage)}</td></tr>}
+                                                {customer.kartaAmount != null && customer.kartaAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta ({customer.kartaPercentage}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.kartaAmount)}</td></tr>}
+                                                {customer.labouryAmount != null && customer.labouryAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (@{customer.labouryRate.toFixed(2)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.labouryAmount)}</td></tr>}
                                             </TableBody>
                                         </Table>
                                     </CardContent>
@@ -138,15 +140,11 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
 
                             <Card className="border-primary/50 bg-primary/5 text-center">
                                 <CardContent className="p-3">
-                                    <p className="text-sm text-primary/80 font-medium">Original Total</p>
-                                    <p className="text-2xl font-bold text-primary/90 font-mono">
-                                        {formatCurrency(Number(customer.originalNetAmount))}
-                                    </p>
+                                    <p className="text-sm text-primary/80 font-medium">Original Payable Amount</p>
+                                    <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
                                     <Separator className="my-2"/>
                                     <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
-                                    <p className="text-3xl font-bold text-destructive font-mono">
-                                        {formatCurrency(Number(customer.netAmount))}
-                                    </p>
+                                    <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p>
                                 </CardContent>
                             </Card>
 

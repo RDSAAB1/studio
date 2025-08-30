@@ -311,15 +311,15 @@ export default function CustomerPaymentsPage() {
   };
   
   const handleShowDetails = (payment: Payment) => {
-    const paidForSrNos = payment.paidFor?.map(pf => pf.srNo) || [];
-    if (paidForSrNos.length === 1) {
-        const entry = customers.find(c => c.srNo === paidForSrNos[0]);
-        if (entry) {
-            setDetailsEntry(entry);
-            return;
-        }
-    }
-    setPaymentDetails(payment);
+      const paidForSrNos = payment.paidFor?.map(pf => pf.srNo) || [];
+      if (paidForSrNos.length === 1) {
+          const entry = customers.find(c => c.srNo === paidForSrNos[0]);
+          if (entry) {
+              setDetailsEntry(entry);
+              return;
+          }
+      }
+      setPaymentDetails(payment);
   };
   
   const handleConfirmSelection = () => {
@@ -424,7 +424,7 @@ export default function CustomerPaymentsPage() {
                     {customerPayments.map(p => (
                         <TableRow key={p.id}>
                         <TableCell className="font-mono text-xs">{p.paymentId}</TableCell>
-                        <TableCell className="text-xs">{new Date(p.date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs">{new Date(p.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{p.notes}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-center">
@@ -468,8 +468,10 @@ export default function CustomerPaymentsPage() {
       />
 
     <CustomerDetailsDialog 
+        isOpen={!!detailsEntry}
         customer={detailsEntry}
         onOpenChange={() => setDetailsEntry(null)}
+        paymentHistory={paymentHistory}
         onPrint={() => { if(detailsEntry) { setReceiptsToPrint([detailsEntry]); setDetailsEntry(null); } }}
     />
       
