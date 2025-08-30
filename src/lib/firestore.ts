@@ -162,9 +162,10 @@ export function getSuppliersRealtime(callback: (suppliers: Customer[]) => void, 
 }
 
 export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
-  const docRef = await addDoc(suppliersCollection, supplierData);
-  await updateDoc(docRef, { id: docRef.id });
-  return { id: docRef.id, ...supplierData };
+    const docRef = doc(collection(db, 'suppliers'));
+    const newSupplier = { ...supplierData, id: docRef.id };
+    await setDoc(docRef, newSupplier);
+    return newSupplier;
 }
 
 export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
