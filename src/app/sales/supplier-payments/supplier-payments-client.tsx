@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
-import { toTitleCase, formatPaymentId, cn, formatCurrency } from "@/lib/utils";
+import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
@@ -40,6 +40,7 @@ export default function SupplierPaymentsPage() {
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   
   const [paymentId, setPaymentId] = useState('');
+  const [rtgsSrNo, setRtgsSrNo] = useState('');
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -88,6 +89,17 @@ export default function SupplierPaymentsPage() {
     }, 0);
     return formatPaymentId(lastPaymentNum + 1);
   }, []);
+
+  const getNextRtgsSrNo = useCallback((currentPayments: Payment[]) => {
+        const rtgsPayments = currentPayments.filter(p => p.rtgsSrNo);
+        if (rtgsPayments.length === 0) return formatSrNo(1, 'R');
+        const lastRtgsNum = rtgsPayments.reduce((max, p) => {
+            const numMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
+            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+            return num > max ? num : max;
+        }, 0);
+        return formatSrNo(lastRtgsNum + 1, 'R');
+    }, []);
   
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   
@@ -168,6 +180,7 @@ export default function SupplierPaymentsPage() {
         setPaymentHistory(fetchedPayments);
         if (!editingPayment) {
           setPaymentId(getNextPaymentId(fetchedPayments));
+          setRtgsSrNo(getNextRtgsSrNo(fetchedPayments));
         }
       }
     }, (error) => {
@@ -192,7 +205,7 @@ export default function SupplierPaymentsPage() {
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
   
   useEffect(() => {
     if (paymentType === 'Partial') {
@@ -297,12 +310,13 @@ export default function SupplierPaymentsPage() {
     setRtgsRate(0);
     setRtgsAmount(0);
     setPaymentId(getNextPaymentId(paymentHistory));
+    setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
     if (isOutsider) {
       setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
       setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
       setPaymentType('Full');
     }
-  }, [getNextPaymentId, paymentHistory]);
+  }, [getNextPaymentId, getNextRtgsSrNo, paymentHistory]);
 
   const handleFullReset = useCallback(() => {
     setSelectedCustomerKey(null);
@@ -430,6 +444,7 @@ export default function SupplierPaymentsPage() {
                 
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
+                    rtgsSrNo: paymentMethod === 'RTGS' ? (tempEditingPayment ? tempEditingPayment.rtgsSrNo : rtgsSrNo) : undefined,
                     customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                     date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
@@ -488,6 +503,7 @@ export default function SupplierPaymentsPage() {
         setSelectedCustomerKey(paymentToEdit.customerId);
         setEditingPayment(paymentToEdit);
         setPaymentId(paymentToEdit.paymentId);
+        setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
         setPaymentAmount(paymentToEdit.amount);
         setPaymentType(paymentToEdit.type);
         setPaymentMethod(paymentToEdit.receiptType);
@@ -601,17 +617,17 @@ export default function SupplierPaymentsPage() {
                         rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'
                     )}
                 >
-                    <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground')}>Outsider</span>
                     <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground')}>Supplier</span>
+                    <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground')}>Outsider</span>
                     <div
                         className={cn(
                             "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
-                            rtgsFor === 'Outsider' ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]'
+                            rtgsFor === 'Supplier' ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
                         )}
                     >
                         <div className={cn(
                             "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
-                            rtgsFor === 'Outsider' ? 'bg-primary' : 'bg-secondary'
+                            rtgsFor === 'Supplier' ? 'bg-secondary' : 'bg-primary'
                         )}>
                             <span className="text-sm font-bold text-primary-foreground">For</span>
                         </div>
@@ -664,7 +680,7 @@ export default function SupplierPaymentsPage() {
                             paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails}
                             setSupplierDetails={setSupplierDetails} bankDetails={bankDetails} setBankDetails={setBankDetails}
                             banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                            handlePaymentIdBlur={() => {}} paymentType={paymentType} setPaymentType={setPaymentType}
+                            handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                             paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                             setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                             cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}

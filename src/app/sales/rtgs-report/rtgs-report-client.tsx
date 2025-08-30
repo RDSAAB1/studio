@@ -6,7 +6,7 @@ import type { Payment, RtgsSettings } from '@/lib/definitions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
-import { formatCurrency, toTitleCase } from '@/lib/utils';
+import { formatCurrency, toTitleCase, formatSrNo } from '@/lib/utils';
 import { Loader2, Edit, Save, X, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,12 +79,14 @@ export default function RtgsReportClient() {
         const unsubscribe = getPaymentsRealtime((payments) => {
             const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
             const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
+                // Use rtgsSrNo if it exists, otherwise fallback to paymentId for older records
+                const srNo = p.rtgsSrNo || p.paymentId || '';
                 return {
                     paymentId: p.paymentId,
                     date: p.date,
                     checkNo: p.checkNo || p.utrNo || '',
                     type: p.type,
-                    srNo: p.paymentId || '',
+                    srNo: srNo,
                     supplierName: toTitleCase(p.supplierName || ''),
                     fatherName: toTitleCase(p.supplierFatherName || ''),
                     contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
