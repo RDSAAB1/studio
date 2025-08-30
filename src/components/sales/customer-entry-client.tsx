@@ -387,31 +387,10 @@ export default function CustomerEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    // Use the calculated state from currentCustomer for submission
     const completeEntry: Customer = {
       ...currentCustomer,
-      // Overwrite with any final values from the form that are not part of calculation
-      date: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
-      dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
-      name: toTitleCase(values.name), 
-      companyName: toTitleCase(values.companyName || ''),
-      address: toTitleCase(values.address), 
-      vehicleNo: toTitleCase(values.vehicleNo), 
-      variety: toTitleCase(values.variety),
-      contact: values.contact,
-      gstin: values.gstin,
-      shippingName: toTitleCase(values.shippingName || ''),
-      shippingCompanyName: toTitleCase(values.shippingCompanyName || ''),
-      shippingAddress: toTitleCase(values.shippingAddress || ''),
-      shippingContact: values.shippingContact,
-      shippingGstin: values.shippingGstin,
-      bags: values.bags,
-      bagRate: values.bagRate,
-      bagWeightKg: values.bagWeightKg,
-      // id will be set to srNo
       id: values.srNo,
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-      term: '0',
     };
 
     try {
@@ -579,6 +558,7 @@ export default function CustomerEntryClient() {
         customer={detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
         onPrint={handleOpenPrintPreview}
+        paymentHistory={paymentHistory}
       />
         
       <DocumentPreviewDialog
