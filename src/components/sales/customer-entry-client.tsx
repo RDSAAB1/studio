@@ -68,7 +68,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     term: '0',
     dueDate: dateStr,
     name: '',
-    so: '', // s/o is not used for customer, but keep for type compatibility if needed
+    so: '',
     companyName: '',
     address: '',
     contact: '',
@@ -97,8 +97,6 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     receiptType: 'Cash',
     paymentType: 'Full',
     customerId: '',
-
-    // Supplier specific fields, ensure they are 0 or empty for customers
     kartaPercentage: 0,
     kartaWeight: 0,
     kartaAmount: 0,
@@ -275,9 +273,8 @@ export default function CustomerEntryClient() {
     setCurrentCustomer(prev => {
         const currentDate = values.date instanceof Date ? values.date : (prev.date ? new Date(prev.date) : new Date());
         return {
-            ...getInitialFormState(), // Start with a clean state
-            ...prev, // Keep existing state like ID if editing
-            ...values, // Apply new form values
+            ...prev,
+            ...values,
             date: currentDate.toISOString().split("T")[0],
             dueDate: (values.date ? new Date(values.date) : new Date()).toISOString().split("T")[0],
             weight: parseFloat(weight.toFixed(2)),
@@ -427,23 +424,20 @@ export default function CustomerEntryClient() {
     }
   };
 
-  const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+  const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
       ...currentCustomer,
-      ...values,
-      id: values.srNo,
-      date: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
-      dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
-      name: toTitleCase(values.name), 
-      companyName: toTitleCase(values.companyName || ''),
-      address: toTitleCase(values.address), 
-      vehicleNo: toTitleCase(values.vehicleNo), 
-      variety: toTitleCase(values.variety),
-      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-      term: '0',
+      id: currentCustomer.srNo,
+      name: toTitleCase(currentCustomer.name), 
+      companyName: toTitleCase(currentCustomer.companyName || ''),
+      address: toTitleCase(currentCustomer.address), 
+      vehicleNo: toTitleCase(currentCustomer.vehicleNo), 
+      variety: toTitleCase(currentCustomer.variety),
+      customerId: `${toTitleCase(currentCustomer.name).toLowerCase()}|${currentCustomer.contact.toLowerCase()}`,
     };
 
-    // Clean up supplier-specific fields
+    // Explicitly delete supplier-specific fields
+    delete (completeEntry as any).so;
     delete (completeEntry as any).kartaPercentage;
     delete (completeEntry as any).kartaWeight;
     delete (completeEntry as any).kartaAmount;
@@ -473,22 +467,22 @@ export default function CustomerEntryClient() {
     }
   };
 
-  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+  const onSubmit = async (callback?: (savedEntry: Customer) => void) => {
     if (isEditing) {
         const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
         if (hasPayments) {
-            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
+            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(deletePayments, callback));
             setIsUpdateConfirmOpen(true);
             return;
         }
     }
-    executeSubmit(values, false, callback);
+    executeSubmit(false, callback);
   };
 
   const handleSaveAndPrint = async (docType: DocumentType) => {
     const isValid = await form.trigger();
     if (isValid) {
-      onSubmit(form.getValues(), (savedEntry) => {
+      onSubmit((savedEntry) => {
         setDocumentPreviewCustomer(savedEntry);
         setDocumentType(docType);
         setIsDocumentPreviewOpen(true);
@@ -572,7 +566,7 @@ export default function CustomerEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
             <CustomerForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -588,7 +582,7 @@ export default function CustomerEntryClient() {
             
             <CalculatedSummary
                 customer={currentCustomer}
-                onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+                onSave={() => form.handleSubmit(() => onSubmit())()}
                 onSaveAndPrint={handleSaveAndPrint}
                 onNew={handleNew}
                 isEditing={isEditing}
