@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer } from "lucide-react";
+import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes } from "lucide-react";
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
@@ -89,7 +89,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                 <Card>
                                     <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0 space-y-3">
-                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2"><DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} /><DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} /><DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} /></div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2"><DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} /><DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} /><DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} /><DetailItem icon={<Boxes size={14} />} label="Bags" value={customer.bags || 0} /></div>
                                         <Separator />
                                         <Table className="text-xs"><TableBody>
                                             <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{customer.grossWeight.toFixed(2)} kg</td></tr>
