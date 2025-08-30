@@ -122,7 +122,7 @@ export default function SupplierEntryClient() {
     setIsLoading(true);
     const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
       setSuppliers(data);
-      if (isInitialLoad.current) {
+      if (isInitialLoad.current && data) {
           const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
           const initialSrNo = formatSrNo(nextSrNum);
           form.setValue('srNo', initialSrNo);
@@ -291,7 +291,7 @@ export default function SupplierEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
-        const currentId = isEditing ? currentSupplier.id : "";
+        const currentId = isEditing ? currentSupplier.srNo : "";
         const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
         const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum), id: currentId };
         resetFormToState(currentState);
@@ -348,6 +348,7 @@ export default function SupplierEntryClient() {
     const completeEntry: Customer = {
       ...currentSupplier,
       ...values,
+      id: values.srNo, // Use srNo as ID
       date: values.date.toISOString().split("T")[0],
       dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
       term: String(values.term),
@@ -356,31 +357,22 @@ export default function SupplierEntryClient() {
     };
 
     try {
-        if (isEditing && completeEntry.id) {
-            if (deletePayments) {
-                await deletePaymentsForSrNo(completeEntry.srNo);
-                const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-                toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
-                const success = await updateSupplier(updatedEntry.id, updatedEntry);
-                 if (success) {
-                    toast({ title: "Success", description: "Entry updated successfully." });
-                    if (callback) callback(updatedEntry); else handleNew();
-                } else {
-                    toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
-                }
-            } else {
-                 const success = await updateSupplier(completeEntry.id, completeEntry);
-                 if (success) {
-                    toast({ title: "Success", description: "Entry updated successfully." });
-                    if (callback) callback(completeEntry); else handleNew();
-                } else {
-                    toast({ title: "Error", description: "Supplier not found. Cannot update.", variant: "destructive" });
-                }
-            }
+        if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
+          // If SR No. has changed, delete the old document
+          await deleteSupplier(currentSupplier.id);
+        }
+
+        if (deletePayments) {
+            await deletePaymentsForSrNo(completeEntry.srNo);
+            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+            toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
+            const savedEntry = await addSupplier(updatedEntry);
+            toast({ title: "Success", description: "Entry updated successfully." });
+            if (callback) callback(savedEntry); else handleNew();
         } else {
-            const newEntry = await addSupplier(completeEntry);
-            toast({ title: "Success", description: "New entry saved successfully." });
-            if (callback) callback(newEntry); else handleNew();
+            const savedEntry = await addSupplier(completeEntry);
+            toast({ title: "Success", description: `Entry ${isEditing ? 'updated' : 'saved'} successfully.` });
+            if (callback) callback(savedEntry); else handleNew();
         }
     } catch (error) {
         console.error("Error saving supplier:", error);

@@ -136,7 +136,7 @@ export default function CustomerEntryClient() {
     setIsLoading(true);
     const unsubscribeCustomers = getCustomersRealtime((data: Customer[]) => {
       setCustomers(data);
-      if (isInitialLoad.current) {
+      if (isInitialLoad.current && data) {
           const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
           const initialSrNo = formatSrNo(nextSrNum, 'C');
           form.setValue('srNo', initialSrNo);
@@ -325,7 +325,7 @@ export default function CustomerEntryClient() {
         resetFormToState(foundCustomer);
     } else {
         setIsEditing(false);
-        const currentId = isEditing ? currentCustomer.id : "";
+        const currentId = isEditing ? currentCustomer.srNo : "";
         const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
         const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum, 'C'), id: currentId };
         resetFormToState(currentState);
@@ -387,6 +387,7 @@ export default function CustomerEntryClient() {
     const completeEntry: Customer = {
       ...currentCustomer,
       ...values,
+      id: values.srNo, // Use srNo as ID
       date: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       name: toTitleCase(values.name), 
@@ -399,32 +400,22 @@ export default function CustomerEntryClient() {
     };
 
     try {
-        if (isEditing && completeEntry.id) {
-            if (deletePayments) {
-                await deletePaymentsForSrNo(completeEntry.srNo);
-                const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-                toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
-                const success = await updateCustomer(updatedEntry.id, updatedEntry);
-                 if (success) {
-                    toast({ title: "Success", description: "Entry updated successfully." });
-                    if (callback) callback(updatedEntry); else handleNew();
-                } else {
-                    toast({ title: "Error", description: "Customer not found. Cannot update.", variant: "destructive" });
-                }
-            } else {
-                 const success = await updateCustomer(completeEntry.id, completeEntry);
-                 if (success) {
-                    toast({ title: "Success", description: "Entry updated successfully." });
-                    if (callback) callback(completeEntry); else handleNew();
-                } else {
-                    toast({ title: "Error", description: "Customer not found. Cannot update.", variant: "destructive" });
-                }
-            }
+        if (isEditing && currentCustomer.id && currentCustomer.id !== completeEntry.id) {
+          // If SR No. has changed, delete the old document
+          await deleteCustomer(currentCustomer.id);
+        }
+
+        if (deletePayments) {
+            await deletePaymentsForSrNo(completeEntry.srNo);
+            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+            toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
+            const savedEntry = await addCustomer(updatedEntry);
+            toast({ title: "Success", description: "Entry updated successfully." });
+            if (callback) callback(savedEntry); else handleNew();
         } else {
-            const newEntry = await addCustomer(completeEntry);
-            toast({ title: "Success", description: "New entry saved successfully." });
-            if (callback) callback(newEntry);
-            else handleNew();
+            const savedEntry = await addCustomer(completeEntry);
+            toast({ title: "Success", description: `Entry ${isEditing ? 'updated' : 'saved'} successfully.` });
+            if (callback) callback(savedEntry); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);

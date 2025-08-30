@@ -162,7 +162,7 @@ export function getSuppliersRealtime(callback: (suppliers: Customer[]) => void, 
 }
 
 export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
-    const docRef = doc(collection(db, 'suppliers'));
+    const docRef = doc(db, 'suppliers', supplierData.srNo);
     const newSupplier = { ...supplierData, id: docRef.id };
     await setDoc(docRef, newSupplier);
     return newSupplier;
@@ -206,7 +206,7 @@ export function getCustomersRealtime(callback: (customers: Customer[]) => void, 
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {
-    const docRef = doc(collection(db, 'customers'));
+    const docRef = doc(db, 'customers', customerData.srNo);
     const newCustomer = { ...customerData, id: docRef.id };
     await setDoc(docRef, newCustomer);
     return newCustomer;
