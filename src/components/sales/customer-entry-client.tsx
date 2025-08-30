@@ -278,8 +278,10 @@ export default function CustomerEntryClient() {
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
       contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, cd: customerState.cdRate || customerState.cd || 0,
-      brokerage: customerState.brokerageRate || customerState.brokerage || 0, kanta: customerState.kanta || 0,
+      rate: customerState.rate || 0, 
+      cd: customerState.cdRate || 0,
+      brokerage: customerState.brokerageRate || 0, 
+      kanta: customerState.kanta || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
       bagWeightKg: customerState.bagWeightKg || 0,
@@ -387,9 +389,11 @@ export default function CustomerEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    // This is the fix. Merge the full `currentCustomer` state (which has all calculations)
+    // with the latest form values. This ensures calculated fields are not lost.
     const completeEntry: Customer = {
-      ...currentCustomer, // This has all the calculated values
-      ...values, // This overrides with form values (like date object)
+      ...currentCustomer,
+      ...values,
       id: values.srNo,
       date: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
       dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
