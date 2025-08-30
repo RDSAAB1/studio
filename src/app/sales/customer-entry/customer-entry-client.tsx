@@ -17,6 +17,7 @@ import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
 import { EntryTable } from "@/components/sales/entry-table";
 import { DocumentPreviewDialog } from "@/components/sales/document-preview-dialog";
+import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
@@ -79,6 +80,7 @@ export default function CustomerEntryClient() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
+  const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [consolidatedReceiptData, setConsolidatedReceiptData] = useState<ConsolidatedReceiptData | null>(null);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
@@ -445,7 +447,7 @@ export default function CustomerEntryClient() {
     const isValid = await form.trigger();
     if (isValid) {
       onSubmit(form.getValues(), (savedEntry) => {
-        setDetailsCustomer(savedEntry);
+        setDocumentPreviewCustomer(savedEntry);
         setDocumentType(docType);
         setIsDocumentPreviewOpen(true);
         handleNew();
@@ -461,52 +463,12 @@ export default function CustomerEntryClient() {
   
   const handleShowDetails = (customer: Customer) => {
     setDetailsCustomer(customer);
-    setDocumentType('tax-invoice'); // Default to tax-invoice on details view
-    setIsDocumentPreviewOpen(true);
   };
 
-  const handlePrint = (entriesToPrint: Customer[]) => {
-    if (!entriesToPrint || entriesToPrint.length === 0) {
-        toast({
-            title: "No Selection",
-            description: "Please select one or more entries to print.",
-            variant: "destructive",
-        });
-        return;
-    }
-
-    if (entriesToPrint.length === 1) {
-        setReceiptsToPrint(entriesToPrint);
-        setConsolidatedReceiptData(null);
-    } else {
-        const firstCustomerId = entriesToPrint[0].customerId;
-        const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
-
-        if (!allSameCustomer) {
-            toast({
-                title: "Multiple Customers Selected",
-                description: "Consolidated receipts can only be printed for a single customer at a time.",
-                variant: "destructive",
-            });
-            return;
-        }
-        
-        const customer = entriesToPrint[0];
-        const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
-        
-        setConsolidatedReceiptData({
-            supplier: {
-                name: customer.name,
-                so: customer.so,
-                address: customer.address,
-                contact: customer.contact,
-            },
-            entries: entriesToPrint,
-            totalAmount: totalAmount,
-            date: format(new Date(), "dd-MMM-yy"),
-        });
-        setReceiptsToPrint([]);
-    }
+  const handleOpenPrintPreview = (customer: Customer) => {
+    setDocumentPreviewCustomer(customer);
+    setDocumentType('tax-invoice'); // Default to tax-invoice
+    setIsDocumentPreviewOpen(true);
   };
 
   if (!isClient) {
@@ -555,40 +517,28 @@ export default function CustomerEntryClient() {
         entries={filteredCustomers} 
         onEdit={handleEdit} 
         onDelete={handleDelete} 
-        onShowDetails={handleShowDetails} 
-        onPrint={handlePrint}
+        onShowDetails={handleShowDetails}
         selectedIds={selectedCustomerIds}
         onSelectionChange={setSelectedCustomerIds}
         onSearch={setSearchTerm}
         entryType="Customer"
       />
+
+      <CustomerDetailsDialog
+        customer={detailsCustomer}
+        onOpenChange={() => setDetailsCustomer(null)}
+        onPrint={handleOpenPrintPreview}
+      />
         
       <DocumentPreviewDialog
         isOpen={isDocumentPreviewOpen}
         setIsOpen={setIsDocumentPreviewOpen}
-        customer={detailsCustomer}
+        customer={documentPreviewCustomer}
         documentType={documentType}
         setDocumentType={setDocumentType}
         receiptSettings={receiptSettings}
       />
       
-      <ReceiptPrintDialog
-        receipts={receiptsToPrint}
-        settings={receiptSettings}
-        onOpenChange={() => setReceiptsToPrint([])}
-      />
-      
-      <ConsolidatedReceiptPrintDialog
-        data={consolidatedReceiptData}
-        settings={receiptSettings}
-        onOpenChange={() => setConsolidatedReceiptData(null)}
-      />
-
-      <ReceiptSettingsDialog
-        settings={receiptSettings}
-        setSettings={setReceiptSettings}
-      />
-
       <UpdateConfirmDialog
         isOpen={isUpdateConfirmOpen}
         onOpenChange={setIsUpdateConfirmOpen}

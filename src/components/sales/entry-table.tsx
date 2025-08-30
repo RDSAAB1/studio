@@ -56,10 +56,12 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                             />
                         </InputWithIcon>
                     </div>
-                    <Button onClick={() => onPrint(entries.filter((c: Customer) => selectedIds.has(c.id)))} disabled={selectedIds.size === 0} size="sm" variant="outline">
-                        <Printer className="mr-2 h-4 w-4" />
-                        Print Selected ({selectedIds.size})
-                    </Button>
+                    {onPrint && (
+                        <Button onClick={() => onPrint(entries.filter((c: Customer) => selectedIds.has(c.id)))} disabled={selectedIds.size === 0} size="sm" variant="outline">
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print Selected ({selectedIds.size})
+                        </Button>
+                    )}
                 </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -101,9 +103,6 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                     <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(entry.netAmount))}</TableCell>
                                     <TableCell className="text-center px-3 py-1">
                                         <div className="flex justify-center items-center gap-0">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([entry])}>
-                                                <Printer className="h-4 w-4" />
-                                            </Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
                                                 <Info className="h-4 w-4" />
                                             </Button>
@@ -140,5 +139,3 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
         </Card>
     );
 });
-
-    
