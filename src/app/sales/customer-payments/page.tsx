@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Info, Pen, Printer, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -491,4 +492,3 @@ export default function CustomerPaymentsPage() {
     </div>
   );
 }
-
