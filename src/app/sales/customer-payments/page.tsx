@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { Customer, CustomerSummary, Payment } from "@/lib/definitions";
-import { toTitleCase, formatPaymentId, formatCurrency } from "@/lib/utils";
+import { toTitleCase, formatSrNo, formatCurrency } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -45,9 +45,9 @@ export default function CustomerPaymentsPage() {
 
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
+  const [receiptNo, setReceiptNo] = useState('');
   
   const [loading, setLoading] = useState(true);
-  const isInitialLoad = useRef(true);
 
   const customerSummary = useMemo(() => {
     const newSummary = new Map<string, CustomerSummary>();
@@ -71,7 +71,6 @@ export default function CustomerPaymentsPage() {
       }
     });
     
-    // Attach payment history to each customer
     paymentHistory.forEach(payment => {
         if(payment.customerId && newSummary.has(payment.customerId)) {
             const summary = newSummary.get(payment.customerId)!;
@@ -81,6 +80,18 @@ export default function CustomerPaymentsPage() {
 
     return newSummary;
   }, [customers, paymentHistory]);
+
+  const getNextReceiptNo = useCallback((payments: Payment[]) => {
+      if (!payments || payments.length === 0) {
+          return formatSrNo(1, 'CR');
+      }
+      const lastNum = payments.reduce((max, p) => {
+          const numMatch = p.paymentId?.match(/^CR(\d+)$/);
+          const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+          return num > max ? num : max;
+      }, 0);
+      return formatSrNo(lastNum + 1, 'CR');
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -100,6 +111,7 @@ export default function CustomerPaymentsPage() {
     const unsubscribePayments = onSnapshot(paymentsQuery, (snapshot) => {
         const paymentsData = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as Payment));
         setPaymentHistory(paymentsData);
+        setReceiptNo(getNextReceiptNo(paymentsData));
     }, (error) => {
          console.error("Error fetching payments:", error);
          toast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
@@ -109,7 +121,7 @@ export default function CustomerPaymentsPage() {
         unsubscribeCustomers();
         unsubscribePayments();
     };
-  }, [toast]);
+  }, [toast, getNextReceiptNo]);
   
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
@@ -155,7 +167,7 @@ export default function CustomerPaymentsPage() {
     const batch = writeBatch(db);
     let remainingPayment = paymentAmount;
 
-    const newPaymentId = `CP${Date.now()}`;
+    const newPaymentId = receiptNo;
     const newPaymentRef = doc(db, "payments", newPaymentId);
 
     const paidForDetails = [];
@@ -171,7 +183,7 @@ export default function CustomerPaymentsPage() {
         const entryRef = doc(db, "customers", entry.id);
         batch.update(entryRef, { netAmount: newNetAmount });
 
-        paidForDetails.push({ srNo: entry.srNo, amount: paymentForThisEntry });
+        paidForDetails.push({ srNo: entry.srNo, amount: paymentForThisEntry, cdApplied: false });
         remainingPayment -= paymentForThisEntry;
     }
     
@@ -182,7 +194,7 @@ export default function CustomerPaymentsPage() {
         date: new Date().toISOString(),
         amount: paymentAmount,
         type: paymentType,
-        receiptType: 'Online', // Placeholder
+        receiptType: 'Cash', // Placeholder, could be a form field
         notes: `Received payment for SR No(s): ${sortedEntries.map(e => e.srNo).join(', ')}`,
         paidFor: paidForDetails,
         cdAmount: 0,
@@ -197,6 +209,7 @@ export default function CustomerPaymentsPage() {
         setSelectedEntryIds(new Set());
         setPaymentAmount(0);
         setPaymentType('Full');
+        setReceiptNo(getNextReceiptNo(paymentHistory)); // Update for next payment
     } catch(error) {
         console.error("Error processing payment:", error);
         toast({ variant: 'destructive', title: "Error", description: "Failed to process payment." });
@@ -287,7 +300,11 @@ export default function CustomerPaymentsPage() {
                       <p className="text-muted-foreground">Total Receivable for Selected Entries:</p>
                       <p className="text-2xl font-bold text-primary">{formatCurrency(totalReceivableForSelected)}</p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="receipt-no">Receipt No.</Label>
+                        <Input id="receipt-no" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} />
+                      </div>
                       <div className="space-y-2">
                         <Label>Payment Type</Label>
                         <Select value={paymentType} onValueChange={setPaymentType}>
