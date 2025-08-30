@@ -68,6 +68,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: 'Full', customerId: '',
+    // Fields that should not be here
     so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
   };
 };
@@ -393,73 +394,79 @@ export default function CustomerEntryClient() {
 
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
-    const calculatedValues = currentCustomer;
-
-    const dataToSave = {
-        // Form fields
-        id: formValues.srNo,
+    
+    // Create a new clean object with only the fields relevant to the customer
+    const dataToSave: Omit<Customer, 'id'> = {
         srNo: formValues.srNo,
         date: formValues.date.toISOString().split('T')[0],
         term: '0', 
         dueDate: formValues.date.toISOString().split('T')[0],
         name: toTitleCase(formValues.name),
-        so: '',
+        companyName: toTitleCase(formValues.companyName || ''),
         address: toTitleCase(formValues.address),
         contact: formValues.contact,
+        gstin: formValues.gstin,
         vehicleNo: toTitleCase(formValues.vehicleNo),
         variety: toTitleCase(formValues.variety),
+        paymentType: formValues.paymentType,
+        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
+        
+        // Form fields for customer
         grossWeight: formValues.grossWeight,
         teirWeight: formValues.teirWeight,
         rate: formValues.rate,
-        paymentType: formValues.paymentType,
-        barcode: '',
-        receiptType: 'Cash',
-        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
-        
-        // Customer-specific form fields
         bags: formValues.bags,
-        companyName: toTitleCase(formValues.companyName || ''),
-        gstin: formValues.gstin,
-        isBrokerageIncluded: formValues.isBrokerageIncluded,
         bagWeightKg: formValues.bagWeightKg,
         bagRate: formValues.bagRate,
-        
+        kanta: formValues.kanta,
+        isBrokerageIncluded: formValues.isBrokerageIncluded,
+
         // Shipping details
         shippingName: toTitleCase(formValues.shippingName || ''),
         shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
+        
+        // Values from calculations
+        weight: currentCustomer.weight,
+        netWeight: currentCustomer.netWeight,
+        amount: currentCustomer.amount,
+        bagAmount: currentCustomer.bagAmount,
+        cd: currentCustomer.cd,
+        cdRate: currentCustomer.cdRate,
+        brokerage: currentCustomer.brokerage,
+        brokerageRate: currentCustomer.brokerageRate,
+        originalNetAmount: currentCustomer.originalNetAmount,
+        netAmount: currentCustomer.netAmount,
 
-        // Calculated values
-        weight: calculatedValues.weight,
-        netWeight: calculatedValues.netWeight,
-        amount: calculatedValues.amount,
-        kanta: calculatedValues.kanta,
-        bagAmount: calculatedValues.bagAmount,
-        brokerage: calculatedValues.brokerage,
-        brokerageRate: calculatedValues.brokerageRate,
-        cd: calculatedValues.cd,
-        cdRate: calculatedValues.cdRate,
-        originalNetAmount: calculatedValues.originalNetAmount,
-        netAmount: calculatedValues.netAmount,
+        // Fields to explicitly exclude
+        so: '',
+        kartaPercentage: 0,
+        kartaWeight: 0,
+        kartaAmount: 0,
+        labouryRate: 0,
+        labouryAmount: 0,
+        barcode: '',
+        receiptType: 'Cash',
     };
     
     try {
-        if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.id) {
+        if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
             await deleteCustomer(currentCustomer.id);
         }
         
         if (deletePayments) {
             await deletePaymentsForSrNo(dataToSave.srNo!);
-            const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount };
+            const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
             await addCustomer(entryWithRestoredAmount as Customer);
             toast({ title: "Success", description: "Entry updated and payments deleted." });
             if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
         } else {
-            await addCustomer(dataToSave as Customer);
+            const entryToSave = { ...dataToSave, id: dataToSave.srNo };
+            await addCustomer(entryToSave as Customer);
             toast({ title: "Success", description: `Entry ${isEditing ? 'updated' : 'saved'} successfully.` });
-            if (callback) callback(dataToSave as Customer); else handleNew();
+            if (callback) callback(entryToSave as Customer); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
