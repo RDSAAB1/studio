@@ -33,7 +33,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Info, Pen, Printer, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -43,17 +42,7 @@ import { getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
 import type { ReceiptSettings } from "@/lib/definitions";
 import { Separator } from "@/components/ui/separator";
 import { DetailsDialog } from "@/components/sales/supplier-payments/details-dialog";
-
-
-const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
-    <div className="flex items-start gap-3">
-        {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
-        <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="font-semibold text-sm break-words">{String(value) || '-'}</p>
-        </div>
-    </div>
-);
+import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
 
 export default function CustomerPaymentsPage() {
@@ -72,7 +61,6 @@ export default function CustomerPaymentsPage() {
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<Payment | null>(null);
-  const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
 
   const customerSummary = useMemo(() => {
     const newSummary = new Map<string, CustomerSummary>();
@@ -328,14 +316,6 @@ export default function CustomerPaymentsPage() {
     )
   }
 
-  const handleShowEntryDetails = (srNo: string) => {
-    const entry = customers.find(c => c.srNo === srNo);
-    if (entry) {
-        setDetailsSupplierEntry(entry);
-    }
-  };
-
-
   return (
     <div className="space-y-8">
       <Card>
@@ -487,64 +467,13 @@ export default function CustomerPaymentsPage() {
         isCustomer={true}
       />
       
-    <Dialog open={!!paymentDetails} onOpenChange={() => setPaymentDetails(null)}>
-        <DialogContent className="max-w-2xl">
-            <DialogHeader>
-                <DialogTitle>Payment Details: {paymentDetails?.paymentId}</DialogTitle>
-            </DialogHeader>
-            {paymentDetails && (
-                <div className="space-y-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <DetailItem label="Payment Date" value={new Date(paymentDetails.date).toLocaleDateString()} />
-                        <DetailItem label="Total Amount Paid" value={formatCurrency(paymentDetails.amount)} />
-                        <DetailItem label="Payment Type" value={paymentDetails.type} />
-                        <DetailItem label="Payment Method" value={paymentDetails.receiptType} />
-                    </div>
-                    <Separator />
-                    <h4 className="font-semibold">Entries Paid in this Transaction</h4>
-                    <div className="border rounded-lg max-h-64 overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>SR No</TableHead>
-                                    <TableHead className="text-right">Amount Paid</TableHead>
-                                    <TableHead className="text-center">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paymentDetails.paidFor?.length ? paymentDetails.paidFor.map(pf => (
-                                    <TableRow key={pf.srNo}>
-                                        <TableCell>{pf.srNo}</TableCell>
-                                        <TableCell className="text-right font-semibold">{formatCurrency(pf.amount)}</TableCell>
-                                        <TableCell className="text-center">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowEntryDetails(pf.srNo)}>
-                                                <Info className="h-4 w-4" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                )) : (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center text-muted-foreground py-4">No entries found for this payment.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
-            )}
-        </DialogContent>
-    </Dialog>
-    
-    <DetailsDialog 
-        isOpen={!!detailsSupplierEntry} 
-        onOpenChange={() => setDetailsSupplierEntry(null)} 
-        customer={detailsSupplierEntry} 
-        paymentHistory={paymentHistory} 
+    <PaymentDetailsDialog
+        payment={paymentDetails}
+        onOpenChange={() => setPaymentDetails(null)}
+        customers={customers}
     />
 
 
     </div>
   );
 }
-
-    
