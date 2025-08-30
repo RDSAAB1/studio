@@ -59,14 +59,51 @@ type FormValues = z.infer<typeof formSchema>;
 const getInitialFormState = (lastVariety?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const dateStr = today.toISOString().split('T')[0];
 
   return {
-    id: "", srNo: 'C----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
-    name: '', so: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
-    weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
-    bagWeightKg: 0, bagRate: 0, bagAmount: 0
+    id: "",
+    srNo: 'C----',
+    date: dateStr,
+    term: '0',
+    dueDate: dateStr,
+    name: '',
+    so: '', // s/o is not used for customer, but keep for type compatibility if needed
+    companyName: '',
+    address: '',
+    contact: '',
+    gstin: '',
+    vehicleNo: '',
+    variety: lastVariety || '',
+    grossWeight: 0,
+    teirWeight: 0,
+    weight: 0,
+    rate: 0,
+    amount: 0,
+    bags: 0,
+    bagWeightKg: 0,
+    bagRate: 0,
+    bagAmount: 0,
+    kanta: 0,
+    brokerage: 0,
+    brokerageRate: 0,
+    cd: 0,
+    cdRate: 0,
+    isBrokerageIncluded: false,
+    netWeight: 0,
+    originalNetAmount: 0,
+    netAmount: 0,
+    barcode: '',
+    receiptType: 'Cash',
+    paymentType: 'Full',
+    customerId: '',
+
+    // Supplier specific fields, ensure they are 0 or empty for customers
+    kartaPercentage: 0,
+    kartaWeight: 0,
+    kartaAmount: 0,
+    labouryRate: 0,
+    labouryAmount: 0,
   };
 };
 
@@ -238,7 +275,9 @@ export default function CustomerEntryClient() {
     setCurrentCustomer(prev => {
         const currentDate = values.date instanceof Date ? values.date : (prev.date ? new Date(prev.date) : new Date());
         return {
-            ...prev, ...values,
+            ...getInitialFormState(), // Start with a clean state
+            ...prev, // Keep existing state like ID if editing
+            ...values, // Apply new form values
             date: currentDate.toISOString().split("T")[0],
             dueDate: (values.date ? new Date(values.date) : new Date()).toISOString().split("T")[0],
             weight: parseFloat(weight.toFixed(2)),
@@ -389,7 +428,6 @@ export default function CustomerEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    // Correctly merge the full calculated state with the latest form values.
     const completeEntry: Customer = {
       ...currentCustomer,
       ...values,
@@ -404,6 +442,13 @@ export default function CustomerEntryClient() {
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
       term: '0',
     };
+
+    // Clean up supplier-specific fields
+    delete (completeEntry as any).kartaPercentage;
+    delete (completeEntry as any).kartaWeight;
+    delete (completeEntry as any).kartaAmount;
+    delete (completeEntry as any).labouryRate;
+    delete (completeEntry as any).labouryAmount;
 
     try {
         if (isEditing && currentCustomer.id && currentCustomer.id !== completeEntry.id) {
