@@ -31,6 +31,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { Info, Pen, Printer, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 import { collection, query, onSnapshot, orderBy, writeBatch, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -330,7 +332,7 @@ export default function CustomerPaymentsPage() {
                 {customerPayments.length > 0 ? (
                 <div className="overflow-x-auto">
                 <Table>
-                    <TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Notes</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Notes</TableHead><TableHead className="text-center">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                     {customerPayments.map(p => (
                         <TableRow key={p.id}>
@@ -338,6 +340,24 @@ export default function CustomerPaymentsPage() {
                         <TableCell>{p.date}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{p.notes}</TableCell>
+                        <TableCell className="text-center">
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><Info className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><Pen className="h-4 w-4" /></Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>This will permanently delete the payment {p.paymentId}.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => {}}>Continue</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><Printer className="h-4 w-4" /></Button>
+                        </TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
