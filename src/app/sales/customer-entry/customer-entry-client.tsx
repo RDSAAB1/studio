@@ -65,7 +65,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     name: '', so: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, cd: 0, isBrokerageIncluded: false,
+    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     bagWeightKg: 0, bagRate: 0, bagAmount: 0
   };
 };
@@ -244,7 +244,9 @@ export default function CustomerEntryClient() {
             netWeight: parseFloat(netWeight.toFixed(2)),
             amount: parseFloat(amount.toFixed(2)),
             brokerage: parseFloat(brokerageAmount.toFixed(2)),
+            brokerageRate: brokerageRate,
             cd: parseFloat(cdAmount.toFixed(2)),
+            cdRate: cdPercentage,
             kanta: parseFloat(kanta.toFixed(2)),
             bagAmount: parseFloat(bagAmount.toFixed(2)),
             originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
@@ -275,8 +277,8 @@ export default function CustomerEntryClient() {
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
       contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, cd: Number(customerState.cd) || 0,
-      brokerage: Number(customerState.brokerage) || 0, kanta: Number(customerState.kanta) || 0,
+      rate: customerState.rate || 0, cd: customerState.cdRate || 0,
+      brokerage: customerState.brokerageRate || 0, kanta: customerState.kanta || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
       bagWeightKg: customerState.bagWeightKg || 0,

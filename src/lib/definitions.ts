@@ -52,7 +52,9 @@ export type Customer = {
   bags?: number;
   companyName?: string;
   brokerage?: number;
+  brokerageRate?: number;
   cd?: number;
+  cdRate?: number;
   isBrokerageIncluded?: boolean;
   bagWeightKg?: number;
   bagRate?: number;
@@ -307,3 +309,5 @@ export type ConsolidatedReceiptData = {
     totalAmount: number;
     date: string;
 };
+
+export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan';

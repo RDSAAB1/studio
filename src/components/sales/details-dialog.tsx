@@ -43,8 +43,6 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
     const paymentsForDetailsEntry = paymentHistory.filter(p => 
       p.paidFor?.some(pf => pf.srNo === customer?.srNo)
     );
-
-    const cdPercentage = (Number(customer.cd) || 0) / (Number(customer.amount) || 1) * 100;
     
     return (
         <Dialog open={isOpen ?? !!customer} onOpenChange={onOpenChange}>
@@ -130,8 +128,8 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                                 <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
                                                 {customer.bagAmount != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount (@{formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount)}</td></tr>}
                                                 {customer.kanta != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>}
-                                                {customer.cd != null && customer.cd > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD ({cdPercentage.toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.cd)}</td></tr>}
-                                                {customer.brokerage != null && customer.brokerage > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.brokerage)}</td></tr>}
+                                                {customer.cd != null && customer.cd > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{customer.cdRate?.toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.cd)}</td></tr>}
+                                                {customer.brokerage != null && customer.brokerage > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerageRate || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.brokerage)}</td></tr>}
                                                 {customer.kartaAmount != null && customer.kartaAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta ({customer.kartaPercentage}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.kartaAmount)}</td></tr>}
                                                 {customer.labouryAmount != null && customer.labouryAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (@{customer.labouryRate.toFixed(2)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.labouryAmount)}</td></tr>}
                                             </TableBody>
