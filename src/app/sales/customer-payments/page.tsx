@@ -34,9 +34,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Info, Pen, Printer, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-import { collection, query, onSnapshot, orderBy, writeBatch, doc } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
+import { getReceiptSettings, updateReceiptSettings } from "@/lib/firestore";
+import type { ReceiptSettings } from "@/lib/definitions";
 
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
@@ -50,6 +53,10 @@ export default function CustomerPaymentsPage() {
   const [receiptNo, setReceiptNo] = useState('');
   
   const [loading, setLoading] = useState(true);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [receiptsToPrint, setReceiptsToPrint] = useState<Payment[]>([]);
+  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<Payment | null>(null);
 
   const customerSummary = useMemo(() => {
     const newSummary = new Map<string, CustomerSummary>();
@@ -113,23 +120,35 @@ export default function CustomerPaymentsPage() {
     const unsubscribePayments = onSnapshot(paymentsQuery, (snapshot) => {
         const paymentsData = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as Payment));
         setPaymentHistory(paymentsData);
-        setReceiptNo(getNextReceiptNo(paymentsData));
+        if (!editingPayment) {
+            setReceiptNo(getNextReceiptNo(paymentsData));
+        }
     }, (error) => {
          console.error("Error fetching payments:", error);
          toast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
     });
 
+     const fetchSettings = async () => {
+        const settings = await getReceiptSettings();
+        if (settings) {
+            setReceiptSettings(settings);
+        }
+    };
+    fetchSettings();
+
+
     return () => {
         unsubscribeCustomers();
         unsubscribePayments();
     };
-  }, [toast, getNextReceiptNo]);
+  }, [toast, getNextReceiptNo, editingPayment]);
   
   const handleCustomerSelect = (key: string) => {
     setSelectedCustomerKey(key);
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setPaymentType('Full');
+    setEditingPayment(null);
   };
 
   const handleEntrySelect = (entryId: string) => {
@@ -166,60 +185,123 @@ export default function CustomerPaymentsPage() {
       return;
     }
 
-    const batch = writeBatch(db);
-    let remainingPayment = paymentAmount;
-
-    const newPaymentId = receiptNo;
-    const newPaymentRef = doc(db, "payments", newPaymentId);
-
-    const paidForDetails = [];
-    const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    for (const entry of sortedEntries) {
-        if (remainingPayment <= 0) break;
-        
-        const receivable = parseFloat(String(entry.netAmount)) || 0;
-        const paymentForThisEntry = Math.min(receivable, remainingPayment);
-        const newNetAmount = receivable - paymentForThisEntry;
-
-        const entryRef = doc(db, "customers", entry.id);
-        batch.update(entryRef, { netAmount: newNetAmount });
-
-        paidForDetails.push({ srNo: entry.srNo, amount: paymentForThisEntry, cdApplied: false });
-        remainingPayment -= paymentForThisEntry;
-    }
-    
-    const paymentData = {
-        id: newPaymentId,
-        paymentId: newPaymentId,
-        customerId: selectedCustomerKey,
-        date: new Date().toISOString(),
-        amount: paymentAmount,
-        type: paymentType,
-        receiptType: 'Cash', // Placeholder, could be a form field
-        notes: `Received payment for SR No(s): ${sortedEntries.map(e => e.srNo).join(', ')}`,
-        paidFor: paidForDetails,
-        cdAmount: 0,
-        cdApplied: false,
-    };
-
-    batch.set(newPaymentRef, paymentData);
-
     try {
-        await batch.commit();
-        toast({ title: "Success", description: "Payment recorded successfully." });
+        await runTransaction(db, async (transaction) => {
+            const tempEditingPayment = editingPayment;
+            
+            // Revert previous payment if editing
+            if(tempEditingPayment) {
+                for (const detail of tempEditingPayment.paidFor || []) {
+                    const customerDocRef = doc(db, "customers", detail.srNo);
+                    const customerDoc = await transaction.get(customerDocRef);
+                    if(customerDoc.exists()){
+                        const currentNetAmount = Number(customerDoc.data().netAmount) || 0;
+                        const amountToRestore = detail.amount;
+                        transaction.update(customerDocRef, { netAmount: currentNetAmount + amountToRestore });
+                    }
+                }
+            }
+
+            const paymentData = {
+                id: tempEditingPayment ? tempEditingPayment.id : receiptNo,
+                paymentId: tempEditingPayment ? tempEditingPayment.paymentId : receiptNo,
+                customerId: selectedCustomerKey,
+                date: new Date().toISOString(),
+                amount: paymentAmount,
+                type: paymentType,
+                receiptType: 'Cash', // Placeholder, could be a form field
+                notes: `Received payment for SR No(s): ${selectedEntries.map(e => e.srNo).join(', ')}`,
+                paidFor: [],
+                cdAmount: 0, 
+                cdApplied: false,
+            };
+
+            let remainingPayment = paymentAmount;
+            const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+            for (const entry of sortedEntries) {
+                if (remainingPayment <= 0) break;
+                
+                const customerDocRef = doc(db, "customers", entry.id);
+                const customerDoc = await transaction.get(customerDocRef);
+                
+                if (customerDoc.exists()) {
+                    const receivable = parseFloat(String(customerDoc.data().netAmount)) || 0;
+                    const paymentForThisEntry = Math.min(receivable, remainingPayment);
+                    const newNetAmount = receivable - paymentForThisEntry;
+
+                    transaction.update(customerDocRef, { netAmount: newNetAmount });
+
+                    (paymentData.paidFor as any).push({ srNo: entry.srNo, amount: paymentForThisEntry });
+                    remainingPayment -= paymentForThisEntry;
+                }
+            }
+            
+            const paymentRef = doc(db, "payments", paymentData.id);
+            transaction.set(paymentRef, paymentData);
+        });
+
+        toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'recorded'} successfully.` });
         setSelectedEntryIds(new Set());
         setPaymentAmount(0);
         setPaymentType('Full');
-        setReceiptNo(getNextReceiptNo(paymentHistory)); // Update for next payment
+        setEditingPayment(null);
+
     } catch(error) {
         console.error("Error processing payment:", error);
         toast({ variant: 'destructive', title: "Error", description: "Failed to process payment." });
     }
   };
+
+  const handleEditPayment = (payment: Payment) => {
+    setEditingPayment(payment);
+    setSelectedCustomerKey(payment.customerId);
+    const srNos = payment.paidFor?.map(pf => pf.srNo) || [];
+    const entryIds = customers.filter(c => srNos.includes(c.srNo)).map(c => c.id);
+    setSelectedEntryIds(new Set(entryIds));
+    setPaymentAmount(payment.amount);
+    setPaymentType(payment.type);
+    setReceiptNo(payment.paymentId);
+  };
+  
+  const handleDeletePayment = async (paymentId: string) => {
+      const paymentToDelete = paymentHistory.find(p => p.id === paymentId);
+      if(!paymentToDelete) return;
+      
+      try {
+          await runTransaction(db, async (transaction) => {
+               for (const detail of paymentToDelete.paidFor || []) {
+                    const customerDocRef = doc(db, "customers", detail.srNo);
+                    const customerDoc = await transaction.get(customerDocRef);
+                    if(customerDoc.exists()){
+                        const currentNetAmount = Number(customerDoc.data().netAmount) || 0;
+                        const amountToRestore = detail.amount;
+                        transaction.update(customerDocRef, { netAmount: currentNetAmount + amountToRestore });
+                    }
+                }
+                const paymentRef = doc(db, "payments", paymentToDelete.id);
+                transaction.delete(paymentRef);
+          });
+          toast({title: "Success", description: "Payment deleted successfully."});
+      } catch (error) {
+          console.error("Error deleting payment:", error);
+          toast({variant: "destructive", title: "Error", description: "Failed to delete payment."});
+      }
+  };
+
+  const handlePrintPayment = (payment: Payment) => {
+    // This is a placeholder for printing. We need to create a receipt component.
+    const customer = customers.find(c => c.customerId === payment.customerId);
+    if(customer) {
+        const receiptData = { ...customer, netAmount: payment.amount, originalNetAmount: payment.amount, date: payment.date };
+        setReceiptsToPrint([receiptData]);
+    } else {
+        toast({variant: 'destructive', title: "Error", description: "Customer not found for this payment."})
+    }
+  };
   
   const receivableEntries = selectedCustomerKey ? customers.filter(c => c.customerId === selectedCustomerKey && (parseFloat(String(c.netAmount)) || 0) > 0) : [];
-  const customerPayments = selectedCustomerKey ? customerSummary.get(selectedCustomerKey)?.paymentHistory || [] : [];
+  const customerPayments = selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey) : [];
   
   if (loading) {
     return (
@@ -296,7 +378,7 @@ export default function CustomerPaymentsPage() {
           </Card>
 
           <Card>
-              <CardHeader><CardTitle>Receive Payment</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{editingPayment ? `Editing Payment ${editingPayment.paymentId}` : "Receive Payment"}</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                   <div className="p-4 border rounded-lg bg-card/30">
                       <p className="text-muted-foreground">Total Receivable for Selected Entries:</p>
@@ -305,7 +387,7 @@ export default function CustomerPaymentsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="receipt-no">Receipt No.</Label>
-                        <Input id="receipt-no" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} />
+                        <Input id="receipt-no" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} readOnly={!!editingPayment} />
                       </div>
                       <div className="space-y-2">
                         <Label>Payment Type</Label>
@@ -322,7 +404,10 @@ export default function CustomerPaymentsPage() {
                           <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} />
                       </div>
                   </div>
-                  <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>Receive Payment</Button>
+                  <Button onClick={processPayment} disabled={selectedEntryIds.size === 0}>
+                    {editingPayment ? 'Update Payment' : 'Receive Payment'}
+                  </Button>
+                   {editingPayment && <Button variant="outline" onClick={() => { setEditingPayment(null); setSelectedEntryIds(new Set()); setPaymentAmount(0); }}>Cancel Edit</Button>}
               </CardContent>
           </Card>
           
@@ -341,22 +426,22 @@ export default function CustomerPaymentsPage() {
                         <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{p.notes}</TableCell>
                         <TableCell className="text-center">
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><Info className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><Pen className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPaymentDetails(p)}><Info className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditPayment(p)}><Pen className="h-4 w-4" /></Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>This will permanently delete the payment {p.paymentId}.</AlertDialogDescription>
+                                        <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore outstanding amounts.</AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => {}}>Continue</AlertDialogAction>
+                                        <AlertDialogAction onClick={() => handleDeletePayment(p.id)}>Continue</AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><Printer className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePrintPayment(p)}><Printer className="h-4 w-4" /></Button>
                         </TableCell>
                         </TableRow>
                     ))}
@@ -370,6 +455,40 @@ export default function CustomerPaymentsPage() {
           </Card>
         </>
       )}
+
+    <ReceiptPrintDialog
+        receipts={receiptsToPrint}
+        settings={receiptSettings}
+        onOpenChange={() => setReceiptsToPrint([])}
+        isCustomer={true}
+      />
+      
+    <Dialog open={!!paymentDetails} onOpenChange={() => setPaymentDetails(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Payment Details: {paymentDetails?.paymentId}</DialogTitle>
+            </DialogHeader>
+            {paymentDetails && (
+                <div className="space-y-4">
+                    <p>Amount: {formatCurrency(paymentDetails.amount)} on {new Date(paymentDetails.date).toLocaleDateString()}</p>
+                    <h4 className="font-semibold">Paid for entries:</h4>
+                    <Table>
+                        <TableHeader><TableRow><TableHead>SR No</TableHead><TableHead>Amount Paid</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {paymentDetails.paidFor?.map(pf => (
+                                <TableRow key={pf.srNo}>
+                                    <TableCell>{pf.srNo}</TableCell>
+                                    <TableCell>{formatCurrency(pf.amount)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+        </DialogContent>
+    </Dialog>
+
     </div>
   );
 }
+
