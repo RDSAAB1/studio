@@ -50,7 +50,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
   today.setHours(0, 0, 0, 0);
 
   return {
-    id: "", srNo: 'S----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
+    id: "", srNo: 'S----', date: today.toISOString().split('T')[0], term: '20', dueDate: today.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
@@ -241,7 +241,7 @@ export default function SupplierEntryClient() {
         formDate = today;
     }
     const formValues: FormValues = {
-      srNo: customerState.srNo, date: formDate, term: Number(customerState.term) || 0,
+      srNo: customerState.srNo, date: formDate, term: Number(customerState.term) || 20,
       name: customerState.name, so: customerState.so, address: customerState.address,
       contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
@@ -295,6 +295,14 @@ export default function SupplierEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
+    if (contactValue.length > 0 && contactValue.length < 10) {
+      toast({
+        title: "Incomplete Contact Number",
+        description: "Please enter a valid 10-digit contact number.",
+        variant: "destructive"
+      });
+      return;
+    }
     if (contactValue.length === 10) {
       const foundCustomer = suppliers.find(c => c.contact === contactValue);
       if (foundCustomer && foundCustomer.id !== currentSupplier.id) {
@@ -414,7 +422,6 @@ export default function SupplierEntryClient() {
   };
   
   const handlePrint = () => {
-    // If items are selected in the table, print them
     if (selectedSupplierIds.size > 0) {
         const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
         if (entriesToPrint.length === 0) {
@@ -455,8 +462,13 @@ export default function SupplierEntryClient() {
             setReceiptsToPrint([]);
         }
     } else {
-      // Otherwise, save and print the current form entry
-      handleSaveAndPrint();
+      const formValues = form.getValues();
+      const isValid = form.trigger();
+      if(isValid && formValues.name && formValues.contact){
+        handleSaveAndPrint();
+      } else {
+         toast({ title: "Cannot Print", description: "Please fill the form or select entries from the table to print.", variant: "destructive" });
+      }
     }
   };
   

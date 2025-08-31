@@ -59,14 +59,17 @@ type FormValues = z.infer<typeof formSchema>;
 const getInitialFormState = (lastVariety?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const dateStr = today.toISOString().split('T')[0];
 
   return {
-    id: "", srNo: 'C----', date: today.toISOString().split('T')[0], term: '0', dueDate: today.toISOString().split('T')[0], 
-    name: '', so: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
-    weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
-    labouryRate: 0, labouryAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', bags: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
-    bagWeightKg: 0, bagRate: 0, bagAmount: 0
+    id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
+    name: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
+    kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
+    netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
+    receiptType: 'Cash', paymentType: 'Full', customerId: '',
+    // Fields that should not be here
+    so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
   };
 };
 
@@ -201,9 +204,11 @@ export default function CustomerEntryClient() {
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
     
-    const bagWeightKg = Number(values.bagWeightKg) || 0;
-    const bagWeightQuintals = bagWeightKg / 100;
-    const netWeight = weight - bagWeightQuintals;
+    const bags = Number(values.bags) || 0;
+    const bagWeightPerBagKg = Number(values.bagWeightKg) || 0;
+    const totalBagWeightKg = bags * bagWeightPerBagKg;
+    const totalBagWeightQuintals = totalBagWeightKg / 100;
+    const netWeight = weight - totalBagWeightQuintals;
     
     const rate = values.rate || 0;
     const amount = netWeight * rate;
@@ -216,7 +221,6 @@ export default function CustomerEntryClient() {
     
     const kanta = Number(values.kanta) || 0;
     
-    const bags = Number(values.bags) || 0;
     const bagRate = Number(values.bagRate) || 0;
     const bagAmount = bags * bagRate;
 
@@ -237,7 +241,8 @@ export default function CustomerEntryClient() {
     setCurrentCustomer(prev => {
         const currentDate = values.date instanceof Date ? values.date : (prev.date ? new Date(prev.date) : new Date());
         return {
-            ...prev, ...values,
+            ...prev,
+            ...values,
             date: currentDate.toISOString().split("T")[0],
             dueDate: (values.date ? new Date(values.date) : new Date()).toISOString().split("T")[0],
             weight: parseFloat(weight.toFixed(2)),
@@ -277,8 +282,10 @@ export default function CustomerEntryClient() {
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
       contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, cd: customerState.cdRate || 0,
-      brokerage: customerState.brokerageRate || 0, kanta: customerState.kanta || 0,
+      rate: customerState.rate || 0, 
+      cd: customerState.cdRate || customerState.cd || 0,
+      brokerage: customerState.brokerageRate || customerState.brokerage || 0,
+      kanta: customerState.kanta || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
       bagWeightKg: customerState.bagWeightKg || 0,
@@ -335,6 +342,14 @@ export default function CustomerEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
+    if (contactValue.length > 0 && contactValue.length < 10) {
+      toast({
+        title: "Incomplete Contact Number",
+        description: "Please enter a valid 10-digit contact number.",
+        variant: "destructive"
+      });
+      return;
+    }
     if (contactValue.length === 10) {
       const foundCustomer = customers.find(c => c.contact === contactValue);
       if (foundCustomer && foundCustomer.id !== currentCustomer.id) {
@@ -385,39 +400,81 @@ export default function CustomerEntryClient() {
     }
   };
 
-  const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    const completeEntry: Customer = {
-      ...currentCustomer,
-      ...values,
-      id: values.srNo, // Use srNo as ID
-      date: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
-      dueDate: (values.date instanceof Date ? values.date : new Date(values.date)).toISOString().split("T")[0],
-      name: toTitleCase(values.name), 
-      companyName: toTitleCase(values.companyName || ''),
-      address: toTitleCase(values.address), 
-      vehicleNo: toTitleCase(values.vehicleNo), 
-      variety: toTitleCase(values.variety),
-      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-      term: '0',
+  const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    const formValues = form.getValues();
+    
+    // Create a new clean object with only the fields relevant to the customer
+    const dataToSave: Omit<Customer, 'id'> = {
+        srNo: formValues.srNo,
+        date: formValues.date.toISOString().split('T')[0],
+        term: '0', 
+        dueDate: formValues.date.toISOString().split('T')[0],
+        name: toTitleCase(formValues.name),
+        companyName: toTitleCase(formValues.companyName || ''),
+        address: toTitleCase(formValues.address),
+        contact: formValues.contact,
+        gstin: formValues.gstin,
+        vehicleNo: toTitleCase(formValues.vehicleNo),
+        variety: toTitleCase(formValues.variety),
+        paymentType: formValues.paymentType,
+        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
+        
+        // Form fields for customer
+        grossWeight: formValues.grossWeight,
+        teirWeight: formValues.teirWeight,
+        rate: formValues.rate,
+        bags: formValues.bags,
+        bagWeightKg: formValues.bagWeightKg,
+        bagRate: formValues.bagRate,
+        kanta: formValues.kanta,
+        isBrokerageIncluded: formValues.isBrokerageIncluded,
+
+        // Shipping details
+        shippingName: toTitleCase(formValues.shippingName || ''),
+        shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
+        shippingAddress: toTitleCase(formValues.shippingAddress || ''),
+        shippingContact: formValues.shippingContact,
+        shippingGstin: formValues.shippingGstin,
+        
+        // Values from calculations
+        weight: currentCustomer.weight,
+        netWeight: currentCustomer.netWeight,
+        amount: currentCustomer.amount,
+        bagAmount: currentCustomer.bagAmount,
+        cd: currentCustomer.cd,
+        cdRate: currentCustomer.cdRate,
+        brokerage: currentCustomer.brokerage,
+        brokerageRate: currentCustomer.brokerageRate,
+        originalNetAmount: currentCustomer.originalNetAmount,
+        netAmount: currentCustomer.netAmount,
+
+        // Fields to explicitly exclude
+        so: '',
+        kartaPercentage: 0,
+        kartaWeight: 0,
+        kartaAmount: 0,
+        labouryRate: 0,
+        labouryAmount: 0,
+        barcode: '',
+        receiptType: 'Cash',
     };
-
+    
     try {
-        if (isEditing && currentCustomer.id && currentCustomer.id !== completeEntry.id) {
-          // If SR No. has changed, delete the old document
-          await deleteCustomer(currentCustomer.id);
+        if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
+            await deleteCustomer(currentCustomer.id);
         }
-
+        
         if (deletePayments) {
-            await deletePaymentsForSrNo(completeEntry.srNo);
-            const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
-            const savedEntry = await addCustomer(updatedEntry);
-            toast({ title: "Success", description: "Entry updated successfully." });
-            if (callback) callback(savedEntry); else handleNew();
+            await deletePaymentsForSrNo(dataToSave.srNo!);
+            const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
+            await addCustomer(entryWithRestoredAmount as Customer);
+            toast({ title: "Success", description: "Entry updated and payments deleted." });
+            if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
         } else {
-            const savedEntry = await addCustomer(completeEntry);
+            const entryToSave = { ...dataToSave, id: dataToSave.srNo };
+            await addCustomer(entryToSave as Customer);
             toast({ title: "Success", description: `Entry ${isEditing ? 'updated' : 'saved'} successfully.` });
-            if (callback) callback(savedEntry); else handleNew();
+            if (callback) callback(entryToSave as Customer); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
@@ -425,22 +482,22 @@ export default function CustomerEntryClient() {
     }
   };
 
-  const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+  const onSubmit = async (callback?: (savedEntry: Customer) => void) => {
     if (isEditing) {
         const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
         if (hasPayments) {
-            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
+            setUpdateAction(() => (deletePayments: boolean) => executeSubmit(deletePayments, callback));
             setIsUpdateConfirmOpen(true);
             return;
         }
     }
-    executeSubmit(values, false, callback);
+    executeSubmit(false, callback);
   };
 
   const handleSaveAndPrint = async (docType: DocumentType) => {
     const isValid = await form.trigger();
     if (isValid) {
-      onSubmit(form.getValues(), (savedEntry) => {
+      onSubmit((savedEntry) => {
         setDocumentPreviewCustomer(savedEntry);
         setDocumentType(docType);
         setIsDocumentPreviewOpen(true);
@@ -489,7 +546,7 @@ export default function CustomerEntryClient() {
         const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
         
         setConsolidatedReceiptData({
-            supplier: { // This should be customer, but the definition is shared.
+            supplier: { 
                 name: customer.name,
                 so: customer.so,
                 address: customer.address,
@@ -505,7 +562,7 @@ export default function CustomerEntryClient() {
 
   const handleOpenPrintPreview = (customer: Customer) => {
     setDocumentPreviewCustomer(customer);
-    setDocumentType('tax-invoice'); // Default to tax-invoice
+    setDocumentType('tax-invoice'); 
     setIsDocumentPreviewOpen(true);
   };
 
@@ -524,7 +581,7 @@ export default function CustomerEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
             <CustomerForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -540,7 +597,7 @@ export default function CustomerEntryClient() {
             
             <CalculatedSummary
                 customer={currentCustomer}
-                onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+                onSave={() => form.handleSubmit(() => onSubmit())()}
                 onSaveAndPrint={handleSaveAndPrint}
                 onNew={handleNew}
                 isEditing={isEditing}
@@ -567,6 +624,7 @@ export default function CustomerEntryClient() {
         customer={detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
         onPrint={handleOpenPrintPreview}
+        paymentHistory={paymentHistory}
       />
         
       <DocumentPreviewDialog
