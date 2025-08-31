@@ -119,14 +119,12 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         <div className="space-y-1">
                             <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                             <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found."/>
-                            {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                         </div>
                     )} />
                      <Controller name="paymentType" control={form.control} render={({ field }) => (
                         <div className="space-y-1">
                             <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                             <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
-                            {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                         </div>
                     )} />
                     <div className="space-y-1">
@@ -143,16 +141,15 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                     <div className="space-y-1">
                         <Label htmlFor="contact" className="text-xs">Contact</Label>
                         <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-8 text-sm pl-10" /> )}/>
+                            <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} /> )}/>
                         </InputWithIcon>
-                        {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="name" className="text-xs">Name</Label>
                         <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                             <PopoverTrigger asChild>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={(e) => { handleCapitalizeOnBlur(e); setTimeout(() => setIsNamePopoverOpen(false), 150); }} autoComplete="off" className="h-8 text-sm pl-10" name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
+                                    <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={(e) => { handleCapitalizeOnBlur(e); setTimeout(() => setIsNamePopoverOpen(false), 150); }} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
                                 </InputWithIcon>
                             </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -161,7 +158,6 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </CommandGroup></CommandList></Command>
                             </PopoverContent>
                         </Popover>
-                        {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="companyName" className="text-xs">Company Name</Label>
