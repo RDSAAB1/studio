@@ -47,7 +47,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 );
 
 
-const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const statementRef = React.useRef<HTMLDivElement>(null);
     if (!data) return null;
 
