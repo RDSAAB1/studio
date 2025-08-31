@@ -56,19 +56,14 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                             </div>
                         ))}
                     </div>
-                    <div className="flex flex-col justify-start items-stretch space-y-2 border-t lg:border-t-0 lg:border-l pt-3 lg:pt-0 lg:pl-3">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button size="sm" className="h-8">
-                                    Actions <MoreVertical className="ml-auto h-4 w-4 shrink-0" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuItem onClick={onSave}>{isEditing ? "Update" : "Save"}</DropdownMenuItem>
-                                <DropdownMenuItem onClick={onNew}>New / Clear</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm" variant="outline" className="h-8">
+                    <div className="flex flex-col sm:flex-row lg:flex-col justify-start items-stretch gap-2 border-t lg:border-t-0 lg:border-l pt-3 lg:pt-0 lg:pl-3">
+                         <Button onClick={onSave} size="sm" className="h-8">
+                            {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+                        </Button>
+                         <Button onClick={onNew} size="sm" variant="outline" className="h-8">
+                            <PlusCircle className="mr-2 h-4 w-4" /> New
+                        </Button>
+                         <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm" variant="outline" className="h-8">
                             <Printer className="mr-2 h-4 w-4"/> Save & Print
                         </Button>
                     </div>
