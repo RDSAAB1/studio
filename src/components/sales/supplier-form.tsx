@@ -16,7 +16,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { OptionsManagerDialog } from "./options-manager-dialog";
-import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, Hourglass, Settings, InfoIcon } from "lucide-react";
+import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, Hourglass, Settings, InfoIcon, PlusCircle } from "lucide-react";
 import { Separator } from "../ui/separator";
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -83,7 +83,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         <div className="space-y-3">
             <Card className="bg-card/60 backdrop-blur-sm border-white/10">
                 <CardContent className="p-3">
-                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-2">
+                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-[1fr_1fr_1.5fr_1.5fr_1.5fr_1.5fr] gap-x-3 gap-y-2">
                         <div className="space-y-1">
                             <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
                             <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
@@ -124,10 +124,10 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-7 gap-3">
-                <Card className="lg:col-span-3">
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                <Card className="lg:col-span-5">
                     <CardContent className="p-3 space-y-2">
-                         <div className="grid grid-cols-2 gap-x-3">
+                        <div className="grid grid-cols-2 gap-x-3">
                             <div className="space-y-1">
                                 <Label htmlFor="contact" className="text-xs">Contact</Label>
                                 <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
@@ -167,17 +167,23 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                     </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-2">
+                <Card className="lg:col-span-3">
                      <CardContent className="p-3 space-y-2">
-                        <div className="space-y-1">
-                            <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
+                         <div className="space-y-1">
+                             <div className="flex justify-between items-center">
+                                <Label className="text-xs">Payment Type</Label>
+                                <Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><PlusCircle className="h-4 w-4"/></Button>
+                            </div>
                             <Controller name="paymentType" control={form.control} render={({ field }) => (
                                 <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
                             )} />
                             {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
+                            <div className="flex justify-between items-center">
+                                <Label className="text-xs">Variety</Label>
+                                <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><PlusCircle className="h-4 w-4"/></Button>
+                            </div>
                             <Controller name="variety" control={form.control} render={({ field }) => (
                                 <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found."/>
                             )} />
@@ -202,7 +208,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                      </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-2">
+                <Card className="lg:col-span-4">
                      <CardContent className="p-3 space-y-2">
                         <div className="space-y-1">
                             <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
