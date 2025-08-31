@@ -42,7 +42,7 @@ const SummaryItem = ({ label, value, isHighlighted, className }: { label: string
 );
 
 
-export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isEditing, onSearch, onPrint, selectedIdsCount }: CalculatedSummaryProps) => {
+export const CalculatedSummary = ({ customer, onSave, onNew, isEditing, onSearch, onPrint, selectedIdsCount }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
     const isPrintActionForSelected = selectedIdsCount > 0;
@@ -53,6 +53,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                 <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
                     <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
                     <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
+                    <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />
                     <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
                     <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
                     <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
