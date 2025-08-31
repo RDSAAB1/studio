@@ -76,7 +76,7 @@ export function DynamicCombobox({
           className="w-full justify-between h-8 text-sm font-normal"
         >
           {selectedOption ? toTitleCase(selectedOption.label) : placeholder}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[51]">

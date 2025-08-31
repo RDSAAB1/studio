@@ -170,20 +170,14 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 <Card className="lg:col-span-3">
                      <CardContent className="p-3 space-y-2">
                          <div className="space-y-1">
-                             <div className="flex justify-between items-center">
-                                <Label className="text-xs">Payment Type</Label>
-                                <Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><PlusCircle className="h-4 w-4"/></Button>
-                            </div>
+                            <Label className="text-xs">Payment Type</Label>
                             <Controller name="paymentType" control={form.control} render={({ field }) => (
                                 <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
                             )} />
                             {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                         </div>
                         <div className="space-y-1">
-                            <div className="flex justify-between items-center">
-                                <Label className="text-xs">Variety</Label>
-                                <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><PlusCircle className="h-4 w-4"/></Button>
-                            </div>
+                            <Label className="text-xs">Variety</Label>
                             <Controller name="variety" control={form.control} render={({ field }) => (
                                 <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found."/>
                             )} />
