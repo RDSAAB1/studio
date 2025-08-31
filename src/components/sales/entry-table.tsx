@@ -11,10 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Info, Pen, Trash } from "lucide-react";
+import { Info, Pen, Printer, Trash } from "lucide-react";
 
 
-export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, entryType = 'Supplier' }: any) {
+export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, onPrintRow, entryType = 'Supplier' }: any) {
     
     const handleSelectAll = (checked: boolean) => {
         const allEntryIds = entries.map((c: Customer) => c.id);
@@ -77,6 +77,9 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                             </Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry.id)}>
                                                 <Pen className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRow(entry)}>
+                                                <Printer className="h-4 w-4" />
                                             </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>

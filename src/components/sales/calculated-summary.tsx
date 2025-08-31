@@ -33,8 +33,8 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
 );
 
 const SummaryItem = ({ label, value, isHighlighted, className }: { label: string; value: string; isHighlighted?: boolean, className?: string; }) => (
-    <div className={cn("flex flex-col items-center", className)}>
-        <p className="text-xs text-muted-foreground whitespace-nowrap">{label}</p>
+    <div className={cn("flex items-baseline gap-2", className)}>
+        <p className="text-xs text-muted-foreground whitespace-nowrap">{label}:</p>
         <p className={cn("font-semibold text-sm", isHighlighted && "text-base font-bold text-primary")}>
             {value}
         </p>
@@ -45,11 +45,12 @@ const SummaryItem = ({ label, value, isHighlighted, className }: { label: string
 export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isEditing, onSearch, onPrint, selectedIdsCount }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
+    const isPrintActionForSelected = selectedIdsCount > 0;
     
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
             <CardContent className="p-3 space-y-3">
-                <div className="flex items-center justify-around gap-x-6 gap-y-2 flex-wrap">
+                <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
                     <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
                     <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
                     <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
@@ -73,19 +74,20 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     </div>
 
                     <div className="flex items-center gap-2">
-                         {selectedIdsCount > 0 && (
-                            <Button onClick={onPrint} size="sm" variant="outline" className="h-8 rounded-md">
-                                <Printer className="h-4 w-4" />
-                            </Button>
-                         )}
+                        <Button
+                            onClick={onPrint}
+                            size="icon"
+                            variant={isPrintActionForSelected ? "default" : "outline"}
+                            className="h-8 w-8 rounded-full"
+                            disabled={isLoading}
+                        >
+                            <Printer className="h-4 w-4" />
+                        </Button>
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading}>
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                         </Button>
                         <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading}>
                             <PlusCircle className="mr-2 h-4 w-4" /> New
-                        </Button>
-                        <Button onClick={onSaveAndPrint} variant="outline" size="sm" className="h-8 rounded-md" disabled={isLoading}>
-                            <Printer className="h-4 w-4"/>
                         </Button>
                     </div>
                 </div>

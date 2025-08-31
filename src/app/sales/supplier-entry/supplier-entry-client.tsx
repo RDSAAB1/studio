@@ -392,7 +392,7 @@ export default function SupplierEntryClient() {
     const isValid = await form.trigger();
     if (isValid) {
       onSubmit(form.getValues(), (savedEntry) => {
-        handlePrint([savedEntry]);
+        handleSinglePrint(savedEntry);
         handleNew();
       });
     } else {
@@ -408,47 +408,55 @@ export default function SupplierEntryClient() {
     setDetailsSupplier(customer);
   }
   
-  const handlePrint = (entriesToPrint: Customer[]) => {
-    if (!entriesToPrint || entriesToPrint.length === 0) {
-        toast({
-            title: "No Selection",
-            description: "Please select one or more entries to print.",
-            variant: "destructive",
-        });
-        return;
-    }
-
-    if (entriesToPrint.length === 1) {
-        setReceiptsToPrint(entriesToPrint);
-        setConsolidatedReceiptData(null);
-    } else {
-        const firstCustomerId = entriesToPrint[0].customerId;
-        const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
-
-        if (!allSameCustomer) {
-            toast({
-                title: "Multiple Suppliers Selected",
-                description: "Consolidated receipts can only be printed for a single supplier at a time.",
-                variant: "destructive",
-            });
+  const handleSinglePrint = (entry: Customer) => {
+    setReceiptsToPrint([entry]);
+    setConsolidatedReceiptData(null);
+  };
+  
+  const handlePrint = () => {
+    // If items are selected in the table, print them
+    if (selectedSupplierIds.size > 0) {
+        const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
+        if (entriesToPrint.length === 0) {
+            toast({ title: "Error", description: "No selected entries found to print.", variant: "destructive" });
             return;
         }
-        
-        const supplier = entriesToPrint[0];
-        const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
-        
-        setConsolidatedReceiptData({
-            supplier: {
-                name: supplier.name,
-                so: supplier.so,
-                address: supplier.address,
-                contact: supplier.contact,
-            },
-            entries: entriesToPrint,
-            totalAmount: totalAmount,
-            date: format(new Date(), "dd-MMM-yy"),
-        });
-        setReceiptsToPrint([]);
+
+        if (entriesToPrint.length === 1) {
+            setReceiptsToPrint(entriesToPrint);
+            setConsolidatedReceiptData(null);
+        } else {
+            const firstCustomerId = entriesToPrint[0].customerId;
+            const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
+    
+            if (!allSameCustomer) {
+                toast({
+                    title: "Multiple Suppliers Selected",
+                    description: "Consolidated receipts can only be printed for a single supplier at a time.",
+                    variant: "destructive",
+                });
+                return;
+            }
+            
+            const supplier = entriesToPrint[0];
+            const totalAmount = entriesToPrint.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0);
+            
+            setConsolidatedReceiptData({
+                supplier: {
+                    name: supplier.name,
+                    so: supplier.so,
+                    address: supplier.address,
+                    contact: supplier.contact,
+                },
+                entries: entriesToPrint,
+                totalAmount: totalAmount,
+                date: format(new Date(), "dd-MMM-yy"),
+            });
+            setReceiptsToPrint([]);
+        }
+    } else {
+      // Otherwise, save and print the current form entry
+      handleSaveAndPrint();
     }
   };
   
@@ -488,7 +496,7 @@ export default function SupplierEntryClient() {
                 onNew={handleNew}
                 isEditing={isEditing}
                 onSearch={setSearchTerm}
-                onPrint={() => handlePrint(filteredSuppliers.filter(s => selectedSupplierIds.has(s.id)))}
+                onPrint={handlePrint}
                 selectedIdsCount={selectedSupplierIds.size}
             />
         </form>
@@ -501,6 +509,7 @@ export default function SupplierEntryClient() {
         onShowDetails={handleShowDetails}
         selectedIds={selectedSupplierIds}
         onSelectionChange={setSelectedSupplierIds}
+        onPrintRow={handleSinglePrint}
       />
         
       <DetailsDialog
