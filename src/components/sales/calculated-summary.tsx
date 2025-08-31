@@ -7,7 +7,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Banknote, Scale, Percent, User, HandCoins, MoreVertical } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Banknote, Scale, Percent, User, HandCoins, MoreVertical, CalendarDays, Weight, Calculator, Milestone } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 
@@ -39,33 +39,38 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
 
     if (!isCustomerForm) {
         // Supplier Form Summary
-        const summaryFields = [
-            { label: "Due Date", value: customer.dueDate ? format(new Date(customer.dueDate), "PPP") : '-' }, { label: "Weight", value: customer.weight.toFixed(2) },
-            { label: "Karta Weight", value: customer.kartaWeight.toFixed(2) }, { label: "Karta Amount", value: formatCurrency(customer.kartaAmount) },
-            { label: "Net Weight", value: customer.netWeight.toFixed(2) }, { label: "Laboury Amount", value: formatCurrency(customer.labouryAmount) },
-            { label: "Amount", value: formatCurrency(customer.amount) }, { label: "Net Amount", value: formatCurrency(Number(customer.netAmount)), isBold: true },
-        ];
         return (
-            <Card className="bg-card/60 backdrop-blur-sm border-white/10">
-                <CardContent className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
-                    <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
-                        {summaryFields.map(item => (
-                            <div key={item.label} className="leading-tight">
-                                <p className="text-xs text-muted-foreground">{item.label}</p>
-                                <p className={cn("font-semibold", item.isBold && "text-primary font-bold text-base")}>{String(item.value)}</p>
-                            </div>
-                        ))}
+             <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
+                <CardContent className="p-2 flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <div className="grid grid-flow-col auto-cols-max gap-x-4 gap-y-1">
+                        <SummaryItem icon={<CalendarDays size={14}/>} label="Due Date" value={customer.dueDate ? format(new Date(customer.dueDate), "dd-MMM-yy") : '-'} />
+                        <Separator orientation="vertical" className="h-8 my-auto" />
+                        <SummaryItem icon={<Weight size={14}/>} label="Final Weight" value={`${customer.weight.toFixed(2)} Qtl`} />
+                        <SummaryItem icon={<Scale size={14}/>} label="Net Weight" value={`${customer.netWeight.toFixed(2)} Qtl`} />
+                        <Separator orientation="vertical" className="h-8 my-auto" />
+                        <SummaryItem icon={<Banknote size={14}/>} label="Total Amount" value={formatCurrency(customer.amount)} />
+                        <SummaryItem icon={<Calculator size={14}/>} label="Laboury" value={formatCurrency(customer.labouryAmount)} />
+                        <SummaryItem icon={<Milestone size={14}/>} label="Karta" value={formatCurrency(customer.kartaAmount)} />
                     </div>
-                    <div className="flex flex-col sm:flex-row lg:flex-col justify-start items-stretch gap-2 border-t lg:border-t-0 lg:border-l pt-3 lg:pt-0 lg:pl-3">
-                         <Button onClick={onSave} size="sm" className="h-8">
-                            {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
-                        </Button>
-                         <Button onClick={onNew} size="sm" variant="outline" className="h-8">
-                            <PlusCircle className="mr-2 h-4 w-4" /> New
-                        </Button>
-                         <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm" variant="outline" className="h-8">
-                            <Printer className="mr-2 h-4 w-4"/> Save & Print
-                        </Button>
+
+                    <div className="w-full sm:w-auto flex items-center justify-end gap-2">
+                        <div className="text-right bg-primary/10 p-2 rounded-lg border border-primary/30">
+                            <p className="text-xs font-semibold text-primary">Net Payable Amount</p>
+                            <p className="text-xl font-bold text-primary">{formatCurrency(Number(customer.netAmount))}</p>
+                        </div>
+                         <div className="flex flex-col gap-1">
+                            <Button onClick={onSave} size="sm" className="h-7 rounded-md">
+                                {isEditing ? <><Pen className="mr-2 h-3 w-3" /> Update</> : <><Save className="mr-2 h-3 w-3" /> Save</>}
+                            </Button>
+                            <div className="flex gap-1">
+                                <Button onClick={onNew} size="sm" variant="outline" className="h-7 rounded-md">
+                                    <PlusCircle className="mr-2 h-3 w-3" /> New
+                                </Button>
+                                <Button type="button" onClick={() => onSaveAndPrint('receipt')} size="sm" variant="outline" className="h-7 rounded-md">
+                                    <Printer className="mr-2 h-3 w-3"/> Print
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
