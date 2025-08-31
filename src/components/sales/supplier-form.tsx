@@ -83,9 +83,9 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         <div className="space-y-3">
             <Card className="bg-card/60 backdrop-blur-sm border-white/10">
                 <CardContent className="p-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-10 gap-3">
                         <Controller name="date" control={form.control} render={({ field }) => (
-                            <div className="space-y-1">
+                            <div className="space-y-1 lg:col-span-2">
                                 <Label className="text-xs">Date</Label>
                                 <Popover>
                                     <PopoverTrigger asChild>
@@ -113,20 +113,20 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             </InputWithIcon>
                         </div>
                         <Controller name="paymentType" control={form.control} render={({ field }) => (
-                            <div className="space-y-1">
+                            <div className="space-y-1 lg:col-span-2">
                                 <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
                                 {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
                             </div>
                         )} />
                         <Controller name="variety" control={form.control} render={({ field }) => (
-                            <div className="space-y-1">
+                            <div className="space-y-1 lg:col-span-2">
                                 <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found."/>
                                 {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                             </div>
                         )} />
-                        <div className="space-y-1">
+                        <div className="space-y-1 lg:col-span-2">
                             <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                             <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
@@ -163,13 +163,13 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 </Popover>
                                 {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 sm:col-span-2">
                                 <Label htmlFor="so" className="text-xs">S/O</Label>
                                 <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
                                     <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 sm:col-span-2">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
