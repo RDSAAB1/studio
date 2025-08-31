@@ -23,9 +23,9 @@ interface CalculatedSummaryProps {
 }
 
 const SummaryItem = ({ label, value, isHighlighted, className }: { label: string; value: string; isHighlighted?: boolean, className?: string; }) => (
-    <div className={cn("flex items-baseline gap-1.5", className)}>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={cn("font-semibold text-sm", isHighlighted && "text-lg font-bold text-primary")}>
+    <div className={cn("flex flex-col", className)}>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={cn("font-semibold text-base", isHighlighted && "text-lg font-bold text-primary")}>
             {value}
         </p>
     </div>
@@ -38,7 +38,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
             <CardContent className="p-3 space-y-3">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-6 gap-y-2">
+                <div className="flex items-center justify-between gap-x-6 gap-y-2 flex-wrap">
                     <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
                     <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
                     <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
