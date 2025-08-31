@@ -39,7 +39,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
             <CardContent className="p-2 flex flex-col sm:flex-row items-center justify-between gap-2">
                 <div className="flex-grow space-y-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                        <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
                        <Separator orientation="vertical" className="h-4" />
                        <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
@@ -52,7 +52,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                        )}
                        <SummaryItem label={isCustomerForm ? 'CD' : 'Karta'} value={formatCurrency(isCustomerForm ? (customer.cd || 0) : (customer.kartaAmount || 0))} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                        <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
                        <Separator orientation="vertical" className="h-4" />
                        <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.netAmount) || 0)} isHighlighted/>
