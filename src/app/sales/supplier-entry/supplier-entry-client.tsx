@@ -487,9 +487,9 @@ export default function SupplierEntryClient() {
                 onSaveAndPrint={handleSaveAndPrint}
                 onNew={handleNew}
                 isEditing={isEditing}
-                isBrokerageIncluded={false}
-                onBrokerageToggle={() => {}}
-                isCustomerForm={false}
+                onSearch={setSearchTerm}
+                onPrint={() => handlePrint(filteredSuppliers.filter(s => selectedSupplierIds.has(s.id)))}
+                selectedIdsCount={selectedSupplierIds.size}
             />
         </form>
       </FormProvider>      
@@ -498,11 +498,9 @@ export default function SupplierEntryClient() {
         entries={filteredSuppliers} 
         onEdit={handleEdit} 
         onDelete={handleDelete} 
-        onShowDetails={handleShowDetails} 
-        onPrint={handlePrint}
+        onShowDetails={handleShowDetails}
         selectedIds={selectedSupplierIds}
         onSelectionChange={setSelectedSupplierIds}
-        onSearch={setSearchTerm}
       />
         
       <DetailsDialog

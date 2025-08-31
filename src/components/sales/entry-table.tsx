@@ -6,24 +6,15 @@ import type { Customer } from "@/lib/definitions";
 import { format } from "date-fns";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Printer, Info, Pen, Trash } from "lucide-react";
+import { Info, Pen, Trash } from "lucide-react";
 
-const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
-    <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            {icon}
-        </div>
-        {children}
-    </div>
-);
 
-export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, onPrint, selectedIds, onSelectionChange, onSearch, entryType = 'Supplier' }: any) {
+export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, entryType = 'Supplier' }: any) {
     
     const handleSelectAll = (checked: boolean) => {
         const allEntryIds = entries.map((c: Customer) => c.id);
@@ -40,30 +31,8 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
         onSelectionChange(newSelectedIds);
     };
 
-    const searchPlaceholder = `Search by SR No, Name, or Contact...`;
-
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between p-3">
-                <CardTitle className="text-base">{entryType} Entry History</CardTitle>
-                <div className="flex items-center gap-2">
-                     <div className="relative w-full max-w-sm">
-                        <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
-                            <Input
-                                placeholder={searchPlaceholder}
-                                onChange={(e) => onSearch(e.target.value)}
-                                className="h-8 pl-10 text-xs"
-                            />
-                        </InputWithIcon>
-                    </div>
-                    {onPrint && (
-                        <Button onClick={() => onPrint(entries.filter((c: Customer) => selectedIds.has(c.id)))} disabled={selectedIds.size === 0} size="sm" variant="outline">
-                            <Printer className="mr-2 h-4 w-4" />
-                            Print Selected ({selectedIds.size})
-                        </Button>
-                    )}
-                </div>
-            </CardHeader>
             <CardContent className="p-0">
                 <div className="overflow-x-auto">
                     <Table>
@@ -103,11 +72,6 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                     <TableCell className="text-right font-semibold px-3 py-1 text-sm">{formatCurrency(Number(entry.netAmount))}</TableCell>
                                     <TableCell className="text-center px-3 py-1">
                                         <div className="flex justify-center items-center gap-0">
-                                            {onPrint && (
-                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrint([entry])}>
-                                                    <Printer className="h-4 w-4" />
-                                                </Button>
-                                            )}
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
                                                 <Info className="h-4 w-4" />
                                             </Button>
