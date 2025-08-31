@@ -41,7 +41,6 @@ const formSchema = z.object({
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
-    cd: z.coerce.number().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -55,7 +54,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '', cd: 0
+    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '',
   };
 };
 
@@ -199,7 +198,6 @@ export default function SupplierEntryClient() {
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
-    const cdAmount = values.cd || 0;
     
     const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
 
@@ -210,7 +208,7 @@ export default function SupplierEntryClient() {
           return sum + (paidForDetail?.amount || 0);
       }, 0);
       
-    const netAmount = originalNetAmount - totalPaidForThisEntry - cdAmount;
+    const netAmount = originalNetAmount - totalPaidForThisEntry;
 
     setCurrentSupplier(prev => ({
       ...prev, ...values,
@@ -220,7 +218,6 @@ export default function SupplierEntryClient() {
       kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
       amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
       kanta: parseFloat(kanta.toFixed(2)), 
-      cd: parseFloat(cdAmount.toFixed(2)),
       originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
       netAmount: parseFloat(netAmount.toFixed(2)),
     }));
@@ -251,7 +248,6 @@ export default function SupplierEntryClient() {
       rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
       labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
       paymentType: customerState.paymentType || 'Full',
-      cd: customerState.cd || 0,
     };
     setCurrentSupplier(customerState);
     form.reset(formValues);
