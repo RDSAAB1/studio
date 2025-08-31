@@ -84,13 +84,13 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
             <Card className="bg-card/60 backdrop-blur-sm border-white/10">
                 <CardContent className="p-3">
                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-2">
-                        <div className="space-y-1 lg:col-span-1">
+                        <div className="space-y-1">
                             <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
                             <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
                                 <Input id="srNo" {...form.register('srNo')} onBlur={(e) => handleSrNoBlur(e.target.value)} className="font-code h-8 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
-                        <div className="space-y-1 lg:col-span-1">
+                        <div className="space-y-1">
                             <Label htmlFor="term" className="text-xs">Term (Days)</Label>
                                 <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
                                 <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} className="h-8 text-sm pl-10" />
@@ -124,11 +124,18 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
-                <Card className="lg:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-7 gap-3">
+                <Card className="lg:col-span-3">
                     <CardContent className="p-3 space-y-2">
-                        <div className="grid grid-cols-2 gap-x-3">
-                           <div className="space-y-1">
+                         <div className="grid grid-cols-2 gap-x-3">
+                            <div className="space-y-1">
+                                <Label htmlFor="contact" className="text-xs">Contact</Label>
+                                <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
+                                    <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-8 text-sm pl-10" /> )}/>
+                                </InputWithIcon>
+                                {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
+                            </div>
+                            <div className="space-y-1">
                                 <Label htmlFor="name" className="text-xs">Name</Label>
                                 <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                                     <PopoverTrigger asChild>
@@ -143,13 +150,6 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                     </PopoverContent>
                                 </Popover>
                                 {form.formState.errors.name && <p className="text-xs text-destructive mt-1">{form.formState.errors.name.message}</p>}
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="contact" className="text-xs">Contact</Label>
-                                <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} onBlur={e => handleContactBlur(e.target.value)} className="h-8 text-sm pl-10" /> )}/>
-                                </InputWithIcon>
-                                {form.formState.errors.contact && <p className="text-xs text-destructive mt-1">{form.formState.errors.contact.message}</p>}
                             </div>
                         </div>
                         <div className="space-y-1">
@@ -169,21 +169,19 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
 
                 <Card className="lg:col-span-2">
                      <CardContent className="p-3 space-y-2">
-                        <div className="grid grid-cols-2 gap-x-3">
-                             <Controller name="paymentType" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                    <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
-                                    {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
-                                </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
+                            <Controller name="paymentType" control={form.control} render={({ field }) => (
+                                <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
                             )} />
+                            {form.formState.errors.paymentType && <p className="text-xs text-destructive mt-1">{form.formState.errors.paymentType.message}</p>}
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                             <Controller name="variety" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                                    <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found."/>
-                                    {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
-                                </div>
+                                <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found."/>
                             )} />
+                            {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                         </div>
                         <Controller name="date" control={form.control} render={({ field }) => (
                             <div className="space-y-1">
@@ -204,7 +202,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                      </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-1">
+                <Card className="lg:col-span-2">
                      <CardContent className="p-3 space-y-2">
                         <div className="space-y-1">
                             <Label htmlFor="kartaPercentage" className="text-xs">Karta %</Label>
