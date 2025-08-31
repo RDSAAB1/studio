@@ -98,18 +98,15 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                          <Button onClick={onNew} size="sm" variant="outline" className="h-7">
                             <PlusCircle className="mr-2 h-4 w-4" /> New
                         </Button>
-                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-7">
-                                    <Printer className="mr-2 h-4 w-4"/> Print <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => onSaveAndPrint('tax-invoice')}>Tax Invoice</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onSaveAndPrint('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Challan</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button variant="outline" size="sm" className="h-7" onClick={() => onSaveAndPrint('tax-invoice')}>
+                            <Printer className="mr-2 h-4 w-4"/> Tax Invoice
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7" onClick={() => onSaveAndPrint('bill-of-supply')}>
+                            <Printer className="mr-2 h-4 w-4"/> Bill of Supply
+                        </Button>
+                         <Button variant="outline" size="sm" className="h-7" onClick={() => onSaveAndPrint('challan')}>
+                            <Printer className="mr-2 h-4 w-4"/> Challan
+                        </Button>
                     </div>
 
                     {isCustomerForm && onBrokerageToggle && (
