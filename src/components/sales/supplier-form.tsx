@@ -83,7 +83,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         <div className="space-y-3">
             <Card className="bg-card/60 backdrop-blur-sm border-white/10">
                 <CardContent className="p-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                         <Controller name="date" control={form.control} render={({ field }) => (
                             <div className="space-y-1">
                                 <Label className="text-xs">Date</Label>
@@ -126,6 +126,12 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 {form.formState.errors.variety && <p className="text-xs text-destructive mt-1">{form.formState.errors.variety.message}</p>}
                             </div>
                         )} />
+                        <div className="space-y-1">
+                            <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
+                            <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
+                                <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
+                            </InputWithIcon>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -133,7 +139,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
                 <Card className="lg:col-span-2">
                     <CardContent className="p-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1">
                                 <Label htmlFor="contact" className="text-xs">Contact</Label>
                                 <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
@@ -167,12 +173,6 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                                 <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
-                                </InputWithIcon>
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
-                                <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                         </div>
