@@ -31,60 +31,66 @@ const SummaryItem = ({ label, value, isHighlighted, className }: { label: string
     </div>
 );
 
-export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isEditing, isCustomerForm, isBrokerageIncluded, onBrokerageToggle }: CalculatedSummaryProps) => {
+export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isEditing, isCustomerForm }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
     
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
-            <CardContent className="p-2 flex flex-col sm:flex-row items-center justify-between gap-2">
-                <div className="flex-grow space-y-1">
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
-                       <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
-                       <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
-                       <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
-                       {isCustomerForm ? (
-                            <SummaryItem label="Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
-                       ) : (
-                            <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
-                       )}
-                       <SummaryItem label={isCustomerForm ? 'CD' : 'Karta'} value={formatCurrency(isCustomerForm ? (customer.cd || 0) : (customer.kartaAmount || 0))} />
+            <CardContent className="p-3">
+                <div className="grid grid-cols-12 items-center gap-4">
+                    <div className="col-span-12 lg:col-span-9">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2">
+                           <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
+                           <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
+                           <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
+                            {isCustomerForm ? (
+                                <SummaryItem label="Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
+                            ) : (
+                                <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
+                            )}
+                            <SummaryItem label={isCustomerForm ? 'CD' : 'Karta'} value={formatCurrency(isCustomerForm ? (customer.cd || 0) : (customer.kartaAmount || 0))} />
+                            <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
+                            <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.netAmount) || 0)} isHighlighted className="col-span-2 md:col-span-1 lg:col-span-1"/>
+                        </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
-                       <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
-                       <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.netAmount) || 0)} isHighlighted/>
-                    </div>
-                </div>
 
-                <div className="flex items-center justify-end gap-2 w-full sm:w-auto">
-                    <Button onClick={onSave} size="sm" className="h-8 rounded-md flex-1 sm:flex-none" disabled={isLoading}>
-                        {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
-                    </Button>
-                    <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md flex-1 sm:flex-none" disabled={isLoading}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> New
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 rounded-md flex-1 sm:flex-none" disabled={isLoading}>
-                                <Printer className="mr-2 h-4 w-4"/>
-                                Print
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <div className="hidden lg:block lg:col-span-1">
+                        <Separator orientation="vertical" className="h-12 mx-auto"/>
+                    </div>
+                    
+                    <div className="col-span-12 lg:col-span-2">
+                        <div className="flex items-center justify-end gap-2 w-full">
+                            <Button onClick={onSave} size="sm" className="h-8 rounded-md flex-1 sm:flex-none" disabled={isLoading}>
+                                {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                             </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                           {isCustomerForm ? (
-                                <>
-                                <DropdownMenuItem onClick={() => onSaveAndPrint('tax-invoice')}>Save & Print Tax Invoice</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onSaveAndPrint('bill-of-supply')}>Save & Print Bill of Supply</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Save & Print Challan</DropdownMenuItem>
-                                </>
-                           ) : (
-                                <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Save & Print</DropdownMenuItem>
-                           )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                            <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md flex-1 sm:flex-none" disabled={isLoading}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> New
+                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-8 rounded-md flex-1 sm:flex-none" disabled={isLoading}>
+                                        <Printer className="mr-2 h-4 w-4"/>
+                                        Print
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                   {isCustomerForm ? (
+                                        <>
+                                        <DropdownMenuItem onClick={() => onSaveAndPrint('tax-invoice')}>Save & Print Tax Invoice</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => onSaveAndPrint('bill-of-supply')}>Save & Print Bill of Supply</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Save & Print Challan</DropdownMenuItem>
+                                        </>
+                                   ) : (
+                                        <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Save & Print</DropdownMenuItem>
+                                   )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
                 </div>
             </CardContent>
         </Card>
     );
 };
+
