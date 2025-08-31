@@ -43,14 +43,14 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
              <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
                 <CardContent className="p-2 flex flex-col sm:flex-row items-center justify-between gap-2">
                     <div className="grid grid-flow-col auto-cols-max gap-x-4 gap-y-1">
-                        <SummaryItem icon={<CalendarDays size={14}/>} label="Due Date" value={customer.dueDate ? format(new Date(customer.dueDate), "dd-MMM-yy") : '-'} />
-                        <Separator orientation="vertical" className="h-8 my-auto" />
-                        <SummaryItem icon={<Weight size={14}/>} label="Final Weight" value={`${customer.weight.toFixed(2)} Qtl`} />
-                        <SummaryItem icon={<Scale size={14}/>} label="Net Weight" value={`${customer.netWeight.toFixed(2)} Qtl`} />
-                        <Separator orientation="vertical" className="h-8 my-auto" />
-                        <SummaryItem icon={<Banknote size={14}/>} label="Total Amount" value={formatCurrency(customer.amount)} />
-                        <SummaryItem icon={<Calculator size={14}/>} label="Laboury" value={formatCurrency(customer.labouryAmount)} />
-                        <SummaryItem icon={<Milestone size={14}/>} label="Karta" value={formatCurrency(customer.kartaAmount)} />
+                        <div className="flex items-center gap-1.5"><CalendarDays size={14} className="text-muted-foreground"/><p className="text-xs text-muted-foreground">Due:</p><p className="text-sm font-semibold">{customer.dueDate ? format(new Date(customer.dueDate), "dd-MMM-yy") : '-'}</p></div>
+                        <Separator orientation="vertical" className="h-6 my-auto" />
+                        <div className="flex items-center gap-1.5"><Weight size={14} className="text-muted-foreground"/><p className="text-xs text-muted-foreground">Final Wt:</p><p className="text-sm font-semibold">{`${customer.weight.toFixed(2)} Qtl`}</p></div>
+                        <div className="flex items-center gap-1.5"><Scale size={14} className="text-muted-foreground"/><p className="text-xs text-muted-foreground">Net Wt:</p><p className="text-sm font-semibold">{`${customer.netWeight.toFixed(2)} Qtl`}</p></div>
+                        <Separator orientation="vertical" className="h-6 my-auto" />
+                        <div className="flex items-center gap-1.5"><Banknote size={14} className="text-muted-foreground"/><p className="text-xs text-muted-foreground">Amount:</p><p className="text-sm font-semibold">{formatCurrency(customer.amount)}</p></div>
+                        <div className="flex items-center gap-1.5"><Calculator size={14} className="text-muted-foreground"/><p className="text-xs text-muted-foreground">Laboury:</p><p className="text-sm font-semibold">{formatCurrency(customer.labouryAmount)}</p></div>
+                        <div className="flex items-center gap-1.5"><Milestone size={14} className="text-muted-foreground"/><p className="text-xs text-muted-foreground">Karta:</p><p className="text-sm font-semibold">{formatCurrency(customer.kartaAmount)}</p></div>
                     </div>
 
                     <div className="w-full sm:w-auto flex items-center justify-end gap-2">
