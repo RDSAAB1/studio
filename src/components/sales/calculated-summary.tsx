@@ -14,22 +14,24 @@ import { Separator } from "../ui/separator";
 interface CalculatedSummaryProps {
     customer: Customer;
     onSave: () => void;
-    onSaveAndPrint: () => void;
+    onSaveAndPrint: (docType: 'challan' | 'tax-invoice' | 'bill-of-supply') => void;
     onNew: () => void;
     isEditing: boolean;
+    isCustomerForm: boolean;
+    isBrokerageIncluded: boolean;
+    onBrokerageToggle: (checked: boolean) => void;
 }
 
 const SummaryItem = ({ label, value, isHighlighted, className }: { label: string; value: string; isHighlighted?: boolean, className?: string; }) => (
     <div className={cn("flex items-baseline gap-1.5", className)}>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={cn("font-semibold text-sm", isHighlighted && "text-base font-bold text-primary")}>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className={cn("font-semibold text-sm", isHighlighted && "text-lg font-bold text-primary")}>
             {value}
         </p>
     </div>
 );
 
-
-export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isEditing }: CalculatedSummaryProps) => {
+export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isEditing, isCustomerForm, isBrokerageIncluded, onBrokerageToggle }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
     
@@ -43,8 +45,12 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                        <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
                        <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
                        <Separator orientation="vertical" className="h-4" />
-                       <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
-                       <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
+                       {isCustomerForm ? (
+                            <SummaryItem label="Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />
+                       ) : (
+                            <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
+                       )}
+                       <SummaryItem label={isCustomerForm ? 'CD' : 'Karta'} value={formatCurrency(isCustomerForm ? (customer.cd || 0) : (customer.kartaAmount || 0))} />
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                        <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
@@ -69,7 +75,15 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={onSaveAndPrint}>Save & Print</DropdownMenuItem>
+                           {isCustomerForm ? (
+                                <>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('tax-invoice')}>Save & Print Tax Invoice</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('bill-of-supply')}>Save & Print Bill of Supply</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Save & Print Challan</DropdownMenuItem>
+                                </>
+                           ) : (
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Save & Print</DropdownMenuItem>
+                           )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
