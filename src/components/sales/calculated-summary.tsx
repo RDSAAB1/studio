@@ -23,13 +23,14 @@ interface CalculatedSummaryProps {
 }
 
 const SummaryItem = ({ label, value, isHighlighted, className }: { label: string; value: string; isHighlighted?: boolean, className?: string; }) => (
-    <div className={cn("flex flex-col", className)}>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={cn("font-semibold text-base", isHighlighted && "text-lg font-bold text-primary")}>
+    <div className={cn("flex items-baseline gap-1.5", className)}>
+        <p className="text-sm text-muted-foreground whitespace-nowrap">{label}:</p>
+        <p className={cn("font-semibold text-sm", isHighlighted && "text-base font-bold text-primary")}>
             {value}
         </p>
     </div>
 );
+
 
 export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isEditing, isCustomerForm }: CalculatedSummaryProps) => {
 
