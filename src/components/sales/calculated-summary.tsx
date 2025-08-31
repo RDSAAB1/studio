@@ -73,10 +73,11 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                     </div>
 
                     <div className="flex items-center gap-2">
-                         <Button onClick={onPrint} disabled={selectedIdsCount === 0} size="sm" variant="outline" className="h-8 rounded-md">
-                            <Printer className="mr-2 h-4 w-4" />
-                            Print Selected ({selectedIdsCount})
-                        </Button>
+                         {selectedIdsCount > 0 && (
+                            <Button onClick={onPrint} size="sm" variant="outline" className="h-8 rounded-md">
+                                <Printer className="h-4 w-4" />
+                            </Button>
+                         )}
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading}>
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                         </Button>
@@ -84,8 +85,7 @@ export const CalculatedSummary = ({ customer, onSave, onSaveAndPrint, onNew, isE
                             <PlusCircle className="mr-2 h-4 w-4" /> New
                         </Button>
                         <Button onClick={onSaveAndPrint} variant="outline" size="sm" className="h-8 rounded-md" disabled={isLoading}>
-                            <Printer className="mr-2 h-4 w-4"/>
-                            Save & Print
+                            <Printer className="h-4 w-4"/>
                         </Button>
                     </div>
                 </div>
