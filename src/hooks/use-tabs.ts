@@ -29,6 +29,7 @@ import {
   ClipboardCheck,
   ChevronRight,
   Banknote,
+  FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -48,17 +49,23 @@ export const allMenuItems: MenuItem[] = [
     href: "/sales/dashboard-overview" 
   },
   {
-    id: "sales",
-    name: "Sales",
-    icon: TrendingUp,
+    id: "supplier",
+    name: "Supplier",
+    icon: Truck,
     subMenus: [
       { id: "supplier-entry", name: "Supplier Entry", icon: ChevronRight, href: "/sales/supplier-entry" },
       { id: "supplier-payments", name: "Supplier Payments", icon: ChevronRight, href: "/sales/supplier-payments" },
       { id: "supplier-profile", name: "Supplier Profile", icon: ChevronRight, href: "/sales/supplier-profile" },
+    ],
+  },
+    {
+    id: "customer",
+    name: "Customer",
+    icon: Users,
+    subMenus: [
       { id: "customer-entry", name: "Customer Entry", icon: ChevronRight, href: "/sales/customer-entry" },
       { id: "customer-payments", name: "Customer Payments", icon: ChevronRight, href: "/sales/customer-payments" },
       { id: "customer-profile", name: "Customer Profile", icon: ChevronRight, href: "/sales/customer-profile" },
-      { id: "rtgs-report", name: "RTGS Report", icon: Banknote, href: "/sales/rtgs-report" },
     ],
   },
   {
@@ -68,6 +75,14 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
         { id: "income-expense", name: "Income & Expense", icon: ChevronRight, href: "/expense-tracker" },
         { id: "cash-bank", name: "Cash & Bank", icon: ChevronRight, href: "/cash-bank" },
+    ]
+  },
+  {
+    id: "reports",
+    name: "Reports",
+    icon: FileText,
+    subMenus: [
+        { id: "rtgs-report", name: "RTGS Report", icon: ChevronRight, href: "/sales/rtgs-report" },
     ]
   },
   {
