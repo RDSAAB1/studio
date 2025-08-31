@@ -29,6 +29,18 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 const suppliersCollection = collection(db, "suppliers");
 
+type PaymentOption = {
+  quantity: number;
+  rate: number;
+  calculatedAmount: number;
+  amountRemaining: number;
+};
+
+type SortConfig = {
+    key: keyof PaymentOption;
+    direction: 'ascending' | 'descending';
+};
+
 export default function SupplierPaymentsPage() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -74,6 +86,14 @@ export default function SupplierPaymentsPage() {
   const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
   const [activeTab, setActiveTab] = useState('processing');
   const [openCombobox, setOpenCombobox] = useState(false);
+
+  // Combination Generator State
+  const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
+  const [calcTargetAmount, setCalcTargetAmount] = useState(0);
+  const [calcMinRate, setCalcMinRate] = useState(2300);
+  const [calcMaxRate, setCalcMaxRate] = useState(2400);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [roundFigureToggle, setRoundFigureToggle] = useState(false);
 
 
   const stableToast = useCallback(toast, []);
@@ -280,9 +300,10 @@ export default function SupplierPaymentsPage() {
   }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentType]);
 
   useEffect(() => {
+    const finalAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
+    setCalcTargetAmount(finalAmount > 0 ? finalAmount : 0);
     if (paymentType === 'Full') {
-      const newAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
-      setPaymentAmount(newAmount > 0 ? newAmount : 0);
+      setPaymentAmount(finalAmount > 0 ? finalAmount : 0);
     }
   }, [totalOutstandingForSelected, calculatedCdAmount, paymentType]);
 
@@ -309,6 +330,7 @@ export default function SupplierPaymentsPage() {
     setRtgsQuantity(0);
     setRtgsRate(0);
     setRtgsAmount(0);
+    setPaymentOptions([]);
     setPaymentId(getNextPaymentId(paymentHistory));
     setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
     if (isOutsider) {
@@ -588,6 +610,83 @@ export default function SupplierPaymentsPage() {
         setIsOutstandingModalOpen(false);
     };
 
+    const handleGeneratePaymentOptions = () => {
+        if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate > calcMaxRate) {
+            toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please enter valid numbers for payment calculation.' });
+            return;
+        }
+
+        const rawOptions: PaymentOption[] = [];
+        const generatedUniqueRemainingAmounts = new Map<number, number>();
+        const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
+
+        for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
+            for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
+                if (currentRate % 5 !== 0) continue;
+
+                let calculatedAmount = q * currentRate;
+                if (roundFigureToggle) {
+                    calculatedAmount = Math.round(calculatedAmount / 100) * 100;
+                }
+
+                if (calculatedAmount > calcTargetAmount) continue;
+
+                const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
+                if (amountRemaining < 0) continue;
+
+                const count = generatedUniqueRemainingAmounts.get(amountRemaining) || 0;
+                if (count < 5) {
+                    rawOptions.push({
+                        quantity: q,
+                        rate: currentRate,
+                        calculatedAmount: calculatedAmount,
+                        amountRemaining: amountRemaining
+                    });
+                    generatedUniqueRemainingAmounts.set(amountRemaining, count + 1);
+                }
+            }
+        }
+        
+        const sortedOptions = rawOptions.sort((a, b) => a.amountRemaining - b.amountRemaining);
+        const limitedOptions = sortedOptions.slice(0, 100);
+
+        setPaymentOptions(limitedOptions);
+        setSortConfig(null);
+        
+        toast({ title: 'Success', description: `Generated ${limitedOptions.length} payment options.` });
+    };
+
+    const selectPaymentAmount = (option: PaymentOption) => {
+        setRtgsQuantity(option.quantity);
+        setRtgsRate(option.rate);
+        setRtgsAmount(option.calculatedAmount);
+        toast({ title: 'Selected', description: `Amount ${option.calculatedAmount} selected.` });
+    };
+
+    const requestSort = (key: keyof PaymentOption) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedPaymentOptions = useMemo(() => {
+        let sortableItems = [...paymentOptions];
+        if (sortConfig !== null) {
+        sortableItems.sort((a, b) => {
+            if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+            }
+            if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+            }
+            return 0;
+        });
+        }
+        return sortableItems;
+    }, [paymentOptions, sortConfig]);
+
     if (!isClient || isLoadingInitial) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -685,12 +784,24 @@ export default function SupplierPaymentsPage() {
                             setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                             cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
                             setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
-                            setUtrNo={setUtrNo} targetAmountForGenerator={totalOutstandingForSelected - calculatedCdAmount}
+                            setUtrNo={setUtrNo} 
+                            parchiNo={parchiNo} setParchiNo={setParchiNo}
                             rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                             setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
                             processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
                             editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
                             setCheckNo={setCheckNo}
+                             // Generator Props
+                            calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
+                            calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
+                            calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
+                            handleGeneratePaymentOptions={handleGeneratePaymentOptions}
+                            paymentOptions={paymentOptions}
+                            selectPaymentAmount={selectPaymentAmount}
+                            requestSort={requestSort}
+                            sortedPaymentOptions={sortedPaymentOptions}
+                            roundFigureToggle={roundFigureToggle}
+                            setRoundFigureToggle={setRoundFigureToggle}
                         />
                     )}
                 </CardContent>

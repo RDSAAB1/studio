@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot } from "lucide-react";
+import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown } from "lucide-react";
 import { format } from 'date-fns';
 import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../table';
+import { Switch } from '../switch';
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -27,9 +29,13 @@ export const PaymentForm = ({
     rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
     cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
     setSixRDate, parchiNo, setParchiNo, utrNo, setUtrNo, checkNo, setCheckNo,
-    targetAmountForGenerator, rtgsQuantity, setRtgsQuantity,
+    rtgsQuantity, setRtgsQuantity,
     rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, resetPaymentForm,
-    editingPayment, setIsBankSettingsOpen
+    editingPayment, setIsBankSettingsOpen,
+    // Combination Generator Props
+    calcTargetAmount, setCalcTargetAmount, calcMinRate, setCalcMinRate, calcMaxRate, setCalcMaxRate,
+    handleGeneratePaymentOptions, paymentOptions, selectPaymentAmount, requestSort, sortedPaymentOptions,
+    roundFigureToggle, setRoundFigureToggle
 }: any) => {
 
     const availableBranches = React.useMemo(() => {
@@ -131,26 +137,54 @@ export const PaymentForm = ({
                             </div>
                         </Card>
                         <Card>
-                            <CardHeader className="p-2 pb-1"><CardTitle className="text-sm">Payment Combination Generator</CardTitle></CardHeader>
+                            <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
+                                <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
+                                <div className="flex items-center gap-2">
+                                     <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                     <Switch id="round-figure-toggle" checked={roundFigureToggle} onCheckedChange={setRoundFigureToggle} />
+                                </div>
+                            </CardHeader>
                             <CardContent className="p-2 space-y-2">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                     <div className="space-y-1">
                                         <Label className="text-xs">Target Amount</Label>
-                                        <Input type="number" placeholder="e.g. 1000000" className="h-8 text-xs"/>
+                                        <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-xs">Min Amount</Label>
-                                        <Input type="number" placeholder="e.g. 10000" className="h-8 text-xs"/>
+                                        <Label className="text-xs">Min Rate</Label>
+                                        <Input type="number" value={calcMinRate} onChange={(e) => setCalcMinRate(Number(e.target.value))} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-xs">Max Amount</Label>
-                                        <Input type="number" placeholder="e.g. 200000" className="h-8 text-xs"/>
+                                        <Label className="text-xs">Max Rate</Label>
+                                        <Input type="number" value={calcMaxRate} onChange={(e) => setCalcMaxRate(Number(e.target.value))} className="h-8 text-xs" />
                                     </div>
                                 </div>
-                                <Button size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4"/>Generate Combinations</Button>
-                                {/* Placeholder for generated combinations table */}
-                                <div className="p-2 border rounded-lg bg-background min-h-[50px] text-center text-muted-foreground text-xs flex items-center justify-center">
-                                    Generated payment combinations will appear here.
+                                <Button onClick={handleGeneratePaymentOptions} size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4" />Generate Combinations</Button>
+                                <div className="p-2 border rounded-lg bg-background min-h-[100px]">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('quantity')} className="text-xs p-1">Qty <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('rate')} className="text-xs p-1">Rate <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('calculatedAmount')} className="text-xs p-1">Amount <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('amountRemaining')} className="text-xs p-1">Remain <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {sortedPaymentOptions.length > 0 ? sortedPaymentOptions.map((option: any, index: number) => (
+                                                <TableRow key={index}>
+                                                    <TableCell className="p-1 text-xs">{option.quantity.toFixed(2)}</TableCell>
+                                                    <TableCell className="p-1 text-xs">{option.rate}</TableCell>
+                                                    <TableCell className="p-1 text-xs">{option.calculatedAmount}</TableCell>
+                                                    <TableCell className="p-1 text-xs">{option.amountRemaining}</TableCell>
+                                                    <TableCell className="p-1 text-xs"><Button variant="outline" size="sm" className="h-6 p-1 text-xs" onClick={() => selectPaymentAmount(option)}>Select</Button></TableCell>
+                                                </TableRow>
+                                            )) : (
+                                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs h-24">Generated payment combinations will appear here.</TableCell></TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
                                 </div>
                             </CardContent>
                         </Card>
