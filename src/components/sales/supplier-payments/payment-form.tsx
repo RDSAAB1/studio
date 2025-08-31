@@ -14,8 +14,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown } from "lucide-react";
 import { format } from 'date-fns';
 import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../table';
-import { Switch } from '../switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from '@/components/ui/switch';
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -151,11 +151,11 @@ export const PaymentForm = ({
                                         <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-xs">Min Rate</Label>
+                                        <Label className="text-xs">Min Amount</Label>
                                         <Input type="number" value={calcMinRate} onChange={(e) => setCalcMinRate(Number(e.target.value))} className="h-8 text-xs" />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-xs">Max Rate</Label>
+                                        <Label className="text-xs">Max Amount</Label>
                                         <Input type="number" value={calcMaxRate} onChange={(e) => setCalcMaxRate(Number(e.target.value))} className="h-8 text-xs" />
                                     </div>
                                 </div>
