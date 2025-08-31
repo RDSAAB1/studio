@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw } from "lucide-react";
+import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot } from "lucide-react";
 import { format } from 'date-fns';
 import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
 
@@ -130,6 +130,16 @@ export const PaymentForm = ({
                                 </div>
                             </div>
                         </Card>
+                         <Card className="p-2">
+                             <CardHeader className="p-1 pb-2"><CardTitle className="text-sm">Payment Combination Generator</CardTitle></CardHeader>
+                             <CardContent className="p-1 flex items-end gap-2">
+                                <div className="space-y-1 flex-grow">
+                                    <Label className="text-xs">Target Amount</Label>
+                                    <Input type="number" placeholder="e.g., 1000000" className="h-8 text-xs" />
+                                </div>
+                                <Button size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4"/>Generate Payment for Target Amount</Button>
+                             </CardContent>
+                         </Card>
                     </div>
                 )}
             </div>
