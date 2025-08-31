@@ -34,6 +34,7 @@ interface DynamicComboboxProps {
   placeholder?: string;
   searchPlaceholder?: string;
   emptyPlaceholder?: string;
+  onIconClick?: () => void;
 }
 
 export function DynamicCombobox({
@@ -44,6 +45,7 @@ export function DynamicCombobox({
   placeholder = "Select an option",
   searchPlaceholder = "Search...",
   emptyPlaceholder = "No options found.",
+  onIconClick
 }: DynamicComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState("");
@@ -68,17 +70,28 @@ export function DynamicCombobox({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-8 text-sm font-normal"
-        >
-          {selectedOption ? toTitleCase(selectedOption.label) : placeholder}
-          <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+      <div className="relative">
+        <PopoverTrigger asChild>
+            <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-start h-8 text-sm font-normal pr-10"
+            >
+            {selectedOption ? toTitleCase(selectedOption.label) : placeholder}
+            </Button>
+        </PopoverTrigger>
+         {onIconClick && (
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={onIconClick}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+            >
+                <PlusCircle className="h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+        )}
+      </div>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[51]">
         <Command>
           <CommandInput
