@@ -130,16 +130,30 @@ export const PaymentForm = ({
                                 </div>
                             </div>
                         </Card>
-                         <Card className="p-2">
-                             <CardHeader className="p-1 pb-2"><CardTitle className="text-sm">Payment Combination Generator</CardTitle></CardHeader>
-                             <CardContent className="p-1 flex items-end gap-2">
-                                <div className="space-y-1 flex-grow">
-                                    <Label className="text-xs">Target Amount</Label>
-                                    <Input type="number" placeholder="e.g., 1000000" className="h-8 text-xs" />
+                        <Card>
+                            <CardHeader className="p-2 pb-1"><CardTitle className="text-sm">Payment Combination Generator</CardTitle></CardHeader>
+                            <CardContent className="p-2 space-y-2">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Target Amount</Label>
+                                        <Input type="number" placeholder="e.g. 1000000" className="h-8 text-xs"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Min Amount</Label>
+                                        <Input type="number" placeholder="e.g. 10000" className="h-8 text-xs"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Max Amount</Label>
+                                        <Input type="number" placeholder="e.g. 200000" className="h-8 text-xs"/>
+                                    </div>
                                 </div>
-                                <Button size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4"/>Generate Payment for Target Amount</Button>
-                             </CardContent>
-                         </Card>
+                                <Button size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4"/>Generate Combinations</Button>
+                                {/* Placeholder for generated combinations table */}
+                                <div className="p-2 border rounded-lg bg-background min-h-[50px] text-center text-muted-foreground text-xs flex items-center justify-center">
+                                    Generated payment combinations will appear here.
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
             </div>
