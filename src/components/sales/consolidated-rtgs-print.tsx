@@ -128,7 +128,6 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         iframeDoc.open();
         iframeDoc.write('<html><head><title>RTGS Advice</title>');
         
-        // Copy all stylesheets from the main document to the iframe
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
@@ -216,9 +215,9 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                     </tbody>
                                     {pageIndex === paymentChunks.length - 1 && (
                                         <tfoot>
-                                            <tr className="bg-gray-100 font-bold">
-                                                <td className="p-2 text-right" colSpan={6}>GRAND TOTAL</td>
-                                                <td className="p-2 text-right">{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</td>
+                                            <tr className="font-bold">
+                                                <td className="p-2 text-right border-t-2 border-black" colSpan={6}>GRAND TOTAL</td>
+                                                <td className="p-2 text-right border-t-2 border-black">{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</td>
                                             </tr>
                                         </tfoot>
                                     )}
