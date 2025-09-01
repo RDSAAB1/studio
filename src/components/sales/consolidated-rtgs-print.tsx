@@ -89,8 +89,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: Con
                         <div className="flex justify-between items-start mb-4">
                              <div className="w-1/2">
                                 <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
-                                <p className="text-gray-600 text-[11px]">{settings.companyAddress1}</p>
-                                <p className="text-gray-600 text-[11px]">{settings.companyAddress2}</p>
+                                <p className="text-gray-600 text-[11px]">{settings.companyAddress1}, {settings.companyAddress2}</p>
                                 <p className="text-gray-600 text-[11px]">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
                                 <div className="mt-2 text-gray-600 text-[11px] border-t pt-2">
                                     <p className="font-bold">Our Bank Details:</p>
@@ -117,7 +116,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: Con
 
                         {/* Information Table */}
                         <table className="w-full text-left mb-4 print-table">
-                            <thead>
+                            <thead className="print-bg-orange">
                                 <tr className="bg-gray-800 text-white uppercase text-xs">
                                     <th className="p-2 font-semibold text-center w-[5%]">#</th>
                                     <th className="p-2 font-semibold w-[25%]">Payee Name</th>
