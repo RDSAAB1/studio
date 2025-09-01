@@ -54,7 +54,7 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
                             <span>{format(new Date(firstDate), "dd MMM, yyyy")}</span>
                         </>}
                         {isSameCheckNo && <>
-                            <span className="font-bold pr-2">Check/UTR #:</span>
+                            <span className="font-bold pr-2">Check #:</span>
                             <span>{firstCheckNo}</span>
                         </>}
                     </div>
