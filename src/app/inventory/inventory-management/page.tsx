@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
 
@@ -43,7 +43,7 @@ export default function InventoryManagementPage() {
         console.error("Error fetching inventory items:", error);
         toast({
           title: "Error",
-          description: "Failed to load inventory items.",
+          description: "Failed to load inventory.",
           variant: "destructive",
         });
         setLoading(false);
@@ -63,7 +63,8 @@ export default function InventoryManagementPage() {
       await addInventoryItem({ ...formData, createdAt: new Date().toISOString() });
       toast({
         title: "Success",
-        description: "Inventory item added successfully.",
+        description: "Inventory item added.",
+        variant: "success",
       });
       setIsModalOpen(false);
       setFormData({ name: '', sku: '', stock: 0, unit: '', purchasePrice: 0, sellingPrice: 0 });
@@ -83,7 +84,8 @@ export default function InventoryManagementPage() {
       await updateInventoryItem(currentInventoryItem.id, formData);
       toast({
         title: "Success",
-        description: "Inventory item updated successfully.",
+        description: "Inventory item updated.",
+        variant: "success",
       });
       setIsModalOpen(false);
       setCurrentInventoryItem(null);
@@ -92,7 +94,7 @@ export default function InventoryManagementPage() {
       console.error("Error updating inventory item:", error);
       toast({
         title: "Error",
-        description: "Failed to update inventory item.",
+        description: "Failed to update item.",
         variant: "destructive",
       });
     }
@@ -104,13 +106,14 @@ export default function InventoryManagementPage() {
         await deleteInventoryItem(id);
         toast({
           title: "Success",
-          description: "Inventory item deleted successfully.",
+          description: "Inventory item deleted.",
+          variant: "success",
         });
       } catch (error) {
         console.error("Error deleting inventory item:", error);
         toast({
           title: "Error",
-          description: "Failed to delete inventory item.",
+          description: "Failed to delete item.",
           variant: "destructive",
         });
       }

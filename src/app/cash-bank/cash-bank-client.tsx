@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowDown, ArrowUp, Save } from "lucide-react";
@@ -49,7 +49,7 @@ const TransactionFormCard = ({ title, description, children }: { title: string, 
 
 
 export default function CashBankClient() {
-    const { toast } = useToast();
+    
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isClient, setIsClient] = useState(false);
@@ -77,7 +77,7 @@ export default function CashBankClient() {
             unsubscribeFunds();
             unsubscribeTransactions();
         };
-    }, [toast]);
+    }, []);
 
     const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(cashBankFormSchemas.capitalInflowSchema), defaultValues: { source: undefined, destination: undefined, amount: 0, description: "" } });
     const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(cashBankFormSchemas.withdrawalSchema), defaultValues: { amount: 0, description: "" } });
@@ -118,7 +118,7 @@ export default function CashBankClient() {
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
             .then(() => {
-                toast({ title: "Success", description: "Transaction recorded successfully." });
+                toast({ title: "Success", description: "Transaction recorded successfully.", variant: "success" });
             })
             .catch((error) => {
                 console.error("Error adding fund transaction:", error);

@@ -15,16 +15,18 @@ const ICONS = {
 export function DynamicIslandToaster() {
   const { toasts } = useToast();
 
+  const hasToasts = toasts.length > 0;
+
   return (
     <div
       className={cn(
         "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
-        "bg-background text-card-foreground border border-border/50 shadow-lg",
+        "bg-card text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
-        // Base state (collapsed)
-        "w-8 min-h-[3rem]",
+        // Base state (collapsed pill)
+        "w-36 h-8",
         // Expanded state
-        { "w-full max-w-sm min-h-[3rem] p-3 rounded-2xl": toasts.length > 0 }
+        { "h-16": hasToasts }
       )}
     >
       {toasts.map(function ({ id, title, description, variant, action }) {
@@ -33,15 +35,15 @@ export function DynamicIslandToaster() {
           <div
             key={id}
             className={cn(
-              "w-full h-full flex items-center gap-3 transition-opacity duration-300",
+              "w-full h-full flex items-center gap-3 transition-opacity duration-300 px-3",
               "animate-in fade-in"
             )}
           >
             <div className="flex-shrink-0">{icon}</div>
-            <div className="flex-grow grid gap-1 text-left">
+            <div className="flex-grow grid gap-0.5 text-left">
               {title && <p className="font-semibold text-sm leading-none">{title}</p>}
               {description && (
-                <p className="text-xs opacity-80 leading-snug">
+                <p className="text-xs opacity-80 leading-tight">
                   {description as string}
                 </p>
               )}
