@@ -38,14 +38,23 @@ export function DynamicIslandToaster() {
         )}
       >
         {hasToasts && (
-          <div className="flex h-full w-full items-center justify-start gap-2 px-4"> {/* Optional: Changed justify-center to justify-start for better alignment */}
-            <div className="flex-shrink-0 flex items-center">{icon}</div>
-            <div className="flex flex-grow items-center text-left overflow-hidden">
-              {/* FIX IS HERE: Added m-0 to the <p> tag */}
-              {title && <p className="font-semibold text-xs truncate m-0">{String(title)}</p>}
-            </div>
+          // --- START OF CHANGES ---
+          // We simplified the structure inside this div.
+          <div className="flex h-full w-full items-center justify-start gap-2 px-4">
+            {/* Item 1: Icon */}
+            <div className="flex-shrink-0">{icon}</div>
+
+            {/* Item 2: Title (<p> is now a direct child) */}
+            {title && (
+              <p className="flex-grow text-left text-xs font-semibold truncate">
+                {String(title)}
+              </p>
+            )}
+
+            {/* Item 3: Action */}
             {toast.action}
           </div>
+          // --- END OF CHANGES ---
         )}
       </div>
     </div>
