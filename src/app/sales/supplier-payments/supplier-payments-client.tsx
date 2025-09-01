@@ -627,6 +627,8 @@ export default function SupplierPaymentsPage() {
                 let calculatedAmount = q * currentRate;
                 if (roundFigureToggle) {
                     calculatedAmount = Math.round(calculatedAmount / 100) * 100;
+                } else {
+                    calculatedAmount = Math.round(calculatedAmount / 5) * 5;
                 }
 
                 if (calculatedAmount > calcTargetAmount) continue;
@@ -657,10 +659,12 @@ export default function SupplierPaymentsPage() {
     };
 
     const selectPaymentAmount = (option: PaymentOption) => {
+        setPaymentType('Partial');
+        setPaymentAmount(option.calculatedAmount);
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
         setRtgsAmount(option.calculatedAmount);
-        toast({ title: 'Selected', description: `Amount ${option.calculatedAmount} selected.` });
+        toast({ title: 'Selected', description: `Amount ${formatCurrency(option.calculatedAmount)} selected.` });
     };
 
     const requestSort = (key: keyof PaymentOption) => {
