@@ -98,9 +98,10 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                          <table className="w-full text-left mb-4 print-table">
                             <thead className="print-bg-orange">
                                 <tr className="bg-gray-800 text-white uppercase text-xs">
-                                    <th className="p-2 font-semibold w-[25%]">Payee Name</th>
-                                    <th className="p-2 font-semibold w-[25%]">Bank Name & Branch</th>
-                                    <th className="p-2 font-semibold w-[20%]">A/C No.</th>
+                                    <th className="p-2 font-semibold w-[20%]">Payee Name</th>
+                                    <th className="p-2 font-semibold w-[20%]">Bank Name</th>
+                                    <th className="p-2 font-semibold w-[15%]">Branch</th>
+                                    <th className="p-2 font-semibold w-[15%]">A/C No.</th>
                                     <th className="p-2 font-semibold w-[15%]">IFSC Code</th>
                                     <th className="p-2 font-semibold text-right w-[15%]">Amount</th>
                                 </tr>
@@ -110,18 +111,19 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                                     <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>
                                         <p style={{ color: '#000' }}>{toTitleCase(payment.supplierName || '')}</p>
                                     </td>
-                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankName}, {toTitleCase(payment.bankBranch || '')}</td>
+                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankName}</td>
+                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{toTitleCase(payment.bankBranch || '')}</td>
                                     <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankAcNo}</td>
                                     <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankIfsc}</td>
                                     <td className="p-2 text-right font-semibold border-x border-gray-200" style={{ color: '#000' }}>{formatCurrency(totalAmount)}</td>
                                 </tr>
                                  {Array.from({ length: 8 }).map((_, i) => (
-                                    <tr key={i} className="border-b border-gray-200"><td className="p-2 h-6 border-x border-gray-200" colSpan={5}></td></tr>
+                                    <tr key={i} className="border-b border-gray-200"><td className="p-2 h-6 border-x border-gray-200" colSpan={6}></td></tr>
                                 ))}
                             </tbody>
                              <tfoot>
                                 <tr className="bg-gray-100 font-bold">
-                                    <td className="p-2 text-right" colSpan={4} style={{ color: '#000' }}>TOTAL</td>
+                                    <td className="p-2 text-right" colSpan={5} style={{ color: '#000' }}>TOTAL</td>
                                     <td className="p-2 text-right" style={{ color: '#000' }}>{formatCurrency(totalAmount)}</td>
                                 </tr>
                             </tfoot>
