@@ -17,6 +17,11 @@ interface RtgsReceiptProps {
 }
 
 export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onPrint }) => {
+
+    if (!payment || !settings) {
+        return null; // Return null if essential data is missing
+    }
+
     const totalAmount = payment.rtgsAmount || payment.amount || 0;
     const checkNo = payment.checkNo || payment.utrNo || payment.paymentId.replace('P', '');
 

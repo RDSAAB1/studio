@@ -5,8 +5,15 @@ import { useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RtgsReceipt } from "@/components/receipts/rtgs-receipt";
 import { useToast } from "@/hooks/use-toast";
+import type { Payment, RtgsSettings } from '@/lib/definitions';
 
-export const RTGSReceiptDialog = ({ payment, onOpenChange }: any) => {
+interface RTGSReceiptDialogProps {
+    payment: Payment | null;
+    settings: RtgsSettings | null;
+    onOpenChange: (open: boolean) => void;
+}
+
+export const RTGSReceiptDialog = ({ payment, settings, onOpenChange }: RTGSReceiptDialogProps) => {
     const { toast } = useToast();
 
     const handleActualPrint = () => {
@@ -43,7 +50,7 @@ export const RTGSReceiptDialog = ({ payment, onOpenChange }: any) => {
     return (
         <Dialog open={!!payment} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0">
-                {payment && <RtgsReceipt payment={payment} onPrint={handleActualPrint}/>}
+                {payment && settings && <RtgsReceipt payment={payment} settings={settings} onPrint={handleActualPrint}/>}
             </DialogContent>
         </Dialog>
     );

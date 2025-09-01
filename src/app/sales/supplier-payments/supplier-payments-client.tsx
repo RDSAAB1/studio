@@ -2,10 +2,10 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment, PaidFor } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -85,6 +85,7 @@ export default function SupplierPaymentsClient() {
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
   const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
   const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
+  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [activeTab, setActiveTab] = useState('processing');
   const [openCombobox, setOpenCombobox] = useState(false);
 
@@ -218,6 +219,15 @@ export default function SupplierPaymentsClient() {
     const unsubscribeBankBranches = getBankBranchesRealtime(setBankBranches, (error) => {
       if(isSubscribed) console.error("Error fetching bank branches:", error);
     });
+    
+    const fetchSettings = async () => {
+        const settings = await getReceiptSettings();
+        if (settings && isSubscribed) {
+            setReceiptSettings(settings);
+        }
+    };
+    fetchSettings();
+
 
     return () => {
       isSubscribed = false;
@@ -857,6 +867,7 @@ export default function SupplierPaymentsClient() {
         
        <RTGSReceiptDialog
             payment={rtgsReceiptData}
+            settings={receiptSettings}
             onOpenChange={() => setRtgsReceiptData(null)}
        />
 
