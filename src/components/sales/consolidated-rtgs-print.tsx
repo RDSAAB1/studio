@@ -193,15 +193,15 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                             <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
                             
                             <table className="w-full text-left mb-4 print-table">
-                                <thead>
+                                <thead className="print-bg-orange">
                                     <tr className="bg-gray-800 text-white uppercase text-xs">
-                                        <th className="p-2 font-semibold text-center w-[5%]">#</th>
-                                        <th className="p-2 font-semibold w-[25%]">Payee Name</th>
-                                        <th className="p-2 font-semibold w-[25%]">Bank Name</th>
-                                        <th className="p-2 font-semibold w-[10%]">Branch</th>
-                                        <th className="p-2 font-semibold w-[15%]">A/C No.</th>
-                                        <th className="p-2 font-semibold w-[10%]">IFSC Code</th>
-                                        <th className="p-2 font-semibold text-right w-[10%]">Amount</th>
+                                        <th className="p-2 font-semibold text-center">#</th>
+                                        <th className="p-2 font-semibold">Payee Name</th>
+                                        <th className="p-2 font-semibold">Bank Name</th>
+                                        <th className="p-2 font-semibold">Branch</th>
+                                        <th className="p-2 font-semibold">A/C No.</th>
+                                        <th className="p-2 font-semibold">IFSC Code</th>
+                                        <th className="p-2 font-semibold text-right">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
