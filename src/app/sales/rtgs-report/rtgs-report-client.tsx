@@ -189,7 +189,7 @@ export default function RtgsReportClient() {
             return;
         }
 
-        const title = 'RTGS Report';
+        const title = 'RTGS Payment Report';
         
         iframeDoc.open();
         iframeDoc.write(`
@@ -209,29 +209,35 @@ export default function RtgsReportClient() {
         });
 
         iframeDoc.write(`
-                    <style>
-                        @media print {
-                            @page { 
-                                size: landscape; 
-                                margin: 15px; 
-                            }
-                            body { 
-                                -webkit-print-color-adjust: exact !important;
-                                print-color-adjust: exact !important;
-                                color: #000 !important;
-                                font-size: 7px;
-                             }
-                             table {
-                                font-size: 7px;
-                                border-collapse: collapse;
-                                width: 100%;
-                             }
-                             th, td {
-                                 padding: 2px !important;
-                                 border: 1px solid #ccc !important;
-                             }
-                        }
-                    </style>
+            <style>
+                @media print {
+                    @page { 
+                        size: landscape; 
+                        margin: 10mm; 
+                    }
+                    body { 
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        color: #000 !important;
+                        font-size: 7px;
+                    }
+                    table {
+                        font-size: 7px;
+                        border-collapse: collapse;
+                        width: 100%;
+                    }
+                    th, td {
+                        padding: 2px 4px !important;
+                        border: 1px solid #ccc !important;
+                        white-space: nowrap;
+                    }
+                    thead {
+                        background-color: #f2f2f2 !important;
+                    }
+                }
+            </style>
+        `);
+        iframeDoc.write(`
                 </head>
                 <body>
                     <h2>${toTitleCase(settings.companyName)} - ${title}</h2>
@@ -444,4 +450,5 @@ export default function RtgsReportClient() {
 
         </div>
     );
-}
+
+    
