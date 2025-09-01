@@ -14,8 +14,15 @@ type MainLayoutProps = {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false); // Default to collapsed
+
+  const getInitialDashboardTab = (): MenuItem[] => {
+    const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+    return dashboard ? [dashboard] : [];
+  };
+
+  const [openTabs, setOpenTabs] = useState<MenuItem[]>(getInitialDashboardTab);
   const [activeTabId, setActiveTabId] = useState<string>('dashboard');
-  const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
+
   const pathname = usePathname();
   const router = useRouter();
 
@@ -36,15 +43,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
     if (initialTab && !openTabs.some(tab => tab.id === initialTab!.id)) {
         setOpenTabs(prev => [...prev, initialTab!]);
-        setActiveTabId(initialTab!.id);
-    } else if (openTabs.length === 0) {
-        // Fallback to dashboard if no other tab is active
+    }
+    
+    if (initialTab) {
+        setActiveTabId(initialTab.id);
+    } else {
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
-            setOpenTabs([dashboard]);
-            setActiveTabId('dashboard');
-            if (pathname !== dashboard.href) {
-              router.push(dashboard.href || '/');
+            setActiveTabId(dashboard.id);
+            if(pathname !== dashboard.href) {
+                router.push(dashboard.href || '/');
             }
         }
     }
@@ -62,6 +70,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // Prevent closing the dashboard tab
+    if (tabId === 'dashboard') {
+        return;
+    }
+
     const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
     let newActiveTabId = activeTabId;
     let newPath = '';
@@ -71,20 +84,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
             newActiveTabId = openTabs[tabIndex - 1].id;
             newPath = openTabs[tabIndex - 1].href || '/';
         } else if (openTabs.length > 1) {
+            // This case should not be hit if dashboard is first and non-closable
             newActiveTabId = openTabs[tabIndex + 1].id;
             newPath = openTabs[tabIndex + 1].href || '/';
         } else {
-            // If it's the last tab, navigate to the dashboard or a default page
+            // Fallback to dashboard
             const dashboard = allMenuItems.find(item => item.id === 'dashboard');
             if (dashboard) {
                 newActiveTabId = dashboard.id;
                 newPath = dashboard.href || '/';
-                if (!openTabs.some(tab => tab.id === dashboard.id)) {
-                  setOpenTabs([dashboard]);
-                }
-            } else {
-               newActiveTabId = ''; 
-               newPath = '/';
             }
         }
     } else {
@@ -96,19 +104,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
     
     const newOpenTabs = openTabs.filter(tab => tab.id !== tabId);
     setOpenTabs(newOpenTabs);
-
-    if (newOpenTabs.length === 0) {
-      const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-      if (dashboard) {
-          setOpenTabs([dashboard]);
-          setActiveTabId(dashboard.id);
-          router.push(dashboard.href || '/');
-      }
-    } else {
-      setActiveTabId(newActiveTabId);
-      if (newPath) {
+    setActiveTabId(newActiveTabId);
+    if (newPath) {
         router.push(newPath);
-      }
     }
   };
 

@@ -15,9 +15,10 @@ interface TabProps {
   onClick: () => void;
   onClose: (e: React.MouseEvent) => void;
   isNextTabActive: boolean;
+  isClosable: boolean;
 }
 
-export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose, isNextTabActive }) => {
+export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose, isNextTabActive, isClosable }) => {
   const router = useRouter();
 
   const cornerStyle = {
@@ -46,17 +47,19 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
           {icon}
           <span className="whitespace-nowrap ml-2 truncate">{title}</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
-            isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
-          )}
-          onClick={onClose}
-        >
-          <X className="h-3 w-3" />
-        </Button>
+        {isClosable && (
+            <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+                "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
+                isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
+            )}
+            onClick={onClose}
+            >
+            <X className="h-3 w-3" />
+            </Button>
+        )}
       </div>
 
       {isActive && (

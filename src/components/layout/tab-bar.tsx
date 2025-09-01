@@ -40,6 +40,7 @@ const TabBar: React.FC<TabBarProps> = ({ openTabs, activeTabId, onTabClick, onCl
               isNextTabActive={isNextTabActive}
               onClick={() => handleTabClick(tab)}
               onClose={(e) => onCloseTab(tab.id, e)}
+              isClosable={tab.id !== 'dashboard'} // Dashboard is not closable
             />
           )
       })}
