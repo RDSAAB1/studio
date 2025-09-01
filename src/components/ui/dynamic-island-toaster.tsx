@@ -24,13 +24,11 @@ export function DynamicIslandToaster() {
     <div
       className={cn(
         "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
-        "bg-card text-card-foreground border border-border/50 shadow-lg",
+        "bg-background text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
-        "h-10",
-        // Base state (collapsed pill)
+        "h-9",
         "w-32",
-        // Expanded state
-        { "w-96": hasToasts } // Expanded width
+        { "w-96": hasToasts }
       )}
     >
       <div
@@ -41,7 +39,7 @@ export function DynamicIslandToaster() {
         )}
       >
         {hasToasts && (
-          <div className="flex items-center justify-center gap-3 px-4">
+           <div className="flex w-full items-center justify-center gap-3 px-4">
             <div className="flex-shrink-0">{icon}</div>
             <div className="flex-grow text-left overflow-hidden">
               {title && <p className="font-semibold text-sm leading-none truncate">{String(title)}</p>}

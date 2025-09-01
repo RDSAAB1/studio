@@ -30,7 +30,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
       </div>
 
       {/* Bottom bar for actions and search */}
-      <div className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
+      <div className="flex h-12 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
         <div className="flex-shrink-0">
           {/* Placeholder for potential left-side controls */}
         </div>
