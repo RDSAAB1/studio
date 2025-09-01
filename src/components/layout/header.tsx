@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import TabBar from './tab-bar';
 import { MenuItem } from "@/hooks/use-tabs";
+import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 
 interface HeaderProps {
   openTabs: MenuItem[];
@@ -24,6 +25,10 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
             onTabClick={onTabClick}
             onCloseTab={onCloseTab}
         />
+
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <DynamicIslandToaster />
+        </div>
 
         <div className="flex items-center gap-2 ml-auto">
             <div className="relative flex-1 md:grow-0">

@@ -7,7 +7,6 @@ import CustomSidebar from "./custom-sidebar";
 import { cn } from "@/lib/utils";
 import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
-import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 
 type MainLayoutProps = {
     children: ReactNode;
@@ -138,7 +137,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
             toggleSidebar={toggleSidebar}
         />
         <div className="main_container">
-            <DynamicIslandToaster />
             <Header 
               openTabs={openTabs}
               activeTabId={activeTabId}

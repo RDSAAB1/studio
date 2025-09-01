@@ -18,13 +18,13 @@ export function DynamicIslandToaster() {
   return (
     <div
       className={cn(
-        "fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 ease-in-out",
-        "bg-neutral-900/80 backdrop-blur-md text-white border border-white/10 shadow-2xl",
+        "relative z-[100] transition-all duration-300 ease-in-out",
+        "bg-card text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
         // Base state (collapsed)
         "w-32 h-8",
         // Expanded state
-        { "w-[calc(100vw-32px)] max-w-md h-auto min-h-[4rem] p-4 rounded-3xl": toasts.length > 0 }
+        { "w-full max-w-sm h-auto min-h-[3.5rem] p-3 rounded-2xl": toasts.length > 0 }
       )}
     >
       {toasts.map(function ({ id, title, description, variant, action }) {
@@ -33,7 +33,7 @@ export function DynamicIslandToaster() {
           <div
             key={id}
             className={cn(
-              "w-full h-full flex items-center gap-4 transition-opacity duration-300",
+              "w-full h-full flex items-center gap-3 transition-opacity duration-300",
               "animate-in fade-in"
             )}
           >
