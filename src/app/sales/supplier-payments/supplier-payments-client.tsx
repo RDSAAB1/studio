@@ -41,7 +41,7 @@ type SortConfig = {
     direction: 'ascending' | 'descending';
 };
 
-export default function SupplierPaymentsPage() {
+export default function SupplierPaymentsClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
@@ -745,71 +745,67 @@ export default function SupplierPaymentsPage() {
                 <TabsTrigger value="history">Full History</TabsTrigger>
             </TabsList>
             <TabsContent value="processing">
-              <Card>
-                <CardContent className="pt-6">
-                    {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
-                        <Card>
-                            <CardContent className="p-3">
-                                <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
-                                    <div className="flex flex-1 items-center gap-2">
-                                        <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
-                                        <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                                            <PopoverTrigger asChild><Button variant="outline" role="combobox" aria-expanded={openCombobox} className="h-8 text-xs flex-1 justify-between font-normal">{selectedCustomerKey ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '') + ` (${customerSummaryMap.get(selectedCustomerKey)?.contact || ''})` : "Search and select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search by name or contact..." /><CommandList><CommandEmpty>No supplier found.</CommandEmpty><CommandGroup>
-                                                {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                                                    <CommandItem key={key} value={`${data.name} ${data.contact}`} onSelect={() => { handleCustomerSelect(key); setOpenCombobox(false); }}>
-                                                      <Check className={cn("mr-2 h-4 w-4", selectedCustomerKey === key ? "opacity-100" : "opacity-0")}/>{toTitleCase(data.name)} ({data.contact})
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup></CommandList></Command></PopoverContent>
-                                        </Popover>
-                                    </div>
-                                    {selectedCustomerKey && (
-                                        <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                                <p className="font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
-                                            </div>
-                                            <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
-                                        </div>
-                                    )}
+                {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
+                    <Card>
+                        <CardContent className="p-3">
+                            <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+                                <div className="flex flex-1 items-center gap-2">
+                                    <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
+                                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                                        <PopoverTrigger asChild><Button variant="outline" role="combobox" aria-expanded={openCombobox} className="h-8 text-xs flex-1 justify-between font-normal">{selectedCustomerKey ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '') + ` (${customerSummaryMap.get(selectedCustomerKey)?.contact || ''})` : "Search and select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search by name or contact..." /><CommandList><CommandEmpty>No supplier found.</CommandEmpty><CommandGroup>
+                                            {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
+                                                <CommandItem key={key} value={`${data.name} ${data.contact}`} onSelect={() => { handleCustomerSelect(key); setOpenCombobox(false); }}>
+                                                  <Check className={cn("mr-2 h-4 w-4", selectedCustomerKey === key ? "opacity-100" : "opacity-0")}/>{toTitleCase(data.name)} ({data.contact})
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup></CommandList></Command></PopoverContent>
+                                    </Popover>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                                {selectedCustomerKey && (
+                                    <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
+                                        <div className="flex items-center gap-1 text-xs">
+                                            <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
+                                            <p className="font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                                        </div>
+                                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
-                    {(selectedCustomerKey || rtgsFor === 'Outsider') && (
-                        <PaymentForm
-                            paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails}
-                            setSupplierDetails={setSupplierDetails} bankDetails={bankDetails} setBankDetails={setBankDetails}
-                            banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                            handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
-                            paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
-                            setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
-                            cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                            setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
-                            setUtrNo={setUtrNo} 
-                            parchiNo={parchiNo} setParchiNo={setParchiNo}
-                            rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
-                            setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                            processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                            editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                            setCheckNo={setCheckNo}
-                             // Generator Props
-                            calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
-                            calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
-                            calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
-                            handleGeneratePaymentOptions={handleGeneratePaymentOptions}
-                            paymentOptions={paymentOptions}
-                            selectPaymentAmount={selectPaymentAmount}
-                            requestSort={requestSort}
-                            sortedPaymentOptions={sortedPaymentOptions}
-                            roundFigureToggle={roundFigureToggle}
-                            setRoundFigureToggle={setRoundFigureToggle}
-                        />
-                    )}
-                </CardContent>
-              </Card>
+                {(selectedCustomerKey || rtgsFor === 'Outsider') && (
+                    <PaymentForm
+                        paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails}
+                        setSupplierDetails={setSupplierDetails} bankDetails={bankDetails} setBankDetails={setBankDetails}
+                        banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
+                        handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
+                        setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
+                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        setUtrNo={setUtrNo} 
+                        parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
+                        setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
+                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
+                            // Generator Props
+                        calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
+                        calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
+                        calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
+                        handleGeneratePaymentOptions={handleGeneratePaymentOptions}
+                        paymentOptions={paymentOptions}
+                        selectPaymentAmount={selectPaymentAmount}
+                        requestSort={requestSort}
+                        sortedPaymentOptions={sortedPaymentOptions}
+                        roundFigureToggle={roundFigureToggle}
+                        setRoundFigureToggle={setRoundFigureToggle}
+                    />
+                )}
             </TabsContent>
             <TabsContent value="history">
                  <div className="space-y-3">
@@ -846,9 +842,10 @@ export default function SupplierPaymentsPage() {
         />
 
         <DetailsDialog 
-            entry={detailsSupplierEntry}
-            payments={paymentsForDetailsEntry}
+            isOpen={!!detailsSupplierEntry}
             onOpenChange={() => setDetailsSupplierEntry(null)}
+            customer={detailsSupplierEntry}
+            paymentHistory={paymentsForDetailsEntry}
         />
         
         <PaymentDetailsDialog
