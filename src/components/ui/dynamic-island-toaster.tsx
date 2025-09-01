@@ -26,7 +26,7 @@ export function DynamicIslandToaster() {
         "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
         "bg-background text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
-        "h-9",
+        "h-8 min-h-[2rem]", // 32px height
         "w-32",
         { "w-96": hasToasts }
       )}
