@@ -213,19 +213,22 @@ export default function RtgsReportClient() {
                         @media print {
                             @page { 
                                 size: landscape; 
-                                margin: 20px; 
+                                margin: 15px; 
                             }
                             body { 
                                 -webkit-print-color-adjust: exact !important;
                                 print-color-adjust: exact !important;
                                 color: #000 !important;
-                                font-size: 9px;
+                                font-size: 7px;
                              }
                              table {
-                                font-size: 9px;
+                                font-size: 7px;
+                                border-collapse: collapse;
+                                width: 100%;
                              }
                              th, td {
                                  padding: 2px !important;
+                                 border: 1px solid #ccc !important;
                              }
                         }
                     </style>
