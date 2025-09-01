@@ -63,7 +63,6 @@ export default function SupplierPaymentsClient() {
   const [sixRNo, setSixRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
-  const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
   
   const [rtgsQuantity, setRtgsQuantity] = useState(0);
@@ -334,7 +333,6 @@ export default function SupplierPaymentsClient() {
     setPaymentAmount(0);
     setCdEnabled(false);
     setEditingPayment(null);
-    setUtrNo('');
     setCheckNo('');
     setSixRNo('');
     setParchiNo('');
@@ -481,10 +479,10 @@ export default function SupplierPaymentsClient() {
                     customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                     date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
-                    receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
+                    receiptType: paymentMethod, notes: `Check: ${checkNo || ''}`,
                     paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
                     sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
-                    parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
+                    parchiNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
                     supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
                     supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
                     bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
@@ -543,7 +541,6 @@ export default function SupplierPaymentsClient() {
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
-        setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
         setSixRNo(paymentToEdit.sixRNo || '');
         setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
@@ -795,14 +792,13 @@ export default function SupplierPaymentsClient() {
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
-                        setUtrNo={setUtrNo} 
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        checkNo={checkNo} setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
                         processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                        setCheckNo={setCheckNo}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -874,8 +870,8 @@ export default function SupplierPaymentsClient() {
         isOpen={isBankSettingsOpen}
         onOpenChange={setIsBankSettingsOpen}
         banks={banks}
-        onAddBank={async (name: string) => { await addBank(name); toast({title: 'Bank Added'}); }}
-        onAddBranch={async (branch: any) => { await addBankBranch(branch); toast({title: 'Branch Added'}); }}
+        onAddBank={async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }}
+        onAddBranch={async (branch: any) => { await addBankBranch(branch); toast({title: 'Branch Added', variant: 'success'}); }}
       />
     </div>
   );

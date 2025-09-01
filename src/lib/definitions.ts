@@ -44,7 +44,6 @@ export type Customer = {
   sixRDate?: string;
   parchiNo?: string;
   checkNo?: string;
-  utrNo?: string;
   rtgsAmount?: number;
   payments?: Payment[]; // To track which payments have been applied
 
@@ -127,7 +126,6 @@ export type Payment = {
     sixRNo?: string;
     sixRDate?: string;
     parchiNo?: string;
-    utrNo?: string;
     checkNo?: string;
     quantity?: number;
     rate?: number;

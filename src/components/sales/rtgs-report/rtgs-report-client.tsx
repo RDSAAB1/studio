@@ -86,7 +86,7 @@ export default function RtgsReportClient() {
                 return {
                     paymentId: p.paymentId,
                     date: p.date,
-                    checkNo: p.checkNo || p.utrNo || '',
+                    checkNo: p.checkNo || '',
                     type: p.type,
                     srNo: srNo,
                     supplierName: toTitleCase(p.supplierName || ''),
@@ -306,12 +306,12 @@ export default function RtgsReportClient() {
                             />
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="searchCheckNo">Search Check/UTR No.</Label>
+                            <Label htmlFor="searchCheckNo">Search Check No.</Label>
                             <Input
                                 id="searchCheckNo"
                                 value={searchCheckNo}
                                 onChange={(e) => setSearchCheckNo(e.target.value)}
-                                placeholder="Enter Check/UTR No."
+                                placeholder="Enter Check No."
                             />
                         </div>
                         <div className="space-y-1">
@@ -368,7 +368,7 @@ export default function RtgsReportClient() {
                                     <TableHead className="w-[150px]">Bank</TableHead>
                                     <TableHead className="w-[150px]">Branch</TableHead>
                                     <TableHead className="w-[120px]">Amount</TableHead>
-                                    <TableHead className="w-[150px]">Check/UTR No.</TableHead>
+                                    <TableHead className="w-[150px]">Check No.</TableHead>
                                     <TableHead className="w-[100px]">Type</TableHead>
                                     <TableHead className="w-[80px]">Rate</TableHead>
                                     <TableHead className="w-[80px]">Weight</TableHead>

@@ -28,7 +28,7 @@ export const PaymentForm = ({
     setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
     rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
     cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
-    setSixRDate, parchiNo, setParchiNo, utrNo, setUtrNo, checkNo, setCheckNo,
+    setSixRDate, parchiNo, setParchiNo, checkNo, setCheckNo,
     rtgsQuantity, setRtgsQuantity,
     rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, resetPaymentForm,
     editingPayment, setIsBankSettingsOpen,
@@ -122,7 +122,6 @@ export const PaymentForm = ({
                             <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
                             <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                            <div className="space-y-1"><Label className="text-xs">UTR No.</Label><Input value={utrNo} onChange={e => setUtrNo(e.target.value)} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">6R Date</Label>
                                 <Popover>
