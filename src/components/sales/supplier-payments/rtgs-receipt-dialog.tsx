@@ -29,7 +29,7 @@ export const RTGSReceiptDialog = ({ payment, settings, onOpenChange }: RTGSRecei
         
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
-             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+             toast({ title: 'Could not create print content.', variant: 'destructive'});
             return;
         }
         

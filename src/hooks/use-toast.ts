@@ -121,11 +121,16 @@ function toast({ ...props }: Toast) {
 
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
+  // Combine title and description into a single title for the dynamic island
+  const singleLineTitle = [props.title, props.description].filter(Boolean).join(" - ");
+
   dispatch({
     type: "ADD_TOAST",
     toast: {
       ...props,
       id,
+      title: singleLineTitle,
+      description: undefined, // Clear description as it's merged into the title
     },
   });
 

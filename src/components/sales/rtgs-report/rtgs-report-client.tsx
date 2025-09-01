@@ -128,10 +128,10 @@ export default function RtgsReportClient() {
             await updateRtgsSettings(tempSettings);
             setSettings(tempSettings);
             setIsEditing(false);
-            toast({ title: "Success", description: "Details saved successfully." });
+            toast({ title: "Details saved successfully.", variant: "success" });
         } catch (error) {
             console.error("Error saving settings:", error);
-            toast({ title: "Error", description: "Failed to save details.", variant: "destructive" });
+            toast({ title: "Failed to save details.", variant: "destructive" });
         }
     };
     
@@ -181,7 +181,7 @@ export default function RtgsReportClient() {
         
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            toast({ variant: 'destructive', title: 'Could not create print content.' });
             return;
         }
 
