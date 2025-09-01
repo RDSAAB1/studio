@@ -36,18 +36,18 @@ export function DynamicIslandToaster() {
       <div
         key={toast?.id || 'empty'}
         className={cn(
-          "w-full h-full flex items-center justify-center gap-3 px-4 transition-opacity duration-300",
+          "w-full h-full flex items-center justify-center transition-opacity duration-300",
           { "opacity-100 animate-in fade-in": hasToasts, "opacity-0": !hasToasts }
         )}
       >
         {hasToasts && (
-          <>
+          <div className="flex items-center justify-center gap-3 px-4">
             <div className="flex-shrink-0">{icon}</div>
             <div className="flex-grow text-left overflow-hidden">
               {title && <p className="font-semibold text-sm leading-none truncate">{String(title)}</p>}
             </div>
             {toast.action}
-          </>
+          </div>
         )}
       </div>
     </div>
