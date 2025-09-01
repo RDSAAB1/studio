@@ -57,7 +57,7 @@ const addToRemoveQueue = (toastId: string) => {
   const timeout = setTimeout(() => {
     toastTimeouts.delete(toastId);
     dispatch({
-      type: "REMOVE_TOAST",
+      type: "DISMISS_TOAST",
       toastId: toastId,
     });
   }, TOAST_REMOVE_DELAY);
@@ -80,19 +80,20 @@ export const reducer = (state: State, action: Action): State => {
 
     case "DISMISS_TOAST": {
       const { toastId } = action
-      if (toastId) {
-        if (toastTimeouts.has(toastId)) {
+      // Clear timeout for this toast
+      if (toastId && toastTimeouts.has(toastId)) {
           clearTimeout(toastTimeouts.get(toastId)!);
           toastTimeouts.delete(toastId);
-        }
-        return {
-          ...state,
-          toasts: state.toasts.filter((t) => t.id !== toastId),
-        }
       }
-      return { ...state, toasts: [] }
+      
+      const newToasts = toastId ? state.toasts.filter((t) => t.id !== toastId) : [];
+
+      return {
+        ...state,
+        toasts: newToasts,
+      }
     }
-    case "REMOVE_TOAST":
+    case "REMOVE_TOAST": // This can be used for silent removal without affecting timeouts for other toasts if needed. Currently, same as DISMISS
       if (action.toastId === undefined) {
         return { ...state, toasts: [] }
       }
