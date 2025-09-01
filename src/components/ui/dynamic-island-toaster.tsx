@@ -2,22 +2,15 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { CheckCircle, Info, XCircle } from "lucide-react";
 import React from "react";
-
-const ICONS = {
-  default: <Info className="h-5 w-5 text-blue-500" />,
-  destructive: <XCircle className="h-5 w-5 text-red-500" />,
-  success: <CheckCircle className="h-5 w-5 text-green-500" />,
-};
 
 export function DynamicIslandToaster() {
   const { toasts } = useToast();
   const hasToasts = toasts.length > 0;
   const toast = toasts[0]; // Always work with the first toast
 
-  const icon = toast ? (ICONS[toast.variant as keyof typeof ICONS] || ICONS.default) : null;
   const title = toast ? toast.title : null;
+  const description = toast ? toast.description : null;
 
   return (
     <div
@@ -27,7 +20,7 @@ export function DynamicIslandToaster() {
         "flex items-center justify-center rounded-full",
         "h-9 min-h-[2.25rem]", // 36px height
         "w-32", // Collapsed width
-        { "w-auto min-w-80 max-w-md px-4": hasToasts } // Expanded width
+        { "w-auto min-w-[20rem] max-w-md px-4": hasToasts } // Expanded width
       )}
     >
       <div
@@ -38,13 +31,11 @@ export function DynamicIslandToaster() {
         )}
       >
         {hasToasts && (
-          <div className="flex h-full w-full items-center justify-start gap-3">
-            <div className="flex-shrink-0">{icon}</div>
-            {title && (
-              <p className="flex-grow text-left text-sm font-semibold truncate">
-                {String(title)}
-              </p>
-            )}
+          <div className="flex h-full w-full items-center justify-center gap-2">
+            <div className="flex-grow text-center overflow-hidden">
+              {title && <p className="font-semibold text-sm truncate">{String(title)}</p>}
+              {description && <p className="text-xs text-muted-foreground truncate">{String(description)}</p>}
+            </div>
             {toast.action}
           </div>
         )}
