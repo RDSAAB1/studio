@@ -26,17 +26,17 @@ export function DynamicIslandToaster() {
         "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
         "bg-card text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
-        "h-12",
+        "h-10",
         // Base state (collapsed pill)
-        "w-12 p-0",
+        "w-32",
         // Expanded state
-        { "w-96 p-2": hasToasts }
+        { "w-96": hasToasts } // Expanded width
       )}
     >
       <div
         key={toast?.id || 'empty'}
         className={cn(
-          "w-full h-full flex items-center gap-3 px-2 transition-opacity duration-300",
+          "w-full h-full flex items-center justify-center gap-3 px-4 transition-opacity duration-300",
           { "opacity-100 animate-in fade-in": hasToasts, "opacity-0": !hasToasts }
         )}
       >
