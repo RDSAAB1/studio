@@ -64,7 +64,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                     </style>
                     <div className="flex-grow-0">
                         {/* Header */}
-                        <div className="flex justify-between items-start mb-4">
+                         <div className="flex justify-between items-start mb-4">
                             <div className="w-1/2">
                                 <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
                                 <p className="text-gray-600 text-[11px]">{settings.companyAddress1}, {settings.companyAddress2}</p>
@@ -87,35 +87,42 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                                 </div>
                             </div>
                         </div>
+
                         
+                        {/* Payee Details */}
+                        <div className="border border-gray-200 p-3 rounded-lg mb-4">
+                            <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Payee Details</h3>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                <div><span className="font-semibold">Name:</span> {toTitleCase(payment.supplierName || '')}</div>
+                                <div><span className="font-semibold">S/O:</span> {toTitleCase(payment.supplierFatherName || '')}</div>
+                                <div className="col-span-2"><span className="font-semibold">Address:</span> {toTitleCase(payment.supplierAddress || '')}</div>
+                            </div>
+                        </div>
+
                         {/* Information Table */}
                          <table className="w-full text-left mb-4 print-table">
                             <thead className="print-bg-orange">
                                 <tr className="bg-gray-800 text-white uppercase text-xs">
-                                    <th className="p-2 font-semibold text-center w-[5%]">#</th>
-                                    <th className="p-2 font-semibold w-[25%]">Payee Name</th>
-                                    <th className="p-2 font-semibold w-[20%]">A/C No.</th>
-                                    <th className="p-2 font-semibold w-[15%]">IFSC Code</th>
-                                    <th className="p-2 font-semibold w-[20%]">Bank & Branch</th>
-                                    <th className="p-2 font-semibold text-right w-[15%]">Amount</th>
+                                    <th className="p-2 font-semibold w-[35%]">Bank Name & Branch</th>
+                                    <th className="p-2 font-semibold w-[25%]">A/C No.</th>
+                                    <th className="p-2 font-semibold w-[20%]">IFSC Code</th>
+                                    <th className="p-2 font-semibold text-right w-[20%]">Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr className="border-b border-gray-200">
-                                    <td className="p-2 text-center border-x border-gray-200">1</td>
-                                    <td className="p-2 border-x border-gray-200">{toTitleCase(payment.supplierName || '')}</td>
+                                    <td className="p-2 border-x border-gray-200">{payment.bankName}, {toTitleCase(payment.bankBranch || '')}</td>
                                     <td className="p-2 border-x border-gray-200">{payment.bankAcNo}</td>
                                     <td className="p-2 border-x border-gray-200">{payment.bankIfsc}</td>
-                                    <td className="p-2 border-x border-gray-200">{payment.bankName}, {toTitleCase(payment.bankBranch || '')}</td>
                                     <td className="p-2 text-right font-semibold border-x border-gray-200">{formatCurrency(totalAmount)}</td>
                                 </tr>
                                  {Array.from({ length: 8 }).map((_, i) => (
-                                    <tr key={i} className="border-b border-gray-200"><td className="p-2 h-6 border-x border-gray-200" colSpan={6}></td></tr>
+                                    <tr key={i} className="border-b border-gray-200"><td className="p-2 h-6 border-x border-gray-200" colSpan={4}></td></tr>
                                 ))}
                             </tbody>
                              <tfoot>
                                 <tr className="bg-gray-100 font-bold">
-                                    <td className="p-2 text-right" colSpan={5}>TOTAL</td>
+                                    <td className="p-2 text-right" colSpan={3}>TOTAL</td>
                                     <td className="p-2 text-right">{formatCurrency(totalAmount)}</td>
                                 </tr>
                             </tfoot>
