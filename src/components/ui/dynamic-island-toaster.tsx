@@ -38,23 +38,19 @@ export function DynamicIslandToaster() {
         )}
       >
         {hasToasts && (
-          // --- START OF CHANGES ---
-          // We simplified the structure inside this div.
           <div className="flex h-full w-full items-center justify-start gap-2 px-4">
-            {/* Item 1: Icon */}
             <div className="flex-shrink-0">{icon}</div>
 
-            {/* Item 2: Title (<p> is now a direct child) */}
+            {/* --- THE ONLY CHANGE IS IN THE LINE BELOW --- */}
+            {/* We added 'flex' and 'items-center' to the <p> tag itself */}
             {title && (
-              <p className="flex-grow text-left text-xs font-semibold truncate">
+              <p className="flex items-center flex-grow text-left text-xs font-semibold truncate">
                 {String(title)}
               </p>
             )}
 
-            {/* Item 3: Action */}
             {toast.action}
           </div>
-          // --- END OF CHANGES ---
         )}
       </div>
     </div>
