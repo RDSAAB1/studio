@@ -170,7 +170,6 @@ export default function DashboardOverviewClient() {
                             <FileText className="h-5 w-5 text-primary" />
                             Recent Transactions
                         </CardTitle>
-                         <CardDescription>Your last 5 income and expense entries.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
