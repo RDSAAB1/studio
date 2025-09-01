@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -8,6 +9,7 @@ import TabBar from './tab-bar';
 import { MenuItem } from "@/hooks/use-tabs";
 import { cn } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
+import { useToast } from "@/hooks/use-toast";
 
 interface HeaderProps {
   openTabs: MenuItem[];
@@ -19,6 +21,8 @@ interface HeaderProps {
 
 export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSidebar }: HeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const { toasts } = useToast();
+  const hasToasts = toasts.length > 0;
 
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
@@ -63,7 +67,10 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
         </div>
         
         <div className={cn("flex flex-1 items-center justify-end gap-2", isSearchOpen && "hidden")}>
-            <div className="relative hidden flex-1 md:flex md:grow-0 max-w-xs">
+            <div className={cn(
+              "relative hidden flex-1 md:flex md:grow-0 max-w-xs transition-opacity",
+              hasToasts && "opacity-0 pointer-events-none"
+            )}>
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                     type="search"
