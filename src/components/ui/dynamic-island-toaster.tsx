@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
@@ -7,8 +8,8 @@ import React from "react";
 
 const ICONS = {
   default: <Info className="h-5 w-5 text-blue-500" />,
-  destructive: <XCircle className="h-5 w-5 text-red-500" />,
   success: <CheckCircle className="h-5 w-5 text-green-500" />,
+  destructive: <XCircle className="h-5 w-5 text-red-500" />,
 };
 
 export function DynamicIslandToaster() {
@@ -18,6 +19,7 @@ export function DynamicIslandToaster() {
 
   const icon = toast ? (ICONS[toast.variant as keyof typeof ICONS] || ICONS.default) : null;
   const title = toast ? toast.title : null;
+  const description = toast ? toast.description : null;
 
   return (
     <div
@@ -40,15 +42,10 @@ export function DynamicIslandToaster() {
         {hasToasts && (
           <div className="flex h-full w-full items-center justify-start gap-2 px-4">
             <div className="flex-shrink-0">{icon}</div>
-
-            {/* --- THE ONLY CHANGE IS IN THE LINE BELOW --- */}
-            {/* We added 'flex' and 'items-center' to the <p> tag itself */}
-            {title && (
-              <p className="flex items-center flex-grow text-left text-xs font-semibold truncate">
-                {String(title)}
-              </p>
-            )}
-
+            <div className="flex-grow text-left overflow-hidden text-xs">
+                {title && <p className="font-semibold truncate">{String(title)}</p>}
+                {description && <p className="text-muted-foreground truncate">{String(description)}</p>}
+            </div>
             {toast.action}
           </div>
         )}
