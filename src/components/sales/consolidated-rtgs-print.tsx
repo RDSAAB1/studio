@@ -184,12 +184,12 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             <ScrollArea className="max-h-[70vh]">
                 <div ref={printRef} className="printable-area">
                     {paymentChunks.map((chunk, pageIndex) => {
-                        const previousPagesTotal = cumulativeTotal;
-                        const currentPageTotal = chunk.reduce((sum, p) => sum + p.amount, 0);
-                        cumulativeTotal += currentPageTotal;
+                        const isLastPage = pageIndex === paymentChunks.length - 1;
+                        const pageTotal = chunk.reduce((sum, p) => sum + p.amount, 0);
+                        cumulativeTotal += pageTotal;
 
                         return (
-                            <div key={pageIndex} className={`p-4 bg-white text-black font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${pageIndex < paymentChunks.length - 1 ? 'page-break-after' : ''}`}>
+                            <div key={pageIndex} className={`p-4 bg-white text-black font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${!isLastPage ? 'page-break-after' : ''}`}>
                                 <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
                                 
                                 <div className="flex-grow">
@@ -218,23 +218,30 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                                 </tr>
                                             ))}
                                         </tbody>
-                                        <tfoot>
-                                            <tr className="font-bold border-t-2 border-black">
-                                                {pageIndex === 0 ? (
-                                                    <>
-                                                        <td className="py-1 px-2 text-right text-black" colSpan={6}>GRAND TOTAL</td>
-                                                        <td className="py-1 px-2 text-right text-black">{formatCurrency(currentPageTotal)}</td>
-                                                    </>
-                                                ) : (
-                                                    <td colSpan={7} className="py-1 px-2 text-right text-xs">
-                                                        <div className="flex justify-end gap-x-4">
-                                                            <span>Prev Total: {formatCurrency(previousPagesTotal)}</span>
-                                                            <span>Page Total: {formatCurrency(currentPageTotal)}</span>
-                                                            <span className="font-bold">Grand Total: {formatCurrency(cumulativeTotal)}</span>
-                                                        </div>
-                                                    </td>
-                                                )}
-                                            </tr>
+                                        <tfoot className="font-bold border-t-2 border-black">
+                                            {paymentChunks.length === 1 ? (
+                                                <tr>
+                                                    <td className="py-1 px-2 text-right text-black" colSpan={6}>GRAND TOTAL</td>
+                                                    <td className="py-1 px-2 text-right text-black">{formatCurrency(cumulativeTotal)}</td>
+                                                </tr>
+                                            ) : (
+                                                <>
+                                                    <tr>
+                                                        <td className="py-1 px-2 text-right text-black text-xs" colSpan={6}>Page Total</td>
+                                                        <td className="py-1 px-2 text-right text-black text-xs">{formatCurrency(pageTotal)}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="py-1 px-2 text-right text-black text-xs" colSpan={6}>Cumulative Total</td>
+                                                        <td className="py-1 px-2 text-right text-black text-xs">{formatCurrency(cumulativeTotal)}</td>
+                                                    </tr>
+                                                    {isLastPage && (
+                                                        <tr className="bg-gray-200">
+                                                            <td className="py-1 px-2 text-right text-black" colSpan={6}>GRAND TOTAL</td>
+                                                            <td className="py-1 px-2 text-right text-black">{formatCurrency(cumulativeTotal)}</td>
+                                                        </tr>
+                                                    )}
+                                                </>
+                                            )}
                                         </tfoot>
                                     </table>
                                 </div>
