@@ -1,10 +1,15 @@
 "use client"
 
+// Inspired by react-hot-toast library
 import * as React from "react"
-import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 4000; // Auto-dismiss after 4 seconds
+import type {
+  ToastActionElement,
+  ToastProps,
+} from "@/components/ui/toast"
+
+const TOAST_LIMIT = 1
+const TOAST_REMOVE_DELAY = 1000000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -15,6 +20,7 @@ type ToasterToast = ToastProps & {
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
+  UPDATE_TOAST: "UPDATE_TOAST",
   DISMISS_TOAST: "DISMISS_TOAST",
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const
@@ -22,8 +28,8 @@ const actionTypes = {
 let count = 0
 
 function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER;
-  return count.toString();
+  count = (count + 1) % Number.MAX_SAFE_INTEGER
+  return count.toString()
 }
 
 type ActionType = typeof actionTypes
@@ -32,6 +38,10 @@ type Action =
   | {
       type: ActionType["ADD_TOAST"]
       toast: ToasterToast
+    }
+  | {
+      type: ActionType["UPDATE_TOAST"]
+      toast: Partial<ToasterToast>
     }
   | {
       type: ActionType["DISMISS_TOAST"]
@@ -46,55 +56,70 @@ interface State {
   toasts: ToasterToast[]
 }
 
-const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
-    return;
+    return
   }
 
   const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId);
+    toastTimeouts.delete(toastId)
     dispatch({
-      type: "DISMISS_TOAST",
+      type: "REMOVE_TOAST",
       toastId: toastId,
-    });
-  }, TOAST_REMOVE_DELAY);
+    })
+  }, TOAST_REMOVE_DELAY)
 
-  toastTimeouts.set(toastId, timeout);
-};
+  toastTimeouts.set(toastId, timeout)
+}
 
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
-      // Clear any existing timeouts when a new toast comes in
-      toastTimeouts.forEach(timeout => clearTimeout(timeout));
-      toastTimeouts.clear();
-      
-      addToRemoveQueue(action.toast.id);
       return {
         ...state,
-        toasts: [action.toast], // Only ever have one toast at a time
+        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+      }
+
+    case "UPDATE_TOAST":
+      return {
+        ...state,
+        toasts: state.toasts.map((t) =>
+          t.id === action.toast.id ? { ...t, ...action.toast } : t
+        ),
       }
 
     case "DISMISS_TOAST": {
       const { toastId } = action
-      // Clear timeout for this toast
-      if (toastId && toastTimeouts.has(toastId)) {
-          clearTimeout(toastTimeouts.get(toastId)!);
-          toastTimeouts.delete(toastId);
+
+      // ! SideEffect in a reducer...
+      if (toastId) {
+        addToRemoveQueue(toastId)
+      } else {
+        state.toasts.forEach((toast) => {
+          addToRemoveQueue(toast.id)
+        })
       }
-      
-      const newToasts = toastId ? state.toasts.filter((t) => t.id !== toastId) : [];
 
       return {
         ...state,
-        toasts: newToasts,
+        toasts: state.toasts.map((t) =>
+          t.id === toastId || toastId === undefined
+            ? {
+                ...t,
+                open: false,
+              }
+            : t
+        ),
       }
     }
-    case "REMOVE_TOAST": // This can be used for silent removal without affecting timeouts for other toasts if needed. Currently, same as DISMISS
+    case "REMOVE_TOAST":
       if (action.toastId === undefined) {
-        return { ...state, toasts: [] }
+        return {
+          ...state,
+          toasts: [],
+        }
       }
       return {
         ...state,
@@ -119,19 +144,29 @@ type Toast = Omit<ToasterToast, "id">
 function toast({ ...props }: Toast) {
   const id = genId()
 
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
+  const update = (props: ToasterToast) =>
+    dispatch({
+      type: "UPDATE_TOAST",
+      toast: { ...props, id },
+    })
+  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
   dispatch({
     type: "ADD_TOAST",
     toast: {
       ...props,
       id,
+      open: true,
+      onOpenChange: (open) => {
+        if (!open) dismiss()
+      },
     },
-  });
+  })
 
   return {
     id: id,
     dismiss,
+    update,
   }
 }
 

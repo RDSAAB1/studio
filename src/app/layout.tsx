@@ -4,6 +4,7 @@ import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import MainLayout from '@/components/layout/main-layout';
 import { HeartHandshake } from 'lucide-react';
+import { Toaster } from '@/components/ui/toaster';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -42,6 +43,7 @@ export default function RootLayout({
         <MainLayout>
           {children}
         </MainLayout>
+        <Toaster />
       </body>
     </html>
   );
