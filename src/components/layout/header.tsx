@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -8,6 +7,7 @@ import { Input } from "../ui/input";
 import TabBar from './tab-bar';
 import { MenuItem } from "@/hooks/use-tabs";
 import { cn } from "@/lib/utils";
+import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 
 interface HeaderProps {
   openTabs: MenuItem[];
@@ -56,6 +56,10 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                     </Button>
                 </div>
             )}
+        </div>
+
+        <div className="absolute left-1/2 top-[calc(2.5rem+0.5rem)] -translate-x-1/2 -translate-y-1/2">
+             <DynamicIslandToaster />
         </div>
         
         <div className={cn("flex flex-1 items-center justify-end gap-2", isSearchOpen && "hidden")}>
