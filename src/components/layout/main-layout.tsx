@@ -42,7 +42,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
 
     if (initialTab && !openTabs.some(tab => tab.id === initialTab!.id)) {
-        setOpenTabs(prev => [...prev, initialTab!]);
+        setOpenTabs(prev => {
+            // Ensure dashboard isn't accidentally removed if it was the only tab
+            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+            if (prev.length === 1 && prev[0].id === 'dashboard' && initialTab!.id !== 'dashboard') {
+                return [prev[0], initialTab!];
+            }
+             if (prev.some(tab => tab.id === initialTab!.id)) {
+                return prev;
+            }
+            return [...prev, initialTab!];
+        });
     }
     
     if (initialTab) {

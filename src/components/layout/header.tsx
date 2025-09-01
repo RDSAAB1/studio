@@ -19,7 +19,7 @@ interface HeaderProps {
 export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
-      <div className="flex-1 min-w-0">
+       <div className="flex-1 min-w-0">
           <TabBar 
               openTabs={openTabs}
               activeTabId={activeTabId}
@@ -27,12 +27,12 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
               onCloseTab={onCloseTab}
           />
       </div>
-
-      <div className="absolute left-1/2 -translate-x-1/2">
+      
+      <div className="flex-shrink-0">
         <DynamicIslandToaster />
       </div>
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-2">
           <div className="relative flex-1 md:grow-0">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
