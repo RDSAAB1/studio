@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
@@ -39,10 +38,11 @@ export function DynamicIslandToaster() {
         )}
       >
         {hasToasts && (
-          <div className="flex h-full w-full items-center justify-center gap-2 px-4">
+          <div className="flex h-full w-full items-center justify-start gap-2 px-4"> {/* Optional: Changed justify-center to justify-start for better alignment */}
             <div className="flex-shrink-0 flex items-center">{icon}</div>
             <div className="flex flex-grow items-center text-left overflow-hidden">
-              {title && <p className="font-semibold text-xs truncate">{String(title)}</p>}
+              {/* FIX IS HERE: Added m-0 to the <p> tag */}
+              {title && <p className="font-semibold text-xs truncate m-0">{String(title)}</p>}
             </div>
             {toast.action}
           </div>
