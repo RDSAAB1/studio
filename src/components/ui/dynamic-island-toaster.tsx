@@ -32,9 +32,10 @@ export function DynamicIslandToaster() {
       >
         {hasToasts && (
           <div className="flex h-full w-full items-center justify-center gap-2">
+            {/* Using a div instead of a p tag to avoid default margins */}
             <div className="flex-grow text-center overflow-hidden">
-              {title && <p className="font-semibold text-sm truncate">{String(title)}</p>}
-              {description && <p className="text-xs text-muted-foreground truncate">{String(description)}</p>}
+              {title && <span className="font-semibold text-sm truncate block">{String(title)}</span>}
+              {description && <span className="text-xs text-muted-foreground truncate block">{String(description)}</span>}
             </div>
             {toast.action}
           </div>
