@@ -62,7 +62,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
             )}
         </div>
 
-        <div className="absolute left-1/2 top-[calc(2.5rem+0.25rem)] -translate-x-1/2 pt-0">
+        <div className="absolute left-1/2 top-[calc(2.5rem+0.25rem)] -translate-x-1/2">
              <DynamicIslandToaster />
         </div>
         

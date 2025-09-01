@@ -18,7 +18,7 @@ export function DynamicIslandToaster() {
         "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
         "bg-background text-primary border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
-        "h-7 min-h-[1.75rem]",
+        "h-8 min-h-[2rem]", // Changed from h-7 to h-8
         "w-48",
         { "w-96": hasToasts }
       )}
@@ -32,7 +32,7 @@ export function DynamicIslandToaster() {
       >
         {hasToasts && (
           <div className="flex-grow text-center overflow-hidden">
-            <span className="font-semibold text-sm truncate block">{String(title)}</span>
+            {title && <span className="font-semibold text-sm truncate block">{String(title)}</span>}
             {description && <span className="text-xs text-muted-foreground truncate block">{String(description)}</span>}
           </div>
         )}
