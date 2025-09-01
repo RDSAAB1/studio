@@ -23,7 +23,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
     }
 
     const totalAmount = payment.rtgsAmount || payment.amount || 0;
-    const checkNo = payment.checkNo || payment.utrNo || payment.paymentId.replace('P', '');
+    const checkNo = payment.checkNo || payment.paymentId.replace('P', '');
 
     return (
         <>
@@ -76,7 +76,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                                     <div className="grid grid-cols-2 text-left">
                                         <span className="font-bold pr-2" style={{ color: '#000' }}>Date:</span>
                                         <span style={{ color: '#000' }}>{format(new Date(payment.date), "dd MMM, yyyy")}</span>
-                                        <span className="font-bold pr-2" style={{ color: '#000' }}>Check/UTR #:</span>
+                                        <span className="font-bold pr-2" style={{ color: '#000' }}>Check #:</span>
                                         <span style={{ color: '#000' }}>{checkNo}</span>
                                     </div>
                                 </div>
