@@ -63,6 +63,7 @@ export default function RtgsReportClient() {
     // State for search filters
     const [searchSrNo, setSearchSrNo] = useState('');
     const [searchCheckNo, setSearchCheckNo] = useState('');
+    const [searchName, setSearchName] = useState('');
     const [startDate, setStartDate] = useState<string>(''); // YYYY-MM-DD
     const [endDate, setEndDate] = useState<string>(''); // YYYY-MM-DD
 
@@ -149,6 +150,9 @@ export default function RtgsReportClient() {
         if (searchCheckNo) {
             filtered = filtered.filter(row => row.checkNo.toLowerCase().includes(searchCheckNo.toLowerCase()));
         }
+        if (searchName) {
+            filtered = filtered.filter(row => row.supplierName.toLowerCase().includes(searchName.toLowerCase()));
+        }
         if (startDate && endDate) {
             const start = new Date(startDate);
             const end = new Date(endDate);
@@ -166,7 +170,7 @@ export default function RtgsReportClient() {
             filtered = filtered.filter(row => new Date(row.date) <= end);
         }
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [reportRows, searchSrNo, searchCheckNo, startDate, endDate]);
+    }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
     const handlePrint = (contentRef: React.RefObject<HTMLDivElement>) => {
         const node = contentRef.current;
@@ -181,7 +185,7 @@ export default function RtgsReportClient() {
         
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Could not create print content' });
+            toast({ variant: 'destructive', title: 'Could not create print content.' });
             return;
         }
 
@@ -295,7 +299,7 @@ export default function RtgsReportClient() {
                     <CardDescription>Use the fields below to search and filter payments.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="space-y-1">
                             <Label htmlFor="searchSrNo">Search SR No.</Label>
                             <Input
@@ -312,6 +316,15 @@ export default function RtgsReportClient() {
                                 value={searchCheckNo}
                                 onChange={(e) => setSearchCheckNo(e.target.value)}
                                 placeholder="Enter Check/UTR No."
+                            />
+                        </div>
+                         <div className="space-y-1">
+                            <Label htmlFor="searchName">Search by Name</Label>
+                            <Input
+                                id="searchName"
+                                value={searchName}
+                                onChange={(e) => setSearchName(e.target.value)}
+                                placeholder="Enter supplier name"
                             />
                         </div>
                         <div className="space-y-1">
