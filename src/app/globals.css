@@ -55,12 +55,13 @@ body {
 }
 
 .main_container{
-    width: calc(100% - 80px); /* Start with collapsed sidebar width */
+    width: calc(100% - 80px); /* Default width for collapsed sidebar */
     display: flex;
     flex-direction: column;
     overflow: hidden;
     transition: all 0.3s ease;
 }
+
 .wrapper.active .main_container {
     width: calc(100% - 250px);
 }
@@ -290,6 +291,9 @@ body {
     }
     .wrapper.active .side_bar{
         left: 0;
+    }
+    .wrapper.active .main_container{
+        width: 100%; /* Ensure main container takes full width when sidebar is overlay */
     }
     .wrapper.active .shadow{
         display: block;
