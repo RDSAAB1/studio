@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
@@ -8,8 +7,8 @@ import React from "react";
 
 const ICONS = {
   default: <Info className="h-5 w-5 text-blue-500" />,
-  success: <CheckCircle className="h-5 w-5 text-green-500" />,
   destructive: <XCircle className="h-5 w-5 text-red-500" />,
+  success: <CheckCircle className="h-5 w-5 text-green-500" />,
 };
 
 export function DynamicIslandToaster() {
@@ -40,12 +39,17 @@ export function DynamicIslandToaster() {
         )}
       >
         {hasToasts && (
-          <div className="flex h-full w-full items-center justify-start gap-2 px-4">
+          <div className="flex h-full w-full items-center justify-start gap-3 px-4">
+            {/* Icon */}
             <div className="flex-shrink-0">{icon}</div>
-            <div className="flex-grow text-left overflow-hidden text-xs">
-                {title && <p className="font-semibold truncate">{String(title)}</p>}
-                {description && <p className="text-muted-foreground truncate">{String(description)}</p>}
+
+            {/* Text Content */}
+            <div className="flex-grow text-left overflow-hidden">
+                {title && <p className="font-semibold text-xs truncate">{String(title)}</p>}
+                {description && <p className="text-muted-foreground text-xs truncate">{String(description)}</p>}
             </div>
+            
+            {/* Action Button */}
             {toast.action}
           </div>
         )}
