@@ -31,7 +31,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
       </div>
 
       {/* Bottom bar for actions and search */}
-      <div className="flex h-10 items-center justify-between gap-4 border-b border-border bg-background px-4 sm:px-6">
+      <div className="flex h-10 items-center justify-between gap-4 border-t border-border bg-background px-4 sm:px-6">
         <div className="flex-shrink-0 md:hidden">
           <Button variant="ghost" size="icon" onClick={toggleSidebar}>
             <Menu className="h-5 w-5" />
@@ -44,7 +44,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
         </div>
 
         <div className="flex flex-1 items-center justify-end gap-2">
-            <div className="relative flex-1 md:grow-0 max-w-xs">
+            <div className="relative hidden flex-1 md:flex md:grow-0 max-w-xs">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                     type="search"
@@ -52,6 +52,10 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                     className="h-8 w-full rounded-full bg-muted pl-8 md:w-[180px] lg:w-[250px]"
                 />
             </div>
+            <Button variant="ghost" size="icon" className="md:hidden">
+              <Search className="h-5 w-5" />
+              <span className="sr-only">Search</span>
+            </Button>
             <Button variant="ghost" size="icon">
                 <Settings className="h-5 w-5" />
                 <span className="sr-only">Settings</span>
