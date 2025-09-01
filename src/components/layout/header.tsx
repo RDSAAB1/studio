@@ -20,7 +20,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
       {/* Top bar for tabs */}
-      <div className="flex h-10 items-center border-b px-4 sm:px-6">
+      <div className="flex h-10 items-center px-4 sm:px-6">
         <TabBar 
           openTabs={openTabs}
           activeTabId={activeTabId}
