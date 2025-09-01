@@ -128,6 +128,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         iframeDoc.open();
         iframeDoc.write('<html><head><title>RTGS Advice</title>');
         
+        // Copy all stylesheets from the main document to the iframe
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
@@ -148,11 +149,6 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 body {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
-                    color: #000 !important;
-                }
-                 .printable-area * {
-                    color: #000 !important;
-                    border-color: #e5e7eb !important;
                 }
                 .page-break {
                     page-break-after: always;
@@ -189,43 +185,45 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             <ScrollArea className="max-h-[70vh]">
                 <div ref={printRef} className="printable-area">
                     {paymentChunks.map((chunk, pageIndex) => (
-                        <div key={pageIndex} className={`p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col min-h-[18.5cm] ${pageIndex < paymentChunks.length - 1 ? 'page-break' : ''}`}>
+                        <div key={pageIndex} className={`p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[18.5cm] ${pageIndex < paymentChunks.length - 1 ? 'page-break' : ''}`}>
                             <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
                             
-                            <table className="w-full text-left mb-4 print-table">
-                                <thead className="print-bg-orange">
-                                    <tr className="bg-gray-800 text-white uppercase text-xs">
-                                        <th className="p-2 font-semibold text-center">#</th>
-                                        <th className="p-2 font-semibold">Payee Name</th>
-                                        <th className="p-2 font-semibold">Bank Name</th>
-                                        <th className="p-2 font-semibold">Branch</th>
-                                        <th className="p-2 font-semibold">A/C No.</th>
-                                        <th className="p-2 font-semibold">IFSC Code</th>
-                                        <th className="p-2 font-semibold text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {chunk.map((payment, index) => (
-                                        <tr key={payment.paymentId} className="border-b border-gray-200">
-                                            <td className="p-2 text-center border-x border-gray-200">{pageIndex * CHUNK_SIZE + index + 1}</td>
-                                            <td className="p-2 border-x border-gray-200">{toTitleCase(payment.supplierName || '')}</td>
-                                            <td className="p-2 border-x border-gray-200">{payment.bank}</td>
-                                            <td className="p-2 border-x border-gray-200">{toTitleCase(payment.branch || '')}</td>
-                                            <td className="p-2 border-x border-gray-200">{payment.acNo}</td>
-                                            <td className="p-2 border-x border-gray-200">{payment.ifscCode}</td>
-                                            <td className="p-2 text-right font-semibold border-x border-gray-200">{formatCurrency(payment.amount)}</td>
+                            <div className="flex-grow">
+                                <table className="w-full text-left mb-4 print-table">
+                                    <thead>
+                                        <tr className="bg-gray-800 text-white uppercase text-xs">
+                                            <th className="p-2 font-semibold text-center">#</th>
+                                            <th className="p-2 font-semibold">Payee Name</th>
+                                            <th className="p-2 font-semibold">Bank Name</th>
+                                            <th className="p-2 font-semibold">Branch</th>
+                                            <th className="p-2 font-semibold">A/C No.</th>
+                                            <th className="p-2 font-semibold">IFSC Code</th>
+                                            <th className="p-2 font-semibold text-right">Amount</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                                {pageIndex === paymentChunks.length - 1 && (
-                                     <tfoot>
-                                        <tr className="bg-gray-100 font-bold">
-                                            <td className="p-2 text-right" colSpan={6}>GRAND TOTAL</td>
-                                            <td className="p-2 text-right">{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</td>
-                                        </tr>
-                                    </tfoot>
-                                )}
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {chunk.map((payment, index) => (
+                                            <tr key={payment.paymentId} className="border-b border-gray-200">
+                                                <td className="p-2 text-center border-x border-gray-200">{pageIndex * CHUNK_SIZE + index + 1}</td>
+                                                <td className="p-2 border-x border-gray-200">{toTitleCase(payment.supplierName || '')}</td>
+                                                <td className="p-2 border-x border-gray-200">{payment.bank}</td>
+                                                <td className="p-2 border-x border-gray-200">{toTitleCase(payment.branch || '')}</td>
+                                                <td className="p-2 border-x border-gray-200">{payment.acNo}</td>
+                                                <td className="p-2 border-x border-gray-200">{payment.ifscCode}</td>
+                                                <td className="p-2 text-right font-semibold border-x border-gray-200">{formatCurrency(payment.amount)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    {pageIndex === paymentChunks.length - 1 && (
+                                        <tfoot>
+                                            <tr className="bg-gray-100 font-bold">
+                                                <td className="p-2 text-right" colSpan={6}>GRAND TOTAL</td>
+                                                <td className="p-2 text-right">{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</td>
+                                            </tr>
+                                        </tfoot>
+                                    )}
+                                </table>
+                            </div>
                             
                             <ReportFooter settings={settings} />
                         </div>
