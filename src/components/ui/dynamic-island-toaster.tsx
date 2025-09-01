@@ -22,9 +22,9 @@ export function DynamicIslandToaster() {
         "bg-card text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
         // Base state (collapsed)
-        "w-8 h-8",
+        "w-8 h-12",
         // Expanded state
-        { "w-full max-w-sm h-auto min-h-[3.5rem] p-3 rounded-2xl": toasts.length > 0 }
+        { "w-full max-w-sm h-12 p-3 rounded-2xl": toasts.length > 0 }
       )}
     >
       {toasts.map(function ({ id, title, description, variant, action }) {
