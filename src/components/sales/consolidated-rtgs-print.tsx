@@ -128,6 +128,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         iframeDoc.open();
         iframeDoc.write('<html><head><title>RTGS Advice</title>');
         
+        // Directly copy all stylesheets from the main document to the iframe
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
@@ -138,6 +139,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             }
         });
         
+        // Add specific print styles
         const printStyles = iframeDoc.createElement('style');
         printStyles.textContent = `
             @media print {
@@ -191,26 +193,26 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                             <div className="flex-grow">
                                 <table className="w-full text-left print-table">
                                     <thead>
-                                        <tr className="bg-gray-800 text-white uppercase text-xs">
-                                            <th className="py-1 px-2 font-semibold text-center">#</th>
-                                            <th className="py-1 px-2 font-semibold">Payee Name</th>
-                                            <th className="py-1 px-2 font-semibold">Bank Name</th>
-                                            <th className="py-1 px-2 font-semibold">Branch</th>
-                                            <th className="py-1 px-2 font-semibold">A/C No.</th>
-                                            <th className="py-1 px-2 font-semibold">IFSC Code</th>
-                                            <th className="py-1 px-2 font-semibold text-right">Amount</th>
+                                        <tr className="bg-gray-800 text-white uppercase text-[10px]">
+                                            <th className="py-0 px-2 font-semibold text-center">#</th>
+                                            <th className="py-0 px-2 font-semibold">Payee Name</th>
+                                            <th className="py-0 px-2 font-semibold">Bank Name</th>
+                                            <th className="py-0 px-2 font-semibold">Branch</th>
+                                            <th className="py-0 px-2 font-semibold">A/C No.</th>
+                                            <th className="py-0 px-2 font-semibold">IFSC Code</th>
+                                            <th className="py-0 px-2 font-semibold text-right">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {chunk.map((payment, index) => (
                                             <tr key={payment.paymentId} className="border-b border-gray-200">
-                                                <td className="py-1 px-2 text-xs text-center border-x border-gray-200 text-black">{pageIndex * CHUNK_SIZE + index + 1}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.supplierName || '')}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.bank}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.branch || '')}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.acNo}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.ifscCode}</td>
-                                                <td className="py-1 px-2 text-xs font-semibold text-right border-x border-gray-200 text-black">{formatCurrency(payment.amount)}</td>
+                                                <td className="py-0 px-2 text-[10px] text-center border-x border-gray-200 text-black">{pageIndex * CHUNK_SIZE + index + 1}</td>
+                                                <td className="py-0 px-2 text-[10px] border-x border-gray-200 text-black">{toTitleCase(payment.supplierName || '')}</td>
+                                                <td className="py-0 px-2 text-[10px] border-x border-gray-200 text-black">{payment.bank}</td>
+                                                <td className="py-0 px-2 text-[10px] border-x border-gray-200 text-black">{toTitleCase(payment.branch || '')}</td>
+                                                <td className="py-0 px-2 text-[10px] border-x border-gray-200 text-black">{payment.acNo}</td>
+                                                <td className="py-0 px-2 text-[10px] border-x border-gray-200 text-black">{payment.ifscCode}</td>
+                                                <td className="py-0 px-2 text-[10px] font-semibold text-right border-x border-gray-200 text-black">{formatCurrency(payment.amount)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
