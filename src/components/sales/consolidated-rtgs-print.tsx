@@ -84,7 +84,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         printStyles.textContent = `
             @media print {
                 @page {
-                    size: A4;
+                    size: A4 landscape;
                     margin: 0;
                 }
                 body {
