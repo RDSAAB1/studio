@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { RtgsSettings } from '@/lib/definitions';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -41,13 +41,13 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
     <div className="flex-grow-0">
         <div className="flex justify-between items-start mb-4">
             <div className="w-1/2">
-                <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
-                <p className="text-gray-600 text-[11px]">{settings.companyAddress1}, {settings.companyAddress2}</p>
-                <p className="text-gray-600 text-[11px]">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
+                <h2 className="font-bold text-3xl mb-1">{settings.companyName}</h2>
+                <p className="text-gray-600 text-sm">{settings.companyAddress1}, {settings.companyAddress2}</p>
+                <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
             </div>
             <div className="text-right">
-                <h1 className="text-3xl font-bold text-gray-800 uppercase mb-1">RTGS ADVICE</h1>
-                <div className="text-sm text-gray-700">
+                <h1 className="text-4xl font-bold text-gray-800 uppercase mb-1">RTGS ADVICE</h1>
+                <div className="text-base text-gray-700">
                     <div className="grid grid-cols-2 text-left">
                         {isSameDate && <>
                             <span className="font-bold pr-2">Date:</span>
@@ -62,8 +62,8 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
             </div>
         </div>
         <div className="border border-gray-200 p-3 rounded-lg mb-4">
-            <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Our Bank Details</h3>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-sm">Our Bank Details</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-base">
                 <div><span className="font-semibold">Bank:</span> <span>{settings.bankName}, {settings.branchName}</span></div>
                 <div><span className="font-semibold">A/C No:</span> <span>{settings.accountNo}</span></div>
                 <div><span className="font-semibold">IFSC:</span> <span>{settings.ifscCode}</span></div>
@@ -102,11 +102,16 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
     const firstCheckNo = payments.length > 0 ? payments[0].checkNo : '';
     const isSameCheckNo = payments.every(p => p.checkNo === firstCheckNo);
 
-    const CHUNK_SIZE = 15;
-    const paymentChunks = [];
-    for (let i = 0; i < payments.length; i += CHUNK_SIZE) {
-        paymentChunks.push(payments.slice(i, i + CHUNK_SIZE));
-    }
+    const CHUNK_SIZE = 10;
+    const paymentChunks = useMemo(() => {
+        const chunks = [];
+        for (let i = 0; i < payments.length; i += CHUNK_SIZE) {
+            chunks.push(payments.slice(i, i + CHUNK_SIZE));
+        }
+        return chunks;
+    }, [payments]);
+    
+    let cumulativeTotal = 0;
 
     const handlePrint = () => {
         const node = printRef.current;
@@ -128,7 +133,6 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         iframeDoc.open();
         iframeDoc.write('<html><head><title>RTGS Advice</title>');
         
-        // Directly copy all stylesheets from the main document to the iframe
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
@@ -139,7 +143,6 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             }
         });
         
-        // Add specific print styles
         const printStyles = iframeDoc.createElement('style');
         printStyles.textContent = `
             @media print {
@@ -151,15 +154,9 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
                 }
-                .page-break-after {
-                    page-break-after: always;
-                }
-                .bg-gray-800 {
-                    background-color: #1f2937 !important;
-                }
-                .bg-gray-800 * {
-                    color: #fff !important;
-                }
+                .page-break-after { page-break-after: always !important; }
+                .bg-gray-800 { background-color: #1f2937 !important; }
+                .bg-gray-800 * { color: #fff !important; }
                 .text-black { color: #000 !important; }
             }
         `;
@@ -186,50 +183,70 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
                 <div ref={printRef} className="printable-area">
-                    {paymentChunks.map((chunk, pageIndex) => (
-                        <div key={pageIndex} className={`p-4 bg-white text-black font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${pageIndex < paymentChunks.length - 1 ? 'page-break-after' : ''}`}>
-                            <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
-                            
-                            <div className="flex-grow">
-                                <table className="w-full text-left print-table">
-                                    <thead>
-                                        <tr className="bg-gray-800 text-white uppercase text-xs">
-                                            <th className="py-1 px-2 font-semibold text-center">#</th>
-                                            <th className="py-1 px-2 font-semibold">Payee Name</th>
-                                            <th className="py-1 px-2 font-semibold">Bank Name</th>
-                                            <th className="py-1 px-2 font-semibold">Branch</th>
-                                            <th className="py-1 px-2 font-semibold">A/C No.</th>
-                                            <th className="py-1 px-2 font-semibold">IFSC Code</th>
-                                            <th className="py-1 px-2 font-semibold text-right">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {chunk.map((payment, index) => (
-                                            <tr key={payment.paymentId} className="border-b border-gray-200">
-                                                <td className="py-1 px-2 text-xs text-center border-x border-gray-200 text-black">{pageIndex * CHUNK_SIZE + index + 1}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.supplierName || '')}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.bank}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.branch || '')}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.acNo}</td>
-                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.ifscCode}</td>
-                                                <td className="py-1 px-2 text-xs font-semibold text-right border-x border-gray-200 text-black">{formatCurrency(payment.amount)}</td>
+                    {paymentChunks.map((chunk, pageIndex) => {
+                        const previousPagesTotal = cumulativeTotal;
+                        const currentPageTotal = chunk.reduce((sum, p) => sum + p.amount, 0);
+                        cumulativeTotal += currentPageTotal;
+
+                        return (
+                            <div key={pageIndex} className={`p-4 bg-white text-black font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${pageIndex < paymentChunks.length - 1 ? 'page-break-after' : ''}`}>
+                                <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
+                                
+                                <div className="flex-grow">
+                                    <table className="w-full text-left print-table">
+                                        <thead>
+                                            <tr className="bg-gray-800 text-white uppercase text-xs">
+                                                <th className="py-1 px-2 font-semibold text-center">#</th>
+                                                <th className="py-1 px-2 font-semibold">Payee Name</th>
+                                                <th className="py-1 px-2 font-semibold">Bank Name</th>
+                                                <th className="py-1 px-2 font-semibold">Branch</th>
+                                                <th className="py-1 px-2 font-semibold">A/C No.</th>
+                                                <th className="py-1 px-2 font-semibold">IFSC Code</th>
+                                                <th className="py-1 px-2 font-semibold text-right">Amount</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                    {pageIndex === paymentChunks.length - 1 && (
+                                        </thead>
+                                        <tbody>
+                                            {chunk.map((payment, index) => (
+                                                <tr key={payment.paymentId} className="border-b border-gray-200">
+                                                    <td className="py-1 px-2 text-xs text-center border-x border-gray-200 text-black">{pageIndex * CHUNK_SIZE + index + 1}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.supplierName || '')}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.bank}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.branch || '')}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.acNo}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.ifscCode}</td>
+                                                    <td className="py-1 px-2 text-xs font-semibold text-right border-x border-gray-200 text-black">{formatCurrency(payment.amount)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
                                         <tfoot>
                                             <tr className="font-bold">
-                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black" colSpan={6}>GRAND TOTAL</td>
-                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black">{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</td>
+                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black" colSpan={6}>PAGE TOTAL</td>
+                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black">{formatCurrency(currentPageTotal)}</td>
                                             </tr>
+                                            {pageIndex > 0 && (
+                                                <>
+                                                 <tr className="font-semibold">
+                                                    <td className="pt-2 px-2 text-right text-xs" colSpan={6}>PREVIOUS PAGE(S) TOTAL:</td>
+                                                    <td className="pt-2 px-2 text-right text-xs">{formatCurrency(previousPagesTotal)}</td>
+                                                 </tr>
+                                                 <tr className="font-semibold">
+                                                    <td className="px-2 text-right text-xs" colSpan={6}>CURRENT PAGE TOTAL:</td>
+                                                    <td className="px-2 text-right text-xs">{formatCurrency(currentPageTotal)}</td>
+                                                 </tr>
+                                                  <tr className="font-bold">
+                                                    <td className="px-2 text-right border-t border-black" colSpan={6}>CUMULATIVE TOTAL:</td>
+                                                    <td className="px-2 text-right border-t border-black">{formatCurrency(cumulativeTotal)}</td>
+                                                  </tr>
+                                                </>
+                                            )}
                                         </tfoot>
-                                    )}
-                                </table>
+                                    </table>
+                                </div>
+                                
+                                <ReportFooter settings={settings} />
                             </div>
-                            
-                            <ReportFooter settings={settings} />
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </ScrollArea>
              <DialogFooter className="p-4 pt-2 print:hidden">

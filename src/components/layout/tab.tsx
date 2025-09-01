@@ -26,7 +26,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
   };
   
   const tabClasses = cn(
-    "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-4 max-w-[240px] flex-1 transition-colors duration-200",
+    "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-3 max-w-[200px] flex-1 transition-colors duration-200",
     {
       'bg-background text-foreground z-10 rounded-t-lg': isActive,
       'bg-card text-card-foreground hover:bg-accent/50': !isActive,
@@ -37,12 +37,12 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
 
   return (
     <div 
-      className="relative flex-grow-0 flex-shrink-1" 
+      className="relative flex-shrink min-w-0" 
       onClick={onClick}
       style={cornerStyle as React.CSSProperties}
     >
       <div className={tabClasses}>
-        <div className="flex items-center z-10 overflow-hidden">
+        <div className="flex items-center z-10 overflow-hidden min-w-0">
           {icon}
           <span className="whitespace-nowrap ml-2 truncate">{title}</span>
         </div>
