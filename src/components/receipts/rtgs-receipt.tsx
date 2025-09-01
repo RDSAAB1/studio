@@ -109,7 +109,6 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                                 <tr className="border-b border-gray-200">
                                     <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>
                                         <p style={{ color: '#000' }}>{toTitleCase(payment.supplierName || '')}</p>
-                                        <p className="text-gray-500 text-[10px]" style={{ color: '#000' }}>S/O: {toTitleCase(payment.supplierFatherName || '')}</p>
                                     </td>
                                     <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankName}, {toTitleCase(payment.bankBranch || '')}</td>
                                     <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankAcNo}</td>
