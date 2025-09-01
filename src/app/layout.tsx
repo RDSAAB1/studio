@@ -2,7 +2,6 @@
 import type { Metadata } from 'next';
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
 import MainLayout from '@/components/layout/main-layout';
 import { HeartHandshake } from 'lucide-react';
 
@@ -43,7 +42,6 @@ export default function RootLayout({
         <MainLayout>
           {children}
         </MainLayout>
-        <Toaster />
       </body>
     </html>
   );
