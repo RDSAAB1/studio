@@ -123,8 +123,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setOpenTabs([...openTabs, item]);
       }
       setActiveTabId(item.id);
-      // Optional: auto-collapse sidebar on item click
-      // setIsSidebarActive(false); 
+      // On mobile, close sidebar after click
+      if (window.innerWidth < 1024) {
+          setIsSidebarActive(false);
+      }
     }
   };
   
@@ -147,10 +149,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
               activeTabId={activeTabId}
               onTabClick={handleTabClick}
               onCloseTab={handleCloseTab}
+              toggleSidebar={toggleSidebar}
             />
             <div className="content">
                 {children}
             </div>
+            {isSidebarActive && <div className="shadow" onClick={toggleSidebar}></div>}
         </div>
     </div>
   );

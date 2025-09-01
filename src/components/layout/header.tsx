@@ -14,9 +14,10 @@ interface HeaderProps {
   activeTabId: string;
   onTabClick: (id: string) => void;
   onCloseTab: (id: string, e: React.MouseEvent) => void;
+  toggleSidebar: () => void;
 }
 
-export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: HeaderProps) {
+export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSidebar }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
       {/* Top bar for tabs */}
@@ -30,9 +31,12 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
       </div>
 
       {/* Bottom bar for actions and search */}
-      <div className="flex h-10 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
-        <div className="flex-shrink-0">
-          {/* Placeholder for potential left-side controls */}
+      <div className="flex h-10 items-center justify-between gap-4 border-b border-border bg-background px-4 sm:px-6">
+        <div className="flex-shrink-0 md:hidden">
+          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
         </div>
         
         <div className="absolute left-1/2 -translate-x-1/2">
