@@ -219,6 +219,13 @@ export default function RtgsReportClient() {
                                 -webkit-print-color-adjust: exact !important;
                                 print-color-adjust: exact !important;
                                 color: #000 !important;
+                                font-size: 10px;
+                             }
+                             table {
+                                font-size: 10px;
+                             }
+                             th, td {
+                                 padding: 4px !important;
                              }
                         }
                     </style>
