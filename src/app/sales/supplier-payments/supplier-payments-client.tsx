@@ -192,7 +192,7 @@ export default function SupplierPaymentsClient() {
     }, (error) => {
         if(isSubscribed) {
             console.error("Error fetching suppliers:", error);
-            stableToast({ variant: 'destructive', title: "Error", description: "Failed to load supplier data." });
+            stableToast({ variant: 'destructive', title: "Failed to load supplier data" });
             setLoading(false);
         }
     });
@@ -208,7 +208,7 @@ export default function SupplierPaymentsClient() {
     }, (error) => {
         if(isSubscribed) {
             console.error("Error fetching payments:", error);
-            stableToast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." });
+            stableToast({ variant: 'destructive', title: "Failed to load payment history" });
         }
     });
     
@@ -388,11 +388,11 @@ export default function SupplierPaymentsClient() {
 
     const processPayment = async () => {
         if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
-            toast({ variant: 'destructive', title: "Error", description: "No supplier selected." });
+            toast({ variant: 'destructive', title: "No supplier selected" });
             return;
         }
         if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) {
-            toast({ variant: 'destructive', title: "Invalid Payment", description: "Please select entries to pay." });
+            toast({ variant: 'destructive', title: "Please select entries to pay" });
             return;
         }
 
@@ -400,11 +400,11 @@ export default function SupplierPaymentsClient() {
         const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
 
         if (totalPaidAmount <= 0) {
-            toast({ variant: 'destructive', title: "Invalid Payment", description: "Payment amount must be greater than zero." });
+            toast({ variant: 'destructive', title: "Payment amount must be positive" });
             return;
         }
         if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalPaidAmount > totalOutstandingForSelected) {
-            toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total outstanding." });
+            toast({ variant: 'destructive', title: "Partial payment cannot exceed outstanding" });
             return;
         }
 
@@ -502,14 +502,14 @@ export default function SupplierPaymentsClient() {
                 }
             });
 
-            toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.` });
+            toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'}.` });
             if (paymentMethod === 'RTGS' && finalPaymentData) {
                 setRtgsReceiptData(finalPaymentData);
             }
             resetPaymentForm(rtgsFor === 'Outsider');
         } catch (error) {
             console.error("Error processing payment:", error);
-            toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment. Please try again." });
+            toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment." });
         }
     };
 
@@ -522,7 +522,7 @@ export default function SupplierPaymentsClient() {
           const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
           
           if (foundSrNos.size !== srNosInPayment.length) {
-              toast({ variant: "destructive", title: "Cannot Edit Payment", description: "Some original supplier entries for this payment could not be found." });
+              toast({ variant: "destructive", title: "Cannot Edit: Original entry missing." });
               return;
           }
 
@@ -560,13 +560,13 @@ export default function SupplierPaymentsClient() {
             bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
         });
         setActiveTab('processing');
-        toast({ title: "Editing Mode", description: `Editing payment ${paymentToEdit.paymentId}. Associated entries have been selected.` });
+        toast({ title: "Editing Mode", description: `Editing payment ${paymentToEdit.paymentId}.` });
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string) => {
         const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
-            toast({ variant: "destructive", title: "Error", description: "Payment not found or ID is missing." });
+            toast({ variant: "destructive", title: "Payment not found or ID missing" });
             return;
         }
     
@@ -609,13 +609,13 @@ export default function SupplierPaymentsClient() {
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) {
             console.error("Error deleting payment:", error);
-            toast({ variant: "destructive", title: "Error", description: "Failed to delete payment." });
+            toast({ variant: "destructive", title: "Failed to delete payment" });
         }
     };
     
     const handlePaySelectedOutstanding = () => {
         if (selectedEntryIds.size === 0) {
-            toast({ variant: "destructive", title: "No Entries Selected", description: "Please select entries to pay." });
+            toast({ variant: "destructive", title: "No Entries Selected" });
             return;
         }
         setIsOutstandingModalOpen(false);
@@ -623,7 +623,7 @@ export default function SupplierPaymentsClient() {
 
     const handleGeneratePaymentOptions = () => {
         if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate > calcMaxRate) {
-            toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please enter valid numbers for payment calculation.' });
+            toast({ variant: 'destructive', title: 'Invalid input for payment calculation' });
             return;
         }
 
@@ -762,8 +762,7 @@ export default function SupplierPaymentsClient() {
                             <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
                                 <div className="flex flex-1 items-center gap-2">
                                     <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
-                                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                                        <PopoverTrigger asChild><Button variant="outline" role="combobox" aria-expanded={openCombobox} className="h-8 text-xs flex-1 justify-between font-normal">{selectedCustomerKey ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '') + ` (${customerSummaryMap.get(selectedCustomerKey)?.contact || ''})` : "Search and select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
+                                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}><PopoverTrigger asChild><Button variant="outline" role="combobox" aria-expanded={openCombobox} className="h-8 text-xs flex-1 justify-between font-normal">{selectedCustomerKey ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '') + ` (${customerSummaryMap.get(selectedCustomerKey)?.contact || ''})` : "Search and select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search by name or contact..." /><CommandList><CommandEmpty>No supplier found.</CommandEmpty><CommandGroup>
                                             {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
                                                 <CommandItem key={key} value={`${data.name} ${data.contact}`} onSelect={() => { handleCustomerSelect(key); setOpenCombobox(false); }}>

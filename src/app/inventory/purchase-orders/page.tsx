@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -12,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { format } from 'date-fns';
 import { Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from "@/hooks/use-toast";
 
 export default function PurchaseOrdersPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
@@ -51,21 +52,19 @@ export default function PurchaseOrdersPage() {
     }, (error) => {
       console.error("Error fetching purchase orders: ", error);
       toast({
-        title: "Error",
-        description: "Failed to load purchase orders.",
+        title: "Failed to load purchase orders",
         variant: "destructive",
       });
       setLoading(false);
     });
 
     return () => unsubscribe(); // Cleanup listener on unmount
-  }, [isClient]);
+  }, [isClient, toast]);
 
   const handleAddOrder = async () => {
     if (!newOrder.supplierId || !newOrder.orderDate || !newOrder.items || newOrder.items.length === 0) {
       toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields.",
+        title: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
@@ -73,8 +72,8 @@ export default function PurchaseOrdersPage() {
     try {
       await addDoc(collection(db, 'purchaseOrders'), newOrder);
       toast({
-        title: "Success",
-        description: "Purchase order added successfully.",
+        title: "Purchase order added successfully",
+        variant: "success",
       });
       setIsAdding(false);
       setNewOrder({
@@ -88,8 +87,7 @@ export default function PurchaseOrdersPage() {
     } catch (error) {
       console.error("Error adding purchase order: ", error);
       toast({
-        title: "Error",
-        description: "Failed to add purchase order.",
+        title: "Failed to add purchase order",
         variant: "destructive",
       });
     }
@@ -101,16 +99,15 @@ export default function PurchaseOrdersPage() {
       const orderRef = doc(db, 'purchaseOrders', editingOrder.id);
       await updateDoc(orderRef, editingOrder);
       toast({
-        title: "Success",
-        description: "Purchase order updated successfully.",
+        title: "Purchase order updated successfully",
+        variant: "success",
       });
       setIsEditing(false);
       setEditingOrder(null);
     } catch (error) {
       console.error("Error updating purchase order: ", error);
       toast({
-        title: "Error",
-        description: "Failed to update purchase order.",
+        title: "Failed to update purchase order",
         variant: "destructive",
       });
     }
@@ -120,14 +117,13 @@ export default function PurchaseOrdersPage() {
     try {
       await deleteDoc(doc(db, 'purchaseOrders', id));
       toast({
-        title: "Success",
-        description: "Purchase order deleted successfully.",
+        title: "Purchase order deleted successfully",
+        variant: "success",
       });
     } catch (error) {
       console.error("Error deleting purchase order: ", error);
       toast({
-        title: "Error",
-        description: "Failed to delete purchase order.",
+        title: "Failed to delete purchase order",
         variant: "destructive",
       });
     }
@@ -278,4 +274,3 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
-

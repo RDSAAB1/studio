@@ -132,8 +132,7 @@ export default function SupplierEntryClient() {
     }, (error) => {
       console.error("Error fetching suppliers: ", error);
       toast({
-        title: "Error",
-        description: "Failed to load supplier data. Please try again.",
+        title: "Failed to load supplier data",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -298,7 +297,6 @@ export default function SupplierEntryClient() {
     if (contactValue.length > 0 && contactValue.length < 10) {
       toast({
         title: "Incomplete Contact Number",
-        description: "Please enter a valid 10-digit contact number.",
         variant: "destructive"
       });
       return;
@@ -309,7 +307,7 @@ export default function SupplierEntryClient() {
         form.setValue('name', foundCustomer.name);
         form.setValue('so', foundCustomer.so);
         form.setValue('address', foundCustomer.address);
-        toast({ title: "Supplier Found", description: `Details for ${toTitleCase(foundCustomer.name)} have been auto-filled.` });
+        toast({ title: "Supplier Found", description: `Details for ${toTitleCase(foundCustomer.name)} auto-filled.` });
       }
     }
   }
@@ -334,15 +332,14 @@ export default function SupplierEntryClient() {
     try {
       await deleteSupplier(id);
       await deletePaymentsForSrNo(currentSupplier.srNo);
-      toast({ title: "Success", description: "Entry and associated payments deleted successfully." });
+      toast({ title: "Entry and payments deleted", variant: "success" });
       if (currentSupplier.id === id) {
         handleNew();
       }
     } catch (error) {
       console.error("Error deleting supplier and payments: ", error);
       toast({
-        title: "Error",
-        description: "Failed to delete entry. Please try again.",
+        title: "Failed to delete entry",
         variant: "destructive",
       });
     }
@@ -369,18 +366,18 @@ export default function SupplierEntryClient() {
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            toast({ title: "Payments Deleted", description: "Associated payments have been removed." });
+            toast({ title: "Payments Deleted", description: "Associated payments removed." });
             const savedEntry = await addSupplier(updatedEntry);
-            toast({ title: "Success", description: "Entry updated successfully." });
+            toast({ title: "Entry updated successfully", variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
-            toast({ title: "Success", description: `Entry ${isEditing ? 'updated' : 'saved'} successfully.` });
+            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully`, variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         }
     } catch (error) {
         console.error("Error saving supplier:", error);
-        toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
+        toast({ title: "Failed to save entry", variant: "destructive" });
     }
   };
 
@@ -405,8 +402,7 @@ export default function SupplierEntryClient() {
       });
     } else {
       toast({
-        title: "Invalid Form",
-        description: "Please check the form for errors before saving.",
+        title: "Invalid Form: Please check for errors",
         variant: "destructive"
       });
     }
@@ -425,7 +421,7 @@ export default function SupplierEntryClient() {
     if (selectedSupplierIds.size > 0) {
         const entriesToPrint = filteredSuppliers.filter(s => selectedSupplierIds.has(s.id));
         if (entriesToPrint.length === 0) {
-            toast({ title: "Error", description: "No selected entries found to print.", variant: "destructive" });
+            toast({ title: "No selected entries found", variant: "destructive" });
             return;
         }
 
@@ -438,8 +434,7 @@ export default function SupplierEntryClient() {
     
             if (!allSameCustomer) {
                 toast({
-                    title: "Multiple Suppliers Selected",
-                    description: "Consolidated receipts can only be printed for a single supplier at a time.",
+                    title: "Consolidated receipts are for a single supplier",
                     variant: "destructive",
                 });
                 return;
@@ -467,7 +462,7 @@ export default function SupplierEntryClient() {
       if(isValid && formValues.name && formValues.contact){
         handleSaveAndPrint();
       } else {
-         toast({ title: "Cannot Print", description: "Please fill the form or select entries from the table to print.", variant: "destructive" });
+         toast({ title: "Please fill form or select entries to print", variant: "destructive" });
       }
     }
   };

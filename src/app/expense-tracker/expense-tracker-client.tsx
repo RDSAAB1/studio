@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -187,14 +188,14 @@ export default function IncomeExpenseClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, "transactions", id));
-      toast({ title: "Success", description: "Transaction deleted successfully." });
+      toast({ title: "Transaction deleted successfully.", variant: "success" });
       if (isEditing === id) {
         setIsEditing(null);
         form.reset(getInitialFormState(transactions)); // Reset form if the deleted item was being edited
       }
     } catch (error) {
       console.error("Error deleting transaction: ", error);
-      toast({ title: "Error", description: "Failed to delete transaction.", variant: "destructive" });
+      toast({ title: "Failed to delete transaction.", variant: "destructive" });
     }
   };
 
@@ -211,18 +212,18 @@ export default function IncomeExpenseClient() {
       if (isEditing) {
         // Update existing transaction
         await setDoc(doc(db, "transactions", isEditing), transactionData, { merge: true });
-        toast({ title: "Success", description: "Transaction updated successfully." });
+        toast({ title: "Transaction updated successfully.", variant: "success" });
       } else {
         // Add new transaction with a new ID
         await addDoc(collection(db, "transactions"), transactionData);
-        toast({ title: "Success", description: "New transaction saved successfully." });
+        toast({ title: "New transaction saved successfully.", variant: "success" });
       }
       setIsEditing(null);
       form.reset(getInitialFormState([])); // Reset with empty initial state to clear form
       setActiveTab("history");
     } catch (error) {
         console.error("Error saving transaction: ", error);
-        toast({ title: "Error", description: "Failed to save transaction.", variant: "destructive" });
+        toast({ title: "Failed to save transaction.", variant: "destructive" });
     } finally {
         setLoading(false);
     }
@@ -328,7 +329,9 @@ export default function IncomeExpenseClient() {
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>This will permanently delete the transaction entry for "{transaction.payee}" of ₹{transaction.amount}.</AlertDialogDescription>
+                                <AlertDialogDescription>
+                                  This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
+                                </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>

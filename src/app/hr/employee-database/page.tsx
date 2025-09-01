@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -45,8 +46,7 @@ export default function EmployeeDatabasePage() {
     }, (error) => {
       console.error("Error fetching employees: ", error);
       toast({
-        title: "Error",
-        description: "Failed to load employee data.",
+        title: "Failed to load employee data",
         variant: "destructive",
       });
       setLoading(false);
@@ -64,16 +64,15 @@ export default function EmployeeDatabasePage() {
     try {
       await addDoc(collection(db, "employees"), formData);
       toast({
-        title: "Success",
-        description: "Employee added successfully.",
+        title: "Employee added successfully",
+        variant: "success",
       });
       setIsDialogOpen(false);
       setFormData({ name: '', employeeId: '', position: '', contact: '' });
     } catch (error) {
       console.error("Error adding employee: ", error);
       toast({
-        title: "Error",
-        description: "Failed to add employee.",
+        title: "Failed to add employee",
         variant: "destructive",
       });
     }
@@ -85,8 +84,8 @@ export default function EmployeeDatabasePage() {
       const employeeRef = doc(db, "employees", currentEmployee.id);
       await updateDoc(employeeRef, formData);
       toast({
-        title: "Success",
-        description: "Employee updated successfully.",
+        title: "Employee updated successfully",
+        variant: "success",
       });
       setIsDialogOpen(false);
       setCurrentEmployee(null);
@@ -94,8 +93,7 @@ export default function EmployeeDatabasePage() {
     } catch (error) {
       console.error("Error updating employee: ", error);
       toast({
-        title: "Error",
-        description: "Failed to update employee.",
+        title: "Failed to update employee",
         variant: "destructive",
       });
     }
@@ -105,14 +103,13 @@ export default function EmployeeDatabasePage() {
     try {
       await deleteDoc(doc(db, "employees", id));
       toast({
-        title: "Success",
-        description: "Employee deleted successfully.",
+        title: "Employee deleted successfully",
+        variant: "success",
       });
     } catch (error) {
       console.error("Error deleting employee: ", error);
       toast({
-        title: "Error",
-        description: "Failed to delete employee.",
+        title: "Failed to delete employee",
         variant: "destructive",
       });
     }

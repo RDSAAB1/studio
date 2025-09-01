@@ -150,8 +150,7 @@ export default function CustomerEntryClient() {
     }, (error) => {
       console.error("Error fetching customers: ", error);
       toast({
-        title: "Error",
-        description: "Failed to load customer data. Please try again.",
+        title: "Failed to load customer data",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -345,7 +344,6 @@ export default function CustomerEntryClient() {
     if (contactValue.length > 0 && contactValue.length < 10) {
       toast({
         title: "Incomplete Contact Number",
-        description: "Please enter a valid 10-digit contact number.",
         variant: "destructive"
       });
       return;
@@ -357,7 +355,7 @@ export default function CustomerEntryClient() {
         form.setValue('companyName', foundCustomer.companyName || '');
         form.setValue('address', foundCustomer.address);
         form.setValue('gstin', foundCustomer.gstin || '');
-        toast({ title: "Customer Found", description: `Details for ${toTitleCase(foundCustomer.name)} have been auto-filled.` });
+        toast({ title: "Customer Found", description: `Details for ${toTitleCase(foundCustomer.name)} auto-filled.` });
       }
     }
   }
@@ -380,21 +378,20 @@ export default function CustomerEntryClient() {
 
   const handleDelete = async (id: string) => {
     if (!id) {
-      toast({ title: "Error", description: "Cannot delete entry without a valid ID.", variant: "destructive" });
+      toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
       return;
     }
     try {
       await deleteCustomer(id);
       await deletePaymentsForSrNo(currentCustomer.srNo);
-      toast({ title: "Success", description: "Entry and associated payments deleted successfully." });
+      toast({ title: "Entry and payments deleted.", variant: "success" });
       if (currentCustomer.id === id) {
         handleNew();
       }
     } catch (error) {
       console.error("Error deleting customer and payments: ", error);
       toast({
-        title: "Error",
-        description: "Failed to delete entry. Please try again.",
+        title: "Failed to delete entry.",
         variant: "destructive",
       });
     }
@@ -468,17 +465,17 @@ export default function CustomerEntryClient() {
             await deletePaymentsForSrNo(dataToSave.srNo!);
             const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
             await addCustomer(entryWithRestoredAmount as Customer);
-            toast({ title: "Success", description: "Entry updated and payments deleted." });
+            toast({ title: "Entry updated and payments deleted", variant: "success" });
             if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
         } else {
             const entryToSave = { ...dataToSave, id: dataToSave.srNo };
             await addCustomer(entryToSave as Customer);
-            toast({ title: "Success", description: `Entry ${isEditing ? 'updated' : 'saved'} successfully.` });
+            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully`, variant: "success" });
             if (callback) callback(entryToSave as Customer); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
-        toast({ title: "Error", description: "Failed to save entry.", variant: "destructive" });
+        toast({ title: "Failed to save entry", variant: "destructive" });
     }
   };
 
@@ -505,8 +502,7 @@ export default function CustomerEntryClient() {
       });
     } else {
       toast({
-        title: "Invalid Form",
-        description: "Please check the form for errors before saving.",
+        title: "Invalid Form: Please check for errors",
         variant: "destructive"
       });
     }
@@ -519,8 +515,7 @@ export default function CustomerEntryClient() {
   const handlePrint = (entriesToPrint: Customer[]) => {
     if (!entriesToPrint || entriesToPrint.length === 0) {
         toast({
-            title: "No Selection",
-            description: "Please select one or more entries to print.",
+            title: "No entries selected to print",
             variant: "destructive",
         });
         return;
@@ -535,8 +530,7 @@ export default function CustomerEntryClient() {
 
         if (!allSameCustomer) {
             toast({
-                title: "Multiple Customers Selected",
-                description: "Consolidated receipts can only be printed for a single customer at a time.",
+                title: "Consolidated receipts are for a single customer",
                 variant: "destructive",
             });
             return;

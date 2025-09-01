@@ -36,7 +36,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
     const handleSave = () => {
         if (editingOption) {
             onUpdate(collectionName, editingOption.id, editingOption.name);
-            toast({ title: "Success", description: "Option updated successfully." });
+            toast({ title: "Option updated successfully", variant: "success" });
             setEditingOption(null);
         }
     };

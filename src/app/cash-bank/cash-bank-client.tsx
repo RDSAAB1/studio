@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -62,7 +63,7 @@ export default function CashBankClient() {
             setLoading(false);
         }, (error) => {
             console.error("Error fetching fund transactions:", error);
-            toast({ title: "Error", description: "Failed to load fund transactions.", variant: "destructive" });
+            toast({ title: "Error loading fund transactions", variant: "destructive" });
             setLoading(false);
         });
 
@@ -70,7 +71,7 @@ export default function CashBankClient() {
             setTransactions(data);
         }, (error) => {
             console.error("Error fetching income/expense transactions:", error);
-            toast({ title: "Error", description: "Failed to load income/expense data.", variant: "destructive" });
+            toast({ title: "Error loading income/expense data", variant: "destructive" });
         });
 
         return () => {
@@ -118,11 +119,11 @@ export default function CashBankClient() {
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
             .then(() => {
-                toast({ title: "Success", description: "Transaction recorded successfully.", variant: "success" });
+                toast({ title: "Transaction recorded successfully", variant: "success" });
             })
             .catch((error) => {
                 console.error("Error adding fund transaction:", error);
-                toast({ title: "Error", description: "Failed to record transaction.", variant: "destructive" });
+                toast({ title: "Failed to record transaction", variant: "destructive" });
                 throw error; // Re-throw to handle in the caller
             });
     };

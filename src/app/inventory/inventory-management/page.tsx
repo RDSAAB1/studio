@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -42,8 +43,7 @@ export default function InventoryManagementPage() {
       (error) => {
         console.error("Error fetching inventory items:", error);
         toast({
-          title: "Error",
-          description: "Failed to load inventory.",
+          title: "Failed to load inventory",
           variant: "destructive",
         });
         setLoading(false);
@@ -62,8 +62,7 @@ export default function InventoryManagementPage() {
     try {
       await addInventoryItem({ ...formData, createdAt: new Date().toISOString() });
       toast({
-        title: "Success",
-        description: "Inventory item added.",
+        title: "Inventory item added",
         variant: "success",
       });
       setIsModalOpen(false);
@@ -71,8 +70,7 @@ export default function InventoryManagementPage() {
     } catch (error) {
       console.error("Error adding inventory item:", error);
       toast({
-        title: "Error",
-        description: "Failed to add inventory item.",
+        title: "Failed to add inventory item",
         variant: "destructive",
       });
     }
@@ -83,8 +81,7 @@ export default function InventoryManagementPage() {
     try {
       await updateInventoryItem(currentInventoryItem.id, formData);
       toast({
-        title: "Success",
-        description: "Inventory item updated.",
+        title: "Inventory item updated",
         variant: "success",
       });
       setIsModalOpen(false);
@@ -93,8 +90,7 @@ export default function InventoryManagementPage() {
     } catch (error) {
       console.error("Error updating inventory item:", error);
       toast({
-        title: "Error",
-        description: "Failed to update item.",
+        title: "Failed to update item",
         variant: "destructive",
       });
     }
@@ -105,15 +101,13 @@ export default function InventoryManagementPage() {
       try {
         await deleteInventoryItem(id);
         toast({
-          title: "Success",
-          description: "Inventory item deleted.",
+          title: "Inventory item deleted",
           variant: "success",
         });
       } catch (error) {
         console.error("Error deleting inventory item:", error);
         toast({
-          title: "Error",
-          description: "Failed to delete item.",
+          title: "Failed to delete item",
           variant: "destructive",
         });
       }
