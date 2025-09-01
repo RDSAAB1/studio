@@ -20,30 +20,45 @@ export const RTGSReceiptDialog = ({ payment, settings, onOpenChange }: RTGSRecei
         const receiptNode = document.getElementById('rtgs-receipt-content');
         if (!receiptNode) return;
 
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            toast({variant: 'destructive', title: 'Error', description: 'Could not open print window.'});
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
             return;
         }
         
-        printWindow.document.write('<html><head><title>Print RTGS Receipt</title>');
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                printWindow.document.write(`<style>${cssText}</style>`);
-            } catch (e) {
-                console.warn("Could not copy stylesheet:", e);
-            }
-        });
-
-        printWindow.document.write('</head><body>');
-        printWindow.document.write(receiptNode.innerHTML);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
+        iframeDoc.open();
+        iframeDoc.write(`
+            <html>
+                <head>
+                    <title>Print RTGS Receipt</title>
+                    <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
+                     <style>
+                        @media print {
+                            body {
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${receiptNode.innerHTML}
+                </body>
+            </html>
+        `);
+        iframeDoc.close();
         
         setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
         }, 500);
     };
 

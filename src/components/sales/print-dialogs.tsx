@@ -33,23 +33,34 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
         document.body.appendChild(iframe);
         
         const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) return;
+        if (!iframeDoc) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            return;
+        }
 
         iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print Receipt</title>');
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.appendChild(iframeDoc.createTextNode(cssText));
-                style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .receipt-container { page-break-after: always; }'));
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn("Could not copy stylesheet:", e);
-            }
-        });
-        iframeDoc.write('</head><body></body></html>');
-        iframeDoc.body.innerHTML = node.innerHTML;
+        iframeDoc.write(`
+            <html>
+                <head>
+                    <title>Print Receipt</title>
+                     <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
+                    <style>
+                        @media print {
+                            body {
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
+                            .receipt-container { 
+                                page-break-after: always;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${node.innerHTML}
+                </body>
+            </html>
+        `);
         iframeDoc.close();
         
         setTimeout(() => {
@@ -107,23 +118,32 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
         document.body.appendChild(iframe);
         
         const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) return;
+        if (!iframeDoc) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            return;
+        }
 
         iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print Consolidated Receipt</title>');
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.appendChild(iframeDoc.createTextNode(cssText));
-                style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .receipt-container { page-break-after: always; }'));
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn("Could not copy stylesheet:", e);
-            }
-        });
-        iframeDoc.write('</head><body></body></html>');
-        iframeDoc.body.innerHTML = node.innerHTML;
+        iframeDoc.write(`
+            <html>
+                <head>
+                    <title>Print Consolidated Receipt</title>
+                    <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
+                    <style>
+                        @media print {
+                            body {
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
+                            .receipt-container { page-break-after: always; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${node.innerHTML}
+                </body>
+            </html>
+        `);
         iframeDoc.close();
         
         setTimeout(() => {
