@@ -103,11 +103,11 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: Con
                                 </tbody>
                             </table>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left">
                             <table>
                                 <tbody>
-                                    {isSameDate && <tr><td className="font-bold pr-4">DATE</td><td>: {format(new Date(firstDate), "dd MMMM yyyy")}</td></tr>}
-                                    {isSameCheckNo && <tr><td className="font-bold pr-4">CHECK NO.</td><td>: {firstCheckNo}</td></tr>}
+                                    {isSameDate && <tr><td className="font-bold pr-2">DATE</td><td>: {format(new Date(firstDate), "dd MMMM yyyy")}</td></tr>}
+                                    {isSameCheckNo && <tr><td className="font-bold pr-2">CHECK NO.</td><td>: {firstCheckNo}</td></tr>}
                                 </tbody>
                             </table>
                         </div>

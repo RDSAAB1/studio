@@ -91,11 +91,11 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, onPrint }) =>
                                 </tbody>
                             </table>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left">
                             <table>
                                 <tbody>
-                                    <tr><td className="font-bold pr-4">DATE</td><td>: {format(new Date(payment.date), "dd MMMM yyyy")}</td></tr>
-                                    <tr><td className="font-bold pr-4">CHECK NO.</td><td>: {checkNo}</td></tr>
+                                    <tr><td className="font-bold pr-2">DATE</td><td>: {format(new Date(payment.date), "dd MMMM yyyy")}</td></tr>
+                                    <tr><td className="font-bold pr-2">CHECK NO.</td><td>: {checkNo}</td></tr>
                                 </tbody>
                             </table>
                         </div>
