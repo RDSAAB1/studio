@@ -72,6 +72,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: Con
                                 color: #000 !important;
                             }
                             .printable-area * {
+                                color: #000 !important;
                                 border-color: #e5e7eb !important;
                             }
                             .printable-area .bg-gray-800 {
@@ -90,11 +91,6 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: Con
                                 <h2 className="font-bold text-2xl mb-1" style={{ color: '#000' }}>{settings.companyName}</h2>
                                 <p className="text-gray-600 text-[11px]" style={{ color: '#000' }}>{settings.companyAddress1}, {settings.companyAddress2}</p>
                                 <p className="text-gray-600 text-[11px]" style={{ color: '#000' }}>Phone: {settings.contactNo} | Email: {settings.gmail}</p>
-                                <div className="mt-2 text-gray-600 text-[11px] border-t pt-2">
-                                    <p className="font-bold" style={{ color: '#000' }}>Our Bank Details:</p>
-                                    <p style={{ color: '#000' }}>{settings.bankName}, {settings.branchName}</p>
-                                    <p style={{ color: '#000' }}>A/C: {settings.accountNo} | IFSC: {settings.ifscCode}</p>
-                                </div>
                             </div>
                              <div className="text-right">
                                 <h1 className="text-3xl font-bold text-gray-800 uppercase mb-1" style={{ color: '#000' }}>RTGS ADVICE</h1>
@@ -110,6 +106,16 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: Con
                                         </>}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                         {/* Our Bank Details */}
+                        <div className="border border-gray-200 p-3 rounded-lg mb-4">
+                            <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs" style={{ color: '#000' }}>Our Bank Details</h3>
+                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                <div><span className="font-semibold" style={{ color: '#000' }}>Bank:</span> <span style={{ color: '#000' }}>{settings.bankName}, {settings.branchName}</span></div>
+                                <div><span className="font-semibold" style={{ color: '#000' }}>A/C No:</span> <span style={{ color: '#000' }}>{settings.accountNo}</span></div>
+                                <div><span className="font-semibold" style={{ color: '#000' }}>IFSC:</span> <span style={{ color: '#000' }}>{settings.ifscCode}</span></div>
                             </div>
                         </div>
 
