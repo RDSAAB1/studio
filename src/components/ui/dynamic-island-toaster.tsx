@@ -39,8 +39,8 @@ export function DynamicIslandToaster() {
         )}
       >
         {hasToasts && (
-           <div className="flex w-full items-center justify-center gap-3 px-4">
-            <div className="flex-shrink-0">{icon}</div>
+          <div className="flex w-full items-center justify-center gap-3 px-4">
+            <div className="flex-shrink-0 flex items-center">{icon}</div>
             <div className="flex-grow text-left overflow-hidden">
               {title && <p className="font-semibold text-sm leading-none truncate">{String(title)}</p>}
             </div>
