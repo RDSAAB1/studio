@@ -20,7 +20,7 @@ import { Switch } from '@/components/ui/switch';
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
     { value: 'unpaid_amount', label: 'CD on Unpaid Amount (Selected)' },
-    { value: 'full_amount', label: 'CD on Full Amount' },
+    { value: 'full_amount', label: 'CD on Full Amount (Selected)' },
 ];
 
 export const PaymentForm = ({
@@ -53,8 +53,8 @@ export const PaymentForm = ({
     };
     
     return (
-        <div className="mt-3 space-y-3">
-            <Card className="p-2">
+        <>
+            <Card className="p-2 mt-3">
                 <CardHeader className="p-1 pb-2"><CardTitle className="text-sm">Supplier/Payee Details</CardTitle></CardHeader>
                 <CardContent className="p-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
                     <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
@@ -64,7 +64,7 @@ export const PaymentForm = ({
                 </CardContent>
             </Card>
 
-            <Card className="bg-muted/30 p-2">
+            <Card className="bg-muted/30 p-2 mt-3">
                 <CardContent className="p-1 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-2 gap-y-2 items-end">
                 {rtgsFor === 'Supplier' && (
                 <>
@@ -96,8 +96,8 @@ export const PaymentForm = ({
             </Card>
 
             {paymentMethod === 'RTGS' && (
-                <div className="space-y-3">
-                     <Card className="p-2">
+                <>
+                     <Card className="p-2 mt-3">
                         <CardHeader className="p-1 pb-2"><CardTitle className="text-sm">Bank Details</CardTitle></CardHeader>
                         <CardContent className="p-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                                 <div className="space-y-1"><Label className="text-xs">Bank</Label>
@@ -114,7 +114,7 @@ export const PaymentForm = ({
                                 <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
                         </CardContent>
                     </Card>
-                    <Card className="p-2">
+                    <Card className="p-2 mt-3">
                         <CardHeader className="p-1 pb-2"><CardTitle className="text-sm">RTGS Details</CardTitle></CardHeader>
                         <CardContent className="p-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                             <div className="space-y-1"><Label className="text-xs">RTGS SR No.</Label><Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} className="h-8 text-xs font-mono"/></div>
@@ -133,7 +133,7 @@ export const PaymentForm = ({
                             <div className="space-y-1 col-span-2 md:col-span-4"><Label className="text-xs">Parchi No. (SR#)</Label><Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs"/></div>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="mt-3">
                         <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
                             <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
                             <div className="flex items-center gap-2">
@@ -185,9 +185,9 @@ export const PaymentForm = ({
                             </div>
                         </CardContent>
                     </Card>
-                </div>
+                </>
             )}
-             <CardFooter className="p-0 pt-2">
+             <CardFooter className="p-0 pt-3">
                 <Card className="bg-muted/30 w-full p-2">
                     <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                     <div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">To Pay:</span><span className="text-sm font-semibold">{formatCurrency(rtgsAmount || paymentAmount)}</span></div>
@@ -199,6 +199,6 @@ export const PaymentForm = ({
                 </CardContent>
                 </Card>
             </CardFooter>
-        </div>
+        </>
     );
 };
