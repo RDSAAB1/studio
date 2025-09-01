@@ -92,6 +92,16 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     print-color-adjust: exact !important;
                     color: #000 !important;
                 }
+                 .printable-area * {
+                    color: #000 !important;
+                    border-color: #e5e7eb !important;
+                }
+                .printable-area .bg-gray-800 {
+                    background-color: #1f2937 !important;
+                }
+                 .printable-area .bg-gray-800 * {
+                    color: #fff !important;
+                }
             }
         `;
         iframeDoc.head.appendChild(printStyles);
@@ -117,18 +127,18 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
                 <div ref={printRef} className="printable-area">
-                    <div className="p-6 bg-white text-black font-sans text-[12px] leading-normal flex flex-col justify-between min-h-[29.7cm]">
+                    <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm]">
                         <div className="flex-grow-0">
                             {/* Header */}
-                            <div className="flex justify-between items-start mb-4">
+                            <div className="flex justify-between items-start mb-8">
                                 <div className="w-1/2">
-                                    <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
-                                    <p className="text-gray-600 text-[11px]">{settings.companyAddress1}, {settings.companyAddress2}</p>
-                                    <p className="text-gray-600 text-[11px]">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
+                                    <h2 className="font-bold text-3xl mb-2">{settings.companyName}</h2>
+                                    <p className="text-gray-600 text-sm">{settings.companyAddress1}, {settings.companyAddress2}</p>
+                                    <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
                                 </div>
                                 <div className="text-right">
-                                    <h1 className="text-3xl font-bold text-gray-800 uppercase mb-1">RTGS ADVICE</h1>
-                                    <div className="text-sm text-gray-700">
+                                    <h1 className="text-4xl font-bold text-gray-800 uppercase mb-2">RTGS ADVICE</h1>
+                                    <div className="text-base text-gray-700">
                                         <div className="grid grid-cols-2 text-left">
                                             {isSameDate && <>
                                                 <span className="font-bold pr-2">Date:</span>
@@ -144,9 +154,9 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                             </div>
 
                             {/* Our Bank Details */}
-                            <div className="border border-gray-200 p-3 rounded-lg mb-4">
-                                <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Our Bank Details</h3>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                            <div className="border border-gray-200 p-4 rounded-lg mb-6">
+                                <h3 className="font-bold text-gray-500 mb-3 uppercase tracking-wider text-sm">Our Bank Details</h3>
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-base">
                                     <div><span className="font-semibold">Bank:</span> <span>{settings.bankName}, {settings.branchName}</span></div>
                                     <div><span className="font-semibold">A/C No:</span> <span>{settings.accountNo}</span></div>
                                     <div><span className="font-semibold">IFSC:</span> <span>{settings.ifscCode}</span></div>
