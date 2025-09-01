@@ -219,26 +219,22 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                             ))}
                                         </tbody>
                                         <tfoot>
-                                            <tr className="font-bold">
-                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black" colSpan={6}>PAGE TOTAL</td>
-                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black">{formatCurrency(currentPageTotal)}</td>
+                                            <tr className="font-bold border-t-2 border-black">
+                                                {pageIndex === 0 ? (
+                                                    <>
+                                                        <td className="py-1 px-2 text-right text-black" colSpan={6}>GRAND TOTAL</td>
+                                                        <td className="py-1 px-2 text-right text-black">{formatCurrency(currentPageTotal)}</td>
+                                                    </>
+                                                ) : (
+                                                    <td colSpan={7} className="py-1 px-2 text-right text-xs">
+                                                        <div className="flex justify-end gap-x-4">
+                                                            <span>Prev Total: {formatCurrency(previousPagesTotal)}</span>
+                                                            <span>Page Total: {formatCurrency(currentPageTotal)}</span>
+                                                            <span className="font-bold">Grand Total: {formatCurrency(cumulativeTotal)}</span>
+                                                        </div>
+                                                    </td>
+                                                )}
                                             </tr>
-                                            {pageIndex > 0 && (
-                                                <>
-                                                 <tr className="font-semibold">
-                                                    <td className="pt-2 px-2 text-right text-xs" colSpan={6}>PREVIOUS PAGE(S) TOTAL:</td>
-                                                    <td className="pt-2 px-2 text-right text-xs">{formatCurrency(previousPagesTotal)}</td>
-                                                 </tr>
-                                                 <tr className="font-semibold">
-                                                    <td className="px-2 text-right text-xs" colSpan={6}>CURRENT PAGE TOTAL:</td>
-                                                    <td className="px-2 text-right text-xs">{formatCurrency(currentPageTotal)}</td>
-                                                 </tr>
-                                                  <tr className="font-bold">
-                                                    <td className="px-2 text-right border-t border-black" colSpan={6}>CUMULATIVE TOTAL:</td>
-                                                    <td className="px-2 text-right border-t border-black">{formatCurrency(cumulativeTotal)}</td>
-                                                  </tr>
-                                                </>
-                                            )}
                                         </tfoot>
                                     </table>
                                 </div>

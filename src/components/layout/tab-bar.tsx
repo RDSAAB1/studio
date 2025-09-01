@@ -24,26 +24,28 @@ const TabBar: React.FC<TabBarProps> = ({ openTabs, activeTabId, onTabClick, onCl
   };
   
   return (
-    <div className="tab-bar-container">
-      {openTabs.map((tab, index) => {
-          const isActive = tab.id === activeTabId;
-          const isNextTabActive = (index + 1 < openTabs.length) && openTabs[index + 1].id === activeTabId;
-          const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
+    <div className="tab-bar-container flex-1 min-w-0">
+      <div className="flex items-end">
+        {openTabs.map((tab, index) => {
+            const isActive = tab.id === activeTabId;
+            const isNextTabActive = (index + 1 < openTabs.length) && openTabs[index + 1].id === activeTabId;
+            const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
 
-          return (
-            <Tab
-              key={tab.id}
-              icon={iconElement}
-              title={tab.name}
-              path={tab.href || '#'}
-              isActive={isActive}
-              isNextTabActive={isNextTabActive}
-              onClick={() => handleTabClick(tab)}
-              onClose={(e) => onCloseTab(tab.id, e)}
-              isClosable={tab.id !== 'dashboard'} // Dashboard is not closable
-            />
-          )
-      })}
+            return (
+              <Tab
+                key={tab.id}
+                icon={iconElement}
+                title={tab.name}
+                path={tab.href || '#'}
+                isActive={isActive}
+                isNextTabActive={isNextTabActive}
+                onClick={() => handleTabClick(tab)}
+                onClose={(e) => onCloseTab(tab.id, e)}
+                isClosable={tab.id !== 'dashboard'} // Dashboard is not closable
+              />
+            )
+        })}
+      </div>
     </div>
   );
 };

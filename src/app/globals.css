@@ -317,7 +317,6 @@ body {
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    flex-grow: 1; /* Allow tab bar to take up space */
 }
 .tab-bar-container::-webkit-scrollbar {
   display: none;

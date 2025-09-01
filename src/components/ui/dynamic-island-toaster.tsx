@@ -18,11 +18,11 @@ export function DynamicIslandToaster() {
   return (
     <div
       className={cn(
-        "relative z-[100] transition-all duration-300 ease-in-out",
+        "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
         "bg-card text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
         // Base state (collapsed)
-        "w-32 h-8",
+        "w-8 h-8",
         // Expanded state
         { "w-full max-w-sm h-auto min-h-[3.5rem] p-3 rounded-2xl": toasts.length > 0 }
       )}

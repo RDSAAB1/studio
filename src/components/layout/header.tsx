@@ -18,37 +18,45 @@ interface HeaderProps {
 
 export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
-       <div className="flex-1 min-w-0">
-          <TabBar 
-              openTabs={openTabs}
-              activeTabId={activeTabId}
-              onTabClick={onTabClick}
-              onCloseTab={onCloseTab}
-          />
-      </div>
-      
-      <div className="flex-shrink-0">
-        <DynamicIslandToaster />
+    <header className="sticky top-0 z-30 flex flex-col bg-card">
+      {/* Top bar for tabs */}
+      <div className="flex h-12 items-center border-b px-4 sm:px-6">
+        <TabBar 
+          openTabs={openTabs}
+          activeTabId={activeTabId}
+          onTabClick={onTabClick}
+          onCloseTab={onCloseTab}
+        />
       </div>
 
-      <div className="flex items-center gap-2">
-          <div className="relative flex-1 md:grow-0">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                  type="search"
-                  placeholder="Search..."
-                  className="h-9 w-full rounded-full bg-background pl-8 md:w-[180px] lg:w-[250px]"
-              />
-          </div>
-          <Button variant="ghost" size="icon">
-              <Settings className="h-5 w-5" />
-              <span className="sr-only">Settings</span>
-          </Button>
-          <Button variant="ghost" size="icon">
-              <UserCircle className="h-5 w-5" />
-              <span className="sr-only">Profile</span>
-          </Button>
+      {/* Bottom bar for actions and search */}
+      <div className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
+        <div className="flex-shrink-0">
+          {/* Placeholder for potential left-side controls */}
+        </div>
+        
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <DynamicIslandToaster />
+        </div>
+
+        <div className="flex flex-1 items-center justify-end gap-2">
+            <div className="relative flex-1 md:grow-0 max-w-xs">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    type="search"
+                    placeholder="Search..."
+                    className="h-9 w-full rounded-full bg-muted pl-8 md:w-[180px] lg:w-[250px]"
+                />
+            </div>
+            <Button variant="ghost" size="icon">
+                <Settings className="h-5 w-5" />
+                <span className="sr-only">Settings</span>
+            </Button>
+            <Button variant="ghost" size="icon">
+                <UserCircle className="h-5 w-5" />
+                <span className="sr-only">Profile</span>
+            </Button>
+        </div>
       </div>
     </header>
   );

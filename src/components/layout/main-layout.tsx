@@ -43,12 +43,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
     if (initialTab && !openTabs.some(tab => tab.id === initialTab!.id)) {
         setOpenTabs(prev => {
-            // Ensure dashboard isn't accidentally removed if it was the only tab
-            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-            if (prev.length === 1 && prev[0].id === 'dashboard' && initialTab!.id !== 'dashboard') {
-                return [prev[0], initialTab!];
-            }
-             if (prev.some(tab => tab.id === initialTab!.id)) {
+            if (prev.some(tab => tab.id === initialTab!.id)) {
                 return prev;
             }
             return [...prev, initialTab!];
@@ -71,7 +66,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const handleTabClick = (tabId: string) => {
     setActiveTabId(tabId);
-    const tab = openTabs.find(t => t.id === tabId);
+    const tab = allMenuItems.flatMap(i => i.subMenus || i).find(t => t.id === tabId);
     if(tab?.href) {
         router.push(tab.href);
     }
@@ -94,9 +89,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
             newActiveTabId = openTabs[tabIndex - 1].id;
             newPath = openTabs[tabIndex - 1].href || '/';
         } else if (openTabs.length > 1) {
-            // This case should not be hit if dashboard is first and non-closable
-            newActiveTabId = openTabs[tabIndex + 1].id;
-            newPath = openTabs[tabIndex + 1].href || '/';
+            const nextTab = openTabs[tabIndex + 1];
+             if (nextTab) {
+                newActiveTabId = nextTab.id;
+                newPath = nextTab.href || '/';
+             }
         } else {
             // Fallback to dashboard
             const dashboard = allMenuItems.find(item => item.id === 'dashboard');
