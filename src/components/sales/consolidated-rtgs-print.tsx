@@ -41,13 +41,13 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
     <div className="flex-grow-0">
         <div className="flex justify-between items-start mb-4">
             <div className="w-1/2">
-                <h2 className="font-bold text-3xl mb-2">{settings.companyName}</h2>
-                <p className="text-gray-600 text-sm">{settings.companyAddress1}, {settings.companyAddress2}</p>
-                <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
+                <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
+                <p className="text-gray-600 text-[11px]">{settings.companyAddress1}, {settings.companyAddress2}</p>
+                <p className="text-gray-600 text-[11px]">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
             </div>
             <div className="text-right">
-                <h1 className="text-4xl font-bold text-gray-800 uppercase mb-2">RTGS ADVICE</h1>
-                <div className="text-base text-gray-700">
+                <h1 className="text-3xl font-bold text-gray-800 uppercase mb-1">RTGS ADVICE</h1>
+                <div className="text-sm text-gray-700">
                     <div className="grid grid-cols-2 text-left">
                         {isSameDate && <>
                             <span className="font-bold pr-2">Date:</span>
@@ -61,9 +61,9 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
                 </div>
             </div>
         </div>
-        <div className="border border-gray-200 p-4 rounded-lg mb-4">
-            <h3 className="font-bold text-gray-500 mb-3 uppercase tracking-wider text-sm">Our Bank Details</h3>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-base">
+        <div className="border border-gray-200 p-3 rounded-lg mb-4">
+            <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Our Bank Details</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <div><span className="font-semibold">Bank:</span> <span>{settings.bankName}, {settings.branchName}</span></div>
                 <div><span className="font-semibold">A/C No:</span> <span>{settings.accountNo}</span></div>
                 <div><span className="font-semibold">IFSC:</span> <span>{settings.ifscCode}</span></div>
@@ -74,17 +74,17 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
 
 const ReportFooter = ({ settings }: { settings: RtgsSettings }) => (
     <div className="flex-grow-0 pt-4 mt-auto">
-        <div className="border-t border-gray-300 pt-4">
+        <div className="border-t border-gray-300 pt-2">
             <div className="flex justify-between items-end">
                 <div className="w-3/5">
-                    <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Notes</h4>
-                    <p className="text-gray-600 text-[10px]">This is a computer-generated advice and does not require a signature.</p>
+                    <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Notes</h4>
+                    <p className="text-gray-600 text-[9px]">This is a computer-generated advice and does not require a signature.</p>
                 </div>
                 <div className="w-2/5 text-center">
-                    <div className="h-16"></div>
-                    <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
-                        <p className="font-bold text-sm">Authorised Signatory</p>
-                        <p className="text-gray-600 text-xs">For {settings.companyName}</p>
+                    <div className="h-12"></div>
+                    <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-1">
+                        <p className="font-bold text-xs">Authorised Signatory</p>
+                        <p className="text-gray-600 text-[10px]">For {settings.companyName}</p>
                     </div>
                 </div>
             </div>
@@ -143,13 +143,13 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             @media print {
                 @page {
                     size: A4 landscape;
-                    margin: 20px;
+                    margin: 15px;
                 }
                 body {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
                 }
-                .page-break {
+                .page-break-after {
                     page-break-after: always;
                 }
                 .bg-gray-800 {
@@ -158,6 +158,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 .bg-gray-800 * {
                     color: #fff !important;
                 }
+                .text-black { color: #000 !important; }
             }
         `;
         iframeDoc.head.appendChild(printStyles);
@@ -184,40 +185,40 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             <ScrollArea className="max-h-[70vh]">
                 <div ref={printRef} className="printable-area">
                     {paymentChunks.map((chunk, pageIndex) => (
-                        <div key={pageIndex} className={`p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[18.5cm] ${pageIndex < paymentChunks.length - 1 ? 'page-break' : ''}`}>
+                        <div key={pageIndex} className={`p-4 bg-white text-black font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${pageIndex < paymentChunks.length - 1 ? 'page-break-after' : ''}`}>
                             <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
                             
                             <div className="flex-grow">
-                                <table className="w-full text-left mb-4 print-table">
+                                <table className="w-full text-left print-table">
                                     <thead>
                                         <tr className="bg-gray-800 text-white uppercase text-xs">
-                                            <th className="p-2 font-semibold text-center">#</th>
-                                            <th className="p-2 font-semibold">Payee Name</th>
-                                            <th className="p-2 font-semibold">Bank Name</th>
-                                            <th className="p-2 font-semibold">Branch</th>
-                                            <th className="p-2 font-semibold">A/C No.</th>
-                                            <th className="p-2 font-semibold">IFSC Code</th>
-                                            <th className="p-2 font-semibold text-right">Amount</th>
+                                            <th className="py-1 px-2 font-semibold text-center">#</th>
+                                            <th className="py-1 px-2 font-semibold">Payee Name</th>
+                                            <th className="py-1 px-2 font-semibold">Bank Name</th>
+                                            <th className="py-1 px-2 font-semibold">Branch</th>
+                                            <th className="py-1 px-2 font-semibold">A/C No.</th>
+                                            <th className="py-1 px-2 font-semibold">IFSC Code</th>
+                                            <th className="py-1 px-2 font-semibold text-right">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {chunk.map((payment, index) => (
                                             <tr key={payment.paymentId} className="border-b border-gray-200">
-                                                <td className="p-2 text-center border-x border-gray-200">{pageIndex * CHUNK_SIZE + index + 1}</td>
-                                                <td className="p-2 border-x border-gray-200">{toTitleCase(payment.supplierName || '')}</td>
-                                                <td className="p-2 border-x border-gray-200">{payment.bank}</td>
-                                                <td className="p-2 border-x border-gray-200">{toTitleCase(payment.branch || '')}</td>
-                                                <td className="p-2 border-x border-gray-200">{payment.acNo}</td>
-                                                <td className="p-2 border-x border-gray-200">{payment.ifscCode}</td>
-                                                <td className="p-2 text-right font-semibold border-x border-gray-200">{formatCurrency(payment.amount)}</td>
+                                                <td className="py-1 px-2 text-xs text-center border-x border-gray-200 text-black">{pageIndex * CHUNK_SIZE + index + 1}</td>
+                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.supplierName || '')}</td>
+                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.bank}</td>
+                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.branch || '')}</td>
+                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.acNo}</td>
+                                                <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.ifscCode}</td>
+                                                <td className="py-1 px-2 text-xs font-semibold text-right border-x border-gray-200 text-black">{formatCurrency(payment.amount)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                     {pageIndex === paymentChunks.length - 1 && (
                                         <tfoot>
                                             <tr className="font-bold">
-                                                <td className="p-2 text-right border-t-2 border-black" colSpan={6}>GRAND TOTAL</td>
-                                                <td className="p-2 text-right border-t-2 border-black">{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</td>
+                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black" colSpan={6}>GRAND TOTAL</td>
+                                                <td className="py-1 px-2 text-right border-t-2 border-black text-black">{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</td>
                                             </tr>
                                         </tfoot>
                                     )}
