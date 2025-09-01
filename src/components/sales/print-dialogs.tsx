@@ -39,28 +39,33 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
         }
 
         iframeDoc.open();
+        iframeDoc.write('<html><head><title>Print Receipt</title>');
+
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const style = iframeDoc.createElement('style');
+                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+        
         iframeDoc.write(`
-            <html>
-                <head>
-                    <title>Print Receipt</title>
-                     <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
-                    <style>
-                        @media print {
-                            body {
-                                -webkit-print-color-adjust: exact !important;
-                                print-color-adjust: exact !important;
-                            }
-                            .receipt-container { 
-                                page-break-after: always;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${node.innerHTML}
-                </body>
-            </html>
-        `);
+            <style>
+                @media print {
+                    body {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .receipt-container { 
+                        page-break-after: always;
+                    }
+                }
+            </style>
+        </head><body></body></html>`);
+        
+        iframeDoc.body.innerHTML = node.innerHTML;
         iframeDoc.close();
         
         setTimeout(() => {
@@ -124,26 +129,31 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
         }
 
         iframeDoc.open();
+        iframeDoc.write('<html><head><title>Print Consolidated Receipt</title>');
+
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const style = iframeDoc.createElement('style');
+                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+        
         iframeDoc.write(`
-            <html>
-                <head>
-                    <title>Print Consolidated Receipt</title>
-                    <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
-                    <style>
-                        @media print {
-                            body {
-                                -webkit-print-color-adjust: exact !important;
-                                print-color-adjust: exact !important;
-                            }
-                            .receipt-container { page-break-after: always; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${node.innerHTML}
-                </body>
-            </html>
-        `);
+            <style>
+                @media print {
+                    body {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .receipt-container { page-break-after: always; }
+                }
+            </style>
+        </head><body></body></html>`);
+        
+        iframeDoc.body.innerHTML = node.innerHTML;
         iframeDoc.close();
         
         setTimeout(() => {

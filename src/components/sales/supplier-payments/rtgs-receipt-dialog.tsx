@@ -34,25 +34,30 @@ export const RTGSReceiptDialog = ({ payment, settings, onOpenChange }: RTGSRecei
         }
         
         iframeDoc.open();
+        iframeDoc.write('<html><head><title>Print RTGS Receipt</title>');
+
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const style = iframeDoc.createElement('style');
+                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+        
         iframeDoc.write(`
-            <html>
-                <head>
-                    <title>Print RTGS Receipt</title>
-                    <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
-                     <style>
-                        @media print {
-                            body {
-                                -webkit-print-color-adjust: exact !important;
-                                print-color-adjust: exact !important;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${receiptNode.innerHTML}
-                </body>
-            </html>
-        `);
+            <style>
+                @media print {
+                    body {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                }
+            </style>
+        </head><body></body></html>`);
+        
+        iframeDoc.body.innerHTML = receiptNode.innerHTML;
         iframeDoc.close();
         
         setTimeout(() => {

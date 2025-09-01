@@ -57,6 +57,8 @@ export default function RtgsReportClient() {
     const [tempSettings, setTempSettings] = useState<RtgsSettings>(initialSettings);
     const { toast } = useToast();
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+    const tablePrintRef = useRef<HTMLDivElement>(null);
+
 
     // State for search filters
     const [searchSrNo, setSearchSrNo] = useState('');
@@ -166,8 +168,8 @@ export default function RtgsReportClient() {
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, startDate, endDate]);
     
-    const handlePrint = (contentId: string) => {
-        const node = document.getElementById(contentId);
+    const handlePrint = (contentRef: React.RefObject<HTMLDivElement>) => {
+        const node = contentRef.current;
         if (!node) return;
 
         const iframe = document.createElement('iframe');
@@ -183,24 +185,37 @@ export default function RtgsReportClient() {
             return;
         }
 
-        const title = contentId === 'table-print-content' ? 'RTGS Report' : 'RTGS Receipts';
+        const title = 'RTGS Report';
         
         iframeDoc.open();
         iframeDoc.write(`
             <html>
                 <head>
                     <title>${title}</title>
-                    <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
+        `);
+        
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const style = iframeDoc.createElement('style');
+                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                iframeDoc.head.appendChild(style);
+            } catch(e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+
+        iframeDoc.write(`
                     <style>
                         @media print {
                             @page { 
-                                size: ${contentId === 'table-print-content' ? 'landscape' : 'A4'}; 
+                                size: landscape; 
                                 margin: 20px; 
                             }
-                            body {
+                            body { 
                                 -webkit-print-color-adjust: exact !important;
                                 print-color-adjust: exact !important;
-                            }
+                                color: #000 !important;
+                             }
                         }
                     </style>
                 </head>
@@ -332,62 +347,14 @@ export default function RtgsReportClient() {
                             <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
-                            <div id="table-print-content" className="hidden">
-                                <Table>
-                                     <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>SR No.</TableHead>
-                                            <TableHead>Name</TableHead>
-                                            <TableHead>Father's Name</TableHead>
-                                            <TableHead>Mobile No.</TableHead>
-                                            <TableHead>A/C No.</TableHead>
-                                            <TableHead>IFSC Code</TableHead>
-                                            <TableHead>Bank</TableHead>
-                                            <TableHead>Branch</TableHead>
-                                            <TableHead>Amount</TableHead>
-                                            <TableHead>Check/UTR No.</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>Rate</TableHead>
-                                            <TableHead>Weight</TableHead>
-                                            <TableHead>6R No.</TableHead>
-                                            <TableHead>6R Date</TableHead>
-                                            <TableHead>Parchi No.</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredReportRows.map((row, index) => (
-                                            <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
-                                                <TableCell>{format(new Date(row.date), 'dd-MMM-yy')}</TableCell>
-                                                <TableCell>{row.srNo}</TableCell>
-                                                <TableCell>{row.supplierName}</TableCell>
-                                                <TableCell>{row.fatherName}</TableCell>
-                                                <TableCell>{row.contact}</TableCell>
-                                                <TableCell>{row.acNo}</TableCell>
-                                                <TableCell>{row.ifscCode}</TableCell>
-                                                <TableCell>{row.bank}</TableCell>
-                                                <TableCell>{row.branch}</TableCell>
-                                                <TableCell>{formatCurrency(row.amount)}</TableCell>
-                                                <TableCell>{row.checkNo}</TableCell>
-                                                <TableCell>{row.type}</TableCell>
-                                                <TableCell>{row.rate.toFixed(2)}</TableCell>
-                                                <TableCell>{row.weight.toFixed(2)}</TableCell>
-                                                <TableCell>{row.sixRNo}</TableCell>
-                                                <TableCell>{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</TableCell>
-                                                <TableCell>{row.parchiNo}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                            <Button onClick={() => handlePrint('table-print-content')} size="sm" variant="outline">
+                            <Button onClick={() => handlePrint(tablePrintRef)} size="sm" variant="outline">
                                 <Printer className="mr-2 h-4 w-4" /> Print Table
                             </Button>
                         </div>
                     )}
                 </CardHeader>
                 <CardContent>
-                    <div className="relative w-full overflow-auto">
+                    <div className="relative w-full overflow-auto" ref={tablePrintRef}>
                         <Table className="min-w-[1200px]">
                             <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
@@ -448,7 +415,7 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                    <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} onPrint={() => handlePrint('rtgs-print-content')} />
+                    <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />
                 </DialogContent>
             </Dialog>
 

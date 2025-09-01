@@ -35,10 +35,9 @@ interface RtgsReportRow {
 interface ConsolidatedRtgsPrintFormatProps {
     payments: RtgsReportRow[];
     settings: RtgsSettings;
-    onPrint: () => void;
 }
 
-export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: ConsolidatedRtgsPrintFormatProps) => {
+export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: ConsolidatedRtgsPrintFormatProps) => {
     const printRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
@@ -67,29 +66,38 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings, onPrint }: Con
         }
 
         iframeDoc.open();
-        iframeDoc.write(`
-            <html>
-                <head>
-                    <title>RTGS Advice</title>
-                    <link rel="stylesheet" href="/_next/static/css/app/layout.css" media="print">
-                    <style>
-                        @media print {
-                            @page {
-                                size: A4;
-                                margin: 0;
-                            }
-                            body {
-                                -webkit-print-color-adjust: exact !important;
-                                print-color-adjust: exact !important;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${node.innerHTML}
-                </body>
-            </html>
-        `);
+        iframeDoc.write('<html><head><title>RTGS Advice</title>');
+        
+        // Copy all style sheets from the main document to the iframe
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const style = iframeDoc.createElement('style');
+                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+        
+        // Add specific print styles
+        const printStyles = iframeDoc.createElement('style');
+        printStyles.textContent = `
+            @media print {
+                @page {
+                    size: A4;
+                    margin: 0;
+                }
+                body {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color: #000 !important;
+                }
+            }
+        `;
+        iframeDoc.head.appendChild(printStyles);
+
+        iframeDoc.write('</head><body></body></html>');
+        iframeDoc.body.innerHTML = node.innerHTML;
         iframeDoc.close();
         
         setTimeout(() => {
