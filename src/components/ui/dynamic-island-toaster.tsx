@@ -21,12 +21,13 @@ export function DynamicIslandToaster() {
     <div
       className={cn(
         "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
-        "bg-card text-card-foreground border border-border/50 shadow-lg",
+        "bg-background text-card-foreground border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
+        "h-12 min-h-[3rem]", // Fixed height
         // Base state (collapsed pill)
-        "w-36 h-8",
+        "w-32",
         // Expanded state
-        { "h-16": hasToasts }
+        { "w-96": hasToasts } // Expands width, not height
       )}
     >
       {toasts.map(function ({ id, title, description, variant, action }) {
@@ -35,7 +36,7 @@ export function DynamicIslandToaster() {
           <div
             key={id}
             className={cn(
-              "w-full h-full flex items-center gap-3 transition-opacity duration-300 px-3",
+              "w-full h-full flex items-center gap-3 transition-opacity duration-300 px-4",
               "animate-in fade-in"
             )}
           >
