@@ -168,11 +168,11 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                 <thead>
                                     <tr className="bg-gray-800 text-white uppercase text-xs">
                                         <th className="p-2 font-semibold text-center w-[5%]">#</th>
-                                        <th className="p-2 font-semibold w-[20%]">Payee Name</th>
-                                        <th className="p-2 font-semibold w-[15%]">Bank Name</th>
+                                        <th className="p-2 font-semibold w-[15%]">Payee Name</th>
+                                        <th className="p-2 font-semibold w-[25%]">Bank Name</th>
                                         <th className="p-2 font-semibold w-[15%]">Branch</th>
                                         <th className="p-2 font-semibold w-[15%]">A/C No.</th>
-                                        <th className="p-2 font-semibold w-[15%]">IFSC Code</th>
+                                        <th className="p-2 font-semibold w-[10%]">IFSC Code</th>
                                         <th className="p-2 font-semibold text-right w-[15%]">Amount</th>
                                     </tr>
                                 </thead>
