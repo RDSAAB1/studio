@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where } from "firebase/firestore";
+import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -744,7 +745,7 @@ export default function SupplierPaymentsClient() {
                 <TabsTrigger value="processing">Payment Processing</TabsTrigger>
                 <TabsTrigger value="history">Full History</TabsTrigger>
             </TabsList>
-            <TabsContent value="processing">
+            <TabsContent value="processing" className="space-y-3">
                 {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
                     <Card>
                         <CardContent className="p-3">
@@ -793,7 +794,6 @@ export default function SupplierPaymentsClient() {
                         processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
                         editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
                         setCheckNo={setCheckNo}
-                            // Generator Props
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
