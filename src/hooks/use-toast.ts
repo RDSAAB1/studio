@@ -82,7 +82,7 @@ export const reducer = (state: State, action: Action): State => {
       const { toastId } = action
       if (toastId) {
         if (toastTimeouts.has(toastId)) {
-          clearTimeout(toastTimeouts.get(toastId));
+          clearTimeout(toastTimeouts.get(toastId)!);
           toastTimeouts.delete(toastId);
         }
         return {
