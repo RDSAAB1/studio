@@ -55,17 +55,12 @@ body {
 }
 
 .main_container{
-    width: calc(100% - 80px); /* Default width for collapsed sidebar */
+    flex-grow: 1; /* Let flexbox handle the width */
     display: flex;
     flex-direction: column;
     overflow: hidden;
     transition: all 0.3s ease;
 }
-
-.wrapper.active .main_container {
-    width: calc(100% - 250px);
-}
-
 
 .main_container > .content {
     padding: 30px;
@@ -90,6 +85,7 @@ body {
     transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
+    flex-shrink: 0; /* Prevent sidebar from shrinking */
 }
 .wrapper.active .side_bar {
     width: 250px;
@@ -351,7 +347,7 @@ body {
 }
 
 .wrapper:not(.active) .main_container {
-  width: calc(100% - 80px);
+  /* This rule is no longer needed with flex-grow */
 }
 
 .wrapper:not(.active) .side_bar .logo_wrap span.text {
