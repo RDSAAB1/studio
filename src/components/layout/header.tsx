@@ -20,7 +20,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
       {/* Top bar for tabs */}
-      <div className="flex h-12 items-center border-b px-4 sm:px-6">
+      <div className="flex h-10 items-center border-b px-4 sm:px-6">
         <TabBar 
           openTabs={openTabs}
           activeTabId={activeTabId}
@@ -30,7 +30,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
       </div>
 
       {/* Bottom bar for actions and search */}
-      <div className="flex h-12 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
+      <div className="flex h-10 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
         <div className="flex-shrink-0">
           {/* Placeholder for potential left-side controls */}
         </div>
@@ -45,7 +45,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab }: Header
                 <Input
                     type="search"
                     placeholder="Search..."
-                    className="h-9 w-full rounded-full bg-muted pl-8 md:w-[180px] lg:w-[250px]"
+                    className="h-8 w-full rounded-full bg-muted pl-8 md:w-[180px] lg:w-[250px]"
                 />
             </div>
             <Button variant="ghost" size="icon">
