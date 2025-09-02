@@ -46,14 +46,13 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             ];
 
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-            const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             
             // 2. Upload the file to Firebase Storage
             const today = format(new Date(), 'yyyy-MM-dd');
             const fileName = `RTGS_Report_${today}_${Date.now()}.xlsx`;
             const storageRef = ref(storage, `rtgs-reports/${fileName}`);
             
-            await uploadBytes(storageRef, excelBlob);
+            await uploadBytes(storageRef, excelBuffer);
             
             // 3. Get the download URL
             const downloadURL = await getDownloadURL(storageRef);
@@ -120,7 +119,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     <div className="flex-grow" />
                     <Button onClick={handleGenerateAndMail} disabled={isUploading}>
                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                        {isUploading ? "Generating..." : "Generate &amp; Mail"}
+                        {isUploading ? "Generating..." : "Generate & Mail"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
