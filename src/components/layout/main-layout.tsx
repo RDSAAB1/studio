@@ -7,7 +7,7 @@ import CustomSidebar from "./custom-sidebar";
 import { cn } from "@/lib/utils";
 import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
 
@@ -19,20 +19,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setIsAuthenticated(true);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+      if (currentUser) {
         if (pathname === '/login' || pathname === '/') {
           router.replace('/sales/dashboard-overview');
         }
       } else {
-        setIsAuthenticated(false);
         router.replace('/login');
       }
     });
@@ -40,7 +41,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [router, pathname]);
   
   useEffect(() => {
-    if (isAuthenticated === null) return;
+    if (loading) return;
     
     let initialTab: MenuItem | undefined;
     for (const item of allMenuItems) {
@@ -59,22 +60,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
       if (!openTabs.some(tab => tab.id === initialTab!.id)) {
         setOpenTabs(prev => [...prev, initialTab!]);
       }
-    } else if (isAuthenticated) {
+    } else if (user) {
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
             setActiveTabId(dashboard.id);
         }
     }
-  }, [pathname, isAuthenticated, openTabs]);
+  }, [pathname, user, loading, openTabs]);
 
   useEffect(() => {
-    if (isAuthenticated && openTabs.length === 0) {
+    if (user && openTabs.length === 0) {
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
             setOpenTabs([dashboard]);
+            setActiveTabId(dashboard.id); // Set initial active tab
         }
     }
-  }, [isAuthenticated, openTabs]);
+  }, [user, openTabs]);
 
   const handleTabClick = (tabId: string) => {
     setActiveTabId(tabId);
@@ -122,7 +124,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
   
   const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
 
-  if (isAuthenticated === null) {
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      // The onAuthStateChanged listener will handle the redirect to /login
+    } catch (error) {
+      console.error("Error signing out: ", error);
+    }
+  };
+
+  if (loading) {
       return (
           <div className="flex h-screen w-screen items-center justify-center bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -130,7 +141,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!isAuthenticated && pathname !== '/login') {
+  if (!user && pathname !== '/login') {
       return (
           <div className="flex h-screen w-screen items-center justify-center bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -138,7 +149,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
 
-  if (!isAuthenticated && pathname === '/login') {
+  if (!user && pathname === '/login') {
       return <>{children}</>;
   }
   
@@ -156,6 +167,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onTabClick={handleTabClick}
               onCloseTab={handleCloseTab}
               toggleSidebar={toggleSidebar}
+              user={user}
+              onSignOut={handleSignOut}
             />
             <div className="content">
                 {children}

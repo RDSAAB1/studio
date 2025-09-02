@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { Settings, UserCircle, Search, Menu, X } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import TabBar from './tab-bar';
@@ -10,6 +10,9 @@ import { MenuItem } from "@/hooks/use-tabs";
 import { cn } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 import { useToast } from "@/hooks/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import type { User } from "firebase/auth";
+
 
 interface HeaderProps {
   openTabs: MenuItem[];
@@ -17,9 +20,11 @@ interface HeaderProps {
   onTabClick: (id: string) => void;
   onCloseTab: (id: string, e: React.MouseEvent) => void;
   toggleSidebar: () => void;
+  user: User | null;
+  onSignOut: () => void;
 }
 
-export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSidebar }: HeaderProps) {
+export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSidebar, user, onSignOut }: HeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const { toasts } = useToast();
   const hasToasts = toasts.length > 0;
@@ -86,10 +91,22 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                 <Settings className="h-5 w-5" />
                 <span className="sr-only">Settings</span>
             </Button>
-            <Button variant="ghost" size="icon">
-                <UserCircle className="h-5 w-5" />
-                <span className="sr-only">Profile</span>
-            </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                        <UserCircle className="h-5 w-5" />
+                        <span className="sr-only">Profile</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onSignOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sign out</span>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </div>
     </header>
