@@ -12,8 +12,8 @@ import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { sendEmailWithAttachment } from '@/lib/actions';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Assuming auth is exported from firebase.ts
+import { onAuthStateChanged } from 'firebase/auth';
+import { getFirebaseAuth } from '@/lib/firebase';
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
@@ -38,6 +38,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             return;
         }
 
+        const auth = getFirebaseAuth();
         const currentUser = auth.currentUser;
         if (!currentUser) {
             toast({ title: "Authentication Error", description: "You must be logged in to send emails.", variant: "destructive" });
