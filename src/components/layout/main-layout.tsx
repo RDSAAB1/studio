@@ -20,7 +20,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Start with loading true
 
   const pathname = usePathname();
   const router = useRouter();
@@ -30,54 +30,49 @@ export default function MainLayout({ children }: MainLayoutProps) {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
-      if (currentUser) {
-        if (pathname === '/login' || pathname === '/') {
-          router.replace('/sales/dashboard-overview');
-        }
-      } else if (pathname !== '/login') {
-        router.replace('/login');
-      }
     });
     return () => unsubscribe();
-  }, [router, pathname]);
-  
-  useEffect(() => {
-    if (loading) return;
-    
-    let initialTab: MenuItem | undefined;
-    for (const item of allMenuItems) {
-      if (item.href === pathname) {
-        initialTab = item;
-        break;
-      }
-      if (item.subMenus) {
-        initialTab = item.subMenus.find(sub => sub.href === pathname);
-        if (initialTab) break;
-      }
-    }
-    
-    if (initialTab) {
-      setActiveTabId(initialTab.id);
-      if (!openTabs.some(tab => tab.id === initialTab!.id)) {
-        setOpenTabs(prev => [...prev, initialTab!]);
-      }
-    } else if (user) {
-        const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-        if (dashboard) {
-            setActiveTabId(dashboard.id);
-        }
-    }
-  }, [pathname, user, loading, openTabs]);
+  }, []);
 
   useEffect(() => {
-    if (user && openTabs.length === 0) {
-        const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-        if (dashboard) {
-            setOpenTabs([dashboard]);
-            setActiveTabId(dashboard.id); // Set initial active tab
+    if (loading) return; // Wait until auth state is determined
+
+    if (user) {
+      if (pathname === '/login' || pathname === '/') {
+        router.replace('/sales/dashboard-overview');
+      } else {
+        let initialTab: MenuItem | undefined;
+        for (const item of allMenuItems) {
+          if (item.href === pathname) {
+            initialTab = item;
+            break;
+          }
+          if (item.subMenus) {
+            initialTab = item.subMenus.find(sub => sub.href === pathname);
+            if (initialTab) break;
+          }
         }
+        
+        if (initialTab) {
+          if (!openTabs.some(tab => tab.id === initialTab!.id)) {
+            setOpenTabs(prev => [...prev, initialTab!]);
+          }
+          setActiveTabId(initialTab.id);
+        } else if (openTabs.length === 0) {
+            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+            if (dashboard) {
+                setOpenTabs([dashboard]);
+                setActiveTabId(dashboard.id);
+            }
+        }
+      }
+    } else {
+      if (pathname !== '/login') {
+        router.replace('/login');
+      }
     }
-  }, [user, openTabs]);
+  }, [user, loading, pathname, router, openTabs]);
+
 
   const handleTabClick = (tabId: string) => {
     setActiveTabId(tabId);
@@ -129,7 +124,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
     try {
       const auth = getFirebaseAuth();
       await signOut(auth);
-      // The onAuthStateChanged listener will handle the redirect to /login
+      setOpenTabs([]); // Clear tabs on sign out
+      router.replace('/login');
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -143,16 +139,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!user && pathname !== '/login') {
-      return (
-          <div className="flex h-screen w-screen items-center justify-center bg-background">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-      );
-  }
-
-  if (!user && pathname === '/login') {
-      return <>{children}</>;
+  if (!user) {
+    // If not logged in, only render the children if we are on the login page.
+    // This prevents a flash of the main layout before redirect.
+    return pathname === '/login' ? <>{children}</> : null;
   }
   
   return (
