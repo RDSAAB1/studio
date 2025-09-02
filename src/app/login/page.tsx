@@ -40,16 +40,13 @@ export default function LoginPage() {
 
         setLoading(true);
         try {
-            await signOut(auth);
+            await signOut(auth); // Ensure previous user is signed out
             const result = await signInWithPopup(auth, googleProvider);
             const credential = AuthProvider.credentialFromResult(result);
-            if (credential) {
-                // This is the OAuth access token needed for Google APIs
-                const accessToken = credential.accessToken;
-                // You can now store this token securely if needed, for example, in memory,
-                // or associate it with the user session for API calls.
-                // For this app, we'll rely on onAuthStateChanged to handle redirects.
-                (auth.currentUser as any).accessToken = accessToken;
+            if (credential && auth.currentUser) {
+                // Store the OAuth refresh token with the user object for later use
+                // This is a non-standard property, so we cast to `any`
+                (auth.currentUser as any).refreshToken = credential.refreshToken;
             }
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);

@@ -47,10 +47,10 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         }
         
         const userEmail = currentUser.email;
-        const accessToken = (currentUser as any).accessToken;
+        const refreshToken = (currentUser as any).refreshToken;
 
-        if (!userEmail || !accessToken) {
-             toast({ title: "Authentication Error", description: "Could not retrieve your email address or access token. Please sign out and sign in again.", variant: "destructive" });
+        if (!userEmail || !refreshToken) {
+             toast({ title: "Authentication Error", description: "Could not retrieve your email address or refresh token. Please sign out and sign in again.", variant: "destructive" });
             return;
         }
 
@@ -85,7 +85,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
                 attachmentBuffer: bufferAsArray,
                 filename,
-                accessToken: accessToken,
+                refreshToken: refreshToken,
                 userEmail: userEmail,
             });
 

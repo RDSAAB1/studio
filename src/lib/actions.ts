@@ -10,12 +10,12 @@ interface EmailOptions {
     body: string;
     attachmentBuffer: number[];
     filename: string;
-    accessToken: string;
+    refreshToken: string; // Changed from accessToken to refreshToken
     userEmail: string;
 }
 
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename, accessToken, userEmail } = options;
+    const { to, subject, body, attachmentBuffer, filename, refreshToken, userEmail } = options;
 
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         const errorMsg = "Google OAuth credentials are not configured in .env file.";
@@ -29,7 +29,14 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
             process.env.GOOGLE_CLIENT_SECRET
         );
 
-        oauth2Client.setCredentials({ access_token: accessToken });
+        oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+        // Get a new access token before sending the email
+        const { token: newAccessToken } = await oauth2Client.getAccessToken();
+
+        if (!newAccessToken) {
+            throw new Error("Failed to retrieve new access token.");
+        }
 
         const transporter = nodemailer.createTransport({
             service: 'gmail',
@@ -38,7 +45,8 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
                 user: userEmail,
                 clientId: process.env.GOOGLE_CLIENT_ID,
                 clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-                accessToken: accessToken,
+                refreshToken: refreshToken,
+                accessToken: newAccessToken,
             },
         });
 
