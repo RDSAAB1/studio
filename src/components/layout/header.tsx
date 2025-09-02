@@ -12,6 +12,7 @@ import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import type { User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 
 interface HeaderProps {
@@ -28,6 +29,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const { toasts } = useToast();
   const hasToasts = toasts.length > 0;
+  const router = useRouter();
 
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
@@ -87,7 +89,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
               <Search className="h-5 w-5" />
               <span className="sr-only">Search</span>
             </Button>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
                 <Settings className="h-5 w-5" />
                 <span className="sr-only">Settings</span>
             </Button>

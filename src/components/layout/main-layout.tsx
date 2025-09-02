@@ -9,14 +9,13 @@ import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
 import { Loader2 } from "lucide-react";
 
 type MainLayoutProps = {
     children: ReactNode;
 }
 
-const PROTECTED_ROUTES = ['/login', '/connect-gmail', '/setup/company-details'];
+const UNPROTECTED_ROUTES = ['/login'];
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
@@ -34,20 +33,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
       setLoading(true);
       if (currentUser) {
         setUser(currentUser);
-        const companySettings = await getCompanySettings(currentUser.uid);
-        if (!companySettings?.appPassword && pathname !== '/connect-gmail') {
-          router.replace('/connect-gmail');
-        } else if (companySettings?.appPassword) {
-          const rtgsSettings = await getRtgsSettings();
-          if (!rtgsSettings && pathname !== '/setup/company-details' && pathname !== '/connect-gmail') {
-             router.replace('/setup/company-details');
-          } else if (rtgsSettings && (pathname === '/setup/company-details' || pathname === '/connect-gmail')) {
-             router.replace('/sales/dashboard-overview');
-          }
+        // Onboarding flow removed, users will be directed to dashboard.
+        // They can access settings from the header/sidebar.
+        if (UNPROTECTED_ROUTES.includes(pathname)) {
+          router.replace('/sales/dashboard-overview');
         }
       } else {
         setUser(null);
-        if (!PROTECTED_ROUTES.includes(pathname) && pathname !== '/login') {
+        if (!UNPROTECTED_ROUTES.includes(pathname)) {
           router.replace('/login');
         }
       }
@@ -57,7 +50,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [pathname, router]);
 
   useEffect(() => {
-    if (loading || !user || PROTECTED_ROUTES.includes(pathname)) return;
+    if (loading || !user || UNPROTECTED_ROUTES.includes(pathname)) return;
 
     let initialTab: MenuItem | undefined;
     for (const item of allMenuItems) {
@@ -154,7 +147,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!user || PROTECTED_ROUTES.includes(pathname)) {
+  if (!user || UNPROTECTED_ROUTES.includes(pathname)) {
     return <>{children}</>;
   }
   
