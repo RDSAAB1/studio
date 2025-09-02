@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { Auth, GoogleAuthProvider, User, OAuthCredential } from 'firebase/auth';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import type { Auth, User, OAuthCredential } from 'firebase/auth';
+import { signInWithPopup, signOut, GoogleAuthProvider } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle } from 'lucide-react';
