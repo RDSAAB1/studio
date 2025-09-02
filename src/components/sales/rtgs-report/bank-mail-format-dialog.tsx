@@ -45,13 +45,17 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <p>${settings.companyName}</p>
             `;
             const subject = "RTGS Payment Request";
-            const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(tableHtml)}`;
             
-            // Using window.open instead of window.location.href for better compatibility
-            const newWindow = window.open(mailtoLink, '_blank');
-            if (!newWindow) {
-                 window.location.href = mailtoLink;
-            }
+            // Construct a Gmail compose URL
+            const gmailUrl = new URL("https://mail.google.com/mail/");
+            gmailUrl.searchParams.set("view", "cm");
+            gmailUrl.searchParams.set("fs", "1");
+            // gmailUrl.searchParams.set("to", "bank.email@example.com"); // Set a recipient if needed
+            gmailUrl.searchParams.set("su", subject);
+            gmailUrl.searchParams.set("body", tableHtml);
+            
+            // Open the Gmail compose window in a new tab
+            window.open(gmailUrl.toString(), '_blank');
         }
     };
 
