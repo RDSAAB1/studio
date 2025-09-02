@@ -13,8 +13,6 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { sendEmailWithAttachment } from '@/lib/actions';
 import { getFirebaseAuth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
@@ -40,28 +38,10 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         }
 
         const auth = getFirebaseAuth();
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
+        if (!auth.currentUser) {
             toast({ title: "Authentication Error", description: "You must be logged in to send emails.", variant: "destructive" });
             return;
         }
-        
-        // Force refresh the ID token to ensure it's not expired.
-        await currentUser.getIdToken(true);
-        
-        const userEmail = currentUser.email;
-        // The refresh token is now attached to the currentUser object in-memory after login.
-        const refreshToken = (currentUser as any).refreshToken;
-
-        if (!userEmail) {
-             toast({ title: "Authentication Error", description: "Could not retrieve your email address.", variant: "destructive" });
-            return;
-        }
-        if (!refreshToken) {
-            toast({ title: "Authentication Error", description: "Refresh token not found. Please sign out and sign in again to grant offline access.", variant: "destructive" });
-           return;
-        }
-
 
         setIsSending(true);
 
@@ -94,8 +74,6 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
                 attachmentBuffer: bufferAsArray,
                 filename,
-                userEmail: userEmail,
-                refreshToken: refreshToken,
             });
 
             if (result.success) {
