@@ -1,23 +1,26 @@
 
 "use client";
 
-import { signInWithPopup, getAdditionalUserInfo, OAuthProvider } from 'firebase/auth';
+import { useState } from 'react';
+import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, BarChart3, Database, Users } from 'lucide-react';
+import { Sparkles, BarChart3, Database, Users, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
+    const [loading, setLoading] = useState(false);
 
     const handleSignIn = async () => {
+        setLoading(true);
         try {
             await signInWithPopup(auth, googleProvider);
             // The onAuthStateChanged listener in MainLayout will handle the redirect.
-            toast({ title: "Login Successful", description: "Redirecting to dashboard...", variant: "success" });
+            // No need to setLoading(false) here as the component will unmount.
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred.";
@@ -35,6 +38,7 @@ export default function LoginPage() {
                 description: errorMessage,
                 variant: "destructive"
             });
+            setLoading(false);
         }
     };
     
@@ -65,9 +69,18 @@ export default function LoginPage() {
                              <FeatureCard icon={<BarChart3 className="h-5 w-5"/>} title="Insightful Reports" description="Generate RTGS, sales, and financial reports with a single click." />
                              <FeatureCard icon={<Database className="h-5 w-5"/>} title="Secure & Reliable" description="Your data is safe and always accessible with our robust backend." />
                          </div>
-                        <Button onClick={handleSignIn} className="w-full font-semibold">
-                             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 21.2 177.2 56.4l-63.1 61.9C338.4 99.4 300.9 88 248 88c-77.2 0-140.1 63.8-140.1 142.3s62.9 142.3 140.1 142.3c85.3 0 121.7-64.8 125.1-97.9H248v-69.8h239.5c1.4 9.3 2.5 19.1 2.5 29.5z"></path></svg>
-                            Sign in with Google
+                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={loading}>
+                             {loading ? (
+                                <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Signing in...
+                                </>
+                             ) : (
+                                <>
+                                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 21.2 177.2 56.4l-63.1 61.9C338.4 99.4 300.9 88 248 88c-77.2 0-140.1 63.8-140.1 142.3s62.9 142.3 140.1 142.3c85.3 0 121.7-64.8 125.1-97.9H248v-69.8h239.5c1.4 9.3 2.5 19.1 2.5 29.5z"></path></svg>
+                                Sign in with Google
+                                </>
+                             )}
                         </Button>
                     </CardContent>
                 </div>
