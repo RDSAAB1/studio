@@ -41,13 +41,8 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signOut(auth); // Ensure previous user is signed out
-            const result = await signInWithPopup(auth, googleProvider);
-            const credential = AuthProvider.credentialFromResult(result);
-            if (credential && auth.currentUser) {
-                // Store the OAuth refresh token with the user object for later use
-                // This is a non-standard property, so we cast to `any`
-                (auth.currentUser as any).refreshToken = credential.refreshToken;
-            }
+            await signInWithPopup(auth, googleProvider);
+            
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred.";

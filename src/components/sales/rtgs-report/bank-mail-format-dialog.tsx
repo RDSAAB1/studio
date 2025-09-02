@@ -12,7 +12,7 @@ import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { sendEmailWithAttachment } from '@/lib/actions';
-import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 
@@ -47,10 +47,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         }
         
         const userEmail = currentUser.email;
-        const refreshToken = (currentUser as any).refreshToken;
 
-        if (!userEmail || !refreshToken) {
-             toast({ title: "Authentication Error", description: "Could not retrieve your email address or refresh token. Please sign out and sign in again.", variant: "destructive" });
+        if (!userEmail) {
+             toast({ title: "Authentication Error", description: "Could not retrieve your email address.", variant: "destructive" });
             return;
         }
 
@@ -85,7 +84,6 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
                 attachmentBuffer: bufferAsArray,
                 filename,
-                refreshToken: refreshToken,
                 userEmail: userEmail,
             });
 

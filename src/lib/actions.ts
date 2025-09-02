@@ -2,7 +2,8 @@
 'use server';
 
 import nodemailer from 'nodemailer';
-import { OAuth2Client } from 'google-auth-library';
+import { getGoogleProvider } from './firebase';
+import {getOAuth2Client} from 'google-auth-library';
 
 interface EmailOptions {
     to: string;
@@ -10,12 +11,12 @@ interface EmailOptions {
     body: string;
     attachmentBuffer: number[];
     filename: string;
-    refreshToken: string; // Changed from accessToken to refreshToken
     userEmail: string;
 }
 
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename, refreshToken, userEmail } = options;
+    const { to, subject, body, attachmentBuffer, filename, userEmail } = options;
+    const provider = getGoogleProvider();
 
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         const errorMsg = "Google OAuth credentials are not configured in .env file.";
@@ -24,14 +25,8 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
     }
 
     try {
-        const oauth2Client = new OAuth2Client(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET
-        );
+        const oauth2Client = getOAuth2Client();
 
-        oauth2Client.setCredentials({ refresh_token: refreshToken });
-
-        // Get a new access token before sending the email
         const { token: newAccessToken } = await oauth2Client.getAccessToken();
 
         if (!newAccessToken) {
@@ -45,7 +40,6 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
                 user: userEmail,
                 clientId: process.env.GOOGLE_CLIENT_ID,
                 clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-                refreshToken: refreshToken,
                 accessToken: newAccessToken,
             },
         });
