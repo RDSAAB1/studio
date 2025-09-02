@@ -113,7 +113,6 @@ export default function SettingsPage() {
             toast({
                 title: "Disconnected",
                 description: "Your email account has been disconnected.",
-                variant: "success",
             });
         } catch (error) {
             console.error("Error disconnecting email:", error);
@@ -198,7 +197,7 @@ export default function SettingsPage() {
                                 <DialogTrigger asChild>
                                     <Button variant="outline" size="sm">How to get this?</Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-md">
+                                <DialogContent className="sm:max-w-lg">
                                     <DialogHeader>
                                         <DialogTitle>How to Get an App Password</DialogTitle>
                                         <DialogDescription>
@@ -206,31 +205,35 @@ export default function SettingsPage() {
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4 text-sm">
-                                        <div className="flex gap-4 p-3 border rounded-lg">
-                                            <div className="font-bold text-lg text-primary">1</div>
-                                            <div>
-                                                <h4 className="font-semibold">Enable 2-Step Verification</h4>
-                                                <p className="text-xs text-muted-foreground">First, enable 2-Step Verification if it's not already on. This is required by Google.</p>
-                                                <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
-                                                    <Button size="sm">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button>
-                                                </a>
-                                            </div>
-                                        </div>
-                                         <div className="flex gap-4 p-3 border rounded-lg">
-                                            <div className="font-bold text-lg text-primary">2</div>
-                                            <div>
-                                                <h4 className="font-semibold">Create App Password</h4>
-                                                <p className="text-xs text-muted-foreground">Once 2-Step Verification is on, go to the App Passwords page. For the app name, use "BizSuite" and click "Create".</p>
-                                                <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
-                                                    <Button size="sm">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
-                                                </a>
-                                            </div>
-                                        </div>
+                                        <Card>
+                                          <CardHeader className="p-4">
+                                            <CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle>
+                                            <CardDescription className="text-xs">First, enable 2-Step Verification if it's not already on. This is required by Google.</CardDescription>
+                                          </CardHeader>
+                                          <CardFooter className="p-4 pt-0">
+                                             <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                                <Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                            </a>
+                                          </CardFooter>
+                                        </Card>
+                                        <Card>
+                                          <CardHeader className="p-4">
+                                            <CardTitle className="text-base">Step 2: Create App Password</CardTitle>
+                                            <CardDescription className="text-xs">Once 2-Step Verification is on, go to the App Passwords page. For the app name, use "BizSuite" and click "Create".</CardDescription>
+                                          </CardHeader>
+                                           <CardFooter className="p-4 pt-0">
+                                            <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                                <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                            </a>
+                                          </CardFooter>
+                                        </Card>
                                         <div className="flex gap-4 p-3 border rounded-lg bg-green-500/10 border-green-500/30">
-                                            <div className="font-bold text-lg text-green-600"><CheckCircle/></div>
+                                            <div className="font-bold text-lg text-green-600 pt-1">
+                                                <CheckCircle/>
+                                            </div>
                                             <div>
                                                 <h4 className="font-semibold">Copy & Paste</h4>
-                                                <p className="text-xs text-muted-foreground">Google will show you a 16-character password. Copy it (without spaces) and paste it into the input field in our settings page.</p>
+                                                <p className="text-xs text-muted-foreground">Google will show you a 16-character password. Copy it (without spaces) and paste it into the input field on our settings page.</p>
                                             </div>
                                         </div>
                                     </div>
