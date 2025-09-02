@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, KeyRound, ExternalLink, Link, Unlink } from 'lucide-react';
+import { Loader2, KeyRound, ExternalLink, Link, Unlink, CheckCircle, ArrowRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -41,13 +41,14 @@ export default function SettingsPage() {
         const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
-                setEmail(currentUser.email || ''); // Default to logged-in user's email
                 setLoading(true);
                 const settings = await getCompanySettings(currentUser.uid);
                 if (settings && settings.appPassword) {
                     setCurrentEmail(settings.email);
+                    setEmail(settings.email);
                 } else {
                     setCurrentEmail(null);
+                    setEmail(currentUser.email || ''); // Default to logged-in user's email if not set
                 }
                 setLoading(false);
             } else {
@@ -108,6 +109,7 @@ export default function SettingsPage() {
             await deleteCompanySettings(user.uid);
             setCurrentEmail(null);
             setAppPassword('');
+             setEmail(user.email || '');
             toast({
                 title: "Disconnected",
                 description: "Your email account has been disconnected.",
@@ -196,28 +198,42 @@ export default function SettingsPage() {
                                 <DialogTrigger asChild>
                                     <Button variant="outline" size="sm">How to get this?</Button>
                                 </DialogTrigger>
-                                <DialogContent>
+                                <DialogContent className="sm:max-w-md">
                                     <DialogHeader>
                                         <DialogTitle>How to Get an App Password</DialogTitle>
                                         <DialogDescription>
-                                            An App Password is a 16-digit code that gives our app permission to send emails on your behalf without exposing your main password.
+                                            An App Password is a 16-digit code that lets our app send emails on your behalf without exposing your main password.
                                         </DialogDescription>
                                     </DialogHeader>
-                                    <div className="space-y-3 text-sm">
-                                        <p>1. Click the button below to go to your Google Account's security settings.</p>
-                                        <p>2. You may need to sign in. Make sure **2-Step Verification** is turned ON.</p>
-                                        <p>3. Find and click on **App passwords**.</p>
-                                        <p>4. For the app name, type "BizSuite DataFlow" and click **Create**.</p>
-                                        <p>5. Google will show you a 16-character password. Copy it.</p>
-                                        <p>6. Come back here and paste the password into the input field.</p>
+                                    <div className="space-y-4 text-sm">
+                                        <div className="flex gap-4 p-3 border rounded-lg">
+                                            <div className="font-bold text-lg text-primary">1</div>
+                                            <div>
+                                                <h4 className="font-semibold">Enable 2-Step Verification</h4>
+                                                <p className="text-xs text-muted-foreground">This is required by Google before you can create an App Password. Click the link, enable it, and come back.</p>
+                                                <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
+                                                    <Button size="sm">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                                </a>
+                                            </div>
+                                        </div>
+                                         <div className="flex gap-4 p-3 border rounded-lg">
+                                            <div className="font-bold text-lg text-primary">2</div>
+                                            <div>
+                                                <h4 className="font-semibold">Create App Password</h4>
+                                                <p className="text-xs text-muted-foreground">Once 2-Step Verification is on, go to the App Passwords page. For the app name, use "BizSuite" and click "Create".</p>
+                                                <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
+                                                    <Button size="sm">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-4 p-3 border rounded-lg bg-green-500/10 border-green-500/30">
+                                            <div className="font-bold text-lg text-green-600"><CheckCircle/></div>
+                                            <div>
+                                                <h4 className="font-semibold">Copy & Paste</h4>
+                                                <p className="text-xs text-muted-foreground">Google will show you a 16-character password. Copy it (without spaces) and paste it into the input field in the settings page.</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <DialogFooter>
-                                         <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">
-                                            <Button>
-                                                Go to Google Settings <ExternalLink className="ml-2 h-4 w-4"/>
-                                            </Button>
-                                        </a>
-                                    </DialogFooter>
                                 </DialogContent>
                             </Dialog>
                         </div>
