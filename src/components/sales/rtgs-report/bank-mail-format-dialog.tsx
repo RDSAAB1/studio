@@ -12,8 +12,9 @@ import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { sendEmailWithAttachment } from '@/lib/actions';
+import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getFirebaseAuth } from '@/lib/firebase';
+
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
@@ -45,7 +46,6 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             return;
         }
 
-        const accessToken = await currentUser.getIdToken(true);
         const userEmail = currentUser.email;
 
         if (!userEmail) {
@@ -56,6 +56,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         setIsSending(true);
 
         try {
+            // Force refresh the token to ensure it's not expired.
+            const accessToken = await currentUser.getIdToken(true);
+
             const dataToExport = payments.map((p: any) => ({
                 'Sr.No': p.srNo,
                 'Debit_Ac_No': settings.accountNo,
