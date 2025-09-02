@@ -81,8 +81,8 @@ export default function ConnectGmailPage() {
                 description: "Your email settings have been connected.",
                 variant: "success",
             });
-            // On successful connection, the main-layout listener will let the user through to the dashboard.
-            router.push('/sales/dashboard-overview');
+            // On successful connection, the main-layout listener will let the user through to the next setup step or dashboard.
+            router.push('/setup/company-details');
         } catch (error) {
             console.error("Error saving settings:", error);
             toast({
@@ -209,7 +209,7 @@ export default function ConnectGmailPage() {
                     </div>
                 </CardContent>
                 <CardFooter className="flex-col gap-3">
-                    <Button onClick={handleSave} disabled={saving} className="w-full">
+                    <Button onClick={handleSave} disabled={saving || !user} className="w-full">
                         {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                         Save & Continue
                     </Button>
@@ -226,7 +226,7 @@ export default function ConnectGmailPage() {
         <div className="flex min-h-screen items-center justify-center p-4 bg-background">
             <Card className="w-full max-w-lg">
                 <CardHeader>
-                    <CardTitle>Connect Your Gmail</CardTitle>
+                    <CardTitle>Step 1: Connect Your Gmail</CardTitle>
                     <CardDescription>
                        To send reports, connect your Gmail account by creating a secure App Password. This is a one-time setup.
                     </CardDescription>

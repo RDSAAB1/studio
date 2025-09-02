@@ -39,25 +39,10 @@ interface RtgsReportRow {
     parchiNo: string;
 }
 
-const initialSettings: RtgsSettings = {
-    companyName: "JAGDAMBE RICE MILL",
-    companyAddress1: "DEVKALI, BANDA",
-    companyAddress2: "SHAHJAHANPUR, (242042)",
-    bankName: "BANK OF BARODA",
-    ifscCode: "BARB0BANDAX",
-    branchName: "BANDA",
-    accountNo: "08290500004938",
-    contactNo: "9794092767",
-    gmail: "jrmdofficial@gmail.com",
-    type: "SB",
-};
-
 export default function RtgsReportClient() {
     const [reportRows, setReportRows] = useState<RtgsReportRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [settings, setSettings] = useState<RtgsSettings>(initialSettings);
-    const [isEditing, setIsEditing] = useState(false);
-    const [tempSettings, setTempSettings] = useState<RtgsSettings>(initialSettings);
+    const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
     const [isBankMailFormatOpen, setIsBankMailFormatOpen] = useState(false);
@@ -73,14 +58,13 @@ export default function RtgsReportClient() {
 
     useEffect(() => {
         setLoading(true);
-        let currentSettings: RtgsSettings = initialSettings;
+        let currentSettings: RtgsSettings | null = null;
 
         const fetchSettings = async () => {
             const savedSettings = await getRtgsSettings();
             if (savedSettings) {
                 currentSettings = savedSettings;
                 setSettings(savedSettings);
-                setTempSettings(savedSettings);
             }
         };
         
@@ -93,7 +77,7 @@ export default function RtgsReportClient() {
                         paymentId: p.paymentId,
                         date: p.date,
                         checkNo: p.checkNo || '',
-                        type: currentSettings.type,
+                        type: currentSettings?.type || 'SB',
                         srNo: srNo,
                         supplierName: toTitleCase(p.supplierName || ''),
                         fatherName: toTitleCase(p.supplierFatherName || ''),
@@ -123,30 +107,6 @@ export default function RtgsReportClient() {
         });
 
     }, []);
-
-    const handleEditToggle = () => {
-        if (isEditing) {
-            setTempSettings(settings);
-        }
-        setIsEditing(!isEditing);
-    };
-
-    const handleSave = async () => {
-        try {
-            await updateRtgsSettings(tempSettings);
-            setSettings(tempSettings);
-            setIsEditing(false);
-            toast({ title: "Details saved successfully", variant: "success" });
-        } catch (error) {
-            console.error("Error saving settings:", error);
-            toast({ title: "Failed to save details", variant: "destructive" });
-        }
-    };
-    
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setTempSettings(prev => ({ ...prev, [name]: value }));
-    };
 
     const filteredReportRows = useMemo(() => {
         let filtered = reportRows;
@@ -181,7 +141,7 @@ export default function RtgsReportClient() {
     
     const handlePrint = (contentRef: React.RefObject<HTMLDivElement>) => {
         const node = contentRef.current;
-        if (!node) return;
+        if (!node || !settings) return;
 
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
@@ -262,61 +222,12 @@ export default function RtgsReportClient() {
         }, 500);
     };
 
-    if (loading) {
+    if (loading || !settings) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
     }
     
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between">
-                    {isEditing ? (
-                        <div className="flex-1 mr-4">
-                            <CardTitle>Edit Details</CardTitle>
-                            <CardDescription>Update your company and bank information here.</CardDescription>
-                        </div>
-                    ) : (
-                        <div className="flex-1">
-                            <h2 className="text-lg font-semibold">{settings.companyName}</h2>
-                            <p className="text-sm text-muted-foreground">{`${settings.companyAddress1}, ${settings.companyAddress2}`}</p>
-                            <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
-                                <p>{settings.contactNo}</p>
-                                <p>{settings.gmail}</p>
-                                <p>{settings.bankName}</p>
-                                <p>A/C: {settings.accountNo} ({settings.type})</p>
-                                <p>IFSC: {settings.ifscCode} | Branch: {settings.branchName}</p>
-                            </div>
-                        </div>
-                    )}
-                    <div className="flex gap-2">
-                        {isEditing ? (
-                            <>
-                                <Button onClick={handleSave} size="sm"><Save className="mr-2 h-4 w-4"/>Save</Button>
-                                <Button onClick={handleEditToggle} size="sm" variant="outline"><X className="mr-2 h-4 w-4"/>Cancel</Button>
-                            </>
-                        ) : (
-                            <Button onClick={handleEditToggle} size="sm"><Edit className="mr-2 h-4 w-4"/>Edit Details</Button>
-                        )}
-                    </div>
-                </CardHeader>
-                {isEditing && (
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                            <div className="space-y-1"><Label>Company Name</Label><Input name="companyName" value={tempSettings.companyName} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Address Line 1</Label><Input name="companyAddress1" value={tempSettings.companyAddress1} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Address Line 2</Label><Input name="companyAddress2" value={tempSettings.companyAddress2} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Bank Name</Label><Input name="bankName" value={tempSettings.bankName} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>IFSC Code</Label><Input name="ifscCode" value={tempSettings.ifscCode} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Branch Name</Label><Input name="branchName" value={tempSettings.branchName} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Account No.</Label><Input name="accountNo" value={tempSettings.accountNo} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Contact No.</Label><Input name="contactNo" value={tempSettings.contactNo} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
-                            <div className="space-y-1"><Label>Account Type</Label><Input name="type" value={tempSettings.type} onChange={handleInputChange} /></div>
-                        </div>
-                    </CardContent>
-                )}
-            </Card>
-
             <Card>
                 <CardHeader>
                     <CardTitle>Filter RTGS Reports</CardTitle>

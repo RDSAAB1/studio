@@ -9,14 +9,14 @@ import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { getCompanySettings } from "@/lib/firestore";
+import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
 import { Loader2 } from "lucide-react";
 
 type MainLayoutProps = {
     children: ReactNode;
 }
 
-const PROTECTED_ROUTES = ['/login', '/connect-gmail'];
+const PROTECTED_ROUTES = ['/login', '/connect-gmail', '/setup/company-details'];
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
@@ -34,15 +34,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
       setLoading(true);
       if (currentUser) {
         setUser(currentUser);
-        const settings = await getCompanySettings(currentUser.uid);
-        if (!settings?.appPassword && pathname !== '/connect-gmail') {
+        const companySettings = await getCompanySettings(currentUser.uid);
+        if (!companySettings?.appPassword && pathname !== '/connect-gmail') {
           router.replace('/connect-gmail');
-        } else if (settings?.appPassword && pathname === '/connect-gmail') {
-          router.replace('/sales/dashboard-overview');
+        } else if (companySettings?.appPassword) {
+          const rtgsSettings = await getRtgsSettings();
+          if (!rtgsSettings && pathname !== '/setup/company-details' && pathname !== '/connect-gmail') {
+             router.replace('/setup/company-details');
+          } else if (rtgsSettings && (pathname === '/setup/company-details' || pathname === '/connect-gmail')) {
+             router.replace('/sales/dashboard-overview');
+          }
         }
       } else {
         setUser(null);
-        if (!PROTECTED_ROUTES.includes(pathname)) {
+        if (!PROTECTED_ROUTES.includes(pathname) && pathname !== '/login') {
           router.replace('/login');
         }
       }
@@ -150,7 +155,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
   
   if (!user || PROTECTED_ROUTES.includes(pathname)) {
-    return <>{children}</>; // Render login or connect-gmail page without layout
+    return <>{children}</>;
   }
   
   return (

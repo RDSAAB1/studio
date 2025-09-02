@@ -272,7 +272,6 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
         return false;
     }
     await updateDoc(customerRef, customerData as any);
-    return true;
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
