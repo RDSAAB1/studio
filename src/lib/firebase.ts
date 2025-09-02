@@ -35,11 +35,8 @@ const getFirebaseAuth = (): Auth => {
 
 const getGoogleProvider = (): GoogleAuthProvider => {
     const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/gmail.send');
-    provider.setCustomParameters({
-        access_type: 'offline', // Request a refresh token
-        prompt: 'consent' // Force consent screen to get refresh token on every login for simplicity
-    });
+    // No advanced scopes are needed here since we use App Password for sending emails.
+    // The sign-in is purely for authentication.
     return provider;
 };
 
