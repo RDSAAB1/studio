@@ -7,62 +7,78 @@ import CustomSidebar from "./custom-sidebar";
 import { cn } from "@/lib/utils";
 import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { Loader2 } from "lucide-react";
 
 type MainLayoutProps = {
     children: ReactNode;
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
-  const [isSidebarActive, setIsSidebarActive] = useState(false); // Default to collapsed
-
-  const getInitialDashboardTab = (): MenuItem[] => {
-    const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-    return dashboard ? [dashboard] : [];
-  };
-
-  const [openTabs, setOpenTabs] = useState<MenuItem[]>(getInitialDashboardTab);
-  const [activeTabId, setActiveTabId] = useState<string>('dashboard');
+  const [isSidebarActive, setIsSidebarActive] = useState(false);
+  const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>('');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   const pathname = usePathname();
   const router = useRouter();
 
-
   useEffect(() => {
-    // Find the initial active tab based on the current path
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+        router.replace('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
+  
+  useEffect(() => {
+    if (isAuthenticated === null) return;
+    
     let initialTab: MenuItem | undefined;
     for (const item of allMenuItems) {
-        if (item.href === pathname) {
-            initialTab = item;
-            break;
-        }
-        if (item.subMenus) {
-            initialTab = item.subMenus.find(sub => sub.href === pathname);
-            if (initialTab) break;
-        }
-    }
-
-    if (initialTab && !openTabs.some(tab => tab.id === initialTab!.id)) {
-        setOpenTabs(prev => {
-            if (prev.some(tab => tab.id === initialTab!.id)) {
-                return prev;
-            }
-            return [...prev, initialTab!];
-        });
+      if (item.href === pathname) {
+        initialTab = item;
+        break;
+      }
+      if (item.subMenus) {
+        initialTab = item.subMenus.find(sub => sub.href === pathname);
+        if (initialTab) break;
+      }
     }
     
     if (initialTab) {
-        setActiveTabId(initialTab.id);
+      setActiveTabId(initialTab.id);
+      if (!openTabs.some(tab => tab.id === initialTab!.id)) {
+        setOpenTabs(prev => [...prev, initialTab!]);
+      }
     } else {
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
             setActiveTabId(dashboard.id);
-            if(pathname !== dashboard.href) {
-                router.push(dashboard.href || '/');
+             if(pathname !== dashboard.href) {
+                // Do not redirect here to avoid conflicts with auth check
             }
         }
     }
-  }, []);
+  }, [pathname, isAuthenticated]);
 
+  useEffect(() => {
+    // Ensure dashboard is always present if authenticated
+    if (isAuthenticated && !openTabs.some(tab => tab.id === 'dashboard')) {
+        const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+        if (dashboard) {
+            setOpenTabs([dashboard]);
+            if (pathname === '/'){
+                router.replace(dashboard.href || '/');
+            }
+        }
+    }
+  }, [isAuthenticated, openTabs, pathname, router]);
 
   const handleTabClick = (tabId: string) => {
     setActiveTabId(tabId);
@@ -75,46 +91,25 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // Prevent closing the dashboard tab
-    if (tabId === 'dashboard') {
-        return;
-    }
+    if (tabId === 'dashboard') return;
 
     const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
     let newActiveTabId = activeTabId;
     let newPath = '';
     
     if(activeTabId === tabId) {
-        if(tabIndex > 0) {
-            newActiveTabId = openTabs[tabIndex - 1].id;
-            newPath = openTabs[tabIndex - 1].href || '/';
-        } else if (openTabs.length > 1) {
-            const nextTab = openTabs[tabIndex + 1];
-             if (nextTab) {
-                newActiveTabId = nextTab.id;
-                newPath = nextTab.href || '/';
-             }
-        } else {
-            // Fallback to dashboard
-            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-            if (dashboard) {
-                newActiveTabId = dashboard.id;
-                newPath = dashboard.href || '/';
-            }
-        }
+        newActiveTabId = openTabs[tabIndex - 1]?.id || 'dashboard';
+        const newActiveTab = allMenuItems.flatMap(i => i.subMenus || i).find(t => t.id === newActiveTabId);
+        newPath = newActiveTab?.href || '/';
     } else {
         const currentActiveTab = openTabs.find(tab => tab.id === activeTabId);
-        if (currentActiveTab) {
-            newPath = currentActiveTab.href || '/';
-        }
+        if (currentActiveTab) newPath = currentActiveTab.href || '/';
     }
     
     const newOpenTabs = openTabs.filter(tab => tab.id !== tabId);
     setOpenTabs(newOpenTabs);
     setActiveTabId(newActiveTabId);
-    if (newPath) {
-        router.push(newPath);
-    }
+    if (newPath) router.push(newPath);
   };
 
   const handleSidebarItemClick = (item: MenuItem) => {
@@ -123,21 +118,29 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setOpenTabs([...openTabs, item]);
       }
       setActiveTabId(item.id);
-      // On mobile, close sidebar after click
       if (window.innerWidth < 1024) {
           setIsSidebarActive(false);
       }
     }
   };
   
-  const toggleSidebar = () => {
-    setIsSidebarActive(!isSidebarActive);
-  };
+  const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
+
+  if (isAuthenticated === null) {
+      return (
+          <div className="flex h-screen w-screen items-center justify-center bg-background">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+      );
+  }
+  
+  if (!isAuthenticated) {
+      // While redirecting, can show a loader or just the children (which would be the login page)
+      return <>{children}</>;
+  }
   
   return (
-    <div 
-        className={cn("wrapper", isSidebarActive && "active")}
-    >
+    <div className={cn("wrapper", isSidebarActive && "active")}>
         <CustomSidebar 
             isSidebarActive={isSidebarActive}
             onMenuItemClick={handleSidebarItemClick}
