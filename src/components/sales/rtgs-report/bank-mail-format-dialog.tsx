@@ -46,13 +46,15 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         setIsSending(true);
 
         try {
-            const idToken = await auth.currentUser.getIdToken(true);
             const userEmail = auth.currentUser.email;
-
-            if (!idToken || !userEmail) {
-                throw new Error("Authentication failed. No ID token provided.");
+            const userId = auth.currentUser.uid;
+            
+            if (!userEmail || !userId) {
+                toast({ title: "Authentication Error", description: "User email or ID not found.", variant: "destructive" });
+                setIsSending(false);
+                return;
             }
-
+            
             const dataToExport = payments.map((p: any) => ({
                 'Sr.No': p.srNo,
                 'Debit_Ac_No': settings.accountNo,
@@ -82,7 +84,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
                 attachmentBuffer: bufferAsArray,
                 filename,
-                idToken: idToken,
+                userId: userId,
                 userEmail: userEmail,
             });
 

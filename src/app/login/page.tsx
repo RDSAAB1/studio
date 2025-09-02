@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Auth, User, OAuthCredential } from 'firebase/auth';
-import { signInWithPopup, signOut, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle } from 'lucide-react';
@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { saveRefreshToken } from '@/lib/firestore';
+
 
 export default function LoginPage() {
     const { toast } = useToast();
@@ -44,10 +46,8 @@ export default function LoginPage() {
             const result = await signInWithPopup(auth, googleProvider);
             const credential = GoogleAuthProvider.credentialFromResult(result);
 
-            if (credential?.refreshToken && auth.currentUser) {
-                 // This is a non-standard but effective way to attach the refresh token to the user object in-memory for the current session.
-                // It's not persisted by Firebase but is available on the client for passing to server actions.
-                (auth.currentUser as any).refreshToken = credential.refreshToken;
+            if (credential?.refreshToken && result.user) {
+                await saveRefreshToken(result.user.uid, credential.refreshToken);
             }
             
         } catch (error: any) {

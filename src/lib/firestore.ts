@@ -27,6 +27,23 @@ const fundTransactionsCollection = collection(db, "fund_transactions");
 const banksCollection = collection(db, "banks");
 const bankBranchesCollection = collection(db, "bankBranches");
 const settingsCollection = collection(db, "settings");
+const usersCollection = collection(db, "users");
+
+
+// --- User Refresh Token Functions ---
+export async function saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
+    const userDocRef = doc(db, "users", userId);
+    await setDoc(userDocRef, { refreshToken: refreshToken }, { merge: true });
+}
+
+export async function getRefreshToken(userId: string): Promise<string | null> {
+    const userDocRef = doc(db, "users", userId);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists() && docSnap.data().refreshToken) {
+        return docSnap.data().refreshToken;
+    }
+    return null;
+}
 
 
 // --- Dynamic Options Functions ---

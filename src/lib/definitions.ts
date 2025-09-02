@@ -68,6 +68,9 @@ export type Customer = {
   shippingAddress?: string;
   shippingContact?: string;
   shippingGstin?: string;
+
+  // New field
+  otherCharges?: number;
 };
 
 export type Transaction = {
@@ -128,6 +131,7 @@ export type Payment = {
     sixRDate?: string;
     parchiNo?: string;
     checkNo?: string;
+    utrNo?: string;
     quantity?: number;
     rate?: number;
     rtgsAmount?: number;
@@ -311,4 +315,3 @@ export type ConsolidatedReceiptData = {
 };
 
 export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan';
-
