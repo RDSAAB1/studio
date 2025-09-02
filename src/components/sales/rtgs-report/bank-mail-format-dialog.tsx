@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Loader2 } from 'lucide-react';
+import { Mail, Loader2, Download } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -18,6 +18,18 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     const tableRef = useRef<HTMLTableElement>(null);
     const [isSending, setIsSending] = useState(false);
 
+    const handleDownload = () => {
+        if (!tableRef.current) return;
+        const worksheet = XLSX.utils.table_to_sheet(tableRef.current);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+        worksheet['!cols'] = [
+            { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }
+        ];
+        const today = format(new Date(), 'yyyy-MM-dd');
+        XLSX.writeFile(workbook, `RTGS_Report_${today}.xlsx`);
+    };
+
     const handleSendMail = async () => {
         if (payments.length === 0) {
             toast({ title: "No data to send", variant: "destructive" });
@@ -27,7 +39,6 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         setIsSending(true);
 
         try {
-            // 1. Prepare data and create Excel file buffer
             const dataToExport = payments.map((p: any) => ({
                 'Sr.No': p.srNo,
                 'Debit_Ac_No': settings.accountNo,
@@ -41,22 +52,15 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             const worksheet = XLSX.utils.json_to_sheet(dataToExport);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
-            worksheet['!cols'] = [
-                { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }
-            ];
-            
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             const bufferAsArray = Array.from(new Uint8Array(excelBuffer));
 
-
-            // 2. Prepare email content
             const today = format(new Date(), 'yyyy-MM-dd');
             const bankEmail = settings.gmail || "your.bank.email@example.com";
             const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
             const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
             const filename = `RTGS_Report_${today}.xlsx`;
 
-            // 3. Call server action to send email
             const result = await sendEmailWithAttachment({
                 to: bankEmail,
                 subject,
@@ -71,7 +75,6 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             } else {
                 throw new Error(result.error || "An unknown error occurred.");
             }
-
         } catch (error: any) {
             console.error("Error sending email:", error);
             toast({ title: "Failed to Send Email", description: error.message || "Please check server logs.", variant: "destructive" });
@@ -120,6 +123,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSending}>Close</Button>
                     <div className="flex-grow" />
+                    <Button onClick={handleDownload} variant="secondary" disabled={isSending}>
+                        <Download className="mr-2 h-4 w-4" /> Download Excel
+                    </Button>
                     <Button onClick={handleSendMail} disabled={isSending}>
                         {isSending ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>

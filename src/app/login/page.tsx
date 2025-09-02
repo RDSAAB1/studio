@@ -8,11 +8,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const provider = new GoogleAuthProvider();
 
 export default function LoginPage() {
     const router = useRouter();
+    const { toast } = useToast();
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -27,8 +29,22 @@ export default function LoginPage() {
         try {
             await signInWithPopup(auth, provider);
             // onAuthStateChanged will handle the redirect
-        } catch (error) {
+            toast({ title: "Login Successful", description: "Welcome back!", variant: "success" });
+        } catch (error: any) {
             console.error("Error signing in with Google: ", error);
+            let errorMessage = "An unknown error occurred.";
+            if (error.code === 'auth/popup-closed-by-user') {
+                errorMessage = "Login cancelled. Please try again.";
+            } else if (error.code === 'auth/network-request-failed') {
+                errorMessage = "Network error. Please check your connection.";
+            } else if (error.code === 'auth/configuration-not-found') {
+                errorMessage = "Authentication is not configured correctly. Please contact support.";
+            }
+            toast({
+                title: "Login Failed",
+                description: errorMessage,
+                variant: "destructive"
+            });
         }
     };
     
