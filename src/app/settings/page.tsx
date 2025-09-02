@@ -230,7 +230,7 @@ export default function SettingsPage() {
                                                 <CardTitle className="text-base">Step 2: Create App Password</CardTitle>
                                                 <CardDescription className="text-xs">
                                                   Once 2-Step Verification is on, go to the App Passwords page. For the app name, use "BizSuite" and click "Create".
-                                                  If you see an error page, it means 2-Step Verification is not active. Please complete Step 1 first.
+                                                  If you see an error like "You are not eligible...", it means 2-Step Verification is not active. Please complete Step 1 first.
                                                 </CardDescription>
                                             </CardHeader>
                                             <CardFooter className="p-4 pt-0">
