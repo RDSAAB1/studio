@@ -61,7 +61,12 @@ export async function getRtgsSettings(): Promise<RtgsSettings | null> {
     const docRef = doc(settingsCollection, "rtgs");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-        return docSnap.data() as RtgsSettings;
+        const data = docSnap.data() as RtgsSettings;
+        // Ensure type exists with a default value
+        if (!data.type) {
+            data.type = "SB";
+        }
+        return data;
     }
     return null;
 }

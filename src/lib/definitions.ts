@@ -44,6 +44,7 @@ export type Customer = {
   sixRDate?: string;
   parchiNo?: string;
   checkNo?: string;
+  utrNo?: string;
   rtgsAmount?: number;
   payments?: Payment[]; // To track which payments have been applied
 
@@ -264,6 +265,7 @@ export type RtgsSettings = {
     accountNo: string;
     contactNo: string;
     gmail: string;
+    type: string;
 };
 
 export type ReceiptFieldSettings = {
@@ -309,3 +311,4 @@ export type ConsolidatedReceiptData = {
 };
 
 export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan';
+

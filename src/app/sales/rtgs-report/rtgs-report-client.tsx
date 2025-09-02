@@ -20,7 +20,7 @@ interface RtgsReportRow {
     paymentId: string;
     date: string;
     checkNo: string;
-    type: string;
+    type: string; 
     srNo: string; 
     supplierName: string;
     fatherName: string;
@@ -47,6 +47,7 @@ const initialSettings: RtgsSettings = {
     accountNo: "08290500004938",
     contactNo: "9794092767",
     gmail: "jrmdofficial@gmail.com",
+    type: "SB",
 };
 
 export default function RtgsReportClient() {
@@ -69,52 +70,55 @@ export default function RtgsReportClient() {
 
     useEffect(() => {
         setLoading(true);
+        let currentSettings: RtgsSettings = initialSettings;
 
         const fetchSettings = async () => {
             const savedSettings = await getRtgsSettings();
             if (savedSettings) {
+                currentSettings = savedSettings;
                 setSettings(savedSettings);
                 setTempSettings(savedSettings);
             }
         };
-        fetchSettings();
+        
+        fetchSettings().then(() => {
+            const unsubscribe = getPaymentsRealtime((payments) => {
+                const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
+                const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
+                    const srNo = p.rtgsSrNo || p.paymentId || '';
+                    return {
+                        paymentId: p.paymentId,
+                        date: p.date,
+                        checkNo: p.checkNo || '',
+                        type: currentSettings.type,
+                        srNo: srNo,
+                        supplierName: toTitleCase(p.supplierName || ''),
+                        fatherName: toTitleCase(p.supplierFatherName || ''),
+                        contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
+                        acNo: p.bankAcNo || '',
+                        ifscCode: p.bankIfsc || '',
+                        branch: toTitleCase(p.bankBranch || ''),
+                        bank: p.bankName || '',
+                        amount: p.rtgsAmount || p.amount || 0,
+                        rate: p.rate || 0,
+                        weight: p.quantity || 0,
+                        sixRNo: p.sixRNo || '',
+                        sixRDate: p.sixRDate || '',
+                        parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
+                    };
+                });
 
-        const unsubscribe = getPaymentsRealtime((payments) => {
-            const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
-            const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
-                // Use rtgsSrNo if it exists, otherwise fallback to paymentId for older records
-                const srNo = p.rtgsSrNo || p.paymentId || '';
-                return {
-                    paymentId: p.paymentId,
-                    date: p.date,
-                    checkNo: p.checkNo || '',
-                    type: p.type,
-                    srNo: srNo,
-                    supplierName: toTitleCase(p.supplierName || ''),
-                    fatherName: toTitleCase(p.supplierFatherName || ''),
-                    contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
-                    acNo: p.bankAcNo || '',
-                    ifscCode: p.bankIfsc || '',
-                    branch: toTitleCase(p.bankBranch || ''),
-                    bank: p.bankName || '',
-                    amount: p.rtgsAmount || p.amount || 0,
-                    rate: p.rate || 0,
-                    weight: p.quantity || 0,
-                    sixRNo: p.sixRNo || '',
-                    sixRDate: p.sixRDate || '',
-                    parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
-                };
+                newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setReportRows(newReportRows);
+                setLoading(false);
+            }, (error) => {
+                console.error("Error fetching RTGS reports: ", error);
+                setLoading(false);
             });
 
-            newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            setReportRows(newReportRows);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching RTGS reports: ", error);
-            setLoading(false);
+            return () => unsubscribe();
         });
 
-        return () => unsubscribe();
     }, []);
 
     const handleEditToggle = () => {
@@ -276,7 +280,7 @@ export default function RtgsReportClient() {
                                 <p>{settings.contactNo}</p>
                                 <p>{settings.gmail}</p>
                                 <p>{settings.bankName}</p>
-                                <p>A/C: {settings.accountNo}</p>
+                                <p>A/C: {settings.accountNo} ({settings.type})</p>
                                 <p>IFSC: {settings.ifscCode} | Branch: {settings.branchName}</p>
                             </div>
                         </div>
@@ -304,6 +308,7 @@ export default function RtgsReportClient() {
                             <div className="space-y-1"><Label>Account No.</Label><Input name="accountNo" value={tempSettings.accountNo} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Contact No.</Label><Input name="contactNo" value={tempSettings.contactNo} onChange={handleInputChange} /></div>
                             <div className="space-y-1"><Label>Email</Label><Input name="gmail" type="email" value={tempSettings.gmail} onChange={handleInputChange} /></div>
+                            <div className="space-y-1"><Label>Account Type</Label><Input name="type" value={tempSettings.type} onChange={handleInputChange} /></div>
                         </div>
                     </CardContent>
                 )}
