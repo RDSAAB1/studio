@@ -1,67 +1,81 @@
 
 "use client";
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Download } from 'lucide-react';
+import { Download, Mail, Loader2 } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from '@/lib/firebase';
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
     const tableRef = useRef<HTMLTableElement>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
-    const handleExportAndMail = () => {
+    const handleGenerateAndMail = async () => {
         if (payments.length === 0) {
             toast({ title: "No data to export", variant: "destructive" });
             return;
         }
+        setIsUploading(true);
 
-        // 1. Prepare and download the Excel file
-        const dataToExport = payments.map((p: any) => ({
-            'Sr.No': p.srNo,
-            'Debit_Ac_No': settings.accountNo,
-            'Amount': p.amount,
-            'IFSC_Code': p.ifscCode,
-            'Credit_Ac_No': p.acNo,
-            'Beneficiary_Name': toTitleCase(p.supplierName),
-            'Scheme Type': p.type
-        }));
+        try {
+            // 1. Prepare data and create Excel file in memory
+            const dataToExport = payments.map((p: any) => ({
+                'Sr.No': p.srNo,
+                'Debit_Ac_No': settings.accountNo,
+                'Amount': p.amount,
+                'IFSC_Code': p.ifscCode,
+                'Credit_Ac_No': p.acNo,
+                'Beneficiary_Name': toTitleCase(p.supplierName),
+                'Scheme Type': p.type
+            }));
 
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+            worksheet['!cols'] = [
+                { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }
+            ];
 
-        worksheet['!cols'] = [
-            { wch: 10 }, // Sr.No
-            { wch: 20 }, // Debit_Ac_No
-            { wch: 15 }, // Amount
-            { wch: 15 }, // IFSC_Code
-            { wch: 20 }, // Credit_Ac_No
-            { wch: 30 }, // Beneficiary_Name
-            { wch: 15 }  // Scheme Type
-        ];
-        
-        const today = format(new Date(), 'yyyy-MM-dd');
-        XLSX.writeFile(workbook, `RTGS_Report_${today}.xlsx`);
-        
-        toast({ title: "Excel file downloaded!", description: "You can now attach it to your email.", variant: "success" });
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            
+            // 2. Upload the file to Firebase Storage
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const fileName = `RTGS_Report_${today}_${Date.now()}.xlsx`;
+            const storageRef = ref(storage, `rtgs-reports/${fileName}`);
+            
+            await uploadBytes(storageRef, excelBlob);
+            
+            // 3. Get the download URL
+            const downloadURL = await getDownloadURL(storageRef);
 
-        // 2. Open Gmail in a new tab with pre-filled details
-        const bankEmail = "your.bank.email@example.com"; // Replace with actual bank email or make it a setting
-        const subject = encodeURIComponent(`RTGS Payment Advice - ${settings.companyName} - ${today}`);
-        const body = encodeURIComponent(
-          `Dear Team,\n\nPlease find the attached RTGS payment advice for today, ${today}.\n\nThank you,\n${settings.companyName}`
-        );
-        
-        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${bankEmail}&su=${subject}&body=${body}`;
-        
-        window.open(gmailUrl, '_blank');
+            // 4. Open Gmail with the link
+            const bankEmail = "your.bank.email@example.com";
+            const subject = encodeURIComponent(`RTGS Payment Advice - ${settings.companyName} - ${today}`);
+            const body = encodeURIComponent(
+              `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}. You can download the file from the link below:\n\n${downloadURL}\n\nThank you,\n${settings.companyName}`
+            );
+            
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${bankEmail}&su=${subject}&body=${body}`;
+            window.open(gmailUrl, '_blank');
+            
+            toast({ title: "Success!", description: "File uploaded and email is ready to be sent.", variant: "success" });
+
+        } catch (error) {
+            console.error("Error generating or mailing file:", error);
+            toast({ title: "Error", description: "Could not generate and mail the file. Please try again.", variant: "destructive" });
+        } finally {
+            setIsUploading(false);
+        }
     };
     
     return (
@@ -70,7 +84,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogHeader>
                     <DialogTitle>Bank Mail Format</DialogTitle>
                     <DialogDescription>
-                        This format is optimized for emailing to the bank. Download the Excel file and attach it to the pre-filled email.
+                        This will generate an Excel file, upload it, and open a pre-filled email with a link to the file.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] border rounded-lg">
@@ -104,7 +118,10 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                     <div className="flex-grow" />
-                    <Button onClick={handleExportAndMail}><Download className="mr-2 h-4 w-4" /> Download & Open Mail</Button>
+                    <Button onClick={handleGenerateAndMail} disabled={isUploading}>
+                        {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                        {isUploading ? "Generating..." : "Generate & Mail"}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
