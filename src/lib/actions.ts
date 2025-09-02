@@ -2,8 +2,7 @@
 'use server';
 
 import nodemailer from 'nodemailer';
-import { getGoogleProvider } from './firebase';
-import {getOAuth2Client} from 'google-auth-library';
+import { google } from 'googleapis';
 
 interface EmailOptions {
     to: string;
@@ -12,21 +11,34 @@ interface EmailOptions {
     attachmentBuffer: number[];
     filename: string;
     userEmail: string;
+    refreshToken: string;
 }
 
+const getOAuth2Client = (refreshToken: string) => {
+    const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI // This can be a placeholder if you're not doing a full web flow here
+    );
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    return oauth2Client;
+};
+
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename, userEmail } = options;
-    const provider = getGoogleProvider();
+    const { to, subject, body, attachmentBuffer, filename, userEmail, refreshToken } = options;
 
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         const errorMsg = "Google OAuth credentials are not configured in .env file.";
         console.error(errorMsg);
         return { success: false, error: errorMsg };
     }
+    
+    if (!refreshToken) {
+        return { success: false, error: "Authentication failed. Please sign out and sign in again." };
+    }
 
     try {
-        const oauth2Client = getOAuth2Client();
-
+        const oauth2Client = getOAuth2Client(refreshToken);
         const { token: newAccessToken } = await oauth2Client.getAccessToken();
 
         if (!newAccessToken) {
@@ -40,6 +52,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
                 user: userEmail,
                 clientId: process.env.GOOGLE_CLIENT_ID,
                 clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                refreshToken: refreshToken,
                 accessToken: newAccessToken,
             },
         });
@@ -63,12 +76,10 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         console.log('Email sent successfully via OAuth2');
         return { success: true };
     } catch (error: any) {
-        console.error('Error sending email:', error);
+        console.error('Error sending email:', error.response?.data || error.message);
         let errorMessage = "Failed to send email. Please try again later.";
-        if (error.code === 'EAUTH' || error.response?.data?.error === 'invalid_grant' || error.responseCode === 401) {
+        if (error.response?.data?.error === 'invalid_grant' || error.responseCode === 401) {
             errorMessage = "Authentication failed. Please sign out and sign in again.";
-        } else if (error.message.includes('Token has been expired or revoked')) {
-             errorMessage = "Your session has expired. Please sign out and sign in again to refresh your permissions.";
         }
         return { success: false, error: errorMessage };
     }

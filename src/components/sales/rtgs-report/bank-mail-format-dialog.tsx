@@ -47,11 +47,17 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         }
         
         const userEmail = currentUser.email;
+        const refreshToken = (currentUser as any).refreshToken;
 
         if (!userEmail) {
              toast({ title: "Authentication Error", description: "Could not retrieve your email address.", variant: "destructive" });
             return;
         }
+        if (!refreshToken) {
+            toast({ title: "Authentication Error", description: "Refresh token not found. Please sign out and sign in again.", variant: "destructive" });
+           return;
+        }
+
 
         setIsSending(true);
 
@@ -85,6 +91,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 attachmentBuffer: bufferAsArray,
                 filename,
                 userEmail: userEmail,
+                refreshToken: refreshToken,
             });
 
             if (result.success) {

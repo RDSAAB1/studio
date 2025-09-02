@@ -23,6 +23,10 @@ const storage = getStorage(app);
 // Use a function to get auth instance to ensure it's client-side
 let auth: Auth;
 const getFirebaseAuth = (): Auth => {
+    if (typeof window === 'undefined') {
+        // Return a mock or minimal auth object on the server
+        return {} as Auth;
+    }
     if (!auth) {
         auth = getAuth(app);
     }

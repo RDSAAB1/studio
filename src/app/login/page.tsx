@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { Auth, GoogleAuthProvider, User } from 'firebase/auth';
+import type { Auth, GoogleAuthProvider, User, OAuthCredential } from 'firebase/auth';
 import { signInWithPopup, signOut, GoogleAuthProvider as AuthProvider } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,13 +41,19 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signOut(auth); // Ensure previous user is signed out
-            await signInWithPopup(auth, googleProvider);
+            const result = await signInWithPopup(auth, googleProvider);
+            const credential = AuthProvider.credentialFromResult(result);
+            if (credential && auth.currentUser) {
+                // Store the OAuth refresh token with the user object for later use
+                // This is a non-standard property, so we cast to `any`
+                 (auth.currentUser as any).refreshToken = credential.refreshToken;
+            }
             
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred.";
             if (error.code === 'auth/popup-closed-by-user') {
-                errorMessage = "Login cancelled or popup blocked. Please ensure the current URL is an authorized domain in your Google Cloud Console.";
+                errorMessage = "Login cancelled. If you see a blank pop-up, please ensure the current URL is an authorized domain in your Google Cloud Console.";
             } else if (error.code === 'auth/network-request-failed') {
                 errorMessage = "Network error. Please check your connection.";
             } else if (error.code === 'auth/configuration-not-found') {
