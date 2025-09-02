@@ -39,25 +39,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
     if (loading) return;
 
     if (user) {
-        // We are on a page that doesn't require auth check (e.g., connect-gmail)
         if (pathname === '/login') {
             router.replace('/sales/dashboard-overview'); // Default redirect
             return;
         }
-
-        const checkSettingsAndRedirect = async () => {
-             // If we are on the root or login page, we need to decide where to go.
-            if (pathname === '/' || pathname === '/login') {
-                const settings = await getCompanySettings(user.uid);
-                if (!settings?.appPassword) {
-                    router.replace('/connect-gmail');
-                } else {
-                    router.replace('/sales/dashboard-overview');
-                }
-            }
-        };
-
-        checkSettingsAndRedirect();
         
         let initialTab: MenuItem | undefined;
         for (const item of allMenuItems) {
@@ -76,12 +61,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 setOpenTabs(prev => [...prev, initialTab!]);
             }
             setActiveTabId(initialTab.id);
-        } else if (openTabs.length === 0 && pathname !== '/connect-gmail') {
+        } else if (openTabs.length === 0) {
             // Default to dashboard if no specific tab is matched
             const dashboard = allMenuItems.find(item => item.id === 'dashboard');
             if (dashboard) {
                 setOpenTabs([dashboard]);
                 setActiveTabId(dashboard.id);
+                 if (pathname === '/') {
+                    router.replace(dashboard.href || '/');
+                }
             }
         }
     } else {
@@ -162,7 +150,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return null; // Don't render layout if not logged in and not on login page
   }
   
-  if (pathname === '/login' || pathname === '/connect-gmail') {
+  if (pathname === '/login') {
       return <>{children}</>;
   }
   

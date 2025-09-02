@@ -111,5 +111,11 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
         { id: "project-dashboard", name: "Dashboard", icon: ChevronRight, href: "/projects/dashboard" },
     ]
+  },
+  {
+    id: "settings",
+    name: "Settings",
+    icon: Settings,
+    href: "/settings",
   }
 ];

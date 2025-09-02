@@ -93,6 +93,14 @@ export async function saveCompanySettings(userId: string, settings: { email: str
     await setDoc(userDocRef, settings, { merge: true });
 }
 
+export async function deleteCompanySettings(userId: string): Promise<void> {
+    const userDocRef = doc(db, "users", userId);
+    // We update the document to remove the fields, rather than deleting the user doc
+    await updateDoc(userDocRef, {
+        appPassword: '' 
+    });
+}
+
 
 export async function getRtgsSettings(): Promise<RtgsSettings | null> {
     const docRef = doc(settingsCollection, "rtgs");
