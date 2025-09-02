@@ -45,22 +45,13 @@ export async function uploadFileToStorage(
     
     const buffer = Buffer.from(bufferData);
 
-    const stream = new Readable();
-    stream.push(buffer);
-    stream.push(null);
-
-    await new Promise((resolve, reject) => {
-        const writeStream = file.createWriteStream({
-            metadata: {
-                contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            },
-        });
-        writeStream.on('error', reject);
-        writeStream.on('finish', resolve);
-        stream.pipe(writeStream);
+    await file.save(buffer, {
+        metadata: {
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+        public: true,
+        validation: 'md5'
     });
-
-    await file.makePublic();
     
     return file.publicUrl();
 

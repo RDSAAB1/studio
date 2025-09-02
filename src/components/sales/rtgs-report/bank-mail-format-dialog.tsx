@@ -46,14 +46,17 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
 
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             
+            // Convert buffer to a plain array of numbers to make it serializable
+            const bufferAsArray = Array.from(new Uint8Array(excelBuffer));
+
             // 2. Upload the file to Firebase Storage via Server Action
             const today = format(new Date(), 'yyyy-MM-dd');
             const fileName = `RTGS_Report_${today}_${Date.now()}.xlsx`;
             
-            const downloadURL = await uploadFileToStorage(excelBuffer, fileName);
+            const downloadURL = await uploadFileToStorage(bufferAsArray, fileName);
 
             // 3. Open Gmail with the link
-            const bankEmail = "your.bank.email@example.com"; // Replace with actual bank email if available
+            const bankEmail = settings.gmail || "your.bank.email@example.com"; 
             const subject = encodeURIComponent(`RTGS Payment Advice - ${settings.companyName} - ${today}`);
             const body = encodeURIComponent(
               `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}. You can download the file from the link below:\n\n${downloadURL}\n\nThank you,\n${settings.companyName}`
