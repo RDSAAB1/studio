@@ -39,7 +39,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <p>Dear Sir/Madam,</p>
                 <p>Please process the following RTGS payments:</p>
                 <br/>
-                ${tableRef.current.outerHTML}
+                <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; font-size: 13px;">
+                    ${tableRef.current.innerHTML}
+                </table>
                 <br/>
                 <p>Thank you,</p>
                 <p>${settings.companyName}</p>
@@ -61,8 +63,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] border rounded-lg">
                     <Table ref={tableRef} className="bg-white">
-                        <TableHeader className="bg-yellow-300">
-                            <TableRow>
+                        <TableHeader>
+                            <TableRow style={{ backgroundColor: '#FCD34D' }}>
                                 <TableHead className="text-black font-bold border">Sr.No</TableHead>
                                 <TableHead className="text-black font-bold border">Debit_Ac_No</TableHead>
                                 <TableHead className="text-black font-bold border">Amount</TableHead>
@@ -75,13 +77,13 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                         <TableBody>
                             {payments.map((p: any, index: number) => (
                                 <TableRow key={p.paymentId || index}>
-                                    <TableCell className="border">{p.srNo}</TableCell>
-                                    <TableCell className="border">{settings.accountNo}</TableCell>
-                                    <TableCell className="border">{p.amount}</TableCell>
-                                    <TableCell className="border">{p.ifscCode}</TableCell>
-                                    <TableCell className="border">{p.acNo}</TableCell>
-                                    <TableCell className="border">{toTitleCase(p.supplierName)}</TableCell>
-                                    <TableCell className="border">{p.type}</TableCell>
+                                    <TableCell className="border text-black">{p.srNo}</TableCell>
+                                    <TableCell className="border text-black">{settings.accountNo}</TableCell>
+                                    <TableCell className="border text-black">{p.amount}</TableCell>
+                                    <TableCell className="border text-black">{p.ifscCode}</TableCell>
+                                    <TableCell className="border text-black">{p.acNo}</TableCell>
+                                    <TableCell className="border text-black">{toTitleCase(p.supplierName)}</TableCell>
+                                    <TableCell className="border text-black">{p.type}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
