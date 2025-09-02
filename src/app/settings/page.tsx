@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, KeyRound, ExternalLink, Link, Unlink, CheckCircle, ArrowRight } from 'lucide-react';
+import { Loader2, KeyRound, ExternalLink, Link, Unlink, CheckCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -32,6 +32,9 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [disconnecting, setDisconnecting] = useState(false);
+    
+    const [isTwoFactorConfirmed, setIsTwoFactorConfirmed] = useState(false);
+    const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
 
     const router = useRouter();
     const { toast } = useToast();
@@ -109,7 +112,7 @@ export default function SettingsPage() {
             await deleteCompanySettings(user.uid);
             setCurrentEmail(null);
             setAppPassword('');
-             setEmail(user.email || '');
+            setEmail(user.email || '');
             toast({
                 title: "Disconnected",
                 description: "Your email account has been disconnected.",
@@ -192,8 +195,9 @@ export default function SettingsPage() {
                                 value={appPassword}
                                 onChange={(e) => setAppPassword(e.target.value)}
                                 placeholder="xxxx xxxx xxxx xxxx"
+                                disabled={!isTwoFactorConfirmed && !currentEmail}
                             />
-                            <Dialog>
+                            <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}>
                                 <DialogTrigger asChild>
                                     <Button variant="outline" size="sm">How to get this?</Button>
                                 </DialogTrigger>
@@ -210,23 +214,30 @@ export default function SettingsPage() {
                                             <CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle>
                                             <CardDescription className="text-xs">First, enable 2-Step Verification if it's not already on. This is required by Google.</CardDescription>
                                           </CardHeader>
-                                          <CardFooter className="p-4 pt-0">
+                                          <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
                                              <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
                                                 <Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button>
                                             </a>
+                                            <Button size="sm" variant="secondary" className="w-full" onClick={() => setIsTwoFactorConfirmed(true)}>
+                                                <ShieldCheck className="mr-2 h-4 w-4" /> I have enabled 2-Step Verification
+                                            </Button>
                                           </CardFooter>
                                         </Card>
-                                        <Card>
-                                          <CardHeader className="p-4">
-                                            <CardTitle className="text-base">Step 2: Create App Password</CardTitle>
-                                            <CardDescription className="text-xs">Once 2-Step Verification is on, go to the App Passwords page. For the app name, use "BizSuite" and click "Create".</CardDescription>
-                                          </CardHeader>
-                                           <CardFooter className="p-4 pt-0">
-                                            <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
-                                                <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
-                                            </a>
-                                          </CardFooter>
-                                        </Card>
+                                        
+                                        {isTwoFactorConfirmed && (
+                                            <Card className="animate-in fade-in-50 duration-500">
+                                            <CardHeader className="p-4">
+                                                <CardTitle className="text-base">Step 2: Create App Password</CardTitle>
+                                                <CardDescription className="text-xs">Once 2-Step Verification is on, go to the App Passwords page. For the app name, use "BizSuite" and click "Create".</CardDescription>
+                                            </CardHeader>
+                                            <CardFooter className="p-4 pt-0">
+                                                <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                                    <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                                </a>
+                                            </CardFooter>
+                                            </Card>
+                                        )}
+
                                         <div className="flex gap-4 p-3 border rounded-lg bg-green-500/10 border-green-500/30">
                                             <div className="font-bold text-lg text-green-600 pt-1">
                                                 <CheckCircle/>
@@ -237,6 +248,9 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                     </div>
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
+                                    </DialogFooter>
                                 </DialogContent>
                             </Dialog>
                         </div>
