@@ -6,10 +6,11 @@ import type { Auth, GoogleAuthProvider } from 'firebase/auth';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, BarChart3, Database, Users, Loader2 } from 'lucide-react';
+import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function LoginPage() {
     const { toast } = useToast();
@@ -17,11 +18,16 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
+    const [origin, setOrigin] = useState('');
 
     useEffect(() => {
         // Dynamically get auth and provider on the client side
         setAuth(getFirebaseAuth());
         setGoogleProvider(getGoogleProvider());
+        // Set the origin URL for display if needed
+        if (typeof window !== 'undefined') {
+            setOrigin(window.location.origin);
+        }
     }, []);
 
     const handleSignIn = async () => {
@@ -45,7 +51,7 @@ export default function LoginPage() {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred.";
             if (error.code === 'auth/popup-closed-by-user') {
-                errorMessage = "Login cancelled. Please try again.";
+                errorMessage = "Login cancelled or popup blocked. Please ensure the current URL is an authorized domain in your Google Cloud Console.";
             } else if (error.code === 'auth/network-request-failed') {
                 errorMessage = "Network error. Please check your connection.";
             } else if (error.code === 'auth/configuration-not-found') {
@@ -71,6 +77,8 @@ export default function LoginPage() {
             </div>
         </div>
     );
+    
+    const isCloudWorkspace = origin.includes('cloudworkstations.dev');
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -102,6 +110,16 @@ export default function LoginPage() {
                                 </>
                              )}
                         </Button>
+                         {isCloudWorkspace && (
+                            <Alert variant="destructive" className="mt-4">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Configuration Help</AlertTitle>
+                                <AlertDescription className="text-xs">
+                                    To enable Google Sign-In, add this URL to your Google Cloud Console's "Authorised JavaScript origins":
+                                    <strong className="block break-all mt-1">{origin}</strong>
+                                </AlertDescription>
+                            </Alert>
+                        )}
                     </CardContent>
                 </div>
                  <div className="hidden md:block bg-muted/40 p-8">
