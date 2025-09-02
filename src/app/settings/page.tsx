@@ -210,7 +210,7 @@ export default function SettingsPage() {
                                             <div className="font-bold text-lg text-primary">1</div>
                                             <div>
                                                 <h4 className="font-semibold">Enable 2-Step Verification</h4>
-                                                <p className="text-xs text-muted-foreground">This is required by Google before you can create an App Password. Click the link, enable it, and come back.</p>
+                                                <p className="text-xs text-muted-foreground">First, enable 2-Step Verification if it's not already on. This is required by Google.</p>
                                                 <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
                                                     <Button size="sm">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button>
                                                 </a>
@@ -230,7 +230,7 @@ export default function SettingsPage() {
                                             <div className="font-bold text-lg text-green-600"><CheckCircle/></div>
                                             <div>
                                                 <h4 className="font-semibold">Copy & Paste</h4>
-                                                <p className="text-xs text-muted-foreground">Google will show you a 16-character password. Copy it (without spaces) and paste it into the input field in the settings page.</p>
+                                                <p className="text-xs text-muted-foreground">Google will show you a 16-character password. Copy it (without spaces) and paste it into the input field in our settings page.</p>
                                             </div>
                                         </div>
                                     </div>
