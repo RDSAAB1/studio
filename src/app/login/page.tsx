@@ -3,27 +3,23 @@
 
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 const provider = new GoogleAuthProvider();
 
 export default function LoginPage() {
-    const router = useRouter();
     const { toast } = useToast();
+    const router = useRouter();
 
     const handleSignIn = async () => {
         try {
-            const result = await signInWithPopup(auth, provider);
-            // On successful sign-in, Firebase automatically persists the user's session.
-            // We can now manually redirect the user to the dashboard.
-            if (result.user) {
-                toast({ title: "Login Successful", description: "Welcome back!", variant: "success" });
-                router.replace('/sales/dashboard-overview');
-            }
+            await signInWithPopup(auth, provider);
+            // The onAuthStateChanged listener in MainLayout will handle the redirect.
+            toast({ title: "Login Successful", description: "Redirecting to dashboard...", variant: "success" });
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred.";

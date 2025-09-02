@@ -28,13 +28,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsAuthenticated(true);
+        if (pathname === '/login' || pathname === '/') {
+          router.replace('/sales/dashboard-overview');
+        }
       } else {
         setIsAuthenticated(false);
         router.replace('/login');
       }
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, pathname]);
   
   useEffect(() => {
     if (isAuthenticated === null) return;
@@ -56,29 +59,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
       if (!openTabs.some(tab => tab.id === initialTab!.id)) {
         setOpenTabs(prev => [...prev, initialTab!]);
       }
-    } else {
+    } else if (isAuthenticated) {
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
             setActiveTabId(dashboard.id);
-             if(pathname !== dashboard.href) {
-                // Do not redirect here to avoid conflicts with auth check
-            }
         }
     }
-  }, [pathname, isAuthenticated]);
+  }, [pathname, isAuthenticated, openTabs]);
 
   useEffect(() => {
-    // Ensure dashboard is always present if authenticated
-    if (isAuthenticated && !openTabs.some(tab => tab.id === 'dashboard')) {
+    if (isAuthenticated && openTabs.length === 0) {
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
             setOpenTabs([dashboard]);
-            if (pathname === '/'){
-                router.replace(dashboard.href || '/');
-            }
         }
     }
-  }, [isAuthenticated, openTabs, pathname, router]);
+  }, [isAuthenticated, openTabs]);
 
   const handleTabClick = (tabId: string) => {
     setActiveTabId(tabId);
@@ -134,8 +130,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!isAuthenticated) {
-      // While redirecting, can show a loader or just the children (which would be the login page)
+  if (!isAuthenticated && pathname !== '/login') {
+      return (
+          <div className="flex h-screen w-screen items-center justify-center bg-background">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+      );
+  }
+
+  if (!isAuthenticated && pathname === '/login') {
       return <>{children}</>;
   }
   
