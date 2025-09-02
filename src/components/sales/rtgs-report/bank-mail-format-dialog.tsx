@@ -16,26 +16,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
 
     const handleCopy = () => {
         if (tableRef.current) {
-            const tableHtml = tableRef.current.outerHTML;
-            const type = "text/html";
-            const blob = new Blob([tableHtml], { type });
-            const data = [new ClipboardItem({ [type]: blob })];
-
-            navigator.clipboard.write(data).then(
-                () => {
-                    toast({ title: "Table copied to clipboard!", variant: "success" });
-                },
-                (err) => {
-                    console.error("Failed to copy table: ", err);
-                    toast({ title: "Failed to copy table", variant: "destructive" });
-                }
-            );
-        }
-    };
-    
-    const handleMail = () => {
-        if (tableRef.current) {
-            const tableHtml = `
+            // Construct the full HTML to be copied, including the greeting and closing.
+            const mailBodyHtml = `
                 <p>Dear Sir/Madam,</p>
                 <p>Please process the following RTGS payments:</p>
                 <br/>
@@ -44,21 +26,23 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <p>Thank you,</p>
                 <p>${settings.companyName}</p>
             `;
-            const subject = "RTGS Payment Request";
-            
-            // Construct a Gmail compose URL
-            const gmailUrl = new URL("https://mail.google.com/mail/");
-            gmailUrl.searchParams.set("view", "cm");
-            gmailUrl.searchParams.set("fs", "1");
-            // gmailUrl.searchParams.set("to", "bank.email@example.com"); // Set a recipient if needed
-            gmailUrl.searchParams.set("su", subject);
-            gmailUrl.searchParams.set("body", tableHtml);
-            
-            // Open the Gmail compose window in a new tab
-            window.open(gmailUrl.toString(), '_blank');
+
+            const type = "text/html";
+            const blob = new Blob([mailBodyHtml], { type });
+            const data = [new ClipboardItem({ [type]: blob })];
+
+            navigator.clipboard.write(data).then(
+                () => {
+                    toast({ title: "Content copied to clipboard!", description: "You can now paste this into your email.", variant: "success" });
+                },
+                (err) => {
+                    console.error("Failed to copy table: ", err);
+                    toast({ title: "Failed to copy content", variant: "destructive" });
+                }
+            );
         }
     };
-
+    
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl">
@@ -97,10 +81,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     </Table>
                 </ScrollArea>
                 <DialogFooter>
-                    <Button variant="outline" onClick={onOpenChange}>Close</Button>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                     <div className="flex-grow" />
-                    <Button variant="outline" onClick={handleCopy}><Copy className="mr-2 h-4 w-4" /> Copy Table</Button>
-                    <Button onClick={handleMail}><Mail className="mr-2 h-4 w-4" /> Mail to Bank</Button>
+                    <Button onClick={handleCopy}><Copy className="mr-2 h-4 w-4" /> Copy for Mail</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
