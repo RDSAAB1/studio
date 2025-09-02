@@ -41,7 +41,14 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signOut(auth); // Ensure previous user is signed out
-            await signInWithPopup(auth, googleProvider);
+            const result = await signInWithPopup(auth, googleProvider);
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+
+            if (credential?.refreshToken && auth.currentUser) {
+                // This is a non-standard but effective way to attach the refresh token to the user object in-memory for the current session.
+                // It's not persisted by Firebase but is available on the client for passing to server actions.
+                (auth.currentUser as any).refreshToken = credential.refreshToken;
+            }
             
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
@@ -60,6 +67,7 @@ export default function LoginPage() {
                 description: errorMessage,
                 variant: "destructive"
             });
+        } finally {
             setLoading(false);
         }
     };

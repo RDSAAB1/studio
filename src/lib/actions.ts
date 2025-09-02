@@ -20,7 +20,9 @@ const getOAuth2Client = (refreshToken: string) => {
         process.env.GOOGLE_CLIENT_SECRET,
         process.env.GOOGLE_REDIRECT_URI // This can be a placeholder if you're not doing a full web flow here
     );
-    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    if (refreshToken) {
+        oauth2Client.setCredentials({ refresh_token: refreshToken });
+    }
     return oauth2Client;
 };
 
