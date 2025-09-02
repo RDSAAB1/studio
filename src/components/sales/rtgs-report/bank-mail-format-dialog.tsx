@@ -39,16 +39,19 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <p>Dear Sir/Madam,</p>
                 <p>Please process the following RTGS payments:</p>
                 <br/>
-                <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; font-size: 13px;">
-                    ${tableRef.current.innerHTML}
-                </table>
+                ${tableRef.current.outerHTML}
                 <br/>
                 <p>Thank you,</p>
                 <p>${settings.companyName}</p>
             `;
             const subject = "RTGS Payment Request";
             const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(tableHtml)}`;
-            window.location.href = mailtoLink;
+            
+            // Using window.open instead of window.location.href for better compatibility
+            const newWindow = window.open(mailtoLink, '_blank');
+            if (!newWindow) {
+                 window.location.href = mailtoLink;
+            }
         }
     };
 
