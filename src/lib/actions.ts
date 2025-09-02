@@ -2,8 +2,7 @@
 'use server';
 
 import nodemailer from 'nodemailer';
-import { google } from 'googleapis';
-import { getRefreshToken } from './firestore';
+import { getCompanySettings } from './firestore';
 
 
 interface EmailOptions {
@@ -12,59 +11,35 @@ interface EmailOptions {
     body: string;
     attachmentBuffer: number[];
     filename: string;
-    userEmail: string;
     userId: string;
 }
 
-const getOAuth2Client = () => {
-    return new google.auth.OAuth2(
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET,
-        "http://localhost" // This is a placeholder, but required for the library
-    );
-};
-
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename, userEmail, userId } = options;
-
-    if (!userId) {
-        return { success: false, error: "Authentication failed. User ID not provided." };
-    }
+    const { to, subject, body, attachmentBuffer, filename, userId } = options;
 
     try {
-        const refreshToken = await getRefreshToken(userId);
-        if (!refreshToken) {
-            return { success: false, error: "Authentication failed. Refresh token not found. Please sign out and sign in again." };
-        }
+        const companySettings = await getCompanySettings(userId);
 
-        const oauth2Client = getOAuth2Client();
-        oauth2Client.setCredentials({ refresh_token: refreshToken });
-
-        const { token: accessToken } = await oauth2Client.getAccessToken();
-
-        if (!accessToken) {
-            return { success: false, error: "Failed to obtain access token." };
+        if (!companySettings || !companySettings.email || !companySettings.appPassword) {
+            return { success: false, error: "Email settings are not configured. Please go to Settings to connect your Gmail account." };
         }
 
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
-                type: 'OAuth2',
-                user: userEmail,
-                clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-                clientSecret: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET,
-                refreshToken: refreshToken,
-                accessToken: accessToken,
+                user: companySettings.email,
+                pass: companySettings.appPassword,
             },
         });
 
         const buffer = Buffer.from(attachmentBuffer);
 
-        await transporter.sendMail({
-            from: `"${userEmail}" <${userEmail}>`,
+        const mailOptions = {
+            from: `"${companySettings.email}" <${companySettings.email}>`,
             to: to,
             subject: subject,
             text: body,
+            html: `<p>${body.replace(/\n/g, '<br>')}</p>`, // Basic HTML version
             attachments: [
                 {
                     filename: filename,
@@ -72,14 +47,16 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
                     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 },
             ],
-        });
+        };
 
+        await transporter.sendMail(mailOptions);
+        
         return { success: true };
     } catch (error: any) {
-        console.error('Error sending email:', error.response?.data || error.message);
-        let errorMessage = "Failed to send email. Please try again later.";
-        if (error.response?.data?.error === 'invalid_grant' || (error.message && error.message.includes('invalid_grant'))) {
-            errorMessage = "Authentication failed. Please sign out and sign in again.";
+        console.error('Error sending email:', error);
+        let errorMessage = "Failed to send email. Please check your App Password and try again.";
+         if (error.code === 'EAUTH') {
+            errorMessage = 'Authentication failed. Please verify your email and App Password in Settings.';
         } else if (error.message) {
             errorMessage = error.message;
         }

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { Auth, User, OAuthCredential } from 'firebase/auth';
+import type { Auth, User } from 'firebase/auth';
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { saveRefreshToken } from '@/lib/firestore';
 
 
 export default function LoginPage() {
@@ -43,12 +42,10 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signOut(auth); // Ensure previous user is signed out
-            const result = await signInWithPopup(auth, googleProvider);
-            const credential = GoogleAuthProvider.credentialFromResult(result);
-
-            if (credential?.refreshToken && result.user) {
-                await saveRefreshToken(result.user.uid, credential.refreshToken);
-            }
+            await signInWithPopup(auth, googleProvider);
+            // On successful login, the onAuthStateChanged listener in MainLayout will handle redirection
+            // to the dashboard. But first, we redirect to the Gmail connection page.
+            router.push('/connect-gmail');
             
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);

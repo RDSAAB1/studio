@@ -74,18 +74,23 @@ export async function deleteOption(collectionName: string, id: string): Promise<
 
 // --- Company & RTGS Settings Functions ---
 
-export async function getCompanySettings(): Promise<{ name: string; email: string; appPassword: string } | null> {
-    const docRef = doc(settingsCollection, "companyDetails");
+export async function getCompanySettings(userId: string): Promise<{ email: string; appPassword: string } | null> {
+    if (!userId) return null;
+    const docRef = doc(db, "users", userId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-        return docSnap.data() as { name: string; email: string; appPassword: string };
+        const data = docSnap.data();
+        return {
+            email: data.email,
+            appPassword: data.appPassword
+        };
     }
     return null;
 }
 
-export async function saveCompanySettings(settings: { name: string; email: string; appPassword: string }): Promise<void> {
-    const docRef = doc(settingsCollection, "companyDetails");
-    await setDoc(docRef, settings, { merge: true });
+export async function saveCompanySettings(userId: string, settings: { email: string; appPassword: string }): Promise<void> {
+    const userDocRef = doc(db, "users", userId);
+    await setDoc(userDocRef, settings, { merge: true });
 }
 
 
