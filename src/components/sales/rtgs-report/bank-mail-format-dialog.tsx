@@ -43,16 +43,16 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             return;
         }
         
-        const refreshToken = (auth.currentUser as any).refreshToken;
-        if (!refreshToken) {
-            toast({ title: "Authentication failed. Please sign out and sign in again.", variant: "destructive" });
-            return;
-        }
-
-
         setIsSending(true);
 
         try {
+            const idToken = await auth.currentUser.getIdToken(true);
+            const userEmail = auth.currentUser.email;
+
+            if (!idToken || !userEmail) {
+                throw new Error("Authentication failed. No ID token provided.");
+            }
+
             const dataToExport = payments.map((p: any) => ({
                 'Sr.No': p.srNo,
                 'Debit_Ac_No': settings.accountNo,
@@ -82,7 +82,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
                 attachmentBuffer: bufferAsArray,
                 filename,
-                refreshToken: refreshToken
+                idToken: idToken,
+                userEmail: userEmail,
             });
 
             if (result.success) {
