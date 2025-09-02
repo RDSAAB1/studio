@@ -10,11 +10,11 @@ import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings } 
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { toTitleCase } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen } from 'lucide-react';
@@ -29,7 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 
 // Schemas
@@ -289,7 +288,9 @@ export default function SettingsPage() {
                                                             </CardFooter>
                                                         </Card>
                                                     </div>
-                                                    <DialogFooter><Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button></DialogFooter>
+                                                    <DialogFooter className="sm:justify-start">
+                                                        <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
+                                                    </DialogFooter>
                                                 </DialogContent>
                                             </Dialog>
                                         </div>
