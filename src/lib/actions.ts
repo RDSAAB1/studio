@@ -25,6 +25,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
     
     const fromEmail = companySettings.email;
     const appPassword = companySettings.appPassword;
+    const companyName = companySettings.name || fromEmail;
 
     try {
         const transporter = nodemailer.createTransport({
@@ -38,7 +39,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         const buffer = Buffer.from(attachmentBuffer);
 
         await transporter.sendMail({
-            from: `"${companySettings.name || fromEmail}" <${fromEmail}>`,
+            from: `"${companyName}" <${fromEmail}>`,
             to: to,
             subject: subject,
             text: body,
@@ -55,7 +56,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
     } catch (error: any) {
         console.error('Error sending email:', error);
         let errorMessage = "Failed to send email. Please check your app password and try again later.";
-        if (error.code === 'EAUTH') {
+        if (error.code === 'EAUTH' || (error.responseCode === 535)) {
             errorMessage = "Authentication failed. Please check the App Password in your settings.";
         }
         return { success: false, error: errorMessage };
