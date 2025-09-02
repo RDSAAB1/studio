@@ -3,8 +3,6 @@
 
 import nodemailer from 'nodemailer';
 import { OAuth2Client } from 'google-auth-library';
-import { getAuth } from 'firebase-admin/auth';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
 
 interface EmailOptions {
     to: string;
@@ -14,16 +12,6 @@ interface EmailOptions {
     filename: string;
     accessToken: string;
     userEmail: string;
-}
-
-// Helper function to initialize Firebase Admin SDK safely
-function tryInitializeAdminApp() {
-    if (getApps().length === 0) {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
-        initializeApp({
-            credential: cert(serviceAccount)
-        });
-    }
 }
 
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
@@ -74,6 +62,13 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         return { success: true };
     } catch (error: any) {
         console.error('Error sending email:', error);
-        return { success: false, error: `Failed to send email: ${error.message}` };
+        // Provide a more user-friendly error message
+        let errorMessage = "Failed to send email. Please try again later.";
+        if (error.code === 'EAUTH') {
+            errorMessage = "Authentication failed. Please sign out and sign in again.";
+        } else if (error.message.includes('Token has been expired or revoked')) {
+             errorMessage = "Your session has expired. Please sign out and sign in again to refresh your permissions.";
+        }
+        return { success: false, error: errorMessage };
     }
 }
