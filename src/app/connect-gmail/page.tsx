@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import { getFirebaseAuth } from '@/lib/firebase';
 import { saveCompanySettings } from '@/lib/firestore';
 import type { User } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, KeyRound, ExternalLink, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, KeyRound, ExternalLink, ShieldCheck, AlertCircle, LogOut } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -80,8 +81,7 @@ export default function ConnectGmailPage() {
                 description: "Your email settings have been connected.",
                 variant: "success",
             });
-            // On successful connection, redirect to the dashboard.
-            // The main-layout listener will now let the user through.
+            // On successful connection, the main-layout listener will let the user through to the dashboard.
             router.push('/sales/dashboard-overview');
         } catch (error) {
             console.error("Error saving settings:", error);
@@ -95,6 +95,21 @@ export default function ConnectGmailPage() {
         }
     };
     
+    const handleSignOut = async () => {
+        const auth = getFirebaseAuth();
+        try {
+            await signOut(auth);
+            router.push('/login');
+        } catch (error) {
+            console.error("Error signing out:", error);
+            toast({
+                title: "Sign Out Failed",
+                description: "Could not sign out. Please try again.",
+                variant: "destructive",
+            });
+        }
+    };
+
     const cardContent = () => {
         if (loading) {
             return (
@@ -193,10 +208,14 @@ export default function ConnectGmailPage() {
                         </div>
                     </div>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex-col gap-3">
                     <Button onClick={handleSave} disabled={saving} className="w-full">
                         {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                         Save & Continue
+                    </Button>
+                     <Button variant="link" size="sm" onClick={handleSignOut} className="text-muted-foreground">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out & Use Different Account
                     </Button>
                 </CardFooter>
             </>
