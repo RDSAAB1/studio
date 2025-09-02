@@ -1,8 +1,7 @@
 
 "use client";
 
-import { useEffect } from 'react';
-import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -16,20 +15,15 @@ export default function LoginPage() {
     const router = useRouter();
     const { toast } = useToast();
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                router.replace('/sales/dashboard-overview');
-            }
-        });
-        return () => unsubscribe();
-    }, [router]);
-
     const handleSignIn = async () => {
         try {
-            await signInWithPopup(auth, provider);
-            // onAuthStateChanged will handle the redirect
-            toast({ title: "Login Successful", description: "Welcome back!", variant: "success" });
+            const result = await signInWithPopup(auth, provider);
+            // On successful sign-in, Firebase automatically persists the user's session.
+            // We can now manually redirect the user to the dashboard.
+            if (result.user) {
+                toast({ title: "Login Successful", description: "Welcome back!", variant: "success" });
+                router.replace('/sales/dashboard-overview');
+            }
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred.";
