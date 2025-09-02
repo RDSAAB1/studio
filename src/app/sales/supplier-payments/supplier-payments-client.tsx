@@ -191,7 +191,7 @@ export default function SupplierPaymentsClient() {
     }, (error) => {
         if(isSubscribed) {
             console.error("Error fetching suppliers:", error);
-            stableToast({ variant: 'destructive', title: "Failed to load supplier data" });
+            stableToast({ title: "Failed to load supplier data.", variant: 'destructive' });
             setLoading(false);
         }
     });
@@ -207,7 +207,7 @@ export default function SupplierPaymentsClient() {
     }, (error) => {
         if(isSubscribed) {
             console.error("Error fetching payments:", error);
-            stableToast({ variant: 'destructive', title: "Failed to load payment history" });
+            stableToast({ title: "Failed to load payment history.", variant: 'destructive' });
         }
     });
     
@@ -386,11 +386,11 @@ export default function SupplierPaymentsClient() {
 
     const processPayment = async () => {
         if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
-            toast({ variant: 'destructive', title: "No supplier selected" });
+            toast({ title: "No supplier selected", variant: 'destructive' });
             return;
         }
         if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) {
-            toast({ variant: 'destructive', title: "Please select entries to pay" });
+            toast({ title: "Please select entries to pay", variant: 'destructive' });
             return;
         }
 
@@ -398,11 +398,11 @@ export default function SupplierPaymentsClient() {
         const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
 
         if (totalPaidAmount <= 0) {
-            toast({ variant: 'destructive', title: "Payment amount must be positive" });
+            toast({ title: "Payment amount must be positive", variant: 'destructive' });
             return;
         }
         if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalPaidAmount > totalOutstandingForSelected) {
-            toast({ variant: 'destructive', title: "Partial payment cannot exceed outstanding" });
+            toast({ title: "Partial payment cannot exceed outstanding", variant: 'destructive' });
             return;
         }
 
@@ -500,14 +500,14 @@ export default function SupplierPaymentsClient() {
                 }
             });
 
-            toast({ title: "Success", description: `Payment ${editingPayment ? 'updated' : 'processed'}.` });
+            toast({ title: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, variant: 'success' });
             if (paymentMethod === 'RTGS' && finalPaymentData) {
                 setRtgsReceiptData(finalPaymentData);
             }
             resetPaymentForm(rtgsFor === 'Outsider');
         } catch (error) {
             console.error("Error processing payment:", error);
-            toast({ variant: "destructive", title: "Transaction Failed", description: "Failed to process payment." });
+            toast({ title: "Transaction Failed", variant: "destructive" });
         }
     };
 
@@ -520,7 +520,7 @@ export default function SupplierPaymentsClient() {
           const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
           
           if (foundSrNos.size !== srNosInPayment.length) {
-              toast({ variant: "destructive", title: "Cannot Edit: Original entry missing." });
+              toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
               return;
           }
 
@@ -557,13 +557,13 @@ export default function SupplierPaymentsClient() {
             bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
         });
         setActiveTab('processing');
-        toast({ title: "Editing Mode", description: `Editing payment ${paymentToEdit.paymentId}.` });
+        toast({ title: `Now editing payment ${paymentToEdit.paymentId}.` });
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string) => {
         const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
-            toast({ variant: "destructive", title: "Payment not found or ID missing" });
+            toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
     
@@ -602,17 +602,17 @@ export default function SupplierPaymentsClient() {
                 transaction.delete(paymentRef);
             });
     
-            toast({ title: 'Payment Deleted', description: `Payment ${paymentToDelete.paymentId} has been removed.`, duration: 3000 });
+            toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) {
             console.error("Error deleting payment:", error);
-            toast({ variant: "destructive", title: "Failed to delete payment" });
+            toast({ title: "Failed to delete payment.", variant: "destructive" });
         }
     };
     
     const handlePaySelectedOutstanding = () => {
         if (selectedEntryIds.size === 0) {
-            toast({ variant: "destructive", title: "No Entries Selected" });
+            toast({ title: "No Entries Selected.", variant: "destructive" });
             return;
         }
         setIsOutstandingModalOpen(false);
@@ -620,7 +620,7 @@ export default function SupplierPaymentsClient() {
 
     const handleGeneratePaymentOptions = () => {
         if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate > calcMaxRate) {
-            toast({ variant: 'destructive', title: 'Invalid input for payment calculation' });
+            toast({ title: 'Invalid input for payment calculation.', variant: 'destructive' });
             return;
         }
 
@@ -663,7 +663,7 @@ export default function SupplierPaymentsClient() {
         setPaymentOptions(limitedOptions);
         setSortConfig(null);
         
-        toast({ title: 'Success', description: `Generated ${limitedOptions.length} payment options.` });
+        toast({ title: `Generated ${limitedOptions.length} payment options.`, variant: 'success' });
     };
 
     const selectPaymentAmount = (option: PaymentOption) => {
@@ -672,7 +672,7 @@ export default function SupplierPaymentsClient() {
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
         setRtgsAmount(option.calculatedAmount);
-        toast({ title: 'Selected', description: `Amount ${formatCurrency(option.calculatedAmount)} selected.` });
+        toast({ title: `Amount ${formatCurrency(option.calculatedAmount)} selected.`, variant: 'success' });
     };
 
     const requestSort = (key: keyof PaymentOption) => {
@@ -792,13 +792,13 @@ export default function SupplierPaymentsClient() {
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} 
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate}
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
-                        checkNo={checkNo} setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
                         processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}

@@ -63,6 +63,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     <Table ref={tableRef} className="bg-white">
                         <TableHeader className="bg-yellow-300">
                             <TableRow>
+                                <TableHead className="text-black font-bold border">Sr.No</TableHead>
+                                <TableHead className="text-black font-bold border">Debit_Ac_No</TableHead>
                                 <TableHead className="text-black font-bold border">Amount</TableHead>
                                 <TableHead className="text-black font-bold border">IFSC_Code</TableHead>
                                 <TableHead className="text-black font-bold border">Credit_Ac_No</TableHead>
@@ -73,6 +75,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                         <TableBody>
                             {payments.map((p: any, index: number) => (
                                 <TableRow key={p.paymentId || index}>
+                                    <TableCell className="border">{p.srNo}</TableCell>
+                                    <TableCell className="border">{settings.accountNo}</TableCell>
                                     <TableCell className="border">{p.amount}</TableCell>
                                     <TableCell className="border">{p.ifscCode}</TableCell>
                                     <TableCell className="border">{p.acNo}</TableCell>
