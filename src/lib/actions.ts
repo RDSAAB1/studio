@@ -2,6 +2,7 @@
 'use server';
 
 import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
 
 interface EmailOptions {
     to: string;
@@ -9,26 +10,54 @@ interface EmailOptions {
     body: string;
     attachmentBuffer: number[];
     filename: string;
+    refreshToken: string;
 }
 
+const OAuth2 = google.auth.OAuth2;
+
+const getOAuth2Client = (refreshToken: string) => {
+    return new OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI 
+    );
+};
+
+
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename } = options;
+    const { to, subject, body, attachmentBuffer, filename, refreshToken } = options;
 
-    const fromEmail = process.env.GMAIL_APP_EMAIL;
-    const appPassword = process.env.GMAIL_APP_PASSWORD;
-
-    if (!fromEmail || !appPassword) {
-        const errorMsg = "Gmail credentials are not configured in .env file.";
+    const fromEmail = process.env.NEXT_PUBLIC_SENDER_EMAIL;
+    if (!fromEmail) {
+        const errorMsg = "Sender email is not configured in .env file.";
         console.error(errorMsg);
         return { success: false, error: errorMsg };
     }
 
+    if (!refreshToken) {
+        return { success: false, error: "Authentication failed. Please sign out and sign in again." };
+    }
+    
+    const oauth2Client = getOAuth2Client(refreshToken);
+    oauth2Client.setCredentials({
+        refresh_token: refreshToken
+    });
+
     try {
+        const { token: accessToken } = await oauth2Client.getAccessToken();
+        if (!accessToken) {
+             return { success: false, error: "Failed to create access token. Please sign out and sign in again." };
+        }
+
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
+                type: 'OAuth2',
                 user: fromEmail,
-                pass: appPassword,
+                clientId: process.env.GOOGLE_CLIENT_ID,
+                clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                refreshToken: refreshToken,
+                accessToken: accessToken,
             },
         });
 
@@ -48,13 +77,15 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
             ],
         });
 
-        console.log('Email sent successfully via App Password.');
         return { success: true };
     } catch (error: any) {
         console.error('Error sending email:', error);
-        let errorMessage = "Failed to send email. Please check your App Password and try again.";
-        if (error.code === 'EAUTH') {
-            errorMessage = "Authentication failed. Please verify your Gmail email and App Password in the .env file.";
+        // Provide a more specific error message if available
+        let errorMessage = "Failed to send email. Please try again later.";
+        if (error.response?.data?.error_description) {
+            errorMessage = error.response.data.error_description;
+        } else if (error.message?.includes('invalid_grant')) {
+            errorMessage = "Authentication failed. Please sign out and sign in again.";
         }
         return { success: false, error: errorMessage };
     }
