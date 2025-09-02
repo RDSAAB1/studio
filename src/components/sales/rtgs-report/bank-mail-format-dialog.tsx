@@ -12,6 +12,8 @@ import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { sendEmailWithAttachment } from '@/lib/actions';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase'; // Assuming auth is exported from firebase.ts
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
@@ -33,6 +35,20 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     const handleSendMail = async () => {
         if (payments.length === 0) {
             toast({ title: "No data to send", variant: "destructive" });
+            return;
+        }
+
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            toast({ title: "Authentication Error", description: "You must be logged in to send emails.", variant: "destructive" });
+            return;
+        }
+
+        const accessToken = await currentUser.getIdToken(true);
+        const userEmail = currentUser.email;
+
+        if (!userEmail) {
+             toast({ title: "Authentication Error", description: "Could not retrieve your email address.", variant: "destructive" });
             return;
         }
 
@@ -66,7 +82,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 subject,
                 body,
                 attachmentBuffer: bufferAsArray,
-                filename
+                filename,
+                accessToken: accessToken,
+                userEmail: userEmail,
             });
 
             if (result.success) {

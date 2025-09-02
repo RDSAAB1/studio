@@ -1,15 +1,13 @@
 
 "use client";
 
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { signInWithPopup, getAdditionalUserInfo, OAuthProvider } from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-
-const provider = new GoogleAuthProvider();
 
 export default function LoginPage() {
     const { toast } = useToast();
@@ -17,7 +15,7 @@ export default function LoginPage() {
 
     const handleSignIn = async () => {
         try {
-            await signInWithPopup(auth, provider);
+            await signInWithPopup(auth, googleProvider);
             // The onAuthStateChanged listener in MainLayout will handle the redirect.
             toast({ title: "Login Successful", description: "Redirecting to dashboard...", variant: "success" });
         } catch (error: any) {
@@ -29,6 +27,8 @@ export default function LoginPage() {
                 errorMessage = "Network error. Please check your connection.";
             } else if (error.code === 'auth/configuration-not-found') {
                 errorMessage = "Authentication is not configured correctly. Please contact support.";
+            } else if (error.code === 'auth/operation-not-allowed') {
+                 errorMessage = "Sign-in with Google is not enabled for this app. Please contact support.";
             }
             toast({
                 title: "Login Failed",

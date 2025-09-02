@@ -2,44 +2,62 @@
 'use server';
 
 import nodemailer from 'nodemailer';
+import { OAuth2Client } from 'google-auth-library';
+import { getAuth } from 'firebase-admin/auth';
+import { getApps, initializeApp, cert } from 'firebase-admin/app';
 
 interface EmailOptions {
     to: string;
     subject: string;
     body: string;
-    attachmentBuffer: number[]; 
+    attachmentBuffer: number[];
     filename: string;
+    accessToken: string;
+    userEmail: string;
+}
+
+// Helper function to initialize Firebase Admin SDK safely
+function tryInitializeAdminApp() {
+    if (getApps().length === 0) {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
+        initializeApp({
+            credential: cert(serviceAccount)
+        });
+    }
 }
 
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename } = options;
+    const { to, subject, body, attachmentBuffer, filename, accessToken, userEmail } = options;
 
-    // Retrieve email credentials from environment variables
-    const gmailEmail = process.env.GMAIL_EMAIL;
-    const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
-
-    if (!gmailEmail || !gmailAppPassword) {
-        const errorMsg = "Email credentials are not configured in .env file.";
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        const errorMsg = "Google OAuth credentials are not configured in .env file.";
         console.error(errorMsg);
         return { success: false, error: errorMsg };
     }
 
-    // Create a transporter object using the default SMTP transport
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: gmailEmail,
-            pass: gmailAppPassword,
-        },
-    });
-
     try {
-        // Convert the array of numbers back to a Buffer
+        const oauth2Client = new OAuth2Client(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET
+        );
+
+        oauth2Client.setCredentials({ access_token: accessToken });
+
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                type: 'OAuth2',
+                user: userEmail,
+                clientId: process.env.GOOGLE_CLIENT_ID,
+                clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                accessToken: accessToken,
+            },
+        });
+
         const buffer = Buffer.from(attachmentBuffer);
 
-        // Send mail with defined transport object
         await transporter.sendMail({
-            from: `"BizSuite DataFlow" <${gmailEmail}>`,
+            from: `"${userEmail}" <${userEmail}>`,
             to: to,
             subject: subject,
             text: body,
@@ -52,7 +70,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
             ],
         });
 
-        console.log('Email sent successfully');
+        console.log('Email sent successfully via OAuth2');
         return { success: true };
     } catch (error: any) {
         console.error('Error sending email:', error);
