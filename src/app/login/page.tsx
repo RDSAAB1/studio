@@ -45,7 +45,7 @@ export default function LoginPage() {
             const credential = GoogleAuthProvider.credentialFromResult(result);
 
             if (credential?.refreshToken && auth.currentUser) {
-                // This is a non-standard but effective way to attach the refresh token to the user object in-memory for the current session.
+                 // This is a non-standard but effective way to attach the refresh token to the user object in-memory for the current session.
                 // It's not persisted by Firebase but is available on the client for passing to server actions.
                 (auth.currentUser as any).refreshToken = credential.refreshToken;
             }

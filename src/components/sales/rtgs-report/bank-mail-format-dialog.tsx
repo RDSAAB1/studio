@@ -42,6 +42,13 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             toast({ title: "Authentication Error", description: "You must be logged in to send emails.", variant: "destructive" });
             return;
         }
+        
+        const refreshToken = (auth.currentUser as any).refreshToken;
+        if (!refreshToken) {
+            toast({ title: "Authentication failed. Please sign out and sign in again.", variant: "destructive" });
+            return;
+        }
+
 
         setIsSending(true);
 
@@ -63,7 +70,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             const bufferAsArray = Array.from(new Uint8Array(excelBuffer));
 
             const today = format(new Date(), 'yyyy-MM-dd');
-            // The recipient email should be configured, using a placeholder for now
+            // This should be a configurable bank email address, for now using a placeholder.
             const bankEmail = "your.bank.email@example.com";
             const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
             const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
@@ -75,6 +82,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
                 attachmentBuffer: bufferAsArray,
                 filename,
+                refreshToken: refreshToken
             });
 
             if (result.success) {

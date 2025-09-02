@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
@@ -38,7 +37,7 @@ const getGoogleProvider = (): GoogleAuthProvider => {
     provider.addScope('https://www.googleapis.com/auth/gmail.send');
     provider.setCustomParameters({
         access_type: 'offline', // Request a refresh token
-        prompt: 'consent' // Force consent screen to get refresh token on every login
+        prompt: 'consent' // Force consent screen to get refresh token on every login for simplicity
     });
     return provider;
 };
