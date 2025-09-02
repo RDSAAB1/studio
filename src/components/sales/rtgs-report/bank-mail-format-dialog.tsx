@@ -1,60 +1,83 @@
 
 "use client";
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Mail } from 'lucide-react';
+import { Mail, Loader2 } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import { sendEmailWithAttachment } from '@/lib/actions';
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
     const tableRef = useRef<HTMLTableElement>(null);
+    const [isSending, setIsSending] = useState(false);
 
-    const handleExportAndMail = () => {
+    const handleSendMail = async () => {
         if (payments.length === 0) {
-            toast({ title: "No data to export", variant: "destructive" });
+            toast({ title: "No data to send", variant: "destructive" });
             return;
         }
 
-        // 1. Prepare data and create Excel file
-        const dataToExport = payments.map((p: any) => ({
-            'Sr.No': p.srNo,
-            'Debit_Ac_No': settings.accountNo,
-            'Amount': p.amount,
-            'IFSC_Code': p.ifscCode,
-            'Credit_Ac_No': p.acNo,
-            'Beneficiary_Name': toTitleCase(p.supplierName),
-            'Scheme Type': p.type
-        }));
+        setIsSending(true);
 
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
-        worksheet['!cols'] = [
-            { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }
-        ];
+        try {
+            // 1. Prepare data and create Excel file buffer
+            const dataToExport = payments.map((p: any) => ({
+                'Sr.No': p.srNo,
+                'Debit_Ac_No': settings.accountNo,
+                'Amount': p.amount,
+                'IFSC_Code': p.ifscCode,
+                'Credit_Ac_No': p.acNo,
+                'Beneficiary_Name': toTitleCase(p.supplierName),
+                'Scheme Type': p.type
+            }));
 
-        // 2. Download the Excel file
-        const today = format(new Date(), 'yyyy-MM-dd');
-        XLSX.writeFile(workbook, `RTGS_Report_${today}.xlsx`);
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+            worksheet['!cols'] = [
+                { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }
+            ];
+            
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const bufferAsArray = Array.from(new Uint8Array(excelBuffer));
 
-        toast({ title: "Excel file downloaded!", description: "You can now attach it to your email.", variant: "success" });
 
-        // 3. Open Gmail in a new tab
-        const bankEmail = settings.gmail || "your.bank.email@example.com"; 
-        const subject = encodeURIComponent(`RTGS Payment Advice - ${settings.companyName} - ${today}`);
-        const body = encodeURIComponent(
-          `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`
-        );
-        
-        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${bankEmail}&su=${subject}&body=${body}`;
-        window.open(gmailUrl, '_blank');
+            // 2. Prepare email content
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const bankEmail = settings.gmail || "your.bank.email@example.com";
+            const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
+            const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
+            const filename = `RTGS_Report_${today}.xlsx`;
+
+            // 3. Call server action to send email
+            const result = await sendEmailWithAttachment({
+                to: bankEmail,
+                subject,
+                body,
+                attachmentBuffer: bufferAsArray,
+                filename
+            });
+
+            if (result.success) {
+                toast({ title: "Email Sent!", description: "The RTGS report has been sent successfully.", variant: "success" });
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error || "An unknown error occurred.");
+            }
+
+        } catch (error: any) {
+            console.error("Error sending email:", error);
+            toast({ title: "Failed to Send Email", description: error.message || "Please check server logs.", variant: "destructive" });
+        } finally {
+            setIsSending(false);
+        }
     };
     
     return (
@@ -63,7 +86,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogHeader>
                     <DialogTitle>Bank Mail Format</DialogTitle>
                     <DialogDescription>
-                        This will download an Excel file and open a pre-filled email in a new tab.
+                        This format will be sent directly to the bank via email with an Excel attachment.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] border rounded-lg">
@@ -95,11 +118,14 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     </Table>
                 </ScrollArea>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSending}>Close</Button>
                     <div className="flex-grow" />
-                    <Button onClick={handleExportAndMail}>
-                        <Mail className="mr-2 h-4 w-4" />
-                        Download Excel &amp; Open Mail
+                    <Button onClick={handleSendMail} disabled={isSending}>
+                        {isSending ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>
+                        ) : (
+                            <><Mail className="mr-2 h-4 w-4" /> Send Mail Directly</>
+                        )}
                     </Button>
                 </DialogFooter>
             </DialogContent>
