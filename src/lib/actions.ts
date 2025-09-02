@@ -6,36 +6,49 @@ import { getApps } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 import { Readable } from 'stream';
 
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  : undefined;
+const tryInitializeAdminApp = () => {
+    if (getApps().length > 0) {
+        return admin.app();
+    }
+    
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccount) {
+        console.error("Firebase service account key is not set in environment variables.");
+        return null;
+    }
 
-if (!getApps().length) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    });
-}
-
-const bucket = getStorage().bucket();
+    try {
+        const parsedServiceAccount = JSON.parse(serviceAccount);
+        return admin.initializeApp({
+            credential: admin.credential.cert(parsedServiceAccount),
+            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        });
+    } catch (error) {
+        console.error("Failed to parse Firebase service account key or initialize app:", error);
+        return null;
+    }
+};
 
 export async function uploadFileToStorage(
   bufferData: number[], // Pass buffer as an array of numbers
   fileName: string
 ): Promise<string> {
+  const app = tryInitializeAdminApp();
+  if (!app) {
+      throw new Error("Firebase Admin SDK not initialized. Check server logs.");
+  }
+  const bucket = getStorage(app).bucket();
+  
   try {
     const filePath = `rtgs-reports/${fileName}`;
     const file = bucket.file(filePath);
     
-    // Convert the array of numbers back to a Buffer
     const buffer = Buffer.from(bufferData);
 
-    // Create a readable stream from the buffer
     const stream = new Readable();
     stream.push(buffer);
     stream.push(null);
 
-    // Pipe the stream to the file in Firebase Storage
     await new Promise((resolve, reject) => {
         const writeStream = file.createWriteStream({
             metadata: {
@@ -47,10 +60,8 @@ export async function uploadFileToStorage(
         stream.pipe(writeStream);
     });
 
-    // Make the file public and get its URL
     await file.makePublic();
     
-    // Return the public URL
     return file.publicUrl();
 
   } catch (error: any) {
