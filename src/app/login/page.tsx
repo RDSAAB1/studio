@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Auth, GoogleAuthProvider } from 'firebase/auth';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signOut } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2 } from 'lucide-react';
@@ -36,6 +36,8 @@ export default function LoginPage() {
 
         setLoading(true);
         try {
+            // Force sign out to ensure the account selection prompt always appears
+            await signOut(auth);
             await signInWithPopup(auth, googleProvider);
             // The onAuthStateChanged listener in MainLayout will handle the redirect.
             // No need to setLoading(false) here as the component will unmount.
