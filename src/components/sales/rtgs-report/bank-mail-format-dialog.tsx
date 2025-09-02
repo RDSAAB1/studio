@@ -7,12 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Mail, Loader2 } from 'lucide-react';
+import { Mail, Loader2 } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from '@/lib/firebase';
+import { uploadFileToStorage } from '@/lib/actions';
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
@@ -47,18 +46,14 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
 
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             
-            // 2. Upload the file to Firebase Storage
+            // 2. Upload the file to Firebase Storage via Server Action
             const today = format(new Date(), 'yyyy-MM-dd');
             const fileName = `RTGS_Report_${today}_${Date.now()}.xlsx`;
-            const storageRef = ref(storage, `rtgs-reports/${fileName}`);
             
-            await uploadBytes(storageRef, excelBuffer);
-            
-            // 3. Get the download URL
-            const downloadURL = await getDownloadURL(storageRef);
+            const downloadURL = await uploadFileToStorage(excelBuffer, fileName);
 
-            // 4. Open Gmail with the link
-            const bankEmail = "your.bank.email@example.com";
+            // 3. Open Gmail with the link
+            const bankEmail = "your.bank.email@example.com"; // Replace with actual bank email if available
             const subject = encodeURIComponent(`RTGS Payment Advice - ${settings.companyName} - ${today}`);
             const body = encodeURIComponent(
               `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}. You can download the file from the link below:\n\n${downloadURL}\n\nThank you,\n${settings.companyName}`
