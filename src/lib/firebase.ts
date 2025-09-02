@@ -1,9 +1,9 @@
 
 // src/lib/firebase.ts
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,14 +16,24 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const storage = getStorage(app);
-const auth = getAuth(app);
 
-// Configure Google Auth Provider to request email sending scope
-const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+// Use a function to get auth instance to ensure it's client-side
+let auth: Auth;
+const getFirebaseAuth = (): Auth => {
+    if (!auth) {
+        auth = getAuth(app);
+    }
+    return auth;
+}
+
+const getGoogleProvider = (): GoogleAuthProvider => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/gmail.send');
+    return provider;
+};
 
 
-export { db, storage, auth, googleProvider };
+export { app, db, storage, getFirebaseAuth, getGoogleProvider };

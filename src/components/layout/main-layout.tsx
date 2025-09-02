@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
 
 type MainLayoutProps = {
@@ -26,6 +26,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const router = useRouter();
 
   useEffect(() => {
+    const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
@@ -33,7 +34,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         if (pathname === '/login' || pathname === '/') {
           router.replace('/sales/dashboard-overview');
         }
-      } else {
+      } else if (pathname !== '/login') {
         router.replace('/login');
       }
     });
@@ -126,6 +127,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const handleSignOut = async () => {
     try {
+      const auth = getFirebaseAuth();
       await signOut(auth);
       // The onAuthStateChanged listener will handle the redirect to /login
     } catch (error) {

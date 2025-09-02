@@ -1,21 +1,39 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { Auth, GoogleAuthProvider } from 'firebase/auth';
 import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [auth, setAuth] = useState<Auth | null>(null);
+    const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
+
+    useEffect(() => {
+        // Dynamically get auth and provider on the client side
+        setAuth(getFirebaseAuth());
+        setGoogleProvider(getGoogleProvider());
+    }, []);
 
     const handleSignIn = async () => {
+        if (!auth || !googleProvider) {
+            toast({
+                title: "Authentication not ready",
+                description: "Please wait a moment and try again.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         setLoading(true);
         try {
             await signInWithPopup(auth, googleProvider);
@@ -69,7 +87,7 @@ export default function LoginPage() {
                              <FeatureCard icon={<BarChart3 className="h-5 w-5"/>} title="Insightful Reports" description="Generate RTGS, sales, and financial reports with a single click." />
                              <FeatureCard icon={<Database className="h-5 w-5"/>} title="Secure & Reliable" description="Your data is safe and always accessible with our robust backend." />
                          </div>
-                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={loading}>
+                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={loading || !auth}>
                              {loading ? (
                                 <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
