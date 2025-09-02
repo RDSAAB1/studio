@@ -195,6 +195,7 @@ export default function SettingsPage() {
                                 value={appPassword}
                                 onChange={(e) => setAppPassword(e.target.value)}
                                 placeholder="xxxx xxxx xxxx xxxx"
+                                disabled={!isTwoFactorConfirmed}
                             />
                             <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}>
                                 <DialogTrigger asChild>
@@ -204,14 +205,14 @@ export default function SettingsPage() {
                                     <DialogHeader>
                                         <DialogTitle>How to Get an App Password</DialogTitle>
                                         <DialogDescription>
-                                            An App Password is a 16-digit code that lets our app send emails on your behalf without exposing your main password.
+                                            An App Password lets our app send emails on your behalf without needing your main password.
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4 text-sm">
                                         <Card>
                                           <CardHeader className="p-4">
                                             <CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle>
-                                            <CardDescription className="text-xs">First, please ensure 2-Step Verification is turned on for your Google Account. This is required.</CardDescription>
+                                            <CardDescription className="text-xs">First, ensure 2-Step Verification is on. It's required by Google.</CardDescription>
                                           </CardHeader>
                                           <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
                                              <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
@@ -224,39 +225,39 @@ export default function SettingsPage() {
                                         </Card>
                                         
                                         {isTwoFactorConfirmed && (
-                                            <Card className="animate-in fade-in-50 duration-500">
-                                            <CardHeader className="p-4">
-                                                <CardTitle className="text-base">Step 2: Create App Password</CardTitle>
-                                                <CardDescription className="text-xs">
-                                                  <ul className="list-disc pl-4 space-y-1 mt-2">
-                                                    <li>Go to the App Passwords page using the button below.</li>
-                                                    <li>For the app name, enter "BizSuite DataFlow" and click "Create".</li>
-                                                  </ul>
-                                                </CardDescription>
-                                            </CardHeader>
-                                            <CardFooter className="p-4 pt-0 flex-col items-start gap-3">
-                                                 <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
-                                                    <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
-                                                </a>
-                                                <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
-                                                    <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
-                                                    <p className="text-xs text-primary/90">
-                                                        If you see an error like "You are not eligible...", it means 2-Step Verification is not active. Please complete Step 1 first.
-                                                    </p>
-                                                </div>
-                                            </CardFooter>
-                                            </Card>
+                                            <div className="animate-in fade-in-50 duration-500 space-y-4">
+                                                <Card className="border-primary/50 bg-primary/10">
+                                                    <CardHeader className="p-4">
+                                                        <CardTitle className="text-base">Step 2: Most Important!</CardTitle>
+                                                        <CardDescription className="text-xs">
+                                                        In the next step, Google will show you a 16-character password. Copy it and paste it into the App Password field on our settings page.
+                                                        </CardDescription>
+                                                    </CardHeader>
+                                                </Card>
+                                                <Card>
+                                                    <CardHeader className="p-4">
+                                                        <CardTitle className="text-base">Step 3: Create App Password</CardTitle>
+                                                        <CardDescription className="text-xs">
+                                                        <ul className="list-disc pl-4 space-y-1 mt-2">
+                                                            <li>Go to the App Passwords page using the button below.</li>
+                                                            <li>For the app name, enter "BizSuite DataFlow" and click "Create".</li>
+                                                        </ul>
+                                                        </CardDescription>
+                                                    </CardHeader>
+                                                    <CardFooter className="p-4 pt-0 flex-col items-start gap-3">
+                                                        <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                                            <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                                        </a>
+                                                        <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
+                                                            <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
+                                                            <p className="text-xs text-primary/90">
+                                                                If you see an error like "You are not eligible...", it means 2-Step Verification is not active. Please complete Step 1 first.
+                                                            </p>
+                                                        </div>
+                                                    </CardFooter>
+                                                </Card>
+                                            </div>
                                         )}
-
-                                        <div className="flex gap-4 p-3 border rounded-lg bg-green-500/10 border-green-500/30">
-                                            <div className="font-bold text-lg text-green-600 pt-1">
-                                                <CheckCircle/>
-                                            </div>
-                                            <div>
-                                                <h4 className="font-semibold">Copy & Paste</h4>
-                                                <p className="text-xs text-muted-foreground">Google will show you a 16-character password. Copy it (without spaces) and paste it into the input field on our settings page.</p>
-                                            </div>
-                                        </div>
                                     </div>
                                     <DialogFooter>
                                         <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
@@ -282,7 +283,7 @@ export default function SettingsPage() {
                 <CardHeader>
                     <CardTitle>Email Settings</CardTitle>
                     <CardDescription>
-                        To send reports via email, connect your Gmail account by generating a secure App Password.
+                       To send reports, connect your Gmail account by creating a secure App Password.
                     </CardDescription>
                 </CardHeader>
                 {cardContent()}
