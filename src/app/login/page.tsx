@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Auth, GoogleAuthProvider, User, OAuthCredential } from 'firebase/auth';
-import { signInWithPopup, signOut, GoogleAuthProvider as AuthProvider } from 'firebase/auth';
+import { signInWithPopup, signOut } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle } from 'lucide-react';
@@ -41,13 +41,7 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signOut(auth); // Ensure previous user is signed out
-            const result = await signInWithPopup(auth, googleProvider);
-            const credential = AuthProvider.credentialFromResult(result);
-            if (credential && auth.currentUser) {
-                // Store the OAuth refresh token with the user object for later use
-                // This is a non-standard property, so we cast to `any`
-                 (auth.currentUser as any).refreshToken = credential.refreshToken;
-            }
+            await signInWithPopup(auth, googleProvider);
             
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);

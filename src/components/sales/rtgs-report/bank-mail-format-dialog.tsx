@@ -47,7 +47,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         }
         
         const userEmail = currentUser.email;
-        const refreshToken = (currentUser as any).refreshToken;
+        const refreshToken = (currentUser as any).stsTokenManager?.refreshToken;
 
         if (!userEmail) {
              toast({ title: "Authentication Error", description: "Could not retrieve your email address.", variant: "destructive" });
