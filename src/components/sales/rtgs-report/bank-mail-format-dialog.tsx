@@ -63,7 +63,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             const bufferAsArray = Array.from(new Uint8Array(excelBuffer));
 
             const today = format(new Date(), 'yyyy-MM-dd');
-            const bankEmail = settings.gmail || "your.bank.email@example.com";
+            // The recipient email should be configured, using a placeholder for now
+            const bankEmail = "your.bank.email@example.com";
             const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
             const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
             const filename = `RTGS_Report_${today}.xlsx`;

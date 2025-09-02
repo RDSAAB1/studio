@@ -1,5 +1,4 @@
 
-
 import { db } from "./firebase";
 import {
   collection,
@@ -56,13 +55,28 @@ export async function deleteOption(collectionName: string, id: string): Promise<
 }
 
 
-// --- RTGS Settings Functions ---
+// --- Company & RTGS Settings Functions ---
+
+export async function getCompanySettings(): Promise<{ name: string; email: string; appPassword: string } | null> {
+    const docRef = doc(settingsCollection, "companyDetails");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as { name: string; email: string; appPassword: string };
+    }
+    return null;
+}
+
+export async function saveCompanySettings(settings: { name: string; email: string; appPassword: string }): Promise<void> {
+    const docRef = doc(settingsCollection, "companyDetails");
+    await setDoc(docRef, settings, { merge: true });
+}
+
+
 export async function getRtgsSettings(): Promise<RtgsSettings | null> {
     const docRef = doc(settingsCollection, "rtgs");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
         const data = docSnap.data() as RtgsSettings;
-        // Ensure type exists with a default value
         if (!data.type) {
             data.type = "SB";
         }
@@ -103,7 +117,6 @@ export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
         const data = docSnap.data() as Partial<ReceiptSettings>;
-        // Merge with defaults to ensure `fields` object exists
         return {
             companyName: data.companyName || "JAGDAMBE RICE MILL",
             address1: data.address1 || "Devkali Road, Banda, Shajahanpur",
@@ -276,14 +289,6 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
     return;
   }
   
-  // This function now needs to handle the nested `paidFor` array.
-  // It finds all payment documents that contain a reference to the given srNo.
-  const q = query(paymentsCollection, where("paidFor", "array-contains-any", [{srNo: srNo}]));
-
-  // A more robust query would be `where('paidFor.srNo', '==', srNo)`, but Firestore doesn't support querying nested array fields directly like this.
-  // The workaround is to fetch potentially matching documents and filter client-side.
-  // A better data model might be a subcollection of payments on each supplier entry.
-  // Given the current model, this is the approach:
   const paymentsSnapshot = await getDocs(query(paymentsCollection));
   
   const batch = writeBatch(db);
@@ -296,10 +301,8 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
     
     if (filteredPaidFor.length < initialPaidFor.length) {
       if (filteredPaidFor.length === 0) {
-        // If no other entries are being paid by this payment, delete the whole payment.
         batch.delete(paymentDoc.ref);
       } else {
-        // Otherwise, just remove the specific entry from the `paidFor` array.
         const originalAmountForSr = initialPaidFor.find(pf => pf.srNo === srNo)?.amount || 0;
         const newTotalAmount = payment.amount - originalAmountForSr;
         batch.update(paymentDoc.ref, { paidFor: filteredPaidFor, amount: newTotalAmount });

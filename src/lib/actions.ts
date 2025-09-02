@@ -2,6 +2,7 @@
 'use server';
 
 import nodemailer from 'nodemailer';
+import { getCompanySettings } from './firestore';
 
 interface EmailOptions {
     to: string;
@@ -14,14 +15,16 @@ interface EmailOptions {
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
     const { to, subject, body, attachmentBuffer, filename } = options;
 
-    const fromEmail = process.env.GMAIL_APP_EMAIL;
-    const appPassword = process.env.GMAIL_APP_PASSWORD;
+    const companySettings = await getCompanySettings();
 
-    if (!fromEmail || !appPassword) {
-        const errorMsg = "Gmail credentials are not configured in the environment variables.";
+    if (!companySettings || !companySettings.email || !companySettings.appPassword) {
+        const errorMsg = "Company email settings are not configured. Please configure them on the Settings page.";
         console.error(errorMsg);
         return { success: false, error: errorMsg };
     }
+    
+    const fromEmail = companySettings.email;
+    const appPassword = companySettings.appPassword;
 
     try {
         const transporter = nodemailer.createTransport({
@@ -35,7 +38,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         const buffer = Buffer.from(attachmentBuffer);
 
         await transporter.sendMail({
-            from: `"${fromEmail}" <${fromEmail}>`,
+            from: `"${companySettings.name || fromEmail}" <${fromEmail}>`,
             to: to,
             subject: subject,
             text: body,
@@ -53,7 +56,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         console.error('Error sending email:', error);
         let errorMessage = "Failed to send email. Please check your app password and try again later.";
         if (error.code === 'EAUTH') {
-            errorMessage = "Authentication failed. Please check your Gmail App Password in the .env file.";
+            errorMessage = "Authentication failed. Please check the App Password in your settings.";
         }
         return { success: false, error: errorMessage };
     }
