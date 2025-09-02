@@ -62,9 +62,8 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         return { success: true };
     } catch (error: any) {
         console.error('Error sending email:', error);
-        // Provide a more user-friendly error message
         let errorMessage = "Failed to send email. Please try again later.";
-        if (error.code === 'EAUTH') {
+        if (error.code === 'EAUTH' || error.response?.data?.error === 'invalid_grant') {
             errorMessage = "Authentication failed. Please sign out and sign in again.";
         } else if (error.message.includes('Token has been expired or revoked')) {
              errorMessage = "Your session has expired. Please sign out and sign in again to refresh your permissions.";

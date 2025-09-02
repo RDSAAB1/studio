@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { Auth, GoogleAuthProvider } from 'firebase/auth';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import type { Auth, GoogleAuthProvider, User } from 'firebase/auth';
+import { signInWithPopup, signOut, GoogleAuthProvider as AuthProvider } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle } from 'lucide-react';
@@ -21,10 +21,8 @@ export default function LoginPage() {
     const [origin, setOrigin] = useState('');
 
     useEffect(() => {
-        // Dynamically get auth and provider on the client side
         setAuth(getFirebaseAuth());
         setGoogleProvider(getGoogleProvider());
-        // Set the origin URL for display if needed
         if (typeof window !== 'undefined') {
             setOrigin(window.location.origin);
         }
@@ -42,11 +40,17 @@ export default function LoginPage() {
 
         setLoading(true);
         try {
-            // Force sign out to ensure the account selection prompt always appears
             await signOut(auth);
-            await signInWithPopup(auth, googleProvider);
-            // The onAuthStateChanged listener in MainLayout will handle the redirect.
-            // No need to setLoading(false) here as the component will unmount.
+            const result = await signInWithPopup(auth, googleProvider);
+            const credential = AuthProvider.credentialFromResult(result);
+            if (credential) {
+                // This is the OAuth access token needed for Google APIs
+                const accessToken = credential.accessToken;
+                // You can now store this token securely if needed, for example, in memory,
+                // or associate it with the user session for API calls.
+                // For this app, we'll rely on onAuthStateChanged to handle redirects.
+                (auth.currentUser as any).accessToken = accessToken;
+            }
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred.";
