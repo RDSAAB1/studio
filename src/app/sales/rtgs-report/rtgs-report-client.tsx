@@ -419,7 +419,7 @@ export default function RtgsReportClient() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="font-bold">{formatCurrency(row.amount)}</div>
-                                                <div className="text-xs text-muted-foreground">{row.rate.toFixed(2)} @ {row.weight.toFixed(2)} Qtl</div>
+                                                <div className="text-xs text-muted-foreground">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="font-medium">{row.checkNo}</div>
@@ -453,3 +453,4 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+
