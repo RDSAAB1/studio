@@ -120,7 +120,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     <div className="flex-grow" />
                     <Button onClick={handleGenerateAndMail} disabled={isUploading}>
                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                        {isUploading ? "Generating..." : "Generate & Mail"}
+                        {isUploading ? "Generating..." : "Generate &amp; Mail"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
