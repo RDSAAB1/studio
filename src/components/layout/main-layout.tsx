@@ -9,6 +9,7 @@ import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
+import { getCompanySettings } from "@/lib/firestore";
 import { Loader2 } from "lucide-react";
 
 type MainLayoutProps = {
@@ -35,43 +36,61 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, []);
 
   useEffect(() => {
-    if (loading) return; // Wait until auth state is determined
+    if (loading) return;
 
     if (user) {
-      if (pathname === '/login' || pathname === '/') {
-        router.replace('/sales/dashboard-overview');
-      } else {
+        // We are on a page that doesn't require auth check (e.g., connect-gmail)
+        if (pathname === '/login') {
+            router.replace('/sales/dashboard-overview'); // Default redirect
+            return;
+        }
+
+        const checkSettingsAndRedirect = async () => {
+             // If we are on the root or login page, we need to decide where to go.
+            if (pathname === '/' || pathname === '/login') {
+                const settings = await getCompanySettings(user.uid);
+                if (!settings?.appPassword) {
+                    router.replace('/connect-gmail');
+                } else {
+                    router.replace('/sales/dashboard-overview');
+                }
+            }
+        };
+
+        checkSettingsAndRedirect();
+        
         let initialTab: MenuItem | undefined;
         for (const item of allMenuItems) {
-          if (item.href === pathname) {
-            initialTab = item;
-            break;
-          }
-          if (item.subMenus) {
-            initialTab = item.subMenus.find(sub => sub.href === pathname);
-            if (initialTab) break;
-          }
+            if (item.href === pathname) {
+                initialTab = item;
+                break;
+            }
+            if (item.subMenus) {
+                initialTab = item.subMenus.find(sub => sub.href === pathname);
+                if (initialTab) break;
+            }
         }
         
         if (initialTab) {
-          if (!openTabs.some(tab => tab.id === initialTab!.id)) {
-            setOpenTabs(prev => [...prev, initialTab!]);
-          }
-          setActiveTabId(initialTab.id);
-        } else if (openTabs.length === 0) {
+            if (!openTabs.some(tab => tab.id === initialTab!.id)) {
+                setOpenTabs(prev => [...prev, initialTab!]);
+            }
+            setActiveTabId(initialTab.id);
+        } else if (openTabs.length === 0 && pathname !== '/connect-gmail') {
+            // Default to dashboard if no specific tab is matched
             const dashboard = allMenuItems.find(item => item.id === 'dashboard');
             if (dashboard) {
                 setOpenTabs([dashboard]);
                 setActiveTabId(dashboard.id);
             }
         }
-      }
     } else {
+      // If not logged in, redirect to login page if not already there.
       if (pathname !== '/login') {
         router.replace('/login');
       }
     }
-  }, [user, loading, pathname, router, openTabs]);
+}, [user, loading, pathname, router]);
 
 
   const handleTabClick = (tabId: string) => {
@@ -139,10 +158,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!user) {
-    // If not logged in, only render the children if we are on the login page.
-    // This prevents a flash of the main layout before redirect.
-    return pathname === '/login' ? <>{children}</> : null;
+  if (!user && pathname !== '/login') {
+    return null; // Don't render layout if not logged in and not on login page
+  }
+  
+  if (pathname === '/login' || pathname === '/connect-gmail') {
+      return <>{children}</>;
   }
   
   return (
