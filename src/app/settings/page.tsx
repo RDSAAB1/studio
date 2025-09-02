@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, KeyRound, ExternalLink, Link, Unlink, CheckCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Loader2, KeyRound, ExternalLink, Link, Unlink, CheckCircle, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -195,7 +195,6 @@ export default function SettingsPage() {
                                 value={appPassword}
                                 onChange={(e) => setAppPassword(e.target.value)}
                                 placeholder="xxxx xxxx xxxx xxxx"
-                                disabled={!isTwoFactorConfirmed && !currentEmail}
                             />
                             <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}>
                                 <DialogTrigger asChild>
@@ -212,7 +211,7 @@ export default function SettingsPage() {
                                         <Card>
                                           <CardHeader className="p-4">
                                             <CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle>
-                                            <CardDescription className="text-xs">First, enable 2-Step Verification if it's not already on. This is required by Google.</CardDescription>
+                                            <CardDescription className="text-xs">First, please ensure 2-Step Verification is turned on for your Google Account. This is required.</CardDescription>
                                           </CardHeader>
                                           <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
                                              <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
@@ -229,17 +228,22 @@ export default function SettingsPage() {
                                             <CardHeader className="p-4">
                                                 <CardTitle className="text-base">Step 2: Create App Password</CardTitle>
                                                 <CardDescription className="text-xs">
-                                                  <ul className="list-disc pl-4 space-y-1">
-                                                    <li>Go to the App Passwords page.</li>
-                                                    <li>For the app name, use "BizSuite DataFlow" and click "Create".</li>
-                                                    <li className="text-destructive/80">If you see an error like "You are not eligible...", it means 2-Step Verification is not active. Please complete Step 1 first.</li>
+                                                  <ul className="list-disc pl-4 space-y-1 mt-2">
+                                                    <li>Go to the App Passwords page using the button below.</li>
+                                                    <li>For the app name, enter "BizSuite DataFlow" and click "Create".</li>
                                                   </ul>
                                                 </CardDescription>
                                             </CardHeader>
-                                            <CardFooter className="p-4 pt-0">
-                                                <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                            <CardFooter className="p-4 pt-0 flex-col items-start gap-3">
+                                                 <a href={`https://myaccount.google.com/apppasswords?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
                                                     <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
                                                 </a>
+                                                <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
+                                                    <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
+                                                    <p className="text-xs text-primary/90">
+                                                        If you see an error like "You are not eligible...", it means 2-Step Verification is not active. Please complete Step 1 first.
+                                                    </p>
+                                                </div>
                                             </CardFooter>
                                             </Card>
                                         )}
@@ -278,7 +282,7 @@ export default function SettingsPage() {
                 <CardHeader>
                     <CardTitle>Email Settings</CardTitle>
                     <CardDescription>
-                        To send reports, connect a Gmail account by creating an App Password.
+                        To send reports via email, connect your Gmail account by generating a secure App Password.
                     </CardDescription>
                 </CardHeader>
                 {cardContent()}
