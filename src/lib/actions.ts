@@ -1,26 +1,60 @@
 
 'use server';
 
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
+import * as admin from 'firebase-admin';
+import { getApps } from 'firebase-admin/app';
+import { getStorage } from 'firebase-admin/storage';
+import { Readable } from 'stream';
+
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+  : undefined;
+
+if (!getApps().length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
+}
+
+const bucket = getStorage().bucket();
 
 export async function uploadFileToStorage(
-  buffer: ArrayBuffer,
+  bufferData: number[], // Pass buffer as an array of numbers
   fileName: string
 ): Promise<string> {
   try {
-    const storageRef = ref(storage, `rtgs-reports/${fileName}`);
+    const filePath = `rtgs-reports/${fileName}`;
+    const file = bucket.file(filePath);
     
-    // Upload the file buffer
-    await uploadBytes(storageRef, buffer);
+    // Convert the array of numbers back to a Buffer
+    const buffer = Buffer.from(bufferData);
+
+    // Create a readable stream from the buffer
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
+    // Pipe the stream to the file in Firebase Storage
+    await new Promise((resolve, reject) => {
+        const writeStream = file.createWriteStream({
+            metadata: {
+                contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            },
+        });
+        writeStream.on('error', reject);
+        writeStream.on('finish', resolve);
+        stream.pipe(writeStream);
+    });
+
+    // Make the file public and get its URL
+    await file.makePublic();
     
-    // Get the download URL
-    const downloadURL = await getDownloadURL(storageRef);
-    
-    return downloadURL;
+    // Return the public URL
+    return file.publicUrl();
+
   } catch (error: any) {
     console.error("Error uploading file to Firebase Storage:", error);
-    // It's better to throw the error to be caught by the client
     throw new Error("Failed to upload file. " + error.message);
   }
 }
