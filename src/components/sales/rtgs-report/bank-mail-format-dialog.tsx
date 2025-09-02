@@ -7,40 +7,50 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Mail } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
     const tableRef = useRef<HTMLTableElement>(null);
 
-    const handleCopy = () => {
-        if (tableRef.current) {
-            // Construct the full HTML to be copied, including the greeting and closing.
-            const mailBodyHtml = `
-                <p>Dear Sir/Madam,</p>
-                <p>Please process the following RTGS payments:</p>
-                <br/>
-                ${tableRef.current.outerHTML}
-                <br/>
-                <p>Thank you,</p>
-                <p>${settings.companyName}</p>
-            `;
-
-            const type = "text/html";
-            const blob = new Blob([mailBodyHtml], { type });
-            const data = [new ClipboardItem({ [type]: blob })];
-
-            navigator.clipboard.write(data).then(
-                () => {
-                    toast({ title: "Content copied to clipboard!", description: "You can now paste this into your email.", variant: "success" });
-                },
-                (err) => {
-                    console.error("Failed to copy table: ", err);
-                    toast({ title: "Failed to copy content", variant: "destructive" });
-                }
-            );
+    const handleExport = () => {
+        if (payments.length === 0) {
+            toast({ title: "No data to export", variant: "destructive" });
+            return;
         }
+
+        const dataToExport = payments.map((p: any) => ({
+            'Sr.No': p.srNo,
+            'Debit_Ac_No': settings.accountNo,
+            'Amount': p.amount,
+            'IFSC_Code': p.ifscCode,
+            'Credit_Ac_No': p.acNo,
+            'Beneficiary_Name': toTitleCase(p.supplierName),
+            'Scheme Type': p.type
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+
+        // Set column widths
+        worksheet['!cols'] = [
+            { wch: 10 }, // Sr.No
+            { wch: 20 }, // Debit_Ac_No
+            { wch: 15 }, // Amount
+            { wch: 15 }, // IFSC_Code
+            { wch: 20 }, // Credit_Ac_No
+            { wch: 30 }, // Beneficiary_Name
+            { wch: 15 }  // Scheme Type
+        ];
+        
+        const today = format(new Date(), 'yyyy-MM-dd');
+        XLSX.writeFile(workbook, `RTGS_Report_${today}.xlsx`);
+
+        toast({ title: "Excel file downloaded!", description: "You can now attach it to your email.", variant: "success" });
     };
     
     return (
@@ -49,7 +59,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogHeader>
                     <DialogTitle>Bank Mail Format</DialogTitle>
                     <DialogDescription>
-                        This format is optimized for copying to Excel or emailing directly to the bank for faster processing.
+                        This format is optimized for emailing to the bank. Download it as an Excel file.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] border rounded-lg">
@@ -83,7 +93,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                     <div className="flex-grow" />
-                    <Button onClick={handleCopy}><Copy className="mr-2 h-4 w-4" /> Copy for Mail</Button>
+                    <Button onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
