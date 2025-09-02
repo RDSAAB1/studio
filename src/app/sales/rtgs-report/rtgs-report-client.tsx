@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase, formatSrNo } from '@/lib/utils';
-import { Loader2, Edit, Save, X, Printer } from 'lucide-react';
+import { Loader2, Edit, Save, X, Printer, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,12 +15,14 @@ import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
+
 
 interface RtgsReportRow {
     paymentId: string;
     date: string;
     checkNo: string;
-    type: string; 
+    type: string;
     srNo: string; 
     supplierName: string;
     fatherName: string;
@@ -58,6 +60,7 @@ export default function RtgsReportClient() {
     const [tempSettings, setTempSettings] = useState<RtgsSettings>(initialSettings);
     const { toast } = useToast();
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+    const [isBankMailFormatOpen, setIsBankMailFormatOpen] = useState(false);
     const tablePrintRef = useRef<HTMLDivElement>(null);
 
 
@@ -378,6 +381,9 @@ export default function RtgsReportClient() {
                     </div>
                      {filteredReportRows.length > 0 && (
                         <div className="flex gap-2">
+                            <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline">
+                                <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
+                            </Button>
                             <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
@@ -454,6 +460,13 @@ export default function RtgsReportClient() {
                     <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />
                 </DialogContent>
             </Dialog>
+
+            <BankMailFormatDialog 
+                isOpen={isBankMailFormatOpen}
+                onOpenChange={setIsBankMailFormatOpen}
+                payments={filteredReportRows}
+                settings={settings}
+            />
 
         </div>
     );
