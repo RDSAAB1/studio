@@ -79,8 +79,6 @@ export default function LoginPage() {
         </div>
     );
     
-    const isCloudWorkspace = origin.includes('cloudworkstations.dev');
-
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
             <Card className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 overflow-hidden shadow-2xl">
@@ -111,16 +109,6 @@ export default function LoginPage() {
                                 </>
                              )}
                         </Button>
-                         {isCloudWorkspace && (
-                            <Alert variant="destructive" className="mt-4">
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertTitle>Configuration Help</AlertTitle>
-                                <AlertDescription className="text-xs">
-                                    To enable Google Sign-In, add this URL to your Google Cloud Console's "Authorised JavaScript origins":
-                                    <strong className="block break-all mt-1">{origin}</strong>
-                                </AlertDescription>
-                            </Alert>
-                        )}
                     </CardContent>
                 </div>
                  <div className="hidden md:block bg-muted/40 p-8">
