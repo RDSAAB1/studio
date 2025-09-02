@@ -16,69 +16,72 @@ type MainLayoutProps = {
     children: ReactNode;
 }
 
+const PROTECTED_ROUTES = ['/login', '/connect-gmail'];
+
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true); // Start with loading true
+  const [loading, setLoading] = useState(true);
 
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     const auth = getFirebaseAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setLoading(true);
+      if (currentUser) {
+        setUser(currentUser);
+        const settings = await getCompanySettings(currentUser.uid);
+        if (!settings?.appPassword && pathname !== '/connect-gmail') {
+          router.replace('/connect-gmail');
+        } else if (settings?.appPassword && pathname === '/connect-gmail') {
+          router.replace('/sales/dashboard-overview');
+        }
+      } else {
+        setUser(null);
+        if (!PROTECTED_ROUTES.includes(pathname)) {
+          router.replace('/login');
+        }
+      }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [pathname, router]);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || !user || PROTECTED_ROUTES.includes(pathname)) return;
 
-    if (user) {
-        if (pathname === '/login') {
-            router.replace('/sales/dashboard-overview'); // Default redirect
-            return;
+    let initialTab: MenuItem | undefined;
+    for (const item of allMenuItems) {
+        if (item.href === pathname) {
+            initialTab = item;
+            break;
         }
-        
-        let initialTab: MenuItem | undefined;
-        for (const item of allMenuItems) {
-            if (item.href === pathname) {
-                initialTab = item;
-                break;
-            }
-            if (item.subMenus) {
-                initialTab = item.subMenus.find(sub => sub.href === pathname);
-                if (initialTab) break;
-            }
+        if (item.subMenus) {
+            initialTab = item.subMenus.find(sub => sub.href === pathname);
+            if (initialTab) break;
         }
-        
-        if (initialTab) {
-            if (!openTabs.some(tab => tab.id === initialTab!.id)) {
-                setOpenTabs(prev => [...prev, initialTab!]);
-            }
-            setActiveTabId(initialTab.id);
-        } else if (openTabs.length === 0) {
-            // Default to dashboard if no specific tab is matched
-            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-            if (dashboard) {
-                setOpenTabs([dashboard]);
-                setActiveTabId(dashboard.id);
-                 if (pathname === '/') {
-                    router.replace(dashboard.href || '/');
-                }
-            }
-        }
-    } else {
-      // If not logged in, redirect to login page if not already there.
-      if (pathname !== '/login') {
-        router.replace('/login');
-      }
     }
-}, [user, loading, pathname, router]);
+    
+    if (initialTab) {
+        if (!openTabs.some(tab => tab.id === initialTab!.id)) {
+            setOpenTabs(prev => [...prev, initialTab!]);
+        }
+        setActiveTabId(initialTab.id);
+    } else if (openTabs.length === 0) {
+        const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+        if (dashboard) {
+            setOpenTabs([dashboard]);
+            setActiveTabId(dashboard.id);
+             if (pathname === '/') {
+                router.replace(dashboard.href || '/');
+            }
+        }
+    }
+}, [user, loading, pathname, router, openTabs]);
 
 
   const handleTabClick = (tabId: string) => {
@@ -146,12 +149,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!user && pathname !== '/login') {
-    return null; // Don't render layout if not logged in and not on login page
-  }
-  
-  if (pathname === '/login') {
-      return <>{children}</>;
+  if (!user || PROTECTED_ROUTES.includes(pathname)) {
+    return <>{children}</>; // Render login or connect-gmail page without layout
   }
   
   return (

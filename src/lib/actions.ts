@@ -12,16 +12,22 @@ interface EmailOptions {
     attachmentBuffer: number[];
     filename: string;
     userId: string;
+    userEmail: string; // Add userEmail to ensure we use the logged-in user's credentials
 }
 
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename, userId } = options;
+    const { to, subject, body, attachmentBuffer, filename, userId, userEmail } = options;
 
     try {
         const companySettings = await getCompanySettings(userId);
 
         if (!companySettings || !companySettings.email || !companySettings.appPassword) {
             return { success: false, error: "Email settings are not configured. Please go to Settings to connect your Gmail account." };
+        }
+
+        // Security check: ensure the settings' email matches the logged-in user's email
+        if (companySettings.email.toLowerCase() !== userEmail.toLowerCase()) {
+            return { success: false, error: "Email configuration mismatch. Please re-configure your email settings." };
         }
 
         const transporter = nodemailer.createTransport({

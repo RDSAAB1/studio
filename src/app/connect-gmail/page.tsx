@@ -4,15 +4,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth } from '@/lib/firebase';
-import { getCompanySettings, saveCompanySettings, deleteCompanySettings } from '@/lib/firestore';
+import { saveCompanySettings } from '@/lib/firestore';
 import type { User } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, KeyRound, ExternalLink, Link, Unlink, CheckCircle, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Loader2, KeyRound, ExternalLink, ShieldCheck, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,15 +22,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-export default function SettingsPage() {
+export default function ConnectGmailPage() {
     const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState('');
     const [appPassword, setAppPassword] = useState('');
-    const [currentEmail, setCurrentEmail] = useState<string | null>(null);
     
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [disconnecting, setDisconnecting] = useState(false);
     
     const [isTwoFactorConfirmed, setIsTwoFactorConfirmed] = useState(false);
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
@@ -44,15 +41,7 @@ export default function SettingsPage() {
         const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
-                setLoading(true);
-                const settings = await getCompanySettings(currentUser.uid);
-                if (settings && settings.appPassword) {
-                    setCurrentEmail(settings.email);
-                    setEmail(settings.email);
-                } else {
-                    setCurrentEmail(null);
-                    setEmail(currentUser.email || ''); // Default to logged-in user's email if not set
-                }
+                setEmail(currentUser.email || '');
                 setLoading(false);
             } else {
                 router.replace('/login');
@@ -86,13 +75,14 @@ export default function SettingsPage() {
                 email: email,
                 appPassword: appPassword.replace(/\s/g, ''),
             });
-            setCurrentEmail(email);
-            setAppPassword(''); // Clear password field after save
             toast({
                 title: "Success!",
-                description: "Your email settings have been connected successfully.",
+                description: "Your email settings have been connected.",
                 variant: "success",
             });
+            // On successful connection, redirect to the dashboard.
+            // The main-layout listener will now let the user through.
+            router.push('/sales/dashboard-overview');
         } catch (error) {
             console.error("Error saving settings:", error);
             toast({
@@ -102,30 +92,6 @@ export default function SettingsPage() {
             });
         } finally {
             setSaving(false);
-        }
-    };
-
-    const handleDisconnect = async () => {
-        if (!user) return;
-        setDisconnecting(true);
-        try {
-            await deleteCompanySettings(user.uid);
-            setCurrentEmail(null);
-            setAppPassword('');
-            setEmail(user.email || '');
-            toast({
-                title: "Disconnected",
-                description: "Your email account has been disconnected.",
-            });
-        } catch (error) {
-            console.error("Error disconnecting email:", error);
-            toast({
-                title: "Error",
-                description: "Could not disconnect your email. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setDisconnecting(false);
         }
     };
     
@@ -138,52 +104,12 @@ export default function SettingsPage() {
             );
         }
 
-        if (currentEmail) {
-            return (
-                <>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-3">
-                            <div className="flex-shrink-0 rounded-full bg-green-500/20 p-2 text-green-600">
-                                <Link className="h-5 w-5"/>
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold">Connected as {currentEmail}</p>
-                                <p className="text-xs text-muted-foreground">The application will send emails using this account.</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                     <CardFooter>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" disabled={disconnecting}>
-                                    {disconnecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Unlink className="mr-2 h-4 w-4"/>}
-                                    Disconnect
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This will disconnect your email account. You won't be able to send reports until you connect a new one.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleDisconnect}>Continue</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </CardFooter>
-                </>
-            );
-        }
-
         return (
             <>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="email">Your Gmail Account</Label>
-                        <Input id="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                        <Input id="email" value={email} readOnly disabled />
                     </div>
 
                     <div className="space-y-2">
@@ -212,7 +138,7 @@ export default function SettingsPage() {
                                         <Card>
                                           <CardHeader className="p-4">
                                             <CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle>
-                                            <CardDescription className="text-xs">First, ensure 2-Step Verification is on. It's required by Google.</CardDescription>
+                                            <CardDescription className="text-xs">First, ensure 2-Step Verification is on for your Google Account. It's required by Google to create an App Password.</CardDescription>
                                           </CardHeader>
                                           <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
                                              <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${email}`} target="_blank" rel="noopener noreferrer" className="w-full">
@@ -251,7 +177,7 @@ export default function SettingsPage() {
                                                         <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
                                                             <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
                                                             <p className="text-xs text-primary/90">
-                                                                If you see an error like "You are not eligible...", it means 2-Step Verification is not active. Please complete Step 1 first.
+                                                                If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.
                                                             </p>
                                                         </div>
                                                     </CardFooter>
@@ -270,7 +196,7 @@ export default function SettingsPage() {
                 <CardFooter>
                     <Button onClick={handleSave} disabled={saving} className="w-full">
                         {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-                        Save & Connect
+                        Save & Continue
                     </Button>
                 </CardFooter>
             </>
@@ -278,12 +204,12 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="flex items-center justify-center p-4">
+        <div className="flex min-h-screen items-center justify-center p-4 bg-background">
             <Card className="w-full max-w-lg">
                 <CardHeader>
-                    <CardTitle>Email Settings</CardTitle>
+                    <CardTitle>Connect Your Gmail</CardTitle>
                     <CardDescription>
-                       To send reports, connect your Gmail account by creating a secure App Password.
+                       To send reports, connect your Gmail account by creating a secure App Password. This is a one-time setup.
                     </CardDescription>
                 </CardHeader>
                 {cardContent()}

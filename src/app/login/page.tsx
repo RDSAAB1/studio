@@ -44,8 +44,8 @@ export default function LoginPage() {
             await signOut(auth); // Ensure previous user is signed out
             await signInWithPopup(auth, googleProvider);
             // On successful login, the onAuthStateChanged listener in MainLayout will handle redirection
-            // to the dashboard. But first, we redirect to the Gmail connection page.
-            router.push('/connect-gmail');
+            // to either the connect-gmail page or the dashboard.
+            router.push('/sales/dashboard-overview');
             
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
