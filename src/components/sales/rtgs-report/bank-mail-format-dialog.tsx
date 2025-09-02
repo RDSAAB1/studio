@@ -45,20 +45,18 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             toast({ title: "Authentication Error", description: "You must be logged in to send emails.", variant: "destructive" });
             return;
         }
-
+        
         const userEmail = currentUser.email;
+        const accessToken = (currentUser as any).accessToken;
 
-        if (!userEmail) {
-             toast({ title: "Authentication Error", description: "Could not retrieve your email address.", variant: "destructive" });
+        if (!userEmail || !accessToken) {
+             toast({ title: "Authentication Error", description: "Could not retrieve your email address or access token. Please sign out and sign in again.", variant: "destructive" });
             return;
         }
 
         setIsSending(true);
 
         try {
-            // Force refresh the token to ensure it's not expired.
-            const accessToken = await currentUser.getIdToken(true);
-
             const dataToExport = payments.map((p: any) => ({
                 'Sr.No': p.srNo,
                 'Debit_Ac_No': settings.accountNo,
