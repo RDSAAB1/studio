@@ -16,12 +16,13 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     const { toast } = useToast();
     const tableRef = useRef<HTMLTableElement>(null);
 
-    const handleExport = () => {
+    const handleExportAndMail = () => {
         if (payments.length === 0) {
             toast({ title: "No data to export", variant: "destructive" });
             return;
         }
 
+        // 1. Prepare and download the Excel file
         const dataToExport = payments.map((p: any) => ({
             'Sr.No': p.srNo,
             'Debit_Ac_No': settings.accountNo,
@@ -36,7 +37,6 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
 
-        // Set column widths
         worksheet['!cols'] = [
             { wch: 10 }, // Sr.No
             { wch: 20 }, // Debit_Ac_No
@@ -49,8 +49,19 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         
         const today = format(new Date(), 'yyyy-MM-dd');
         XLSX.writeFile(workbook, `RTGS_Report_${today}.xlsx`);
-
+        
         toast({ title: "Excel file downloaded!", description: "You can now attach it to your email.", variant: "success" });
+
+        // 2. Open Gmail in a new tab with pre-filled details
+        const bankEmail = "your.bank.email@example.com"; // Replace with actual bank email or make it a setting
+        const subject = encodeURIComponent(`RTGS Payment Advice - ${settings.companyName} - ${today}`);
+        const body = encodeURIComponent(
+          `Dear Team,\n\nPlease find the attached RTGS payment advice for today, ${today}.\n\nThank you,\n${settings.companyName}`
+        );
+        
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${bankEmail}&su=${subject}&body=${body}`;
+        
+        window.open(gmailUrl, '_blank');
     };
     
     return (
@@ -59,7 +70,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogHeader>
                     <DialogTitle>Bank Mail Format</DialogTitle>
                     <DialogDescription>
-                        This format is optimized for emailing to the bank. Download it as an Excel file.
+                        This format is optimized for emailing to the bank. Download the Excel file and attach it to the pre-filled email.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] border rounded-lg">
@@ -93,7 +104,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                     <div className="flex-grow" />
-                    <Button onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Download Excel</Button>
+                    <Button onClick={handleExportAndMail}><Download className="mr-2 h-4 w-4" /> Download & Open Mail</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
