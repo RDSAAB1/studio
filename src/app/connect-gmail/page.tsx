@@ -66,7 +66,7 @@ export default function ConnectGmailPage() {
         try {
             await saveCompanySettings(user.uid, {
                 email: user.email!,
-                appPassword: appPassword,
+                appPassword: appPassword.replace(/\s/g, ''),
             });
             toast({
                 title: "Success!",
