@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
@@ -15,10 +16,10 @@ export function DynamicIslandToaster() {
   return (
     <div
       className={cn(
-        "relative z-[100] transition-all duration-500 ease-[cubic-bezier(0.68,-0.55,0.27,1.55)]",
+        "relative z-[100] transition-all duration-500 ease-in-out",
         "bg-background text-primary border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
-        "h-8 min-h-[2rem]", // Changed from h-7 to h-8
+        "h-8 min-h-[2rem]",
         "w-48",
         { "w-96": hasToasts }
       )}
