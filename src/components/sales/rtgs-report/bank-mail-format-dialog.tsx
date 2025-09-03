@@ -45,7 +45,6 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
             });
 
-            // Auto-generate and set the Excel attachment
             const dataToExport = payments.map((p: any) => ({
                 'Sr.No': p.srNo,
                 'Debit_Ac_No': settings.accountNo,
@@ -66,7 +65,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             }]);
             
-            setIsPreview(true); // Always start with preview
+            setIsPreview(true);
         }
     }, [isOpen, settings, payments]);
     
@@ -173,11 +172,11 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-0">
+            <DialogContent className="h-full w-full max-h-full max-w-full sm:h-[95vh] sm:w-[95vw] sm:max-w-[95vw] p-0 flex flex-col">
                 <DialogHeader className="bg-muted px-4 py-2 rounded-t-lg">
                     <DialogTitle className="text-base font-normal">New Message</DialogTitle>
                 </DialogHeader>
-                <div className="p-4 space-y-3">
+                <div className="p-4 space-y-3 flex-grow flex flex-col">
                     <div className="flex items-center border-b pb-2">
                         <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
                         <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
@@ -189,7 +188,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     <Textarea 
                         value={emailData.body}
                         onChange={(e) => setEmailData({...emailData, body: e.target.value})}
-                        className="border-0 focus-visible:ring-0 shadow-none min-h-48 p-0 resize-y"
+                        className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow"
                     />
                     <div className="space-y-2">
                         {attachments.map((att, index) => (
@@ -221,5 +220,3 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         </Dialog>
     );
 };
-
-    
