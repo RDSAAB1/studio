@@ -9,13 +9,14 @@ import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 import { Header } from "./header";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
+import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
 import { Loader2 } from "lucide-react";
 
 type MainLayoutProps = {
     children: ReactNode;
 }
 
-const UNPROTECTED_ROUTES = ['/login'];
+const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
@@ -30,21 +31,30 @@ export default function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setLoading(true);
-      if (currentUser) {
-        setUser(currentUser);
-        // Onboarding flow removed, users will be directed to dashboard.
-        // They can access settings from the header/sidebar.
-        if (UNPROTECTED_ROUTES.includes(pathname)) {
-          router.replace('/sales/dashboard-overview');
+        setLoading(true);
+        if (currentUser) {
+            setUser(currentUser);
+            const companySettings = await getCompanySettings(currentUser.uid);
+            const rtgsSettings = await getRtgsSettings();
+
+            if (!companySettings || !companySettings.appPassword) {
+                if (pathname !== '/setup/connect-gmail') {
+                    router.replace('/setup/connect-gmail');
+                }
+            } else if (!rtgsSettings) {
+                if (pathname !== '/setup/company-details') {
+                    router.replace('/setup/company-details');
+                }
+            } else if (UNPROTECTED_ROUTES.includes(pathname)) {
+                router.replace('/sales/dashboard-overview');
+            }
+        } else {
+            setUser(null);
+            if (!UNPROTECTED_ROUTES.includes(pathname)) {
+                router.replace('/login');
+            }
         }
-      } else {
-        setUser(null);
-        if (!UNPROTECTED_ROUTES.includes(pathname)) {
-          router.replace('/login');
-        }
-      }
-      setLoading(false);
+        setLoading(false);
     });
     return () => unsubscribe();
   }, [pathname, router]);

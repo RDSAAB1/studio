@@ -65,7 +65,7 @@ const SettingsCard = ({ title, description, children, footer }: { title: string;
             <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>{children}</CardContent>
-        {footer && <CardFooter>{footer}</CardFooter>}
+        {footer && <CardFooter className="flex justify-end">{footer}</CardFooter>}
     </Card>
 );
 
@@ -164,10 +164,11 @@ export default function SettingsPage() {
             } else {
                 setUser(null);
                 setLoading(false);
+                router.push('/login');
             }
         });
         return () => unsubscribeAuth();
-    }, []);
+    }, [router, companyForm, bankForm, emailForm]);
 
     const onCompanySubmit = async (data: CompanyFormValues) => {
         setSaving(true);
@@ -276,43 +277,39 @@ export default function SettingsPage() {
                                             <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}><DialogTrigger asChild><Button type="button" variant="outline" size="sm">How?</Button></DialogTrigger>
                                                 <DialogContent className="sm:max-w-lg">
                                                      <DialogHeader><DialogTitle>How to Get an App Password</DialogTitle><DialogDescription>An App Password lets our app send emails on your behalf without needing your main password.</DialogDescription></DialogHeader>
-                                                      <div className="space-y-4 text-sm">
-                                                        <Card>
-                                                            <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">First, ensure 2-Step Verification is on for your Google Account. It's required by Google to create an App Password.</CardDescription></CardHeader>
-                                                            <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
-                                                                <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
-                                                                <Button onClick={() => {setIsTwoFactorConfirmed(true); toast({title: "Confirmed!", description: "You can now proceed to create an App Password."})}} className="w-full" variant="secondary" size="sm">I have enabled 2-Step Verification</Button>
-                                                            </CardFooter>
-                                                        </Card>
-                                                        {isTwoFactorConfirmed && (
-                                                            <>
-                                                                <Card className="border-primary/50 bg-primary/10">
-                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Most Important!</CardTitle><CardDescription className="text-xs">In the next step, Google will show you a 16-character password. Copy it and paste it into the App Password field on our settings page.</CardDescription></CardHeader>
-                                                                </Card>
-                                                                <Card>
-                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create App Password</CardTitle>
-                                                                        <CardDescription className="text-xs">
-                                                                            <ul className="list-disc pl-4 space-y-1 mt-2">
-                                                                                <li>Go to the App Passwords page using the button below.</li>
-                                                                                <li>For the app name, enter "BizSuite DataFlow" and click "Create".</li>
-                                                                                <li>If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.</li>
-                                                                            </ul>
-                                                                        </CardDescription>
-                                                                    </CardHeader>
-                                                                    <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
-                                                                        <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
-                                                                        <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
-                                                                            <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
-                                                                            <p className="text-xs text-primary/90">If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.</p>
-                                                                        </div>
-                                                                    </CardFooter>
-                                                                </Card>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    <DialogFooter className="sm:justify-start">
-                                                        <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
-                                                    </DialogFooter>
+                                                     <div className="space-y-4 text-sm">
+                                                            <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
+                                                                <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
+                                                                <p className="text-xs text-primary/90">To create an App Password, you first need to enable 2-Step Verification on your Google Account.</p>
+                                                            </div>
+                                                            <Card>
+                                                                <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">This adds an extra layer of security to your account.</CardDescription></CardHeader>
+                                                                <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
+                                                                    <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
+                                                                    <Button onClick={() => {setIsTwoFactorConfirmed(true); toast({title: "Confirmed!", description: "You can now proceed to Step 2."})}} className="w-full" variant="secondary" size="sm">I have enabled it</Button>
+                                                                </CardFooter>
+                                                            </Card>
+                                                            
+                                                            <Card className={!isTwoFactorConfirmed ? 'opacity-50 pointer-events-none' : ''}>
+                                                                <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create & Copy Password</CardTitle></CardHeader>
+                                                                <CardContent className="p-4 pt-0 space-y-2 text-xs">
+                                                                    <p className="font-bold">Follow these steps carefully on the Google page:</p>
+                                                                    <ul className="list-decimal pl-5 space-y-1">
+                                                                        <li>Under "Select app", choose <strong>"Other (Custom name)"</strong>.</li>
+                                                                        <li>Enter a name like <strong>"BizSuite DataFlow"</strong> and click "CREATE".</li>
+                                                                        <li>Google will show you a 16-character password. <strong>Copy this password.</strong></li>
+                                                                    </ul>
+                                                                </CardContent>
+                                                                <CardFooter className="p-4 pt-0">
+                                                                    <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                                                        <Button size="sm" className="w-full" disabled={!isTwoFactorConfirmed}>Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                                                    </a>
+                                                                </CardFooter>
+                                                            </Card>
+                                                        </div>
+                                                        <DialogFooter className="sm:justify-start">
+                                                          <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
+                                                        </DialogFooter>
                                                 </DialogContent>
                                             </Dialog>
                                         </div>
@@ -386,5 +383,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    
