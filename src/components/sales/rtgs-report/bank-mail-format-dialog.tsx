@@ -190,15 +190,18 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                         onChange={(e) => setEmailData({...emailData, body: e.target.value})}
                         className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow"
                     />
-                    <div className="flex flex-wrap gap-2 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2">
                         {attachments.map((att, index) => (
-                             <div key={index} className="flex items-center gap-1.5 bg-muted rounded-full pl-2 pr-1 py-0.5 text-sm">
-                                <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                                <span className="font-medium truncate max-w-48">{att.filename}</span>
+                             <div key={index} className="relative flex items-center gap-2 bg-muted p-2 rounded-lg border">
+                                <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                <div className="flex-grow overflow-hidden">
+                                    <p className="text-sm font-medium truncate">{att.filename}</p>
+                                    <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() => removeAttachment(index)}
-                                    className="rounded-full hover:bg-muted-foreground/20 p-0.5"
+                                    className="absolute top-1 right-1 rounded-full hover:bg-muted-foreground/20 p-0.5"
                                 >
                                     <X className="h-3 w-3" />
                                 </button>
