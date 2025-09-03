@@ -12,12 +12,13 @@ import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { toTitleCase } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -117,6 +118,7 @@ export default function SettingsPage() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const router = useRouter();
     
     // States for settings
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
@@ -223,6 +225,17 @@ export default function SettingsPage() {
         }
     }
 
+    const handleSignOut = async () => {
+        try {
+            await signOut(getFirebaseAuth());
+            router.push('/login');
+        } catch (error) {
+            console.error("Error signing out: ", error);
+            toast({ title: "Failed to sign out", variant: "destructive" });
+        }
+    };
+
+
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
     }
@@ -231,11 +244,12 @@ export default function SettingsPage() {
         <div className="space-y-8">
             <h1 className="text-3xl font-bold">Settings</h1>
             <Tabs defaultValue="company">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="company">Company Details</TabsTrigger>
                     <TabsTrigger value="email">Bank & Email</TabsTrigger>
                     <TabsTrigger value="receipts">Receipts</TabsTrigger>
                     <TabsTrigger value="data">Application Data</TabsTrigger>
+                    <TabsTrigger value="account">Account</TabsTrigger>
                 </TabsList>
                 <TabsContent value="company" className="mt-6">
                     <form onSubmit={companyForm.handleSubmit(onCompanySubmit)}>
@@ -278,6 +292,7 @@ export default function SettingsPage() {
                                                                 <ul className="list-disc pl-4 space-y-1 mt-2">
                                                                     <li>Go to the App Passwords page using the button below.</li>
                                                                     <li>For the app name, enter "BizSuite DataFlow" and click "Create".</li>
+                                                                    <li>If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.</li>
                                                                 </ul>
                                                                 </CardDescription>
                                                             </CardHeader>
@@ -344,6 +359,24 @@ export default function SettingsPage() {
                         <OptionsManager type="paymentType" options={paymentTypeOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
                     </div>
                  </TabsContent>
+                 <TabsContent value="account" className="mt-6">
+                    <SettingsCard title="Account Information" description="Manage your account details and sign out.">
+                        {user && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
+                                    <UserCircle className="h-10 w-10 text-muted-foreground" />
+                                    <div>
+                                        <p className="font-semibold">{user.displayName || "No name provided"}</p>
+                                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                                    </div>
+                                </div>
+                                <Button variant="outline" onClick={handleSignOut}>
+                                    <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                                </Button>
+                            </div>
+                        )}
+                    </SettingsCard>
+                </TabsContent>
             </Tabs>
         </div>
     );
