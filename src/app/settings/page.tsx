@@ -26,6 +26,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -56,14 +57,14 @@ const emailSchema = z.object({
 });
 type EmailFormValues = z.infer<typeof emailSchema>;
 
-const SettingsCard = ({ title, description, children, footer }: { title: string; description: string; children: React.ReactNode; footer: React.ReactNode }) => (
+const SettingsCard = ({ title, description, children, footer }: { title: string; description: string; children: React.ReactNode; footer?: React.ReactNode }) => (
     <Card>
         <CardHeader>
             <CardTitle>{title}</CardTitle>
             <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>{children}</CardContent>
-        <CardFooter>{footer}</CardFooter>
+        {footer && <CardFooter>{footer}</CardFooter>}
     </Card>
 );
 
@@ -252,7 +253,7 @@ export default function SettingsPage() {
                  <TabsContent value="email" className="mt-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)}>
-                             <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
+                             <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
                                 <div className="space-y-4">
                                      <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
                                      <div className="space-y-1"><Label>Google App Password</Label>
@@ -262,16 +263,17 @@ export default function SettingsPage() {
                                                 <DialogContent className="sm:max-w-lg">
                                                      <DialogHeader><DialogTitle>How to Get an App Password</DialogTitle><DialogDescription>An App Password lets our app send emails on your behalf without needing your main password.</DialogDescription></DialogHeader>
                                                       <div className="space-y-4 text-sm">
-                                                        <Card><CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">First, ensure 2-Step Verification is on for your Google Account. It's required by Google to create an App Password.</CardDescription></CardHeader>
-                                                          <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
-                                                             <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
-                                                          </CardFooter>
+                                                        <Card>
+                                                            <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">First, ensure 2-Step Verification is on for your Google Account. It's required by Google to create an App Password.</CardDescription></CardHeader>
+                                                            <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
+                                                                <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
+                                                            </CardFooter>
                                                         </Card>
                                                         <Card className="border-primary/50 bg-primary/10">
-                                                            <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Most Important!</CardTitle><CardDescription className="text-xs">In the next step, Google will show you a 16-character password. Copy it and paste it into the App Password field on our settings page.</CardDescription></CardHeader>
+                                                            <CardHeader className="p-4"><CardTitle className="text-base">Most Important!</CardTitle><CardDescription className="text-xs">In the next step, Google will show you a 16-character password. Copy it and paste it into the App Password field on our settings page.</CardDescription></CardHeader>
                                                         </Card>
                                                         <Card>
-                                                            <CardHeader className="p-4"><CardTitle className="text-base">Step 3: Create App Password</CardTitle>
+                                                            <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create App Password</CardTitle>
                                                                 <CardDescription className="text-xs">
                                                                 <ul className="list-disc pl-4 space-y-1 mt-2">
                                                                     <li>Go to the App Passwords page using the button below.</li>
@@ -279,7 +281,7 @@ export default function SettingsPage() {
                                                                 </ul>
                                                                 </CardDescription>
                                                             </CardHeader>
-                                                            <CardFooter className="p-4 pt-0 flex-col items-start gap-3">
+                                                            <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
                                                                 <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
                                                                 <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
                                                                     <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
