@@ -5,18 +5,23 @@ import nodemailer from 'nodemailer';
 import { getCompanySettings } from './firestore';
 
 
+interface AttachmentData {
+    filename: string;
+    buffer: number[];
+    contentType: string;
+}
+
 interface EmailOptions {
     to: string;
     subject: string;
     body: string;
-    attachmentBuffer: number[];
-    filename: string;
+    attachments: AttachmentData[];
     userId: string;
-    userEmail: string; // Add userEmail to ensure we use the logged-in user's credentials
+    userEmail: string; 
 }
 
 export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-    const { to, subject, body, attachmentBuffer, filename, userId, userEmail } = options;
+    const { to, subject, body, attachments, userId, userEmail } = options;
 
     try {
         const companySettings = await getCompanySettings(userId);
@@ -25,7 +30,6 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
             return { success: false, error: "Email settings are not configured. Please go to Settings to connect your Gmail account." };
         }
 
-        // Security check: ensure the settings' email matches the logged-in user's email
         if (companySettings.email.toLowerCase() !== userEmail.toLowerCase()) {
             return { success: false, error: "Email configuration mismatch. Please re-configure your email settings." };
         }
@@ -38,21 +42,17 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
             },
         });
 
-        const buffer = Buffer.from(attachmentBuffer);
-
         const mailOptions = {
             from: `"${companySettings.email}" <${companySettings.email}>`,
             to: to,
             subject: subject,
             text: body,
-            html: `<p>${body.replace(/\n/g, '<br>')}</p>`, // Basic HTML version
-            attachments: [
-                {
-                    filename: filename,
-                    content: buffer,
-                    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                },
-            ],
+            html: `<p>${body.replace(/\n/g, '<br>')}</p>`,
+            attachments: attachments.map(att => ({
+                filename: att.filename,
+                content: Buffer.from(att.buffer),
+                contentType: att.contentType,
+            })),
         };
 
         await transporter.sendMail(mailOptions);
@@ -69,3 +69,5 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         return { success: false, error: errorMessage };
     }
 }
+
+    

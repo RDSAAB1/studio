@@ -77,7 +77,7 @@ export default function RtgsReportClient() {
                         paymentId: p.paymentId,
                         date: p.date,
                         checkNo: p.checkNo || '',
-                        type: currentSettings?.type || 'SB',
+                        type: p.type || (currentSettings?.type || 'SB'),
                         srNo: srNo,
                         supplierName: toTitleCase(p.supplierName || ''),
                         fatherName: toTitleCase(p.supplierFatherName || ''),
@@ -382,3 +382,5 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+
+    
