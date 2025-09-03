@@ -8,9 +8,9 @@ import { z } from "zod";
 import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings } from '@/lib/firestore';
 import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
-import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { toTitleCase } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
@@ -243,12 +243,12 @@ export default function SettingsPage() {
     return (
         <div className="space-y-8">
             <h1 className="text-3xl font-bold">Settings</h1>
-            <Tabs defaultValue="company">
-                <TabsList className="grid w-full grid-cols-5">
-                    <TabsTrigger value="company">Company Details</TabsTrigger>
+            <Tabs defaultValue="company" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
+                    <TabsTrigger value="company">Company</TabsTrigger>
                     <TabsTrigger value="email">Bank & Email</TabsTrigger>
                     <TabsTrigger value="receipts">Receipts</TabsTrigger>
-                    <TabsTrigger value="data">Application Data</TabsTrigger>
+                    <TabsTrigger value="data">App Data</TabsTrigger>
                     <TabsTrigger value="account">Account</TabsTrigger>
                 </TabsList>
                 <TabsContent value="company" className="mt-6">
@@ -272,7 +272,7 @@ export default function SettingsPage() {
                                      <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
                                      <div className="space-y-1"><Label>Google App Password</Label>
                                         <div className="flex items-center gap-2">
-                                            <Input type="password" {...emailForm.register('appPassword')} placeholder="xxxx xxxx xxxx xxxx"/>
+                                            <Input type="password" {...emailForm.register('appPassword')} placeholder="xxxx xxxx xxxx xxxx" disabled={!isTwoFactorConfirmed} />
                                             <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}><DialogTrigger asChild><Button type="button" variant="outline" size="sm">How?</Button></DialogTrigger>
                                                 <DialogContent className="sm:max-w-lg">
                                                      <DialogHeader><DialogTitle>How to Get an App Password</DialogTitle><DialogDescription>An App Password lets our app send emails on your behalf without needing your main password.</DialogDescription></DialogHeader>
@@ -281,29 +281,34 @@ export default function SettingsPage() {
                                                             <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">First, ensure 2-Step Verification is on for your Google Account. It's required by Google to create an App Password.</CardDescription></CardHeader>
                                                             <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
                                                                 <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
+                                                                <Button onClick={() => {setIsTwoFactorConfirmed(true); toast({title: "Confirmed!", description: "You can now proceed to create an App Password."})}} className="w-full" variant="secondary" size="sm">I have enabled 2-Step Verification</Button>
                                                             </CardFooter>
                                                         </Card>
-                                                        <Card className="border-primary/50 bg-primary/10">
-                                                            <CardHeader className="p-4"><CardTitle className="text-base">Most Important!</CardTitle><CardDescription className="text-xs">In the next step, Google will show you a 16-character password. Copy it and paste it into the App Password field on our settings page.</CardDescription></CardHeader>
-                                                        </Card>
-                                                        <Card>
-                                                            <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create App Password</CardTitle>
-                                                                <CardDescription className="text-xs">
-                                                                <ul className="list-disc pl-4 space-y-1 mt-2">
-                                                                    <li>Go to the App Passwords page using the button below.</li>
-                                                                    <li>For the app name, enter "BizSuite DataFlow" and click "Create".</li>
-                                                                    <li>If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.</li>
-                                                                </ul>
-                                                                </CardDescription>
-                                                            </CardHeader>
-                                                            <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
-                                                                <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
-                                                                <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
-                                                                    <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
-                                                                    <p className="text-xs text-primary/90">If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.</p>
-                                                                </div>
-                                                            </CardFooter>
-                                                        </Card>
+                                                        {isTwoFactorConfirmed && (
+                                                            <>
+                                                                <Card className="border-primary/50 bg-primary/10">
+                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Most Important!</CardTitle><CardDescription className="text-xs">In the next step, Google will show you a 16-character password. Copy it and paste it into the App Password field on our settings page.</CardDescription></CardHeader>
+                                                                </Card>
+                                                                <Card>
+                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create App Password</CardTitle>
+                                                                        <CardDescription className="text-xs">
+                                                                            <ul className="list-disc pl-4 space-y-1 mt-2">
+                                                                                <li>Go to the App Passwords page using the button below.</li>
+                                                                                <li>For the app name, enter "BizSuite DataFlow" and click "Create".</li>
+                                                                                <li>If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.</li>
+                                                                            </ul>
+                                                                        </CardDescription>
+                                                                    </CardHeader>
+                                                                    <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
+                                                                        <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
+                                                                        <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
+                                                                            <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
+                                                                            <p className="text-xs text-primary/90">If you see an error like "The setting you are looking for is not available for your account.", it means 2-Step Verification is not active. Please complete Step 1 first.</p>
+                                                                        </div>
+                                                                    </CardFooter>
+                                                                </Card>
+                                                            </>
+                                                        )}
                                                     </div>
                                                     <DialogFooter className="sm:justify-start">
                                                         <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
@@ -324,12 +329,12 @@ export default function SettingsPage() {
                         </form>
                          <form onSubmit={bankForm.handleSubmit(onBankSubmit)}>
                             <SettingsCard title="Bank Details" description="This information is used for RTGS reports." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Bank Details</Button>}>
-                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                    <div className="space-y-1"><Label>Bank Name</Label><Input {...bankForm.register("bankName")} /></div>
                                    <div className="space-y-1"><Label>Branch Name</Label><Input {...bankForm.register("branchName")} /></div>
                                    <div className="space-y-1"><Label>Account Number</Label><Input {...bankForm.register("accountNo")} /></div>
                                    <div className="space-y-1"><Label>IFSC Code</Label><Input {...bankForm.register("ifscCode")} /></div>
-                                   <div className="space-y-1"><Label>Account Type</Label><Input {...bankForm.register("type")} placeholder="e.g. SB or CA" /></div>
+                                   <div className="space-y-1 sm:col-span-2"><Label>Account Type</Label><Input {...bankForm.register("type")} placeholder="e.g. SB or CA" /></div>
                                </div>
                             </SettingsCard>
                          </form>
@@ -381,3 +386,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
