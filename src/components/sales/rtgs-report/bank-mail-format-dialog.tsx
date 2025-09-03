@@ -1,35 +1,42 @@
 
 "use client";
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Loader2, Download } from 'lucide-react';
+import { Mail, Loader2, Paperclip, FileSpreadsheet } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { sendEmailWithAttachment } from '@/lib/actions';
 import { getFirebaseAuth } from '@/lib/firebase';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings }: any) => {
     const { toast } = useToast();
-    const tableRef = useRef<HTMLTableElement>(null);
     const [isSending, setIsSending] = useState(false);
+    const [emailData, setEmailData] = useState({
+        to: 'your.bank.email@example.com',
+        subject: '',
+        body: '',
+    });
 
-    const handleDownload = () => {
-        if (!tableRef.current) return;
-        const worksheet = XLSX.utils.table_to_sheet(tableRef.current);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
-        worksheet['!cols'] = [
-            { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }
-        ];
-        const today = format(new Date(), 'yyyy-MM-dd');
-        XLSX.writeFile(workbook, `RTGS_Report_${today}.xlsx`);
-    };
+    useEffect(() => {
+        if (isOpen && settings) {
+            const today = format(new Date(), 'dd-MMM-yyyy');
+            const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
+            const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
+            
+            setEmailData({
+                to: 'your.bank.email@example.com', // This should be a configurable setting in the future
+                subject,
+                body,
+            });
+        }
+    }, [isOpen, settings]);
 
     const handleSendMail = async () => {
         if (payments.length === 0) {
@@ -72,16 +79,12 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             const bufferAsArray = Array.from(new Uint8Array(excelBuffer));
 
             const today = format(new Date(), 'yyyy-MM-dd');
-            // This should be a configurable bank email address, for now using a placeholder.
-            const bankEmail = "your.bank.email@example.com";
-            const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
-            const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
             const filename = `RTGS_Report_${today}.xlsx`;
 
             const result = await sendEmailWithAttachment({
-                to: bankEmail,
-                subject,
-                body,
+                to: emailData.to,
+                subject: emailData.subject,
+                body: emailData.body,
                 attachmentBuffer: bufferAsArray,
                 filename,
                 userId: userId,
@@ -104,52 +107,35 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                    <DialogTitle>Bank Mail Format</DialogTitle>
-                    <DialogDescription>
-                        This format will be sent directly to the bank via email with an Excel attachment.
-                    </DialogDescription>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader className="bg-muted p-4 rounded-t-lg">
+                    <DialogTitle className="text-sm font-normal">New Message</DialogTitle>
                 </DialogHeader>
-                <ScrollArea className="max-h-[60vh] border rounded-lg">
-                    <Table ref={tableRef} className="bg-white">
-                        <TableHeader>
-                            <TableRow style={{ backgroundColor: '#FCD34D' }}>
-                                <TableHead className="text-black font-bold border">Sr.No</TableHead>
-                                <TableHead className="text-black font-bold border">Debit_Ac_No</TableHead>
-                                <TableHead className="text-black font-bold border">Amount</TableHead>
-                                <TableHead className="text-black font-bold border">IFSC_Code</TableHead>
-                                <TableHead className="text-black font-bold border">Credit_Ac_No</TableHead>
-                                <TableHead className="text-black font-bold border">Beneficiary_Name</TableHead>
-                                <TableHead className="text-black font-bold border">Scheme Type</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {payments.map((p: any, index: number) => (
-                                <TableRow key={p.paymentId || index}>
-                                    <TableCell className="border text-black">{p.srNo}</TableCell>
-                                    <TableCell className="border text-black">{settings.accountNo}</TableCell>
-                                    <TableCell className="border text-black">{p.amount}</TableCell>
-                                    <TableCell className="border text-black">{p.ifscCode}</TableCell>
-                                    <TableCell className="border text-black">{p.acNo}</TableCell>
-                                    <TableCell className="border text-black">{toTitleCase(p.supplierName)}</TableCell>
-                                    <TableCell className="border text-black">{p.type}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSending}>Close</Button>
-                    <div className="flex-grow" />
-                    <Button onClick={handleDownload} variant="secondary" disabled={isSending}>
-                        <Download className="mr-2 h-4 w-4" /> Download Excel
-                    </Button>
+                <div className="p-4 space-y-3">
+                    <div className="flex items-center border-b pb-2">
+                        <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
+                        <Input id="to" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                    </div>
+                     <div className="flex items-center border-b pb-2">
+                        <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
+                        <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                    </div>
+                    <Textarea 
+                        value={emailData.body}
+                        onChange={(e) => setEmailData({...emailData, body: e.target.value})}
+                        className="border-0 focus-visible:ring-0 shadow-none min-h-48 p-0"
+                    />
+                    <div className="flex items-center gap-2 bg-muted/50 border rounded-lg p-2">
+                        <FileSpreadsheet className="h-5 w-5 text-green-600"/>
+                        <span className="text-sm font-medium">RTGS_Report_{format(new Date(), 'yyyy-MM-dd')}.xlsx</span>
+                    </div>
+                </div>
+                <DialogFooter className="bg-muted p-3 rounded-b-lg">
                     <Button onClick={handleSendMail} disabled={isSending}>
                         {isSending ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</>
                         ) : (
-                            <><Mail className="mr-2 h-4 w-4" /> Send Mail Directly</>
+                            <><Mail className="mr-2 h-4 w-4" /> Send</>
                         )}
                     </Button>
                 </DialogFooter>
