@@ -31,6 +31,7 @@ import {
   Banknote,
   FileText,
   Settings,
+  Upload,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -111,6 +112,12 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
         { id: "project-dashboard", name: "Dashboard", icon: ChevronRight, href: "/projects/dashboard" },
     ]
+  },
+  {
+    id: "data-capture",
+    name: "Data Capture",
+    icon: Upload,
+    href: "/data-capture",
   },
   { 
     id: "settings", 
