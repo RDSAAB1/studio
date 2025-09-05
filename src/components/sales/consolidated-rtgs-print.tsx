@@ -192,7 +192,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                             <div key={pageIndex} className={`p-4 bg-white text-black font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${!isLastPage ? 'page-break-after' : ''}`}>
                                 <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
                                 
-                                <div className="flex-grow">
+                                <div className="flex-grow overflow-x-auto">
                                     <table className="w-full text-left print-table">
                                         <thead>
                                             <tr className="bg-gray-800 text-white uppercase text-[10px]">

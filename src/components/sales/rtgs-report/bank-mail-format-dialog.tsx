@@ -138,28 +138,30 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                         <DialogDescription>Review the data that will be included in the Excel file before composing the email.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[60vh] border rounded-lg">
-                        <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-muted">
-                                <tr>
-                                    <th className="p-2 text-left">Sr.No</th>
-                                    <th className="p-2 text-left">Beneficiary</th>
-                                    <th className="p-2 text-left">A/C No.</th>
-                                    <th className="p-2 text-left">IFSC</th>
-                                    <th className="p-2 text-right">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {payments.map((p: any) => (
-                                    <tr key={p.srNo} className="border-t">
-                                        <td className="p-2">{p.srNo}</td>
-                                        <td className="p-2">{p.supplierName}</td>
-                                        <td className="p-2">{p.acNo}</td>
-                                        <td className="p-2">{p.ifscCode}</td>
-                                        <td className="p-2 text-right font-medium">{p.amount}</td>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="sticky top-0 bg-muted">
+                                    <tr>
+                                        <th className="p-2 text-left">Sr.No</th>
+                                        <th className="p-2 text-left">Beneficiary</th>
+                                        <th className="p-2 text-left">A/C No.</th>
+                                        <th className="p-2 text-left">IFSC</th>
+                                        <th className="p-2 text-right">Amount</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {payments.map((p: any) => (
+                                        <tr key={p.srNo} className="border-t">
+                                            <td className="p-2">{p.srNo}</td>
+                                            <td className="p-2">{p.supplierName}</td>
+                                            <td className="p-2">{p.acNo}</td>
+                                            <td className="p-2">{p.ifscCode}</td>
+                                            <td className="p-2 text-right font-medium">{p.amount}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </ScrollArea>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -172,11 +174,11 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="h-full w-full max-h-full max-w-full sm:h-[95vh] sm:w-[95vw] sm:max-w-[95vw] p-0 flex flex-col">
+            <DialogContent className="h-full w-full max-h-full max-w-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl p-0 flex flex-col">
                 <DialogHeader className="bg-muted px-4 py-2 rounded-t-lg">
                     <DialogTitle className="text-base font-normal">New Message</DialogTitle>
                 </DialogHeader>
-                <div className="p-4 space-y-3 flex-grow flex flex-col">
+                <div className="p-4 space-y-3 flex-grow flex flex-col min-h-0">
                     <div className="flex items-center border-b pb-2">
                         <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
                         <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
@@ -188,9 +190,9 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     <Textarea 
                         value={emailData.body}
                         onChange={(e) => setEmailData({...emailData, body: e.target.value})}
-                        className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow"
+                        className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
                     />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                         {attachments.map((att, index) => (
                              <div key={index} className="relative flex items-center gap-2 bg-muted p-2 rounded-lg border">
                                 <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />

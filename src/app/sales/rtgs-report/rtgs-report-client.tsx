@@ -285,20 +285,20 @@ export default function RtgsReportClient() {
             </Card>
 
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                         <CardTitle>RTGS Payment Report</CardTitle>
                         <CardDescription>A detailed report of all payments made via RTGS.</CardDescription>
                     </div>
                      {filteredReportRows.length > 0 && (
-                        <div className="flex gap-2">
-                            <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline">
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
                             </Button>
-                            <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline">
+                            <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
-                            <Button onClick={() => handlePrint(tablePrintRef)} size="sm" variant="outline">
+                            <Button onClick={() => handlePrint(tablePrintRef)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print Table
                             </Button>
                         </div>
@@ -323,33 +323,33 @@ export default function RtgsReportClient() {
                                     filteredReportRows.map((row, index) => (
                                         <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
                                             <TableCell>
-                                                <div className="font-medium">{format(new Date(row.date), 'dd-MMM-yy')}</div>
+                                                <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
                                                 <div className="text-xs text-muted-foreground">{row.srNo}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-medium">{row.supplierName}</div>
-                                                <div className="text-xs text-muted-foreground">{row.fatherName}</div>
+                                                <div className="font-medium whitespace-nowrap">{row.supplierName}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.fatherName}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-medium">{row.bank}</div>
-                                                <div className="text-xs text-muted-foreground">{row.branch}</div>
-                                                <div className="text-xs text-muted-foreground">{row.ifscCode}</div>
+                                                <div className="font-medium whitespace-nowrap">{row.bank}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.branch}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.ifscCode}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-medium">{row.acNo}</div>
-                                                <div className="text-xs text-muted-foreground">{row.contact}</div>
+                                                <div className="font-medium whitespace-nowrap">{row.acNo}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.contact}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-bold">{formatCurrency(row.amount)}</div>
-                                                <div className="text-xs text-muted-foreground">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
+                                                <div className="font-bold whitespace-nowrap">{formatCurrency(row.amount)}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-medium">{row.checkNo}</div>
+                                                <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
                                                 <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="font-medium">{row.sixRNo}</div>
-                                                <div className="text-xs text-muted-foreground">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
+                                                <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -382,5 +382,3 @@ export default function RtgsReportClient() {
         </div>
     );
 }
-
-    
