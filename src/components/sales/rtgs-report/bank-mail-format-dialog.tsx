@@ -212,18 +212,18 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     </div>
                 </div>
                 <DialogFooter className="bg-muted p-3 rounded-b-lg flex justify-between items-center">
+                    <div className="relative">
+                        <Button size="icon" variant="ghost" asChild>
+                            <Label htmlFor="file-upload"><Paperclip className="h-5 w-5"/></Label>
+                        </Button>
+                        <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
+                    </div>
                     <div className="flex items-center gap-2">
+                        <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button onClick={handleSendMail} disabled={isSending}>
                             {isSending ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> ) : ( <><Mail className="mr-2 h-4 w-4" /> Send</> )}
                         </Button>
-                        <div className="relative">
-                             <Button size="icon" variant="ghost" asChild>
-                                 <Label htmlFor="file-upload"><Paperclip className="h-5 w-5"/></Label>
-                            </Button>
-                            <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
-                        </div>
                     </div>
-                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
