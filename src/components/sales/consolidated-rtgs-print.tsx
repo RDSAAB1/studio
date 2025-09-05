@@ -194,8 +194,8 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                 
                                 <div className="flex-grow overflow-x-auto">
                                     <table className="w-full text-left print-table">
-                                        <thead>
-                                            <tr className="bg-gray-800 text-white uppercase text-[10px]">
+                                        <thead className="text-[10px]">
+                                            <tr className="bg-gray-800 text-white uppercase">
                                                 <th className="py-1 px-2 font-semibold text-center">#</th>
                                                 <th className="py-1 px-2 font-semibold">Payee Name</th>
                                                 <th className="py-1 px-2 font-semibold">Bank Name</th>

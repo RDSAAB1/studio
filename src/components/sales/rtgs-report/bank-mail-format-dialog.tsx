@@ -194,20 +194,22 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                         {attachments.map((att, index) => (
-                             <div key={index} className="relative flex items-center gap-2 bg-muted p-2 rounded-lg border">
+                             <Card key={index} className="relative flex items-center gap-2 p-2">
                                 <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
                                 <div className="flex-grow overflow-hidden">
                                     <p className="text-sm font-medium truncate">{att.filename}</p>
                                     <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
                                 </div>
-                                <button
+                                <Button
                                     type="button"
                                     onClick={() => removeAttachment(index)}
-                                    className="absolute top-1 right-1 rounded-full hover:bg-muted-foreground/20 p-0.5"
+                                    className="absolute top-1 right-1 rounded-full h-5 w-5"
+                                    variant="ghost"
+                                    size="icon"
                                 >
                                     <X className="h-3 w-3" />
-                                </button>
-                            </div>
+                                </Button>
+                            </Card>
                         ))}
                     </div>
                 </div>
@@ -219,7 +221,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                         <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange}/>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button onClick={handleSendMail} disabled={isSending}>
                             {isSending ? ( <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> ) : ( <><Mail className="mr-2 h-4 w-4" /> Send</> )}
                         </Button>

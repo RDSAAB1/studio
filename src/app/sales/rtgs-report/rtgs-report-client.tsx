@@ -373,7 +373,7 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                     <DialogHeader className="sr-only">
+                    <DialogHeader className="sr-only">
                         <DialogTitle>RTGS Print Preview</DialogTitle>
                         <DialogDescription>A preview of the consolidated RTGS report for printing.</DialogDescription>
                     </DialogHeader>
