@@ -90,7 +90,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         <div className="space-y-3">
             <Card className="bg-card/60 backdrop-blur-sm border-white/10">
                 <CardContent className="p-3">
-                     <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1.5fr] gap-x-3 gap-y-2">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-2">
                         <div className="space-y-1">
                             <Label htmlFor="srNo" className="text-xs">Sr No.</Label>
                             <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
@@ -135,7 +135,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 <div className="lg:col-span-5">
                     <Card className="h-full">
                         <CardContent className="p-3 space-y-2 flex flex-col justify-between h-full">
-                           <div className="grid grid-cols-2 gap-x-3">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
                                 <div className="space-y-1">
                                     <Label htmlFor="contact" className="text-xs">Contact</Label>
                                     <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
