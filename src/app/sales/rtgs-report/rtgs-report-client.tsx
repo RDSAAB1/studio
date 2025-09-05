@@ -139,9 +139,12 @@ export default function RtgsReportClient() {
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
-    const handlePrint = (contentRef: React.RefObject<HTMLDivElement>) => {
-        const node = contentRef.current;
-        if (!node || !settings) return;
+    const handlePrint = () => {
+        const node = tablePrintRef.current;
+        if (!node || !settings) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
+            return;
+        }
 
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
@@ -149,12 +152,17 @@ export default function RtgsReportClient() {
         iframe.style.height = '0';
         iframe.style.border = '0';
         document.body.appendChild(iframe);
-        
+
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Could not create print content.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            document.body.removeChild(iframe);
             return;
         }
+
+        const appUrl = window.location.origin;
+        const stylesheetUrl = `${appUrl}/globals.css`;
+        const tailwindConfigUrl = `${appUrl}/tailwind.config.js`; // Assuming your config is served
 
         const title = 'RTGS Payment Report';
         
@@ -163,63 +171,58 @@ export default function RtgsReportClient() {
             <html>
                 <head>
                     <title>${title}</title>
-        `);
-        
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const style = iframeDoc.createElement('style');
-                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                iframeDoc.head.appendChild(style);
-            } catch(e) {
-                console.warn('Could not copy stylesheet:', e);
-            }
-        });
-
-        iframeDoc.write(`
-            <style>
-                @media print {
-                    @page { 
-                        size: landscape; 
-                        margin: 10mm; 
-                    }
-                    body { 
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                        color: #000 !important;
-                        font-size: 7px;
-                    }
-                    table {
-                        font-size: 7px;
-                        border-collapse: collapse;
-                        width: 100%;
-                    }
-                    th, td {
-                        padding: 2px 4px !important;
-                        border: 1px solid #ccc !important;
-                        white-space: nowrap;
-                    }
-                    thead {
-                        background-color: #f2f2f2 !important;
-                    }
-                }
-            </style>
-        `);
-        iframeDoc.write(`
+                    <link rel="stylesheet" href="${stylesheetUrl}">
+                    <style>
+                        @media print {
+                            @page { 
+                                size: landscape; 
+                                margin: 10mm; 
+                            }
+                            body { 
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                                color: #000 !important;
+                                background-color: #fff !important;
+                            }
+                            table {
+                                font-size: 8px; /* Smaller font for more data */
+                                border-collapse: collapse;
+                                width: 100%;
+                            }
+                            th, td {
+                                padding: 2px 4px !important;
+                                border: 1px solid #ccc !important;
+                                white-space: nowrap;
+                            }
+                            thead {
+                                background-color: #f2f2f2 !important;
+                            }
+                            .print-header {
+                                display: block !important;
+                                margin-bottom: 1rem;
+                            }
+                             .no-print {
+                                display: none !important;
+                            }
+                        }
+                    </style>
                 </head>
-                <body>
-                    <h2>${toTitleCase(settings.companyName)} - ${title}</h2>
-                    <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+                <body class="bg-white">
+                    <div class="print-header">
+                      <h2 class="text-xl font-bold">${toTitleCase(settings.companyName)} - ${title}</h2>
+                      <p class="text-sm">Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+                    </div>
                     ${node.innerHTML}
                 </body>
             </html>
         `);
         iframeDoc.close();
-        
+
         setTimeout(() => {
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500);
+        }, 1000); // Increased timeout for styles to load
     };
 
     if (loading || !settings) {
@@ -298,7 +301,7 @@ export default function RtgsReportClient() {
                             <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
-                            <Button onClick={() => handlePrint(tablePrintRef)} size="sm" variant="outline" className="w-full sm:w-auto">
+                            <Button onClick={handlePrint} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print Table
                             </Button>
                         </div>
