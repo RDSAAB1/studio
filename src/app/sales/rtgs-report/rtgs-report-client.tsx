@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -369,17 +369,22 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
+                    <DialogHeader>
+                        <DialogTitle className="sr-only">RTGS Print Preview</DialogTitle>
+                        <DialogDescription className="sr-only">A preview of the consolidated RTGS report for printing.</DialogDescription>
+                    </DialogHeader>
                     <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />
                 </DialogContent>
             </Dialog>
 
              <Dialog open={isTablePrintPreviewOpen} onOpenChange={setIsTablePrintPreviewOpen}>
                 <DialogContent className="max-w-screen-xl w-full h-[90vh] flex flex-col p-0">
-                    <div className="p-4 border-b">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-semibold">Table Print Preview</h3>
-                            <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
-                        </div>
+                    <DialogHeader className="p-4 border-b">
+                        <DialogTitle>Table Print Preview</DialogTitle>
+                        <DialogDescription className="sr-only">A preview of the RTGS report table.</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end p-2 border-b">
+                         <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </div>
                     <ScrollArea className="flex-grow">
                         <div className="p-4" dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
