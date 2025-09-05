@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
+import { Switch } from "@/components/ui/switch";
 
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; // Assuming firebase.ts is in lib
