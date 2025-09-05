@@ -306,72 +306,74 @@ export default function RtgsReportClient() {
                     )}
                 </CardHeader>
                 <CardContent>
-                    <div className="relative w-full overflow-x-auto">
-                        <Table ref={tablePrintRef}>
-                            <TableHeader className="sticky top-0 z-10 bg-background">
-                                <TableRow>
-                                    <TableHead>Date / SR No.</TableHead>
-                                    <TableHead>Payee / Father's Name</TableHead>
-                                    <TableHead>Bank / Branch / IFSC</TableHead>
-                                    <TableHead>A/C No. / Mobile</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead>Check / Parchi No.</TableHead>
-                                    <TableHead>6R No. / Date</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredReportRows.length > 0 ? (
-                                    filteredReportRows.map((row, index) => (
-                                        <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
-                                            <TableCell>
-                                                <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
-                                                <div className="text-xs text-muted-foreground">{row.srNo}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium whitespace-nowrap">{row.supplierName}</div>
-                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.fatherName}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium whitespace-nowrap">{row.bank}</div>
-                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.branch}</div>
-                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.ifscCode}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium whitespace-nowrap">{row.acNo}</div>
-                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.contact}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-bold whitespace-nowrap">{formatCurrency(row.amount)}</div>
-                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
-                                                <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
-                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
+                    <div className="overflow-x-auto">
+                        <div ref={tablePrintRef}>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date / SR No.</TableHead>
+                                        <TableHead>Payee / Father's Name</TableHead>
+                                        <TableHead>Bank / Branch / IFSC</TableHead>
+                                        <TableHead>A/C No. / Mobile</TableHead>
+                                        <TableHead>Amount</TableHead>
+                                        <TableHead>Check / Parchi No.</TableHead>
+                                        <TableHead>6R No. / Date</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredReportRows.length > 0 ? (
+                                        filteredReportRows.map((row, index) => (
+                                            <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
+                                                <TableCell>
+                                                    <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
+                                                    <div className="text-xs text-muted-foreground">{row.srNo}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium whitespace-nowrap">{row.supplierName}</div>
+                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.fatherName}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium whitespace-nowrap">{row.bank}</div>
+                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.branch}</div>
+                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.ifscCode}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium whitespace-nowrap">{row.acNo}</div>
+                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.contact}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-bold whitespace-nowrap">{formatCurrency(row.amount)}</div>
+                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
+                                                    <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
+                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="h-24 text-center">
+                                                No RTGS reports found.
                                             </TableCell>
                                         </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center">
-                                            No RTGS reports found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                    <DialogHeader>
-                        <DialogTitle className="sr-only">RTGS Print Preview</DialogTitle>
-                        <DialogDescription className="sr-only">A preview of the consolidated RTGS report for printing.</DialogDescription>
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>RTGS Print Preview</DialogTitle>
+                        <DialogDescription>A preview of the consolidated RTGS report for printing.</DialogDescription>
                     </DialogHeader>
                     <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />
                 </DialogContent>
@@ -402,3 +404,4 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+
