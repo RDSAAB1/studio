@@ -16,6 +16,7 @@ import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface RtgsReportRow {
@@ -45,6 +46,7 @@ export default function RtgsReportClient() {
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+    const [isTablePrintPreviewOpen, setIsTablePrintPreviewOpen] = useState(false);
     const [isBankMailFormatOpen, setIsBankMailFormatOpen] = useState(false);
     const tablePrintRef = useRef<HTMLDivElement>(null);
 
@@ -160,10 +162,6 @@ export default function RtgsReportClient() {
             return;
         }
 
-        const appUrl = window.location.origin;
-        const stylesheetUrl = `${appUrl}/globals.css`;
-        const tailwindConfigUrl = `${appUrl}/tailwind.config.js`; // Assuming your config is served
-
         const title = 'RTGS Payment Report';
         
         iframeDoc.open();
@@ -171,7 +169,7 @@ export default function RtgsReportClient() {
             <html>
                 <head>
                     <title>${title}</title>
-                    <link rel="stylesheet" href="${stylesheetUrl}">
+                    <link rel="stylesheet" href="${window.location.origin}/globals.css">
                     <style>
                         @media print {
                             @page { 
@@ -185,19 +183,19 @@ export default function RtgsReportClient() {
                                 background-color: #fff !important;
                             }
                             table {
-                                font-size: 8px; /* Smaller font for more data */
-                                border-collapse: collapse;
-                                width: 100%;
+                                font-size: 8px !important;
+                                border-collapse: collapse !important;
+                                width: 100% !important;
                             }
                             th, td {
                                 padding: 2px 4px !important;
                                 border: 1px solid #ccc !important;
-                                white-space: nowrap;
+                                white-space: nowrap !important;
                             }
                             thead {
                                 background-color: #f2f2f2 !important;
                             }
-                            .print-header {
+                            .print-header, .print-footer {
                                 display: block !important;
                                 margin-bottom: 1rem;
                             }
@@ -207,12 +205,12 @@ export default function RtgsReportClient() {
                         }
                     </style>
                 </head>
-                <body class="bg-white">
+                <body class="bg-white text-black p-4">
                     <div class="print-header">
                       <h2 class="text-xl font-bold">${toTitleCase(settings.companyName)} - ${title}</h2>
                       <p class="text-sm">Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
                     </div>
-                    ${node.innerHTML}
+                    ${node.outerHTML}
                 </body>
             </html>
         `);
@@ -301,15 +299,15 @@ export default function RtgsReportClient() {
                             <Button onClick={() => setIsPrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print RTGS Format
                             </Button>
-                            <Button onClick={handlePrint} size="sm" variant="outline" className="w-full sm:w-auto">
+                            <Button onClick={() => setIsTablePrintPreviewOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Printer className="mr-2 h-4 w-4" /> Print Table
                             </Button>
                         </div>
                     )}
                 </CardHeader>
                 <CardContent>
-                    <div className="relative w-full overflow-auto" ref={tablePrintRef}>
-                        <Table>
+                    <div className="relative w-full overflow-x-auto">
+                        <Table ref={tablePrintRef}>
                             <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
                                     <TableHead>Date / SR No.</TableHead>
@@ -372,6 +370,20 @@ export default function RtgsReportClient() {
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
                     <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />
+                </DialogContent>
+            </Dialog>
+
+             <Dialog open={isTablePrintPreviewOpen} onOpenChange={setIsTablePrintPreviewOpen}>
+                <DialogContent className="max-w-screen-xl w-full h-[90vh] flex flex-col p-0">
+                    <div className="p-4 border-b">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold">Table Print Preview</h3>
+                            <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
+                        </div>
+                    </div>
+                    <ScrollArea className="flex-grow">
+                        <div className="p-4" dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
+                    </ScrollArea>
                 </DialogContent>
             </Dialog>
 
