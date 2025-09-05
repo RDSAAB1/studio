@@ -17,72 +17,72 @@ export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPr
         <Card>
             <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
             <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                    <ScrollArea className="h-96">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="p-2 text-xs">ID</TableHead>
-                                <TableHead className="p-2 text-xs">Date</TableHead>
-                                <TableHead className="p-2 text-xs">Method</TableHead>
-                                <TableHead className="p-2 text-xs">Ref (SR#)</TableHead>
-                                <TableHead className="text-right p-2 text-xs">Amount</TableHead>
-                                <TableHead className="text-right p-2 text-xs">CD</TableHead>
-                                <TableHead className="text-center p-2 text-xs">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {payments.map((p: any) => (
-                                <TableRow key={p.id}>
-                                    <TableCell className="font-mono text-xs p-2">{p.paymentId}</TableCell>
-                                    <TableCell className="p-2 text-xs">{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
-                                    <TableCell className="p-2 text-xs"><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
-                                    <TableCell className="text-xs max-w-[100px] truncate p-2" title={(p.paidFor || []).map((pf: any) => pf.srNo).join(', ')}>
-                                        {(p.paidFor || []).map((pf: any) => pf.srNo).join(', ')}
-                                    </TableCell>
-                                    <TableCell className="text-right p-2 text-xs">{formatCurrency(p.amount)}</TableCell>
-                                    <TableCell className="text-right p-2 text-xs">{formatCurrency(p.cdAmount)}</TableCell>
-                                    <TableCell className="text-center p-0">
-                                        <div className="flex justify-center items-center gap-0">
-                                            {p.receiptType === 'RTGS' && (
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRtgs(p)}>
-                                                    <Printer className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(p)}>
-                                                <Info className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
-                                                <Pen className="h-4 w-4" />
-                                            </Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount.</AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => p.id && onDelete(p.id)}>Continue</AlertDialogAction>
-                                                </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {payments.length === 0 && (
+                <ScrollArea className="h-96">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
+                                    <TableHead className="p-2 text-xs">ID</TableHead>
+                                    <TableHead className="p-2 text-xs">Date</TableHead>
+                                    <TableHead className="p-2 text-xs">Method</TableHead>
+                                    <TableHead className="p-2 text-xs">Ref (SR#)</TableHead>
+                                    <TableHead className="text-right p-2 text-xs">Amount</TableHead>
+                                    <TableHead className="text-right p-2 text-xs">CD</TableHead>
+                                    <TableHead className="text-center p-2 text-xs">Actions</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                    </ScrollArea>
-                </div>
+                            </TableHeader>
+                            <TableBody>
+                                {payments.map((p: any) => (
+                                    <TableRow key={p.id}>
+                                        <TableCell className="font-mono text-xs p-2">{p.paymentId}</TableCell>
+                                        <TableCell className="p-2 text-xs">{format(new Date(p.date), "dd-MMM-yy")}</TableCell>
+                                        <TableCell className="p-2 text-xs"><Badge variant={p.receiptType === 'RTGS' ? 'default' : 'secondary'}>{p.receiptType}</Badge></TableCell>
+                                        <TableCell className="text-xs max-w-[100px] truncate p-2" title={(p.paidFor || []).map((pf: any) => pf.srNo).join(', ')}>
+                                            {(p.paidFor || []).map((pf: any) => pf.srNo).join(', ')}
+                                        </TableCell>
+                                        <TableCell className="text-right p-2 text-xs">{formatCurrency(p.amount)}</TableCell>
+                                        <TableCell className="text-right p-2 text-xs">{formatCurrency(p.cdAmount)}</TableCell>
+                                        <TableCell className="text-center p-0">
+                                            <div className="flex justify-center items-center gap-0">
+                                                {p.receiptType === 'RTGS' && (
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRtgs(p)}>
+                                                        <Printer className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(p)}>
+                                                    <Info className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
+                                                    <Pen className="h-4 w-4" />
+                                                </Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount.</AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => p.id && onDelete(p.id)}>Continue</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {payments.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </ScrollArea>
             </CardContent>
         </Card>
     );

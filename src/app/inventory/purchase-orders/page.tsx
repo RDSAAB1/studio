@@ -151,6 +151,7 @@ export default function PurchaseOrdersPage() {
           No purchase orders found.
         </div>
       ) : (
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -184,6 +185,7 @@ export default function PurchaseOrdersPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
 
       {/* Add Purchase Order Dialog */}

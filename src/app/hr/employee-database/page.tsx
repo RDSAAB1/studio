@@ -137,7 +137,7 @@ export default function EmployeeDatabasePage() {
         <h2 className="text-2xl font-bold">Employee Database</h2>
         <Button onClick={openDialogForAdd}>Add New Employee</Button>
       </div>
-
+        <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -163,7 +163,7 @@ export default function EmployeeDatabasePage() {
           ))}
         </TableBody>
       </Table>
-
+        </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>

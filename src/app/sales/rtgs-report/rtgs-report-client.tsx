@@ -373,7 +373,7 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                    <DialogHeader className="sr-only">
+                     <DialogHeader className="sr-only">
                         <DialogTitle>RTGS Print Preview</DialogTitle>
                         <DialogDescription>A preview of the consolidated RTGS report for printing.</DialogDescription>
                     </DialogHeader>
@@ -383,15 +383,15 @@ export default function RtgsReportClient() {
 
              <Dialog open={isTablePrintPreviewOpen} onOpenChange={setIsTablePrintPreviewOpen}>
                 <DialogContent className="max-w-screen-xl w-full h-[90vh] flex flex-col p-0">
-                    <DialogHeader className="p-4 border-b">
+                    <DialogHeader className="p-4 border-b sr-only">
                         <DialogTitle>Table Print Preview</DialogTitle>
-                        <DialogDescription className="sr-only">A preview of the RTGS report table.</DialogDescription>
+                        <DialogDescription>A preview of the RTGS report table.</DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end p-2 border-b">
                          <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </div>
                     <ScrollArea className="flex-grow">
-                        <div className="p-4" dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
+                        <div className="p-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
                     </ScrollArea>
                 </DialogContent>
             </Dialog>

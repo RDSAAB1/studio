@@ -438,6 +438,7 @@ export const SupplierProfileView = ({
                       <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
                       <CardContent>
                           <ScrollArea className="h-[14rem]">
+                            <div className="overflow-x-auto">
                               <Table>
                                   <TableHeader>
                                       <TableRow>
@@ -471,6 +472,7 @@ export const SupplierProfileView = ({
                                       )}
                                   </TableBody>
                               </Table>
+                            </div>
                           </ScrollArea>
                       </CardContent>
                   </Card>
@@ -478,6 +480,7 @@ export const SupplierProfileView = ({
                       <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
                       <CardContent>
                           <ScrollArea className="h-[14rem]">
+                             <div className="overflow-x-auto">
                               <Table>
                                   <TableHeader>
                                       <TableRow>
@@ -509,6 +512,7 @@ export const SupplierProfileView = ({
                                     )}
                                   </TableBody>
                               </Table>
+                             </div>
                           </ScrollArea>
                       </CardContent>
                   </Card>
