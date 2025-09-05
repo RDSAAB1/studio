@@ -149,10 +149,7 @@ export default function CustomerEntryClient() {
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching customers: ", error);
-      toast({
-        title: "Failed to load customer data",
-        variant: "destructive",
-      });
+      toast({ title: "Failed to load customer data", variant: "destructive" });
       setIsLoading(false);
     });
 
@@ -608,6 +605,7 @@ export default function CustomerEntryClient() {
         onDelete={handleDelete} 
         onShowDetails={handleShowDetails}
         onPrint={handlePrint}
+        onPrintRow={(entry: Customer) => handlePrint([entry])}
         selectedIds={selectedCustomerIds}
         onSelectionChange={setSelectedCustomerIds}
         onSearch={setSearchTerm}

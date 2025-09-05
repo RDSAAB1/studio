@@ -78,7 +78,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry.id)}>
                                                 <Pen className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRow(entry)}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintRow && onPrintRow(entry)}>
                                                 <Printer className="h-4 w-4" />
                                             </Button>
                                             <AlertDialog>
