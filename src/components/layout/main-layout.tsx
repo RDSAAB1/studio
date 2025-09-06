@@ -133,6 +133,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
       setActiveTabId(item.id);
       if (window.innerWidth < 1024) {
           setIsSidebarActive(false);
+      } else {
+        // Collapse sidebar on item click on desktop as well
+        setIsSidebarActive(false);
       }
     }
   };
@@ -167,11 +170,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
   
   return (
-    <div className={cn("wrapper", isSidebarActive && "active")}>
+    <div 
+        className={cn("wrapper", isSidebarActive && "active")}
+        onMouseEnter={() => setIsSidebarActive(true)}
+        onMouseLeave={() => setIsSidebarActive(false)}
+    >
         <CustomSidebar 
             isSidebarActive={isSidebarActive}
             onMenuItemClick={handleSidebarItemClick}
-            toggleSidebar={toggleSidebar}
         />
         <div className="main_container">
             <Header 
@@ -186,7 +192,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <div className="content">
                 {children}
             </div>
-            {isSidebarActive && <div className="shadow" onClick={toggleSidebar}></div>}
+            {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
         </div>
     </div>
   );
