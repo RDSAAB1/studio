@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as React from "react";
+import { useState, useEffect } from "react";
 import { Settings, UserCircle, Search, Menu, X, LogOut, Bell } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -33,12 +33,12 @@ const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
 
-    React.useEffect(() => {
+    useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
         return () => unsubscribe();
     }, []);
 
-    React.useEffect(() => {
+    useEffect(() => {
         const today = new Date();
         today.setHours(0,0,0,0);
         const pending = loans.filter(loan => 
@@ -83,7 +83,7 @@ const NotificationBell = () => {
 }
 
 export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSidebar, user, onSignOut }: HeaderProps) {
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { toasts } = useToast();
   const hasToasts = toasts.length > 0;
   const router = useRouter();
