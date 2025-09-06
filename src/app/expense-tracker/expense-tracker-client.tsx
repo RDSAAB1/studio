@@ -29,7 +29,7 @@ import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc,
 import { db } from "@/lib/firebase"; 
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -118,6 +118,7 @@ export default function IncomeExpenseClient() {
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [isAdvanced, setIsAdvanced] = useState(false);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -474,66 +475,71 @@ export default function IncomeExpenseClient() {
                               </Select>
                           </div>
                       )} />
-                      <Controller name="status" control={form.control} render={({ field }) => (
-                          <div className="space-y-1">
-                              <Label className="text-xs">Status</Label>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="Paid">Paid</SelectItem>
-                                      <SelectItem value="Pending">Pending</SelectItem>
-                                      <SelectItem value="Cancelled">Cancelled</SelectItem>
-                                  </SelectContent>
-                              </Select>
-                          </div>
-                      )} />
+                      
+                        {selectedTransactionType === 'Expense' && (
+                            <div className="flex items-center space-x-2 pt-6">
+                                <Switch id="advanced-toggle" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
+                                <Label htmlFor="advanced-toggle" className="text-sm font-normal flex items-center gap-2"><SlidersHorizontal className="h-4 w-4"/> Advanced Fields</Label>
+                            </div>
+                        )}
 
-                       <div className="space-y-1">
-                          <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
-                          <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
-                          </InputWithIcon>
-                      </div>
-
-                       <div className="space-y-1">
-                          <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
-                          <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />} />
-                          </InputWithIcon>
-                      </div>
-
-                       {selectedTransactionType === 'Expense' && (
-                            <Controller name="expenseType" control={form.control} render={({ field }) => (
-                              <div className="space-y-2">
-                                  <Label className="text-xs">Expense Type</Label>
-                                  <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                                      <div className="flex items-center space-x-2">
-                                          <RadioGroupItem value="Business" id="type-business" />
-                                          <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                          <RadioGroupItem value="Personal" id="type-personal" />
-                                          <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
-                                      </div>
-                                  </RadioGroup>
-                              </div>
-                            )} />
-                       )}
-
-                        <div className="space-y-1">
-                          <Label htmlFor="mill" className="text-xs">Mill</Label>
-                          <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
-                          </InputWithIcon>
-                        </div>
-
-
-                       <Controller name="isRecurring" control={form.control} render={({ field }) => (
-                          <div className="flex items-center space-x-2 pt-6">
-                              <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
-                              <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Transaction</Label>
-                          </div>
-                       )} />
+                        {isAdvanced && selectedTransactionType === 'Expense' && (
+                            <>
+                                <Controller name="status" control={form.control} render={({ field }) => (
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Status</Label>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Paid">Paid</SelectItem>
+                                                <SelectItem value="Pending">Pending</SelectItem>
+                                                <SelectItem value="Cancelled">Cancelled</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )} />
+                                <div className="space-y-1">
+                                    <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
+                                    <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                                        <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
+                                    </InputWithIcon>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
+                                    <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                                        <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />} />
+                                    </InputWithIcon>
+                                </div>
+                                <Controller name="expenseType" control={form.control} render={({ field }) => (
+                                    <div className="space-y-2">
+                                        <Label className="text-xs">Expense Type</Label>
+                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="Business" id="type-business" />
+                                                <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="Personal" id="type-personal" />
+                                                <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </div>
+                                )} />
+                                <div className="space-y-1">
+                                    <Label htmlFor="mill" className="text-xs">Mill</Label>
+                                    <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
+                                        <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
+                                    </InputWithIcon>
+                                </div>
+                                <Controller name="isRecurring" control={form.control} render={({ field }) => (
+                                    <div className="flex items-center space-x-2 pt-6">
+                                        <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
+                                        <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Transaction</Label>
+                                    </div>
+                                )} />
+                            </>
+                        )}
+                      
 
                       <div className="space-y-1 lg:col-span-3">
                           <Label htmlFor="description" className="text-xs">Description</Label>
