@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { format } from "date-fns";
 import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@/lib/firestore';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 export default function ProjectManagementPage() {
@@ -144,44 +145,46 @@ export default function ProjectManagementPage() {
             </Card>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>{currentProject?.id ? 'Edit Project' : 'Add New Project'}</DialogTitle>
                     </DialogHeader>
-                    {currentProject && (
-                        <div className="grid gap-4 py-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="name">Project Name</Label>
-                                <Input id="name" name="name" value={currentProject.name} onChange={handleInputChange} />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="description">Description</Label>
-                                <Textarea id="description" name="description" value={currentProject.description} onChange={handleInputChange} />
-                            </div>
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <ScrollArea className="max-h-[70vh] -mr-4 pr-4">
+                        {currentProject && (
+                            <div className="grid gap-4 py-4 pr-1">
                                 <div className="space-y-1">
-                                    <Label htmlFor="status">Status</Label>
-                                    <Select onValueChange={handleStatusChange} value={currentProject.status}>
-                                        <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Open">Open</SelectItem>
-                                            <SelectItem value="InProgress">In Progress</SelectItem>
-                                            <SelectItem value="Completed">Completed</SelectItem>
-                                            <SelectItem value="OnHold">On Hold</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <Label htmlFor="name">Project Name</Label>
+                                    <Input id="name" name="name" value={currentProject.name} onChange={handleInputChange} />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="startDate">Start Date</Label>
-                                    <Input id="startDate" name="startDate" type="date" value={currentProject.startDate} onChange={handleInputChange} />
+                                    <Label htmlFor="description">Description</Label>
+                                    <Textarea id="description" name="description" value={currentProject.description} onChange={handleInputChange} />
                                 </div>
-                                <div className="space-y-1 sm:col-span-2">
-                                    <Label htmlFor="endDate">End Date (Optional)</Label>
-                                    <Input id="endDate" name="endDate" type="date" value={currentProject.endDate} onChange={handleInputChange} />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="status">Status</Label>
+                                        <Select onValueChange={handleStatusChange} value={currentProject.status}>
+                                            <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Open">Open</SelectItem>
+                                                <SelectItem value="InProgress">In Progress</SelectItem>
+                                                <SelectItem value="Completed">Completed</SelectItem>
+                                                <SelectItem value="OnHold">On Hold</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="startDate">Start Date</Label>
+                                        <Input id="startDate" name="startDate" type="date" value={currentProject.startDate} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="space-y-1 sm:col-span-2">
+                                        <Label htmlFor="endDate">End Date (Optional)</Label>
+                                        <Input id="endDate" name="endDate" type="date" value={currentProject.endDate} onChange={handleInputChange} />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </ScrollArea>
                     <DialogFooter>
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                         <Button onClick={handleSaveProject}>{currentProject?.id ? 'Save Changes' : 'Create Project'}</Button>
