@@ -32,6 +32,7 @@ import {
   FileText,
   Settings,
   Upload,
+  List,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -112,6 +113,7 @@ export const allMenuItems: MenuItem[] = [
     icon: Briefcase,
     subMenus: [
         { id: "project-dashboard", name: "Dashboard", icon: ChevronRight, href: "/projects/dashboard" },
+        { id: "project-management", name: "Management", icon: List, href: "/projects/management" },
         { id: "tasks", name: "Tasks", icon: ClipboardCheck, href: "/projects/tasks" },
         { id: "collaboration", name: "Collaboration", icon: Users, href: "/projects/collaboration" },
     ]

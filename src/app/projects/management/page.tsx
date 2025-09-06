@@ -1,0 +1,193 @@
+
+"use client";
+
+import { useState, useEffect } from 'react';
+import type { Project } from '@/lib/definitions';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { format } from "date-fns";
+import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@/lib/firestore';
+
+
+export default function ProjectManagementPage() {
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [currentProject, setCurrentProject] = useState<Partial<Project> | null>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const unsubscribe = getProjectsRealtime((projectsData) => {
+            setProjects(projectsData);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching projects:", error);
+            setLoading(false);
+            toast({ title: "Failed to load projects", variant: "destructive" });
+        });
+        return () => unsubscribe();
+    }, [toast]);
+
+    const handleNewProject = () => {
+        setCurrentProject({
+            name: '',
+            description: '',
+            status: 'Open',
+            startDate: format(new Date(), 'yyyy-MM-dd'),
+            endDate: ''
+        });
+        setIsDialogOpen(true);
+    };
+
+    const handleEditProject = (project: Project) => {
+        setCurrentProject(project);
+        setIsDialogOpen(true);
+    };
+
+    const handleDeleteProject = async (id: string) => {
+        try {
+            await deleteProject(id);
+            toast({ title: "Project deleted successfully", variant: "success" });
+        } catch (error) {
+            console.error("Error deleting project:", error);
+            toast({ title: "Failed to delete project", variant: "destructive" });
+        }
+    };
+
+    const handleSaveProject = async () => {
+        if (!currentProject || !currentProject.name) {
+            toast({ title: "Project name is required", variant: "destructive" });
+            return;
+        }
+
+        try {
+            if (currentProject.id) {
+                await updateProject(currentProject.id, currentProject);
+                toast({ title: "Project updated", variant: "success" });
+            } else {
+                await addProject(currentProject as Omit<Project, 'id'>);
+                toast({ title: "Project created", variant: "success" });
+            }
+            setIsDialogOpen(false);
+            setCurrentProject(null);
+        } catch (error) {
+            console.error("Error saving project:", error);
+            toast({ title: "Failed to save project", variant: "destructive" });
+        }
+    };
+    
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (!currentProject) return;
+        setCurrentProject({ ...currentProject, [e.target.name]: e.target.value });
+    };
+
+    const handleStatusChange = (status: Project['status']) => {
+        if (!currentProject) return;
+        setCurrentProject({ ...currentProject, status });
+    }
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Project Management</CardTitle>
+                        <CardDescription>Create, view, and manage all your projects.</CardDescription>
+                    </div>
+                    <Button onClick={handleNewProject}><PlusCircle className="mr-2 h-4 w-4" /> Add New Project</Button>
+                </CardHeader>
+                <CardContent>
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Project Name</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Start Date</TableHead>
+                                        <TableHead>End Date</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {projects.length > 0 ? projects.map((project) => (
+                                        <TableRow key={project.id}>
+                                            <TableCell className="font-medium">{project.name}</TableCell>
+                                            <TableCell>{project.status}</TableCell>
+                                            <TableCell>{format(new Date(project.startDate), "PPP")}</TableCell>
+                                            <TableCell>{project.endDate ? format(new Date(project.endDate), "PPP") : '-'}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => handleEditProject(project)}><Edit className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteProject(project.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    )) : (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-24 text-center">No projects found. Start by adding a new one.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{currentProject?.id ? 'Edit Project' : 'Add New Project'}</DialogTitle>
+                    </DialogHeader>
+                    {currentProject && (
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="name">Project Name</Label>
+                                <Input id="name" name="name" value={currentProject.name} onChange={handleInputChange} />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea id="description" name="description" value={currentProject.description} onChange={handleInputChange} />
+                            </div>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="status">Status</Label>
+                                    <Select onValueChange={handleStatusChange} value={currentProject.status}>
+                                        <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Open">Open</SelectItem>
+                                            <SelectItem value="InProgress">In Progress</SelectItem>
+                                            <SelectItem value="Completed">Completed</SelectItem>
+                                            <SelectItem value="OnHold">On Hold</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="startDate">Start Date</Label>
+                                    <Input id="startDate" name="startDate" type="date" value={currentProject.startDate} onChange={handleInputChange} />
+                                </div>
+                                <div className="space-y-1 sm:col-span-2">
+                                    <Label htmlFor="endDate">End Date (Optional)</Label>
+                                    <Input id="endDate" name="endDate" type="date" value={currentProject.endDate} onChange={handleInputChange} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button onClick={handleSaveProject}>{currentProject?.id ? 'Save Changes' : 'Create Project'}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}

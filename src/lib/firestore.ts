@@ -19,7 +19,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -433,4 +433,30 @@ export function getAttendanceForDateRealtime(
 export async function setAttendance(entry: AttendanceEntry): Promise<void> {
     const docRef = doc(db, "attendance", entry.id);
     await setDoc(docRef, entry, { merge: true });
+}
+
+// --- Project Functions ---
+const projectsCollection = collection(db, "projects");
+
+export function getProjectsRealtime(callback: (projects: Project[]) => void, onError: (error: Error) => void): () => void {
+    const q = query(projectsCollection, orderBy("startDate", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        callback(projects);
+    }, onError);
+}
+
+export async function addProject(projectData: Omit<Project, 'id'>): Promise<Project> {
+    const docRef = await addDoc(projectsCollection, projectData);
+    return { id: docRef.id, ...projectData };
+}
+
+export async function updateProject(id: string, projectData: Partial<Project>): Promise<void> {
+    const projectRef = doc(db, "projects", id);
+    await updateDoc(projectRef, projectData);
+}
+
+export async function deleteProject(id: string): Promise<void> {
+    const projectRef = doc(db, "projects", id);
+    await deleteDoc(projectRef);
 }

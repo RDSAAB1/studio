@@ -514,6 +514,23 @@ export default function IncomeExpenseClient() {
                           </div>
                       )} />
 
+                        {selectedTransactionType === 'Expense' && (
+                            <Controller name="projectId" control={form.control} render={({ field }) => (
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Project</Label>
+                                    <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                                        <SelectTrigger className="h-9 text-sm">
+                                            <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Project (Optional)" /></div>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">None</SelectItem>
+                                            {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )} />
+                        )}
+
                         <div className="flex items-center space-x-2 pt-6">
                             <Switch id="calculate-toggle" checked={isCalculated} onCheckedChange={setIsCalculated} />
                             <Label htmlFor="calculate-toggle" className="text-sm font-normal flex items-center gap-2"><Calculator className="h-4 w-4"/> Calculate Amount</Label>
@@ -573,18 +590,6 @@ export default function IncomeExpenseClient() {
                                                         <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
                                                     </div>
                                                 </RadioGroup>
-                                            </div>
-                                        )} />
-                                        <Controller name="projectId" control={form.control} render={({ field }) => (
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Project</Label>
-                                                <Select onValueChange={field.onChange} value={field.value || 'none'}>
-                                                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Project (Optional)" /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="none">None</SelectItem>
-                                                        {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
                                             </div>
                                         )} />
                                     </>
