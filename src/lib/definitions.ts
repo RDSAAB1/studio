@@ -92,7 +92,6 @@ export type Transaction = {
     expenseNature?: 'Permanent' | 'Seasonal';
     isCalculated?: boolean;
     quantity?: number;
-    unit?: string;
     rate?: number;
 };
 
@@ -262,9 +261,20 @@ export type Employee = {
 export type PayrollEntry = {
     id: string;
     employeeId: string;
-    payPeriod: string; // e.g., "July 2024"
+    payPeriod: string; // e.g., "2024-07"
     amount: number;
-    // Add other fields like deductions, bonuses, paymentDate, etc.
+    createdAt?: Date;
+    updatedAt?: Date;
+};
+
+export type AttendanceEntry = {
+    id: string; // Composite key: `${date}-${employeeId}`
+    date: string; // Format: 'YYYY-MM-DD'
+    employeeId: string;
+    status: 'Present' | 'Absent' | 'Leave' | 'Half-day';
+    checkIn?: string; // e.g., '09:00 AM'
+    checkOut?: string; // e.g., '05:00 PM'
+    notes?: string;
 };
 
 export type Campaign = {

@@ -19,7 +19,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -414,4 +414,23 @@ export async function deleteSubCategory(collectionName: "incomeCategories" | "ex
     await updateDoc(doc(db, collectionName, categoryId), {
         subCategories: arrayRemove(subCategoryName)
     });
+}
+
+// --- Attendance Functions ---
+
+export function getAttendanceForDateRealtime(
+  date: string, // YYYY-MM-DD format
+  callback: (records: AttendanceEntry[]) => void, 
+  onError: (error: Error) => void
+): () => void {
+    const q = query(collection(db, "attendance"), where("date", "==", date));
+    return onSnapshot(q, (snapshot) => {
+        const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceEntry));
+        callback(records);
+    }, onError);
+}
+
+export async function setAttendance(entry: AttendanceEntry): Promise<void> {
+    const docRef = doc(db, "attendance", entry.id);
+    await setDoc(docRef, entry, { merge: true });
 }
