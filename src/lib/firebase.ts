@@ -3,7 +3,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,21 +16,27 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+let app: FirebaseApp;
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
+
 const db = getFirestore(app);
 const storage = getStorage(app);
 
 // Use a function to get auth instance to ensure it's client-side
-let auth: Auth;
+let authInstance: Auth | null = null;
 const getFirebaseAuth = (): Auth => {
     if (typeof window === 'undefined') {
         // Return a mock or minimal auth object on the server
         return {} as Auth;
     }
-    if (!auth) {
-        auth = getAuth(app);
+    if (!authInstance) {
+        authInstance = getAuth(app);
     }
-    return auth;
+    return authInstance;
 }
 
 const getGoogleProvider = (): GoogleAuthProvider => {
@@ -40,4 +46,4 @@ const getGoogleProvider = (): GoogleAuthProvider => {
     return provider;
 };
 
-export { app, db, storage, getFirebaseAuth, getGoogleProvider };
+export { app, db, storage, getFirebaseAuth, getGoogleProvider, onAuthStateChanged };
