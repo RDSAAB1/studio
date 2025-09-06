@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, where } from "firebase/firestore";
+import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 import type { Employee, PayrollEntry, AttendanceEntry } from "@/lib/definitions"; 
 import { Button } from "@/components/ui/button";
@@ -89,9 +89,10 @@ export default function PayrollManagementPage() {
         where('date', '>=', startDate),
         where('date', '<=', endDate)
     );
-
-    const attendanceSnapshot = await onSnapshot(qAttendance, (snapshot) => {
-        const records = snapshot.docs.map(doc => doc.data() as AttendanceEntry);
+    
+    try {
+        const attendanceSnapshot = await getDocs(qAttendance);
+        const records = attendanceSnapshot.docs.map(doc => doc.data() as AttendanceEntry);
         
         let present = 0;
         let absent = 0;
@@ -114,8 +115,10 @@ export default function PayrollManagementPage() {
 
         setAttendanceSummary({ present, absent, leave, halfDay, totalDays: daysInMonth, payableDays });
         setCurrentEntry(prev => ({...prev, amount: Math.round(payableSalary)}));
-    });
-    // This is not ideal as we don't store unsubscribe, but for a one-off calc it's okay.
+    } catch(err) {
+        console.error("Error calculating salary:", err);
+        setError("Failed to calculate salary due to a database error.");
+    }
   };
 
   const handleSaveEntry = async () => {
