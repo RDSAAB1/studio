@@ -89,11 +89,12 @@ export const allMenuItems: MenuItem[] = [
   },
   {
     id: "hr",
-    name: "HR & Payroll",
+    name: "HR Management",
     icon: Users2,
     subMenus: [
       { id: "employee-db", name: "Employee Database", icon: ChevronRight, href: "/hr/employee-database" },
-      { id: "payroll", name: "Payroll", icon: ChevronRight, href: "/hr/payroll-management" },
+      { id: "payroll", name: "Payroll Management", icon: ChevronRight, href: "/hr/payroll-management" },
+      { id: "attendance", name: "Attendance Tracking", icon: ChevronRight, href: "/hr/attendance-tracking" },
     ],
   },
   {

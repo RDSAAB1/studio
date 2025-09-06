@@ -2,24 +2,17 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Assuming you have an initialized Firestore instance exported as 'db'
+import { collection, onSnapshot, query, doc, addDoc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from 'lucide-react';
-
-interface Employee {
-  id?: string;
-  name: string;
-  employeeId: string;
-  position: string;
-  contact: string;
-  // Add other employee fields as needed
-}
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import type { Employee } from '@/lib/definitions';
 
 export default function EmployeeDatabasePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -35,7 +28,7 @@ export default function EmployeeDatabasePage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const q = query(collection(db, "employees"));
+    const q = query(collection(db, "employees"), orderBy("name"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const employeesData: Employee[] = [];
       snapshot.forEach((doc) => {
@@ -52,7 +45,7 @@ export default function EmployeeDatabasePage() {
       setLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup the listener on component unmount
+    return () => unsubscribe();
   }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,42 +53,25 @@ export default function EmployeeDatabasePage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleAddEmployee = async () => {
-    try {
-      await addDoc(collection(db, "employees"), formData);
-      toast({
-        title: "Employee added successfully",
-        variant: "success",
-      });
-      setIsDialogOpen(false);
-      setFormData({ name: '', employeeId: '', position: '', contact: '' });
-    } catch (error) {
-      console.error("Error adding employee: ", error);
-      toast({
-        title: "Failed to add employee",
-        variant: "destructive",
-      });
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.employeeId) {
+        toast({ title: "Name and Employee ID are required", variant: "destructive" });
+        return;
     }
-  };
 
-  const handleUpdateEmployee = async () => {
-    if (!currentEmployee?.id) return;
     try {
-      const employeeRef = doc(db, "employees", currentEmployee.id);
-      await updateDoc(employeeRef, formData);
-      toast({
-        title: "Employee updated successfully",
-        variant: "success",
-      });
-      setIsDialogOpen(false);
-      setCurrentEmployee(null);
-      setFormData({ name: '', employeeId: '', position: '', contact: '' });
+        if (currentEmployee) {
+            const employeeRef = doc(db, "employees", currentEmployee.id);
+            await updateDoc(employeeRef, formData);
+            toast({ title: "Employee updated successfully", variant: "success" });
+        } else {
+            await addDoc(collection(db, "employees"), formData);
+            toast({ title: "Employee added successfully", variant: "success" });
+        }
+        closeDialog();
     } catch (error) {
-      console.error("Error updating employee: ", error);
-      toast({
-        title: "Failed to update employee",
-        variant: "destructive",
-      });
+        console.error("Error saving employee: ", error);
+        toast({ title: `Failed to ${currentEmployee ? 'update' : 'add'} employee`, variant: "destructive" });
     }
   };
 
@@ -126,46 +102,60 @@ export default function EmployeeDatabasePage() {
     setFormData({ name: employee.name, employeeId: employee.employeeId, position: employee.position, contact: employee.contact });
     setIsDialogOpen(true);
   };
-
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setCurrentEmployee(null);
+    setFormData({ name: '', employeeId: '', position: '', contact: '' });
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Employee Database</h2>
-        <Button onClick={openDialogForAdd}>Add New Employee</Button>
-      </div>
-        <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Employee ID</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Position</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {employees.map((employee) => (
-            <TableRow key={employee.id}>
-              <TableCell>{employee.employeeId}</TableCell>
-              <TableCell>{employee.name}</TableCell>
-              <TableCell>{employee.position}</TableCell>
-              <TableCell>{employee.contact}</TableCell>
-              <TableCell>
-                <Button variant="outline" size="sm" className="mr-2" onClick={() => openDialogForEdit(employee)}>Edit</Button>
-                <Button variant="destructive" size="sm" onClick={() => employee.id && handleDeleteEmployee(employee.id)}>Delete</Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-        </div>
+    <div className="space-y-6">
+       <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle className="text-xl font-semibold">Employee Database</CardTitle>
+                <CardDescription>Manage your team's information here.</CardDescription>
+            </div>
+            <Button onClick={openDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Employee</Button>
+        </CardHeader>
+        <CardContent>
+            {loading ? (
+                 <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                        <TableRow>
+                            <TableHead>Employee ID</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Position</TableHead>
+                            <TableHead>Contact</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {employees.map((employee) => (
+                            <TableRow key={employee.id}>
+                            <TableCell>{employee.employeeId}</TableCell>
+                            <TableCell>{employee.name}</TableCell>
+                            <TableCell>{employee.position}</TableCell>
+                            <TableCell>{employee.contact}</TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => openDialogForEdit(employee)}><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => employee.id && handleDeleteEmployee(employee.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+        </CardContent>
+       </Card>
+      
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent onEscapeKeyDown={closeDialog}>
           <DialogHeader>
             <DialogTitle>{currentEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
           </DialogHeader>
@@ -186,11 +176,10 @@ export default function EmployeeDatabasePage() {
               <Label htmlFor="contact" className="text-right">Contact</Label>
               <Input id="contact" name="contact" value={formData.contact} onChange={handleInputChange} className="col-span-3" />
             </div>
-            {/* Add other fields here */}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={currentEmployee ? handleUpdateEmployee : handleAddEmployee}>
+            <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+            <Button onClick={handleSubmit}>
               {currentEmployee ? 'Save Changes' : 'Add Employee'}
             </Button>
           </DialogFooter>
