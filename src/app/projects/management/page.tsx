@@ -87,7 +87,9 @@ export default function ProjectManagementPage() {
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (!currentProject) return;
-        setCurrentProject({ ...currentProject, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        const isNumericField = name === 'totalCost' || name === 'totalBilled';
+        setCurrentProject({ ...currentProject, [name]: isNumericField ? Number(value) : value });
     };
 
     const handleStatusChange = (status: Project['status']) => {
@@ -177,7 +179,11 @@ export default function ProjectManagementPage() {
                                         <Label htmlFor="startDate">Start Date</Label>
                                         <Input id="startDate" name="startDate" type="date" value={currentProject.startDate} onChange={handleInputChange} />
                                     </div>
-                                    <div className="space-y-1 sm:col-span-2">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="totalCost">Total Cost (Optional)</Label>
+                                        <Input id="totalCost" name="totalCost" type="number" value={currentProject.totalCost || ''} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="space-y-1">
                                         <Label htmlFor="endDate">End Date (Optional)</Label>
                                         <Input id="endDate" name="endDate" type="date" value={currentProject.endDate} onChange={handleInputChange} />
                                     </div>

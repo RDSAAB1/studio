@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,12 @@ import { Switch } from "@/components/ui/switch";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getTransactionsRealtime } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getTransactionsRealtime, getLoansRealtime, updateLoan } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -57,6 +57,7 @@ const transactionSchema = z.object({
   quantity: z.coerce.number().optional(),
   rate: z.coerce.number().optional(),
   projectId: z.string().optional(),
+  loanId: z.string().optional(),
 });
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
@@ -88,6 +89,7 @@ const getInitialFormState = (): Omit<Transaction, 'id' | 'date' | 'nextDueDate'>
     quantity: 0,
     rate: 0,
     projectId: '',
+    loanId: '',
   };
 };
 
@@ -131,6 +133,7 @@ export default function IncomeExpenseClient() {
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
@@ -179,7 +182,7 @@ export default function IncomeExpenseClient() {
     });
     
     const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
-
+    const unsubLoans = getLoansRealtime(setLoans, console.error);
     const unsubIncome = getIncomeCategories(setIncomeCategories, console.error);
     const unsubExpense = getExpenseCategories(setExpenseCategories, console.error);
     
@@ -195,6 +198,7 @@ export default function IncomeExpenseClient() {
       unsubIncome();
       unsubExpense();
       unsubProjects();
+      unsubLoans();
     };
   }, []);
   
@@ -307,6 +311,7 @@ export default function IncomeExpenseClient() {
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
         projectId: values.projectId === 'none' ? '' : values.projectId,
+        loanId: values.loanId === 'none' ? '' : values.loanId,
       };
 
       if (isEditing) {
@@ -316,6 +321,18 @@ export default function IncomeExpenseClient() {
         await addDoc(collection(db, "transactions"), transactionData);
         toast({ title: "Transaction saved.", variant: "success" });
       }
+      
+      // If it's a loan payment, update the loan's remaining amount
+      if(values.loanId && values.loanId !== 'none' && values.transactionType === 'Expense') {
+          const loanToUpdate = loans.find(l => l.id === values.loanId);
+          if(loanToUpdate) {
+              const newAmountPaid = (loanToUpdate.amountPaid || 0) + values.amount;
+              const newRemainingAmount = loanToUpdate.totalAmount - newAmountPaid;
+              await updateLoan(values.loanId, { amountPaid: newAmountPaid, remainingAmount: newRemainingAmount });
+              toast({ title: "Loan Updated", description: `Remaining balance for ${loanToUpdate.loanName} is now ${formatCurrency(newRemainingAmount)}.` });
+          }
+      }
+
       handleNew();
       setActiveTab("history");
     } catch (error) {
@@ -569,6 +586,7 @@ export default function IncomeExpenseClient() {
                       )} />
 
                         {selectedTransactionType === 'Expense' && (
+                           <>
                             <Controller name="projectId" control={form.control} render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Project</Label>
@@ -583,6 +601,21 @@ export default function IncomeExpenseClient() {
                                     </Select>
                                 </div>
                             )} />
+                            <Controller name="loanId" control={form.control} render={({ field }) => (
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Loan Payment</Label>
+                                    <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                                        <SelectTrigger className="h-9 text-sm">
+                                            <div className="flex items-center gap-2"><HandCoins className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Loan (Optional)" /></div>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">None</SelectItem>
+                                            {loans.map(l => <SelectItem key={l.id} value={l.id}>{l.loanName}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )} />
+                           </>
                         )}
 
                         <div className="flex items-center space-x-2 pt-6">

@@ -96,6 +96,7 @@ export type Transaction = {
     quantity?: number;
     rate?: number;
     projectId?: string; // Link to a project
+    loanId?: string; // Link to a loan
 };
 
 export type IncomeCategory = {
@@ -355,6 +356,8 @@ export type Project = {
     status: 'Open' | 'InProgress' | 'Completed' | 'OnHold';
     startDate: string;
     endDate?: string;
+    totalCost?: number; // Optional: Total estimated or actual cost of the project
+    totalBilled?: number; // Optional: Total amount billed or expensed against the project
 };
 
 export type Task = {
@@ -375,7 +378,7 @@ export type Loan = {
     productName?: string; // For Product loan
     totalAmount: number; // Total cost for Product, Limit for Bank, Principal for Outsider
     amountPaid: number; // DP for Product, amount repaid for others
-    remainingAmount?: number;
+    remainingAmount: number;
     interestRate: number; // Annual for Bank, Monthly for Outsider
     tenureMonths: number;
     emiAmount: number; // Only for Product loan
