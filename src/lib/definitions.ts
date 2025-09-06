@@ -92,6 +92,18 @@ export type Transaction = {
     expenseNature?: 'Permanent' | 'Seasonal';
 };
 
+export type IncomeCategory = {
+    id: string;
+    name: string;
+    subCategories: string[];
+}
+export type ExpenseCategory = {
+    id: string;
+    name: string;
+    nature: 'Permanent' | 'Seasonal';
+    subCategories: string[];
+}
+
 export type FundTransaction = {
     id: string;
     date: string;

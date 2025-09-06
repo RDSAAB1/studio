@@ -16,8 +16,10 @@ import {
   setDoc,
   writeBatch,
   runTransaction,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -272,6 +274,7 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
         return false;
     }
     await updateDoc(customerRef, customerData as any);
+    return true;
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
@@ -369,4 +372,46 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
   const finalData = { ...transactionData, date: new Date().toISOString() };
   const docRef = await addDoc(fundTransactionsCollection, finalData);
   return { id: docRef.id, ...finalData };
+}
+
+// --- Income/Expense Category Functions ---
+
+export function getIncomeCategories(callback: (data: IncomeCategory[]) => void, onError: (error: Error) => void) {
+    const q = query(collection(db, "incomeCategories"), orderBy("name"));
+    return onSnapshot(q, (snapshot) => {
+        const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncomeCategory));
+        callback(categories);
+    }, onError);
+}
+
+export function getExpenseCategories(callback: (data: ExpenseCategory[]) => void, onError: (error: Error) => void) {
+    const q = query(collection(db, "expenseCategories"), orderBy("name"));
+    return onSnapshot(q, (snapshot) => {
+        const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseCategory));
+        callback(categories);
+    }, onError);
+}
+
+export async function addCategory(collectionName: "incomeCategories" | "expenseCategories", category: { name: string; nature?: string }) {
+    await addDoc(collection(db, collectionName), { ...category, subCategories: [] });
+}
+
+export async function updateCategoryName(collectionName: "incomeCategories" | "expenseCategories", id: string, name: string) {
+    await updateDoc(doc(db, collectionName, id), { name });
+}
+
+export async function deleteCategory(collectionName: "incomeCategories" | "expenseCategories", id: string) {
+    await deleteDoc(doc(db, collectionName, id));
+}
+
+export async function addSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
+    await updateDoc(doc(db, collectionName, categoryId), {
+        subCategories: arrayUnion(subCategoryName)
+    });
+}
+
+export async function deleteSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
+    await updateDoc(doc(db, collectionName, categoryId), {
+        subCategories: arrayRemove(subCategoryName)
+    });
 }

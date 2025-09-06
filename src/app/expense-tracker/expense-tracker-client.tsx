@@ -4,9 +4,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { initialTransactions } from "@/lib/data";
-import type { Transaction } from "@/lib/definitions";
-import { toTitleCase, cn } from "@/lib/utils";
+import type { Transaction, IncomeCategory, ExpenseCategory } from "@/lib/definitions";
+import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,15 +22,16 @@ import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
 import { Switch } from "@/components/ui/switch";
 
-import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Assuming firebase.ts is in lib
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CategoryManagerDialog } from "./category-manager-dialog";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory } from "@/lib/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase"; 
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
-import { transactionCategories } from "@/lib/data";
 
 // Zod Schema
 const transactionSchema = z.object({
@@ -49,14 +49,14 @@ const transactionSchema = z.object({
   taxAmount: z.coerce.number().optional(),
   expenseType: z.enum(["Personal", "Business"]).optional(),
   isRecurring: z.boolean(),
-  mill: z.string().optional(), // Note: This might need review based on how 'Mill' relates to Income/Expense
+  mill: z.string().optional(), 
   expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
 });
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 type TransactionFormData = Omit<TransactionFormValues, 'date'> & { date: string }; // For Firestore compatibility
 
-const getInitialFormState = (transactions: Transaction[]): Omit<Transaction, 'id' | 'date'> & { date: Date } => {
+const getInitialFormState = (): Omit<Transaction, 'id' | 'date'> & { date: Date } => {
   const staticDate = new Date();
   staticDate.setHours(0, 0, 0, 0);
 
@@ -69,7 +69,6 @@ const getInitialFormState = (transactions: Transaction[]): Omit<Transaction, 'id
     payee: '',
     description: '',
     paymentMethod: 'Cash',
-    // isRecurring: false, // Default handled by form.reset
     status: 'Paid',
     invoiceNumber: '',
     taxAmount: 0,
@@ -115,10 +114,14 @@ export default function IncomeExpenseClient() {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("history");
   const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'ascending' | 'descending' } | null>(null);
+  
+  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
-    defaultValues: getInitialFormState(transactions),
+    defaultValues: getInitialFormState(),
   });
 
   const selectedTransactionType = form.watch('transactionType');
@@ -127,29 +130,27 @@ export default function IncomeExpenseClient() {
 
   const availableCategories = useMemo(() => {
     if (selectedTransactionType === 'Income') {
-        return transactionCategories.Income.categories || [];
+        return incomeCategories;
     }
     if (selectedTransactionType === 'Expense' && selectedExpenseNature) {
-        return transactionCategories.Expense[selectedExpenseNature]?.categories || [];
+        return expenseCategories.filter(c => c.nature === selectedExpenseNature);
     }
     return [];
-  }, [selectedTransactionType, selectedExpenseNature]);
+  }, [selectedTransactionType, selectedExpenseNature, incomeCategories, expenseCategories]);
 
   const availableSubCategories = useMemo(() => {
     const categoryObj = availableCategories.find(c => c.name === selectedCategory);
     return categoryObj?.subCategories || [];
   }, [selectedCategory, availableCategories]);
 
-  // Fetch data from Firestore in real-time
   useEffect(() => {
-    const q = query(collection(db, "transactions"), orderBy("date", "desc")); // Order by date
+    const q = query(collection(db, "transactions"), orderBy("date", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const transactionsData = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
-          id: doc.id,
-          ...data,
-          date: new Date(data.date) // Convert Firestore Timestamp or string back to Date
+          id: doc.id, ...data,
+          date: new Date(data.date) 
         } as Transaction;
       });
       setTransactions(transactionsData);
@@ -158,7 +159,15 @@ export default function IncomeExpenseClient() {
       console.error("Error fetching transactions: ", error);
       setLoading(false);
     });
-    return () => unsubscribe(); // Clean up the listener
+
+    const unsubIncome = getIncomeCategories(setIncomeCategories, console.error);
+    const unsubExpense = getExpenseCategories(setExpenseCategories, console.error);
+
+    return () => {
+      unsubscribe();
+      unsubIncome();
+      unsubExpense();
+    };
   }, []);
 
   useEffect(() => {
@@ -171,16 +180,16 @@ export default function IncomeExpenseClient() {
   }, [selectedCategory, form]);
 
   const handleNew = useCallback(() => {
-    setIsEditing(null); // Reset editing state
-    form.reset(getInitialFormState(transactions));
+    setIsEditing(null); 
+    form.reset(getInitialFormState());
     setActiveTab("form");
-  }, [transactions, form]);
+  }, [form]);
 
   const handleEdit = (transaction: Transaction) => {
     setIsEditing(transaction.id);
     form.reset({
       ...transaction,
-      date: new Date(transaction.date), // Ensure date is a Date object for the form
+      date: new Date(transaction.date), 
       taxAmount: transaction.taxAmount || 0,
     });
     setActiveTab("form");
@@ -189,10 +198,10 @@ export default function IncomeExpenseClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, "transactions", id));
-      toast({ title: "Transaction deleted successfully.", variant: "success" });
+      toast({ title: "Transaction deleted.", variant: "success" });
       if (isEditing === id) {
         setIsEditing(null);
-        form.reset(getInitialFormState(transactions)); // Reset form if the deleted item was being edited
+        form.reset(getInitialFormState()); 
       }
     } catch (error) {
       console.error("Error deleting transaction: ", error);
@@ -205,22 +214,20 @@ export default function IncomeExpenseClient() {
     try {
       const transactionData: TransactionFormData = {
         ...values,
-        date: format(values.date, "yyyy-MM-dd"), // Save date as string
+        date: format(values.date, "yyyy-MM-dd"), 
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
       };
 
       if (isEditing) {
-        // Update existing transaction
         await setDoc(doc(db, "transactions", isEditing), transactionData, { merge: true });
-        toast({ title: "Transaction updated successfully.", variant: "success" });
+        toast({ title: "Transaction updated.", variant: "success" });
       } else {
-        // Add new transaction with a new ID
         await addDoc(collection(db, "transactions"), transactionData);
-        toast({ title: "New transaction saved successfully.", variant: "success" });
+        toast({ title: "Transaction saved.", variant: "success" });
       }
       setIsEditing(null);
-      form.reset(getInitialFormState([])); // Reset with empty initial state to clear form
+      form.reset(getInitialFormState()); 
       setActiveTab("history");
     } catch (error) {
         console.error("Error saving transaction: ", error);
@@ -275,9 +282,9 @@ export default function IncomeExpenseClient() {
               <CardDescription>A summary of your recorded income and expenses.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Total Income" value={`₹${totalIncome.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-green-500"/>
-              <StatCard title="Total Expense" value={`₹${totalExpense.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-red-500"/>
-              <StatCard title="Net Profit/Loss" value={`₹${netProfitLoss.toFixed(2)}`} icon={<BarChart />} colorClass={netProfitLoss >= 0 ? "text-green-500" : "text-red-500"}/>
+              <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<CircleDollarSign />} colorClass="text-green-500"/>
+              <StatCard title="Total Expense" value={formatCurrency(totalExpense)} icon={<CircleDollarSign />} colorClass="text-red-500"/>
+              <StatCard title="Net Profit/Loss" value={formatCurrency(netProfitLoss)} icon={<BarChart />} colorClass={netProfitLoss >= 0 ? "text-green-500" : "text-red-500"}/>
               <StatCard title="Total Transactions" value={String(totalTransactions)} icon={<Hash />} />
           </CardContent>
       </SectionCard>
@@ -288,11 +295,14 @@ export default function IncomeExpenseClient() {
             <TabsTrigger value="history" className="flex-1 sm:flex-initial"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
             <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
           </TabsList>
-          {activeTab === 'history' && (
-             <Button onClick={handleNew} size="sm" className="w-full sm:w-auto">
-                <PlusCircle className="mr-2 h-4 w-4" /> New Transaction
+          <div className="w-full sm:w-auto flex items-center gap-2">
+            <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto"><Settings className="mr-2 h-4 w-4" />Manage Categories</Button>
+            {activeTab === 'history' && (
+              <Button onClick={handleNew} size="sm" className="w-full sm:w-auto">
+                  <PlusCircle className="mr-2 h-4 w-4" /> New Transaction
               </Button>
-          )}
+            )}
+          </div>
         </div>
         <TabsContent value="history" className="mt-4">
           <SectionCard>
@@ -305,7 +315,7 @@ export default function IncomeExpenseClient() {
                       <TableHead>Type</TableHead>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                       <TableHead>Sub-Category</TableHead>
-                      <TableHead className="cursor-pointer text-right" onClick={() => requestSort('amount')}>Amount <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                       <TableHead>Payee/Payer</TableHead>
                        <TableHead>Mill</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
@@ -318,7 +328,7 @@ export default function IncomeExpenseClient() {
                         <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
                         <TableCell>{transaction.category}</TableCell>
                         <TableCell>{transaction.subCategory}</TableCell>
-                        <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>₹{transaction.amount.toFixed(2)}</TableCell>
+                        <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(transaction.amount)}</TableCell>
                         <TableCell>{transaction.payee}</TableCell>
                         <TableCell>{transaction.mill}</TableCell>
                         <TableCell className="text-center">
@@ -421,7 +431,7 @@ export default function IncomeExpenseClient() {
                                     <div className="flex items-center gap-2"><Tag className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Category" /></div>
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {availableCategories.map(cat => <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>)}
+                                    {availableCategories.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                             {form.formState.errors.category && <p className="text-xs text-destructive mt-1">{form.formState.errors.category.message}</p>}
@@ -446,7 +456,7 @@ export default function IncomeExpenseClient() {
                       <div className="space-y-1">
                           <Label htmlFor="payee" className="text-xs">Payee / Payer</Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-9 text-sm pl-10" />} />
+                              <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" />} />
                           </InputWithIcon>
                           {form.formState.errors.payee && <p className="text-xs text-destructive mt-1">{form.formState.errors.payee.message}</p>}
                       </div>
@@ -481,14 +491,14 @@ export default function IncomeExpenseClient() {
                        <div className="space-y-1">
                           <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
                           <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-9 text-sm pl-10" />} />
+                              <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
                           </InputWithIcon>
                       </div>
 
                        <div className="space-y-1">
                           <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
                           <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-9 text-sm pl-10" />} />
+                              <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />} />
                           </InputWithIcon>
                       </div>
 
@@ -513,7 +523,7 @@ export default function IncomeExpenseClient() {
                         <div className="space-y-1">
                           <Label htmlFor="mill" className="text-xs">Mill</Label>
                           <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-9 text-sm pl-10" />} />
+                              <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
                           </InputWithIcon>
                         </div>
 
@@ -537,7 +547,7 @@ export default function IncomeExpenseClient() {
                       {isEditing && (
                         <Button type="button" variant="outline" onClick={() => {
                           setIsEditing(null);
-                          form.reset(getInitialFormState(transactions));
+                          form.reset(getInitialFormState());
                         }} size="sm">
                           Cancel
                         </Button>
@@ -548,8 +558,17 @@ export default function IncomeExpenseClient() {
            </SectionCard>
         </TabsContent>
       </Tabs>
+      <CategoryManagerDialog
+        isOpen={isCategoryManagerOpen}
+        onOpenChange={setIsCategoryManagerOpen}
+        incomeCategories={incomeCategories}
+        expenseCategories={expenseCategories}
+        onAddCategory={addCategory}
+        onUpdateCategoryName={updateCategoryName}
+        onDeleteCategory={deleteCategory}
+        onAddSubCategory={addSubCategory}
+        onDeleteSubCategory={deleteSubCategory}
+      />
     </div>
   );
 }
-
-    
