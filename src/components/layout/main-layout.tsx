@@ -17,6 +17,7 @@ type MainLayoutProps = {
 }
 
 const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
+const SETUP_ROUTES = ['/setup/connect-gmail', '/setup/company-details'];
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
@@ -24,6 +25,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -31,9 +33,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        setLoading(true);
         if (currentUser) {
             setUser(currentUser);
+            // Check for setup completion only if user is logged in
             const companySettings = await getCompanySettings(currentUser.uid);
             const rtgsSettings = await getRtgsSettings();
 
@@ -46,7 +48,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     router.replace('/setup/company-details');
                 }
             } else if (UNPROTECTED_ROUTES.includes(pathname)) {
-                router.replace('/sales/dashboard-overview');
+                 router.replace('/sales/dashboard-overview');
             }
         } else {
             setUser(null);
@@ -54,6 +56,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 router.replace('/login');
             }
         }
+        setAuthChecked(true);
         setLoading(false);
     });
     return () => unsubscribe();
@@ -79,14 +82,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
             setOpenTabs(prev => [...prev, initialTab!]);
         }
         setActiveTabId(initialTab.id);
-    } else if (openTabs.length === 0) {
+    } else if (openTabs.length === 0 && pathname !== '/') {
+        // If no tab matches and we are not on the root, maybe select a default
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
             setOpenTabs([dashboard]);
             setActiveTabId(dashboard.id);
-             if (pathname === '/') {
-                router.replace(dashboard.href || '/');
-            }
         }
     }
 }, [user, loading, pathname, router, openTabs]);
@@ -149,7 +150,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   };
 
-  if (loading) {
+  if (!authChecked) {
       return (
           <div className="flex h-screen w-screen items-center justify-center bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -157,7 +158,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!user || UNPROTECTED_ROUTES.includes(pathname)) {
+  if (!user && !SETUP_ROUTES.includes(pathname)) {
+    return <>{children}</>;
+  }
+
+  if (user && SETUP_ROUTES.includes(pathname)) {
     return <>{children}</>;
   }
   

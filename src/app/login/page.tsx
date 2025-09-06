@@ -19,14 +19,11 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
-    const [origin, setOrigin] = useState('');
+    const [authError, setAuthError] = useState<string | null>(null);
 
     useEffect(() => {
         setAuth(getFirebaseAuth());
         setGoogleProvider(getGoogleProvider());
-        if (typeof window !== 'undefined') {
-            setOrigin(window.location.origin);
-        }
     }, []);
 
     const handleSignIn = async () => {
@@ -40,24 +37,27 @@ export default function LoginPage() {
         }
 
         setLoading(true);
+        setAuthError(null);
         try {
-            await signOut(auth); // Ensure previous user is signed out
+            // Explicitly sign out to clear any lingering state before a new sign-in attempt.
+            // This can help resolve issues with stuck auth states.
+            await signOut(auth);
+            
             await signInWithPopup(auth, googleProvider);
             // On successful login, the onAuthStateChanged listener in MainLayout will handle redirection
             router.push('/sales/dashboard-overview');
             
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
-            let errorMessage = "An unknown error occurred.";
+            let errorMessage = "An unknown error occurred. Please try again.";
             if (error.code === 'auth/popup-closed-by-user') {
-                errorMessage = "Login cancelled. If you see a blank pop-up, please ensure the current URL is an authorized domain in your Google Cloud Console.";
+                errorMessage = "Login cancelled. If the pop-up closes automatically, please ensure the current URL is an authorized domain in your Firebase project settings (Authentication > Settings > Authorized domains).";
             } else if (error.code === 'auth/network-request-failed') {
-                errorMessage = "Network error. Please check your connection.";
-            } else if (error.code === 'auth/configuration-not-found') {
-                errorMessage = "Authentication is not configured correctly. Please contact support.";
-            } else if (error.code === 'auth/operation-not-allowed') {
-                 errorMessage = "Sign-in with Google is not enabled for this app. Please contact support.";
+                errorMessage = "Network error. Please check your internet connection.";
+            } else if (error.code) {
+                 errorMessage = `An error occurred: ${error.message} (Code: ${error.code})`;
             }
+            setAuthError(errorMessage);
             toast({
                 title: "Login Failed",
                 description: errorMessage,
@@ -95,6 +95,15 @@ export default function LoginPage() {
                              <FeatureCard icon={<BarChart3 className="h-5 w-5"/>} title="Insightful Reports" description="Generate RTGS, sales, and financial reports with a single click." />
                              <FeatureCard icon={<Database className="h-5 w-5"/>} title="Secure & Reliable" description="Your data is safe and always accessible with our robust backend." />
                          </div>
+                        {authError && (
+                            <Alert variant="destructive" className="mb-4">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Authentication Error</AlertTitle>
+                                <AlertDescription>
+                                    {authError}
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         <Button onClick={handleSignIn} className="w-full font-semibold" disabled={loading || !auth}>
                              {loading ? (
                                 <>

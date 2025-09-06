@@ -17,11 +17,23 @@ const firebaseConfig = {
 
 // Initialize Firebase
 let app: FirebaseApp;
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
+if (typeof window !== 'undefined') {
+    if (getApps().length === 0) {
+        app = initializeApp(firebaseConfig);
+    } else {
+        app = getApp();
+    }
 } else {
-  app = getApp();
+    // For server-side rendering, we might not need to initialize the app
+    // or we can use a mock. However, for auth, client-side init is crucial.
+    // This block is mainly a safeguard.
+    if (getApps().length === 0) {
+        app = initializeApp(firebaseConfig);
+    } else {
+        app = getApp();
+    }
 }
+
 
 const db = getFirestore(app);
 const storage = getStorage(app);
