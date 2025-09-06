@@ -1,9 +1,12 @@
+// NOTE: Server actions are not supported with static export
+// This file has been disabled for Netlify deployment
+// To re-enable email functionality, consider using Netlify Functions or a third-party service
 
+/*
 'use server';
 
 import nodemailer from 'nodemailer';
 import { getCompanySettings } from './firestore';
-
 
 interface AttachmentData {
     filename: string;
@@ -34,7 +37,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
             return { success: false, error: "Email configuration mismatch. Please re-configure your email settings." };
         }
 
-        const transporter = nodemailer.createTransport({
+        const transporter = nodemailer.createTransporter({
             service: 'gmail',
             auth: {
                 user: companySettings.email,
@@ -69,5 +72,10 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         return { success: false, error: errorMessage };
     }
 }
+*/
 
-    
+// Placeholder function for static export
+export async function sendEmailWithAttachment(options: any): Promise<{ success: boolean; error?: string }> {
+    console.warn('Email functionality is disabled for static export. Consider using Netlify Functions for email support.');
+    return { success: false, error: "Email functionality is not available in static export mode. Please use Netlify Functions or a third-party service." };
+}

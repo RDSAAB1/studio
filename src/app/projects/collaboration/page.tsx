@@ -1,3 +1,4 @@
+"use client";
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase'; // Assuming db is exported from your firebase init file
