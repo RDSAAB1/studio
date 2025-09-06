@@ -110,6 +110,16 @@ export default function CashBankClient() {
     const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(cashBankFormSchemas.capitalInflowSchema), defaultValues: { source: undefined, destination: undefined, amount: 0, description: "" } });
     const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(cashBankFormSchemas.withdrawalSchema), defaultValues: { amount: 0, description: "" } });
     const depositForm = useForm<DepositValues>({ resolver: zodResolver(cashBankFormSchemas.depositSchema), defaultValues: { amount: 0, description: "" } });
+    
+    const loansWithCalculatedRemaining = useMemo(() => {
+        return loans.map(loan => {
+            const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
+            const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
+            const totalPaid = (loan.amountPaid || 0) + totalPaidTowardsPrincipal;
+            const remainingAmount = loan.totalAmount - totalPaid;
+            return { ...loan, remainingAmount, amountPaid: totalPaid };
+        });
+    }, [loans, transactions]);
 
     const financialState = useMemo(() => {
         let bankBalance = 0;
@@ -138,10 +148,10 @@ export default function CashBankClient() {
             }
         });
         
-        const totalLiabilities = loans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
+        const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
         
         return { bankBalance, cashInHand, totalAssets: bankBalance + cashInHand, totalLiabilities };
-    }, [fundTransactions, transactions, loans]);
+    }, [fundTransactions, transactions, loansWithCalculatedRemaining]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
@@ -381,7 +391,7 @@ export default function CashBankClient() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                    {loans.map((loan) => (
+                                    {loansWithCalculatedRemaining.map((loan) => (
                                         <TableRow key={loan.id}>
                                             <TableCell>
                                                 <div className="font-medium">{loan.loanName}</div>

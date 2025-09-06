@@ -322,17 +322,6 @@ export default function IncomeExpenseClient() {
         toast({ title: "Transaction saved.", variant: "success" });
       }
       
-      // If it's a loan payment, update the loan's remaining amount
-      if(values.loanId && values.loanId !== 'none' && values.transactionType === 'Expense') {
-          const loanToUpdate = loans.find(l => l.id === values.loanId);
-          if(loanToUpdate) {
-              const newAmountPaid = (loanToUpdate.amountPaid || 0) + values.amount;
-              const newRemainingAmount = loanToUpdate.totalAmount - newAmountPaid;
-              await updateLoan(values.loanId, { amountPaid: newAmountPaid, remainingAmount: newRemainingAmount });
-              toast({ title: "Loan Updated", description: `Remaining balance for ${loanToUpdate.loanName} is now ${formatCurrency(newRemainingAmount)}.` });
-          }
-      }
-
       handleNew();
       setActiveTab("history");
     } catch (error) {
