@@ -185,9 +185,11 @@ export default function CashBankClient() {
     useEffect(() => {
         if (currentLoan.loanType === 'Product' && currentLoan.totalAmount && currentLoan.amountPaid && currentLoan.emiAmount) {
             if(currentLoan.totalAmount > currentLoan.amountPaid && currentLoan.emiAmount > 0) {
-                 const remaining = currentLoan.totalAmount - currentLoan.amountPaid;
-                 const tenure = Math.ceil(remaining / currentLoan.emiAmount);
+                 const remainingAmount = currentLoan.totalAmount - currentLoan.amountPaid;
+                 const tenure = Math.ceil(remainingAmount / currentLoan.emiAmount);
                  setCurrentLoan(prev => ({...prev, tenureMonths: tenure}));
+            } else {
+                 setCurrentLoan(prev => ({...prev, tenureMonths: 0}));
             }
         }
     }, [currentLoan.totalAmount, currentLoan.amountPaid, currentLoan.emiAmount, currentLoan.loanType]);
