@@ -478,7 +478,9 @@ export default function IncomeExpenseClient() {
                         )} />
 
                       <div className="space-y-1">
-                          <Label htmlFor="payee" className="text-xs">Payee / Payer</Label>
+                          <Label htmlFor="payee" className="text-xs">
+                            {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
+                          </Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
                               <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" />} />
                           </InputWithIcon>
