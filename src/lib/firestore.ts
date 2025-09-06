@@ -1,4 +1,5 @@
 
+
 import { db } from "./firebase";
 import {
   collection,
@@ -19,7 +20,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -30,6 +31,7 @@ const banksCollection = collection(db, "banks");
 const bankBranchesCollection = collection(db, "bankBranches");
 const settingsCollection = collection(db, "settings");
 const usersCollection = collection(db, "users");
+const loansCollection = collection(db, "loans");
 
 
 // --- User Refresh Token Functions ---
@@ -459,4 +461,29 @@ export async function updateProject(id: string, projectData: Partial<Project>): 
 export async function deleteProject(id: string): Promise<void> {
     const projectRef = doc(db, "projects", id);
     await deleteDoc(projectRef);
+}
+
+
+// --- Loan Functions ---
+export function getLoansRealtime(callback: (loans: Loan[]) => void, onError: (error: Error) => void): () => void {
+    const q = query(loansCollection, orderBy("startDate", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
+        callback(loans);
+    }, onError);
+}
+
+export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
+    const docRef = await addDoc(loansCollection, loanData);
+    return { id: docRef.id, ...loanData };
+}
+
+export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<void> {
+    const loanRef = doc(db, "loans", id);
+    await updateDoc(loanRef, loanData);
+}
+
+export async function deleteLoan(id: string): Promise<void> {
+    const loanRef = doc(db, "loans", id);
+    await deleteDoc(loanRef);
 }

@@ -370,14 +370,16 @@ export type Task = {
 export type Loan = {
     id: string;
     loanName: string;
-    lenderName: string;
-    loanType: 'BankLoan' | 'ExternalLoan';
-    totalAmount: number;
-    amountPaid: number;
-    remainingAmount: number;
-    interestRate: number;
+    loanType: 'Product' | 'Bank' | 'Outsider';
+    lenderName?: string; // For Bank or Outsider
+    productName?: string; // For Product loan
+    totalAmount: number; // Total cost for Product, Limit for Bank, Principal for Outsider
+    amountPaid: number; // DP for Product, amount repaid for others
+    remainingAmount?: number;
+    interestRate: number; // Annual for Bank, Monthly for Outsider
     tenureMonths: number;
-    emiAmount: number;
+    emiAmount: number; // Only for Product loan
     startDate: string;
-    status: 'Active' | 'Paid';
+    status?: 'Active' | 'Paid';
+    paymentMethod: 'Bank' | 'Cash';
 }
