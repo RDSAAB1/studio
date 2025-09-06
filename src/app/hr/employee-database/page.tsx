@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { Employee } from '@/lib/definitions';
+import { toTitleCase } from '@/lib/utils';
 
 export default function EmployeeDatabasePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -24,6 +25,8 @@ export default function EmployeeDatabasePage() {
     employeeId: '',
     position: '',
     contact: '',
+    baseSalary: 0,
+    monthlyLeaveAllowance: 0,
   });
   const { toast } = useToast();
 
@@ -50,7 +53,10 @@ export default function EmployeeDatabasePage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ 
+        ...prev, 
+        [name]: name === 'baseSalary' || name === 'monthlyLeaveAllowance' ? Number(value) : value 
+    }));
   };
 
   const generateNewEmployeeId = () => {
@@ -70,16 +76,16 @@ export default function EmployeeDatabasePage() {
     }
 
     try {
+        const dataToSave = { ...formData, name: toTitleCase(formData.name) };
+
         if (currentEmployee) {
-            // Editing existing employee
-            const employeeRef = doc(db, "employees", currentEmployee.employeeId);
-            await setDoc(employeeRef, formData, { merge: true });
+            const employeeRef = doc(db, "employees", currentEmployee.id);
+            await setDoc(employeeRef, dataToSave, { merge: true });
             toast({ title: "Employee updated successfully", variant: "success" });
         } else {
-            // Adding new employee with generated ID as document ID
             const newEmployeeId = formData.employeeId;
             const employeeRef = doc(db, "employees", newEmployeeId);
-            await setDoc(employeeRef, formData);
+            await setDoc(employeeRef, dataToSave);
             toast({ title: "Employee added successfully", variant: "success" });
         }
         closeDialog();
@@ -108,20 +114,27 @@ export default function EmployeeDatabasePage() {
   const openDialogForAdd = () => {
     setCurrentEmployee(null);
     const newEmployeeId = generateNewEmployeeId();
-    setFormData({ name: '', employeeId: newEmployeeId, position: '', contact: '' });
+    setFormData({ name: '', employeeId: newEmployeeId, position: '', contact: '', baseSalary: 0, monthlyLeaveAllowance: 0 });
     setIsDialogOpen(true);
   };
 
   const openDialogForEdit = (employee: Employee) => {
     setCurrentEmployee(employee);
-    setFormData({ name: employee.name, employeeId: employee.employeeId, position: employee.position, contact: employee.contact });
+    setFormData({ 
+        name: employee.name, 
+        employeeId: employee.employeeId, 
+        position: employee.position, 
+        contact: employee.contact,
+        baseSalary: employee.baseSalary || 0,
+        monthlyLeaveAllowance: employee.monthlyLeaveAllowance || 0
+    });
     setIsDialogOpen(true);
   };
   
   const closeDialog = () => {
     setIsDialogOpen(false);
     setCurrentEmployee(null);
-    setFormData({ name: '', employeeId: '', position: '', contact: '' });
+    setFormData({ name: '', employeeId: '', position: '', contact: '', baseSalary: 0, monthlyLeaveAllowance: 0 });
   }
 
   return (
@@ -146,16 +159,20 @@ export default function EmployeeDatabasePage() {
                             <TableHead>Name</TableHead>
                             <TableHead>Position</TableHead>
                             <TableHead>Contact</TableHead>
+                            <TableHead>Base Salary</TableHead>
+                            <TableHead>Allowed Leaves</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
                         {employees.map((employee) => (
-                            <TableRow key={employee.employeeId}>
+                            <TableRow key={employee.id}>
                             <TableCell>{employee.employeeId}</TableCell>
                             <TableCell>{employee.name}</TableCell>
                             <TableCell>{employee.position}</TableCell>
                             <TableCell>{employee.contact}</TableCell>
+                            <TableCell>{employee.baseSalary?.toFixed(2) || 'N/A'}</TableCell>
+                            <TableCell>{employee.monthlyLeaveAllowance || 0}</TableCell>
                             <TableCell className="text-right">
                                 <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => openDialogForEdit(employee)}><Edit className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => employee.id && handleDeleteEmployee(employee.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -190,6 +207,14 @@ export default function EmployeeDatabasePage() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="contact" className="text-right">Contact</Label>
               <Input id="contact" name="contact" value={formData.contact} onChange={handleInputChange} className="col-span-3" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="baseSalary" className="text-right">Base Salary</Label>
+              <Input id="baseSalary" name="baseSalary" type="number" value={formData.baseSalary} onChange={handleInputChange} className="col-span-3" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="monthlyLeaveAllowance" className="text-right">Monthly Leaves</Label>
+              <Input id="monthlyLeaveAllowance" name="monthlyLeaveAllowance" type="number" value={formData.monthlyLeaveAllowance} onChange={handleInputChange} className="col-span-3" />
             </div>
           </div>
           <DialogFooter>

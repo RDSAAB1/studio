@@ -256,6 +256,8 @@ export type Employee = {
     name: string;
     position: string;
     contact: string;
+    baseSalary: number;
+    monthlyLeaveAllowance: number;
 };
 
 export type PayrollEntry = {

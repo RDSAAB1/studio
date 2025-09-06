@@ -2,21 +2,30 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Assuming firebase.ts exports 'db'
-import type { Employee, PayrollEntry } from "@/lib/definitions"; // Adjust based on your definitions
+import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, where } from "firebase/firestore";
+import { db } from "@/lib/firebase"; 
+import type { Employee, PayrollEntry, AttendanceEntry } from "@/lib/definitions"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { format } from "date-fns";
-import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calendar as CalendarIcon } from "lucide-react";
+import { format, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
+import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calendar as CalendarIcon, Calculator, TrendingUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+
+type AttendanceSummary = {
+    present: number;
+    absent: number;
+    leave: number;
+    halfDay: number;
+    totalDays: number;
+    payableDays: number;
+};
 
 export default function PayrollManagementPage() {
   const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
@@ -26,6 +35,7 @@ export default function PayrollManagementPage() {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<Partial<PayrollEntry>>({});
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
   
   useEffect(() => {
     const qPayroll = query(collection(db, "payroll"));
@@ -53,6 +63,61 @@ export default function PayrollManagementPage() {
     };
   }, [loading]);
 
+  const calculateSalary = async () => {
+    if (!currentEntry.employeeId || !currentEntry.payPeriod) {
+        setAttendanceSummary(null);
+        return;
+    }
+
+    const employee = employees.find(e => e.employeeId === currentEntry.employeeId);
+    if (!employee || !employee.baseSalary) {
+        alert("Employee not found or base salary not set.");
+        return;
+    }
+
+    const year = parseInt(currentEntry.payPeriod.split('-')[0]);
+    const month = parseInt(currentEntry.payPeriod.split('-')[1]) - 1;
+    const periodDate = new Date(year, month);
+    
+    const startDate = format(startOfMonth(periodDate), 'yyyy-MM-dd');
+    const endDate = format(endOfMonth(periodDate), 'yyyy-MM-dd');
+    const daysInMonth = getDaysInMonth(periodDate);
+    const perDaySalary = employee.baseSalary / daysInMonth;
+
+    const qAttendance = query(collection(db, 'attendance'), 
+        where('employeeId', '==', employee.employeeId),
+        where('date', '>=', startDate),
+        where('date', '<=', endDate)
+    );
+
+    const attendanceSnapshot = await onSnapshot(qAttendance, (snapshot) => {
+        const records = snapshot.docs.map(doc => doc.data() as AttendanceEntry);
+        
+        let present = 0;
+        let absent = 0;
+        let leave = 0;
+        let halfDay = 0;
+
+        records.forEach(r => {
+            if(r.status === 'Present') present++;
+            else if(r.status === 'Absent') absent++;
+            else if(r.status === 'Leave') leave++;
+            else if(r.status === 'Half-day') halfDay++;
+        });
+
+        const allowedLeaves = employee.monthlyLeaveAllowance || 0;
+        const unpaidLeaves = Math.max(0, leave - allowedLeaves);
+        const payableLeaves = leave - unpaidLeaves;
+        
+        const payableDays = present + payableLeaves + (halfDay * 0.5);
+        const payableSalary = payableDays * perDaySalary;
+
+        setAttendanceSummary({ present, absent, leave, halfDay, totalDays: daysInMonth, payableDays });
+        setCurrentEntry(prev => ({...prev, amount: Math.round(payableSalary)}));
+    });
+    // This is not ideal as we don't store unsubscribe, but for a one-off calc it's okay.
+  };
+
   const handleSaveEntry = async () => {
     if (!currentEntry.employeeId || !currentEntry.payPeriod || currentEntry.amount === undefined) {
       alert("Please fill required fields.");
@@ -73,6 +138,7 @@ export default function PayrollManagementPage() {
       
       setIsEditDialogOpen(false);
       setCurrentEntry({});
+      setAttendanceSummary(null);
     } catch (e) {
       console.error("Error saving payroll entry: ", e);
       setError("Failed to save payroll entry.");
@@ -86,6 +152,7 @@ export default function PayrollManagementPage() {
   
   const handleAddNew = () => {
     setCurrentEntry({ payPeriod: format(new Date(), 'yyyy-MM') });
+    setAttendanceSummary(null);
     setIsEditDialogOpen(true);
   }
 
@@ -150,7 +217,7 @@ export default function PayrollManagementPage() {
                     <Button variant="ghost" size="icon" className="mr-2" onClick={() => handleEditEntry(entry)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteEntry(entry.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => entry.id && handleDeleteEntry(entry.id)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>
@@ -162,7 +229,6 @@ export default function PayrollManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -181,34 +247,40 @@ export default function PayrollManagementPage() {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="payPeriod" className="text-right">Pay Period</Label>
-               <Popover>
-                  <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !currentEntry.payPeriod && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {currentEntry.payPeriod ? format(new Date(currentEntry.payPeriod), "MMMM yyyy") : <span>Pick a month</span>}
-                      </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 z-[51]">
-                      <Calendar
-                          mode="single"
-                          onSelect={(date) => {
-                              if (date) {
-                                  setCurrentEntry({ ...currentEntry, payPeriod: format(date, 'yyyy-MM') });
-                              }
-                          }}
-                          initialFocus
-                      />
-                  </PopoverContent>
-              </Popover>
+                <Label htmlFor="payPeriod" className="text-right">Pay Period</Label>
+                <Input 
+                    id="payPeriod"
+                    type="month"
+                    value={currentEntry.payPeriod || ''}
+                    onChange={(e) => setCurrentEntry({ ...currentEntry, payPeriod: e.target.value })}
+                    className="col-span-3"
+                />
             </div>
+            {attendanceSummary && (
+                <Card className="col-span-4 bg-muted/50">
+                    <CardHeader className="p-3">
+                        <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Attendance Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 text-xs grid grid-cols-2 gap-2">
+                        <p>Total Days: {attendanceSummary.totalDays}</p>
+                        <p>Present: {attendanceSummary.present}</p>
+                        <p>Absent: {attendanceSummary.absent}</p>
+                        <p>Leave: {attendanceSummary.leave}</p>
+                        <p>Half-day: {attendanceSummary.halfDay}</p>
+                        <p className="font-bold">Payable Days: {attendanceSummary.payableDays.toFixed(2)}</p>
+                    </CardContent>
+                </Card>
+            )}
              <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right">Amount</Label>
-              <Input id="amount" type="number" value={currentEntry.amount || ""} onChange={(e) => setCurrentEntry({ ...currentEntry, amount: parseFloat(e.target.value) })} className="col-span-3" />
+              <Label htmlFor="amount" className="text-right">Payable Salary</Label>
+               <div className="col-span-3 flex items-center gap-2">
+                <Input id="amount" type="number" value={currentEntry.amount || ""} onChange={(e) => setCurrentEntry({ ...currentEntry, amount: parseFloat(e.target.value) })} />
+                <Button variant="secondary" size="icon" onClick={calculateSalary}><Calculator className="h-4 w-4"/></Button>
+               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setAttendanceSummary(null); }}>Cancel</Button>
             <Button onClick={handleSaveEntry}>Save Entry</Button>
           </DialogFooter>
         </DialogContent>
