@@ -1,8 +1,8 @@
 import DynamicExpenseTrackerClient from './dynamic-expense-tracker';
 import type { PageProps } from '@/app/types';
 
-export default function ExpenseTrackerPage({ searchParams }: PageProps) {
+export default function ExpenseTrackerPage() {
   return (
-    <DynamicExpenseTrackerClient searchParams={searchParams || {}} />
+    <DynamicExpenseTrackerClient />
   );
 }

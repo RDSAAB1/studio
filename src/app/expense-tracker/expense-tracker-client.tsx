@@ -122,7 +122,8 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
   </Card>
 );
 
-export default function IncomeExpenseClient({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined }}) {
+export default function IncomeExpenseClient() {
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
@@ -152,14 +153,15 @@ export default function IncomeExpenseClient({ searchParams }: { searchParams: { 
   const rate = form.watch('rate');
 
   useEffect(() => {
-    if (searchParams?.loanId && loans.length > 0) {
+    const loanId = searchParams.get('loanId');
+    if (loanId && loans.length > 0) {
       handleNew();
       setActiveTab('form');
       form.setValue('transactionType', 'Expense');
-      form.setValue('loanId', searchParams.loanId as string);
-      form.setValue('amount', Number(searchParams.amount || 0));
-      form.setValue('payee', toTitleCase(searchParams.payee as string || ''));
-      form.setValue('description', searchParams.description as string || '');
+      form.setValue('loanId', loanId);
+      form.setValue('amount', Number(searchParams.get('amount') || 0));
+      form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
+      form.setValue('description', searchParams.get('description') || '');
       form.setValue('category', 'Interest & Loan Payments');
       setTimeout(() => form.setValue('subCategory', 'Loan Repayment'), 100);
     }
