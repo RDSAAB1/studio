@@ -90,6 +90,10 @@ export type Transaction = {
     isRecurring: boolean;
     mill?: string;
     expenseNature?: 'Permanent' | 'Seasonal';
+    isCalculated?: boolean;
+    quantity?: number;
+    unit?: string;
+    rate?: number;
 };
 
 export type IncomeCategory = {

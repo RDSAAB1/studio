@@ -29,7 +29,7 @@ import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc,
 import { db } from "@/lib/firebase"; 
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal } from "lucide-react";
+import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 
@@ -51,6 +51,10 @@ const transactionSchema = z.object({
   isRecurring: z.boolean(),
   mill: z.string().optional(), 
   expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
+  isCalculated: z.boolean(),
+  quantity: z.coerce.number().optional(),
+  unit: z.string().optional(),
+  rate: z.coerce.number().optional(),
 });
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
@@ -76,6 +80,10 @@ const getInitialFormState = (): Omit<Transaction, 'id' | 'date'> & { date: Date 
     isRecurring: false,
     mill: '',
     expenseNature: 'Permanent',
+    isCalculated: false,
+    quantity: 0,
+    unit: '',
+    rate: 0,
   };
 };
 
@@ -119,6 +127,7 @@ export default function IncomeExpenseClient() {
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
+  const [isCalculated, setIsCalculated] = useState(false);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -128,6 +137,15 @@ export default function IncomeExpenseClient() {
   const selectedTransactionType = form.watch('transactionType');
   const selectedExpenseNature = form.watch('expenseNature');
   const selectedCategory = form.watch('category');
+  const quantity = form.watch('quantity');
+  const rate = form.watch('rate');
+
+  useEffect(() => {
+    if (isCalculated) {
+      const calculatedAmount = (quantity || 0) * (rate || 0);
+      form.setValue('amount', calculatedAmount);
+    }
+  }, [quantity, rate, isCalculated, form]);
 
   const availableCategories = useMemo(() => {
     if (selectedTransactionType === 'Income') {
@@ -183,6 +201,8 @@ export default function IncomeExpenseClient() {
   const handleNew = useCallback(() => {
     setIsEditing(null); 
     form.reset(getInitialFormState());
+    setIsAdvanced(false);
+    setIsCalculated(false);
     setActiveTab("form");
   }, [form]);
 
@@ -192,7 +212,13 @@ export default function IncomeExpenseClient() {
       ...transaction,
       date: new Date(transaction.date), 
       taxAmount: transaction.taxAmount || 0,
+      quantity: transaction.quantity || 0,
+      rate: transaction.rate || 0,
+      unit: transaction.unit || '',
+      isCalculated: transaction.isCalculated || false,
     });
+    setIsAdvanced(!!(transaction.status || transaction.invoiceNumber || transaction.taxAmount || transaction.expenseType || transaction.isRecurring || transaction.mill));
+    setIsCalculated(transaction.isCalculated || false);
     setActiveTab("form");
   };
 
@@ -215,6 +241,7 @@ export default function IncomeExpenseClient() {
     try {
       const transactionData: TransactionFormData = {
         ...values,
+        isCalculated,
         date: format(values.date, "yyyy-MM-dd"), 
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
@@ -227,8 +254,7 @@ export default function IncomeExpenseClient() {
         await addDoc(collection(db, "transactions"), transactionData);
         toast({ title: "Transaction saved.", variant: "success" });
       }
-      setIsEditing(null);
-      form.reset(getInitialFormState()); 
+      handleNew();
       setActiveTab("history");
     } catch (error) {
         console.error("Error saving transaction: ", error);
@@ -402,7 +428,7 @@ export default function IncomeExpenseClient() {
                       <div className="space-y-1">
                           <Label htmlFor="amount" className="text-xs">Amount</Label>
                           <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="amount" control={form.control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" />} />
+                              <Controller name="amount" control={form.control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
                           </InputWithIcon>
                           {form.formState.errors.amount && <p className="text-xs text-destructive mt-1">{form.formState.errors.amount.message}</p>}
                       </div>
@@ -475,7 +501,29 @@ export default function IncomeExpenseClient() {
                               </Select>
                           </div>
                       )} />
+
+                        <div className="flex items-center space-x-2 pt-6">
+                            <Switch id="calculate-toggle" checked={isCalculated} onCheckedChange={setIsCalculated} />
+                            <Label htmlFor="calculate-toggle" className="text-sm font-normal flex items-center gap-2"><Calculator className="h-4 w-4"/> Calculate Amount</Label>
+                        </div>
                       
+                        {isCalculated && (
+                            <>
+                                <div className="space-y-1">
+                                    <Label htmlFor="quantity" className="text-xs">Quantity</Label>
+                                    <Controller name="quantity" control={form.control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
+                                </div>
+                                 <div className="space-y-1">
+                                    <Label htmlFor="unit" className="text-xs">Unit</Label>
+                                    <Controller name="unit" control={form.control} render={({ field }) => <Input id="unit" {...field} placeholder="e.g., kg, piece" className="h-8 text-sm" />} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="rate" className="text-xs">Rate</Label>
+                                    <Controller name="rate" control={form.control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-8 text-sm" />} />
+                                </div>
+                            </>
+                        )}
+                        
                         {selectedTransactionType === 'Expense' && (
                             <div className="flex items-center space-x-2 pt-6">
                                 <Switch id="advanced-toggle" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
