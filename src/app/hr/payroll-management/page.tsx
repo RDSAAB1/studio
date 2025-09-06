@@ -169,7 +169,7 @@ export default function PayrollManagementPage() {
               <Label htmlFor="employeeId" className="text-right">Employee</Label>
               <select id="employeeId" value={currentEntry.employeeId || ""} onChange={(e) => setCurrentEntry({ ...currentEntry, employeeId: e.target.value })} className="col-span-3 p-2 border rounded-md">
                 <option value="">Select Employee</option>
-                {employees.map(e => <option key={e.employeeId} value={e.employeeId}>{e.name} ({e.employeeId})</option>)}
+                {employees.map(e => <option key={e.id} value={e.employeeId}>{e.name} ({e.employeeId})</option>)}
               </select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
