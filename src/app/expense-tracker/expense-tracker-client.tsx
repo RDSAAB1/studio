@@ -321,11 +321,6 @@ export default function IncomeExpenseClient() {
           </TabsList>
           <div className="w-full sm:w-auto flex items-center gap-2">
             <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto"><Settings className="mr-2 h-4 w-4" />Manage Categories</Button>
-            {activeTab === 'history' && (
-              <Button onClick={handleNew} size="sm" className="w-full sm:w-auto">
-                  <PlusCircle className="mr-2 h-4 w-4" /> New Transaction
-              </Button>
-            )}
           </div>
         </div>
         <TabsContent value="history" className="mt-4">
