@@ -49,24 +49,26 @@ const transactionSchema = z.object({
   taxAmount: z.coerce.number().optional(),
   expenseType: z.enum(["Personal", "Business"]).optional(),
   isRecurring: z.boolean(),
+  recurringFrequency: z.enum(["daily", "weekly", "monthly", "yearly"]).optional(),
+  nextDueDate: z.date().optional(),
   mill: z.string().optional(), 
   expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
   isCalculated: z.boolean(),
   quantity: z.coerce.number().optional(),
   rate: z.coerce.number().optional(),
-  projectId: z.string().optional(), // Added projectId
+  projectId: z.string().optional(),
 });
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
-type TransactionFormData = Omit<TransactionFormValues, 'date'> & { date: string }; // For Firestore compatibility
+type TransactionFormData = Omit<TransactionFormValues, 'date' | 'nextDueDate'> & { date: string, nextDueDate?: string }; // For Firestore compatibility
 
-const getInitialFormState = (): Omit<Transaction, 'id' | 'date'> & { date: Date } => {
+const getInitialFormState = (): Omit<Transaction, 'id' | 'date' | 'nextDueDate'> & { date: Date, nextDueDate?: Date } => {
   const staticDate = new Date();
   staticDate.setHours(0, 0, 0, 0);
 
   return {
     date: staticDate,
-    transactionType: 'Expense', // Default to Expense
+    transactionType: 'Expense',
     category: '',
     subCategory: '',
     amount: 0,
@@ -78,6 +80,8 @@ const getInitialFormState = (): Omit<Transaction, 'id' | 'date'> & { date: Date 
     taxAmount: 0,
     expenseType: 'Business',
     isRecurring: false,
+    recurringFrequency: 'monthly',
+    nextDueDate: undefined,
     mill: '',
     expenseNature: 'Permanent',
     isCalculated: false,
@@ -121,7 +125,7 @@ export default function IncomeExpenseClient() {
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("history");
+  const [activeTab, setActiveTab] = useState("form");
   const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'ascending' | 'descending' } | null>(null);
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
@@ -130,6 +134,7 @@ export default function IncomeExpenseClient() {
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -237,6 +242,7 @@ export default function IncomeExpenseClient() {
     form.reset(getInitialFormState());
     setIsAdvanced(false);
     setIsCalculated(false);
+    setIsRecurring(false);
     setActiveTab("form");
   }, [form]);
 
@@ -249,9 +255,11 @@ export default function IncomeExpenseClient() {
       quantity: transaction.quantity || 0,
       rate: transaction.rate || 0,
       isCalculated: transaction.isCalculated || false,
+      nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
     });
-    setIsAdvanced(!!(transaction.status || transaction.invoiceNumber || transaction.taxAmount || transaction.expenseType || transaction.isRecurring || transaction.mill || transaction.projectId));
+    setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
+    setIsRecurring(transaction.isRecurring || false);
     setActiveTab("form");
   };
 
@@ -293,10 +301,12 @@ export default function IncomeExpenseClient() {
       const transactionData: TransactionFormData = {
         ...values,
         isCalculated,
+        isRecurring,
         date: format(values.date, "yyyy-MM-dd"), 
+        nextDueDate: values.nextDueDate ? format(values.nextDueDate, "yyyy-MM-dd") : undefined,
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
-        projectId: values.projectId === 'none' ? '' : values.projectId, // Handle 'none' value
+        projectId: values.projectId === 'none' ? '' : values.projectId,
       };
 
       if (isEditing) {
@@ -371,8 +381,8 @@ export default function IncomeExpenseClient() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
           <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="history" className="flex-1 sm:flex-initial"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
             <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
+            <TabsTrigger value="history" className="flex-1 sm:flex-initial"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
           </TabsList>
           <div className="w-full sm:w-auto flex items-center gap-2">
             <Button onClick={() => setIsCategoryManagerOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto"><Settings className="mr-2 h-4 w-4" />Manage Categories</Button>
@@ -594,6 +604,46 @@ export default function IncomeExpenseClient() {
                         )}
                         
                         <div className="flex items-center space-x-2 pt-6">
+                            <Switch id="recurring-toggle" checked={isRecurring} onCheckedChange={setIsRecurring} />
+                            <Label htmlFor="recurring-toggle" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Transaction</Label>
+                        </div>
+                        
+                        {isRecurring && (
+                            <>
+                                <Controller name="recurringFrequency" control={form.control} render={({ field }) => (
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Frequency</Label>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="daily">Daily</SelectItem>
+                                                <SelectItem value="weekly">Weekly</SelectItem>
+                                                <SelectItem value="monthly">Monthly</SelectItem>
+                                                <SelectItem value="yearly">Yearly</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )} />
+                                <Controller name="nextDueDate" control={form.control} render={({ field }) => (
+                                  <div className="space-y-1">
+                                      <Label className="text-xs">Next Due Date</Label>
+                                      <Popover>
+                                          <PopoverTrigger asChild>
+                                              <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
+                                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                                  {field.value ? format(field.value, "PPP") : <span>Pick next due date</span>}
+                                              </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0 z-[51]">
+                                              <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date)} initialFocus />
+                                          </PopoverContent>
+                                      </Popover>
+                                  </div>
+                                )} />
+                            </>
+                        )}
+
+                        <div className="flex items-center space-x-2 pt-6">
                             <Switch id="advanced-toggle" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
                             <Label htmlFor="advanced-toggle" className="text-sm font-normal flex items-center gap-2"><SlidersHorizontal className="h-4 w-4"/> Advanced Fields</Label>
                         </div>
@@ -644,12 +694,6 @@ export default function IncomeExpenseClient() {
                                         <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
                                     </InputWithIcon>
                                 </div>
-                                <Controller name="isRecurring" control={form.control} render={({ field }) => (
-                                    <div className="flex items-center space-x-2 pt-6">
-                                        <Switch id="isRecurring" checked={field.value} onCheckedChange={field.onChange} />
-                                        <Label htmlFor="isRecurring" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Transaction</Label>
-                                    </div>
-                                )} />
                             </>
                         )}
                       

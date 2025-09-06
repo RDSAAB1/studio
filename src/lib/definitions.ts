@@ -88,6 +88,8 @@ export type Transaction = {
     taxAmount?: number;
     expenseType?: 'Personal' | 'Business';
     isRecurring: boolean;
+    recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    nextDueDate?: string;
     mill?: string;
     expenseNature?: 'Permanent' | 'Seasonal';
     isCalculated?: boolean;
@@ -364,3 +366,18 @@ export type Task = {
   assignedTo?: string;
   dueDate?: string;
 };
+
+export type Loan = {
+    id: string;
+    loanName: string;
+    lenderName: string;
+    loanType: 'BankLoan' | 'ExternalLoan';
+    totalAmount: number;
+    amountPaid: number;
+    remainingAmount: number;
+    interestRate: number;
+    tenureMonths: number;
+    emiAmount: number;
+    startDate: string;
+    status: 'Active' | 'Paid';
+}

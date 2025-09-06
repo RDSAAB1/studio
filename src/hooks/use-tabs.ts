@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -78,6 +77,7 @@ export const allMenuItems: MenuItem[] = [
     subMenus: [
         { id: "income-expense", name: "Income & Expense", icon: ChevronRight, href: "/expense-tracker" },
         { id: "cash-bank", name: "Cash & Bank", icon: ChevronRight, href: "/cash-bank" },
+        { id: "loan-management", name: "Loan Management", icon: ChevronRight, href: "/finance/loan-management" },
     ]
   },
   {
