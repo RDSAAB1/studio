@@ -33,7 +33,7 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) return;
-    const categoryData: { name: string, nature?: string } = { name: newCategoryName };
+    const categoryData: { name: string, nature?: string } = { name: toTitleCase(newCategoryName) };
     if (nature) categoryData.nature = nature;
     onAddCategory(collectionName, categoryData).then(() => setNewCategoryName(''));
   };
@@ -41,7 +41,7 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
   const handleAddSubCategory = (categoryId: string) => {
     const subCategoryName = newSubCategory[categoryId]?.trim();
     if (!subCategoryName) return;
-    onAddSubCategory(collectionName, categoryId, subCategoryName).then(() => setNewSubCategory(prev => ({...prev, [categoryId]: ''})));
+    onAddSubCategory(collectionName, categoryId, toTitleCase(subCategoryName)).then(() => setNewSubCategory(prev => ({...prev, [categoryId]: ''})));
   };
 
   return (
@@ -53,7 +53,7 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
       <CardContent className="space-y-4">
         <div className="flex gap-2">
           <Input placeholder="New Category Name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
-          <Button onClick={handleAddCategory}>Add Category</Button>
+          <Button onClick={handleAddCategory}><PlusCircle className="mr-2 h-4 w-4"/>Add Category</Button>
         </div>
         <ScrollArea className="h-72 p-2 border rounded-md">
           {categories.map((cat: any) => (
@@ -62,19 +62,25 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
                 <span className="font-semibold">{toTitleCase(cat.name)}</span>
                 <AlertDialog>
                   <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
-                  <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete "{cat.name}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteCategory(collectionName, cat.id)}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                  <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete "{cat.name}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone and will delete all sub-categories.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteCategory(collectionName, cat.id)}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                 </AlertDialog>
               </div>
               <ul className="list-disc list-inside pl-4 text-sm space-y-1">
                 {cat.subCategories?.map((sub: string) => (
                     <li key={sub} className="flex justify-between items-center group">
                         <span>{toTitleCase(sub)}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 invisible group-hover:visible" onClick={() => onDeleteSubCategory(collectionName, cat.id, sub)}><Trash2 className="h-3 w-3"/></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 invisible group-hover:visible" onClick={() => onDeleteSubCategory(collectionName, cat.id, sub)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                     </li>
                 ))}
               </ul>
                <div className="flex gap-2 mt-2">
-                    <Input placeholder="New Sub-Category" value={newSubCategory[cat.id] || ''} onChange={e => setNewSubCategory(prev => ({ ...prev, [cat.id]: e.target.value }))} className="h-8"/>
+                    <Input 
+                      placeholder="New Sub-Category" 
+                      value={newSubCategory[cat.id] || ''} 
+                      onChange={e => setNewSubCategory(prev => ({ ...prev, [cat.id]: e.target.value }))} 
+                      className="h-8 text-sm"
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddSubCategory(cat.id)}
+                    />
                     <Button size="sm" onClick={() => handleAddSubCategory(cat.id)}>Add Sub</Button>
                 </div>
             </div>
@@ -108,7 +114,7 @@ export const CategoryManagerDialog = ({ isOpen, onOpenChange, incomeCategories, 
                         </TabsContent>
                     </Tabs>
                 </ScrollArea>
-                <DialogFooter>
+                <DialogFooter className="mt-4">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                 </DialogFooter>
             </DialogContent>
