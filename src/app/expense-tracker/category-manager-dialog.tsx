@@ -88,24 +88,26 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
 export const CategoryManagerDialog = ({ isOpen, onOpenChange, incomeCategories, expenseCategories, ...props }: CategoryManagerDialogProps) => {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Category Management</DialogTitle>
                     <DialogDescription>Add, edit, or remove categories and sub-categories for income and expenses.</DialogDescription>
                 </DialogHeader>
-                <Tabs defaultValue="expense" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="expense">Expense</TabsTrigger>
-                        <TabsTrigger value="income">Income</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="expense" className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <CategoryList title="Permanent Expenses" categories={expenseCategories.filter(c => c.nature === 'Permanent')} collectionName="expenseCategories" {...props} nature="Permanent" />
-                        <CategoryList title="Seasonal Expenses" categories={expenseCategories.filter(c => c.nature === 'Seasonal')} collectionName="expenseCategories" {...props} nature="Seasonal" />
-                    </TabsContent>
-                    <TabsContent value="income" className="mt-4">
-                        <CategoryList title="Income" categories={incomeCategories} collectionName="incomeCategories" {...props} />
-                    </TabsContent>
-                </Tabs>
+                <ScrollArea className="flex-grow pr-6 -mr-6">
+                    <Tabs defaultValue="expense" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="expense">Expense</TabsTrigger>
+                            <TabsTrigger value="income">Income</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="expense" className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <CategoryList title="Permanent Expenses" categories={expenseCategories.filter(c => c.nature === 'Permanent')} collectionName="expenseCategories" {...props} nature="Permanent" />
+                            <CategoryList title="Seasonal Expenses" categories={expenseCategories.filter(c => c.nature === 'Seasonal')} collectionName="expenseCategories" {...props} nature="Seasonal" />
+                        </TabsContent>
+                        <TabsContent value="income" className="mt-4">
+                            <CategoryList title="Income" categories={incomeCategories} collectionName="incomeCategories" {...props} />
+                        </TabsContent>
+                    </Tabs>
+                </ScrollArea>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
                 </DialogFooter>
