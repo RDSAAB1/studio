@@ -517,14 +517,12 @@ export default function IncomeExpenseClient() {
                             </>
                         )}
                         
-                        {selectedTransactionType === 'Expense' && (
-                            <div className="flex items-center space-x-2 pt-6">
-                                <Switch id="advanced-toggle" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
-                                <Label htmlFor="advanced-toggle" className="text-sm font-normal flex items-center gap-2"><SlidersHorizontal className="h-4 w-4"/> Advanced Fields</Label>
-                            </div>
-                        )}
+                        <div className="flex items-center space-x-2 pt-6">
+                            <Switch id="advanced-toggle" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
+                            <Label htmlFor="advanced-toggle" className="text-sm font-normal flex items-center gap-2"><SlidersHorizontal className="h-4 w-4"/> Advanced Fields</Label>
+                        </div>
 
-                        {isAdvanced && selectedTransactionType === 'Expense' && (
+                        {isAdvanced && (
                             <>
                                 <Controller name="status" control={form.control} render={({ field }) => (
                                     <div className="space-y-1">
@@ -551,21 +549,23 @@ export default function IncomeExpenseClient() {
                                         <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />} />
                                     </InputWithIcon>
                                 </div>
-                                <Controller name="expenseType" control={form.control} render={({ field }) => (
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Expense Type</Label>
-                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="Business" id="type-business" />
-                                                <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="Personal" id="type-personal" />
-                                                <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
-                                            </div>
-                                        </RadioGroup>
-                                    </div>
-                                )} />
+                                {selectedTransactionType === 'Expense' && (
+                                    <Controller name="expenseType" control={form.control} render={({ field }) => (
+                                        <div className="space-y-2">
+                                            <Label className="text-xs">Expense Type</Label>
+                                            <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="Business" id="type-business" />
+                                                    <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="Personal" id="type-personal" />
+                                                    <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
+                                                </div>
+                                            </RadioGroup>
+                                        </div>
+                                    )} />
+                                )}
                                 <div className="space-y-1">
                                     <Label htmlFor="mill" className="text-xs">Mill</Label>
                                     <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
