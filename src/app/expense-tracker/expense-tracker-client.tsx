@@ -274,7 +274,7 @@ export default function IncomeExpenseClient() {
               <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Transactions Overview</CardTitle>
               <CardDescription>A summary of your recorded income and expenses.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard title="Total Income" value={`₹${totalIncome.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-green-500"/>
               <StatCard title="Total Expense" value={`₹${totalExpense.toFixed(2)}`} icon={<CircleDollarSign />} colorClass="text-red-500"/>
               <StatCard title="Net Profit/Loss" value={`₹${netProfitLoss.toFixed(2)}`} icon={<BarChart />} colorClass={netProfitLoss >= 0 ? "text-green-500" : "text-red-500"}/>
@@ -283,18 +283,18 @@ export default function IncomeExpenseClient() {
       </SectionCard>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex justify-between items-center">
-          <TabsList>
-            <TabsTrigger value="history"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
-            <TabsTrigger value="form"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="history" className="flex-1 sm:flex-initial"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
+            <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
           </TabsList>
           {activeTab === 'history' && (
-             <Button onClick={handleNew} size="sm">
+             <Button onClick={handleNew} size="sm" className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" /> New Transaction
               </Button>
           )}
         </div>
-        <TabsContent value="history">
+        <TabsContent value="history" className="mt-4">
           <SectionCard>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -349,11 +349,11 @@ export default function IncomeExpenseClient() {
             </CardContent>
           </SectionCard>
         </TabsContent>
-        <TabsContent value="form">
+        <TabsContent value="form" className="mt-4">
            <SectionCard>
               <CardContent className="p-6">
                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       
                       <Controller name="transactionType" control={form.control} render={({ field }) => (
                           <div className="space-y-2">
@@ -551,3 +551,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
