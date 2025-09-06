@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, doc, addDoc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, setDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ export default function EmployeeDatabasePage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const q = query(collection(db, "employees"), orderBy("name"));
+    const q = query(collection(db, "employees"), orderBy("employeeId"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const employeesData: Employee[] = [];
       snapshot.forEach((doc) => {
@@ -53,6 +53,16 @@ export default function EmployeeDatabasePage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const generateNewEmployeeId = () => {
+    if (employees.length === 0) {
+      return 'EMP001';
+    }
+    const lastId = employees[employees.length - 1].employeeId;
+    const lastNumber = parseInt(lastId.replace('EMP', ''), 10);
+    const newNumber = lastNumber + 1;
+    return `EMP${String(newNumber).padStart(3, '0')}`;
+  };
+
   const handleSubmit = async () => {
     if (!formData.name || !formData.employeeId) {
         toast({ title: "Name and Employee ID are required", variant: "destructive" });
@@ -61,11 +71,15 @@ export default function EmployeeDatabasePage() {
 
     try {
         if (currentEmployee) {
-            const employeeRef = doc(db, "employees", currentEmployee.id);
-            await updateDoc(employeeRef, formData);
+            // Editing existing employee
+            const employeeRef = doc(db, "employees", currentEmployee.employeeId);
+            await setDoc(employeeRef, formData, { merge: true });
             toast({ title: "Employee updated successfully", variant: "success" });
         } else {
-            await addDoc(collection(db, "employees"), formData);
+            // Adding new employee with generated ID as document ID
+            const newEmployeeId = formData.employeeId;
+            const employeeRef = doc(db, "employees", newEmployeeId);
+            await setDoc(employeeRef, formData);
             toast({ title: "Employee added successfully", variant: "success" });
         }
         closeDialog();
@@ -93,7 +107,8 @@ export default function EmployeeDatabasePage() {
 
   const openDialogForAdd = () => {
     setCurrentEmployee(null);
-    setFormData({ name: '', employeeId: '', position: '', contact: '' });
+    const newEmployeeId = generateNewEmployeeId();
+    setFormData({ name: '', employeeId: newEmployeeId, position: '', contact: '' });
     setIsDialogOpen(true);
   };
 
@@ -136,7 +151,7 @@ export default function EmployeeDatabasePage() {
                         </TableHeader>
                         <TableBody>
                         {employees.map((employee) => (
-                            <TableRow key={employee.id}>
+                            <TableRow key={employee.employeeId}>
                             <TableCell>{employee.employeeId}</TableCell>
                             <TableCell>{employee.name}</TableCell>
                             <TableCell>{employee.position}</TableCell>
@@ -160,13 +175,13 @@ export default function EmployeeDatabasePage() {
             <DialogTitle>{currentEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="employeeId" className="text-right">Employee ID</Label>
+              <Input id="employeeId" name="employeeId" value={formData.employeeId} readOnly disabled className="col-span-3" />
+            </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">Name</Label>
               <Input id="name" name="name" value={formData.name} onChange={handleInputChange} className="col-span-3" />
-            </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="employeeId" className="text-right">Employee ID</Label>
-              <Input id="employeeId" name="employeeId" value={formData.employeeId} onChange={handleInputChange} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="position" className="text-right">Position</Label>
