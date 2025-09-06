@@ -252,6 +252,7 @@ export default function IncomeExpenseClient() {
         date: format(values.date, "yyyy-MM-dd"), 
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
+        projectId: values.projectId === 'none' ? '' : values.projectId, // Handle 'none' value
       };
 
       if (isEditing) {
@@ -577,10 +578,10 @@ export default function IncomeExpenseClient() {
                                         <Controller name="projectId" control={form.control} render={({ field }) => (
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Project</Label>
-                                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                <Select onValueChange={field.onChange} value={field.value || 'none'}>
                                                     <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Project (Optional)" /></SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="">None</SelectItem>
+                                                        <SelectItem value="none">None</SelectItem>
                                                         {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                                                     </SelectContent>
                                                 </Select>
