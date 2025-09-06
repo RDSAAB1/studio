@@ -170,16 +170,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
   
   return (
-    <div 
-        className={cn("wrapper", isSidebarActive && "active")}
-        onMouseEnter={() => setIsSidebarActive(true)}
-        onMouseLeave={() => setIsSidebarActive(false)}
-    >
-        <CustomSidebar 
-            isSidebarActive={isSidebarActive}
-            onMenuItemClick={handleSidebarItemClick}
-        />
-        <div className="main_container">
+    <div className={cn("wrapper", isSidebarActive && "active")}>
+        <div onMouseEnter={() => setIsSidebarActive(true)}>
+            <CustomSidebar 
+                isSidebarActive={isSidebarActive}
+                onMenuItemClick={handleSidebarItemClick}
+            />
+        </div>
+        <div 
+            className="main_container"
+            onMouseEnter={() => setIsSidebarActive(false)}
+        >
             <Header 
               openTabs={openTabs}
               activeTabId={activeTabId}
