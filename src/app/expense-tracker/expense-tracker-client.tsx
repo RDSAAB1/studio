@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getTransactionsRealtime } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
@@ -118,6 +118,7 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 export default function IncomeExpenseClient() {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("history");
@@ -164,21 +165,15 @@ export default function IncomeExpenseClient() {
   }, [selectedCategory, availableCategories]);
 
   useEffect(() => {
-    const q = query(collection(db, "transactions"), orderBy("date", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const transactionsData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id, ...data,
-          date: new Date(data.date) 
-        } as Transaction;
-      });
-      setTransactions(transactionsData);
-      setLoading(false);
+    const unsubTransactions = getTransactionsRealtime((data) => {
+        setTransactions(data);
+        setLoading(false);
     }, (error) => {
-      console.error("Error fetching transactions: ", error);
-      setLoading(false);
+        console.error("Error fetching transactions: ", error);
+        setLoading(false);
     });
+    
+    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
 
     const unsubIncome = getIncomeCategories(setIncomeCategories, console.error);
     const unsubExpense = getExpenseCategories(setExpenseCategories, console.error);
@@ -190,12 +185,43 @@ export default function IncomeExpenseClient() {
     }, console.error);
 
     return () => {
-      unsubscribe();
+      unsubTransactions();
+      unsubFunds();
       unsubIncome();
       unsubExpense();
       unsubProjects();
     };
   }, []);
+  
+  const financialState = useMemo(() => {
+        let bankBalance = 0;
+        let cashInHand = 0;
+        
+        fundTransactions.forEach(t => {
+            if (t.type === 'CapitalInflow') {
+                if(t.destination === 'BankAccount') bankBalance += t.amount;
+                if(t.destination === 'CashInHand') cashInHand += t.amount;
+            } else if (t.type === 'BankWithdrawal') {
+                bankBalance -= t.amount;
+                cashInHand += t.amount;
+            } else if (t.type === 'BankDeposit') {
+                cashInHand -= t.amount;
+                bankBalance += t.amount;
+            }
+        });
+        
+        transactions.forEach(t => {
+            if (t.transactionType === 'Income') {
+                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
+                if (t.paymentMethod === 'Cash') cashInHand += t.amount;
+            } else if (t.transactionType === 'Expense') {
+                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
+                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
+            }
+        });
+        
+        return { bankBalance, cashInHand };
+    }, [fundTransactions, transactions]);
 
   useEffect(() => {
     form.setValue('category', '');
@@ -244,6 +270,24 @@ export default function IncomeExpenseClient() {
   };
 
   const onSubmit = async (values: TransactionFormValues) => {
+    if (values.transactionType === 'Expense') {
+        let availableBalance = 0;
+        if(values.paymentMethod === 'Cash') {
+            availableBalance = financialState.cashInHand;
+        } else if (values.paymentMethod === 'Online' || values.paymentMethod === 'Cheque') {
+            availableBalance = financialState.bankBalance;
+        }
+
+        if (values.amount > availableBalance) {
+            toast({
+                title: "Insufficient Balance",
+                description: `Cannot process expense of ${formatCurrency(values.amount)}. Available ${values.paymentMethod} balance is ${formatCurrency(availableBalance)}.`,
+                variant: "destructive"
+            });
+            return;
+        }
+    }
+  
     setLoading(true);
     try {
       const transactionData: TransactionFormData = {

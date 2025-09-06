@@ -2,10 +2,10 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings } from '@/lib/firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -45,6 +45,8 @@ type SortConfig = {
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
@@ -63,6 +65,7 @@ export default function SupplierPaymentsClient() {
   const [sixRNo, setSixRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
+  const [utrNo, setUtrNo] = useState('');
   const [checkNo, setCheckNo] = useState('');
   
   const [rtgsQuantity, setRtgsQuantity] = useState(0);
@@ -183,7 +186,7 @@ export default function SupplierPaymentsClient() {
     let isSubscribed = true;
     setLoading(true);
 
-    const unsubscribeSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
+    const unsubSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
       if (isSubscribed) {
           setSuppliers(fetchedSuppliers);
           setLoading(false);
@@ -196,7 +199,7 @@ export default function SupplierPaymentsClient() {
         }
     });
 
-    const unsubscribePayments = getPaymentsRealtime((fetchedPayments) => {
+    const unsubPayments = getPaymentsRealtime((fetchedPayments) => {
       if(isSubscribed) {
         setPaymentHistory(fetchedPayments);
         if (!editingPayment) {
@@ -210,6 +213,9 @@ export default function SupplierPaymentsClient() {
             stableToast({ title: "Failed to load payment history.", variant: 'destructive' });
         }
     });
+    
+    const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
+    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
     
     const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
       if(isSubscribed) console.error("Error fetching banks:", error);
@@ -230,13 +236,45 @@ export default function SupplierPaymentsClient() {
 
     return () => {
       isSubscribed = false;
-      unsubscribeSuppliers();
-      unsubscribePayments();
+      unsubSuppliers();
+      unsubPayments();
+      unsubTransactions();
+      unsubFunds();
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
   }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
   
+  const financialState = useMemo(() => {
+        let bankBalance = 0;
+        let cashInHand = 0;
+        
+        fundTransactions.forEach(t => {
+            if (t.type === 'CapitalInflow') {
+                if(t.destination === 'BankAccount') bankBalance += t.amount;
+                if(t.destination === 'CashInHand') cashInHand += t.amount;
+            } else if (t.type === 'BankWithdrawal') {
+                bankBalance -= t.amount;
+                cashInHand += t.amount;
+            } else if (t.type === 'BankDeposit') {
+                cashInHand -= t.amount;
+                bankBalance += t.amount;
+            }
+        });
+        
+        transactions.forEach(t => {
+            if (t.transactionType === 'Income') {
+                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
+                if (t.paymentMethod === 'Cash') cashInHand += t.amount;
+            } else if (t.transactionType === 'Expense') {
+                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
+                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
+            }
+        });
+        
+        return { bankBalance, cashInHand };
+  }, [fundTransactions, transactions]);
+
   useEffect(() => {
     if (paymentType === 'Partial') {
       setCdAt('paid_amount');
@@ -333,6 +371,7 @@ export default function SupplierPaymentsClient() {
     setPaymentAmount(0);
     setCdEnabled(false);
     setEditingPayment(null);
+    setUtrNo('');
     setCheckNo('');
     setSixRNo('');
     setParchiNo('');
@@ -395,6 +434,23 @@ export default function SupplierPaymentsClient() {
         }
 
         const finalPaymentAmount = rtgsAmount || paymentAmount;
+        
+        let availableBalance = 0;
+        if (paymentMethod === 'Cash') {
+            availableBalance = financialState.cashInHand;
+        } else if (paymentMethod === 'Online' || paymentMethod === 'RTGS' || paymentMethod === 'Cheque') {
+            availableBalance = financialState.bankBalance;
+        }
+
+        if (finalPaymentAmount > availableBalance) {
+            toast({
+                title: "Insufficient Balance",
+                description: `Cannot process payment of ${formatCurrency(finalPaymentAmount)}. Available ${paymentMethod} balance is ${formatCurrency(availableBalance)}.`,
+                variant: "destructive"
+            });
+            return;
+        }
+        
         const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
 
         if (totalPaidAmount <= 0) {
@@ -479,10 +535,10 @@ export default function SupplierPaymentsClient() {
                     customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                     date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
-                    receiptType: paymentMethod, notes: `Check: ${checkNo || ''}`,
+                    receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                     paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
                     sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
-                    parchiNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
+                    parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
                     supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
                     supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
                     bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
@@ -541,6 +597,7 @@ export default function SupplierPaymentsClient() {
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
+        setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
         setSixRNo(paymentToEdit.sixRNo || '');
         setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
@@ -711,7 +768,7 @@ export default function SupplierPaymentsClient() {
   return (
     <div className="space-y-3">
         <Tabs value={paymentMethod} onValueChange={setPaymentMethod}>
-            <TabsList className="grid w-full grid-cols-3 h-9"><TabsTrigger value="Cash">Cash</TabsTrigger><TabsTrigger value="Online">Online</TabsTrigger><TabsTrigger value="RTGS">RTGS</TabsTrigger></TabsList>
+            <TabsList className="grid w-full grid-cols-4 h-9"><TabsTrigger value="Cash">Cash</TabsTrigger><TabsTrigger value="Online">Online</TabsTrigger><TabsTrigger value="RTGS">RTGS</TabsTrigger><TabsTrigger value="Cheque">Cheque</TabsTrigger></TabsList>
         </Tabs>
         
         {paymentMethod === 'RTGS' && (
@@ -792,7 +849,8 @@ export default function SupplierPaymentsClient() {
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
