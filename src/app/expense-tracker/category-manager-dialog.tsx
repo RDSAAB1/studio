@@ -93,14 +93,6 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
 
 export const CategoryManagerDialog = ({ isOpen, onOpenChange, incomeCategories, expenseCategories, ...props }: CategoryManagerDialogProps) => {
     
-    // Hardcoded new category for interest payments
-    const financialCategories = {
-        title: "Interest & Loan Payments",
-        categories: [{ id: 'interest', name: 'Interest on Loan', subCategories: [] }], // Mocked for display
-        collectionName: "expenseCategories",
-        nature: "Permanent",
-    };
-
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
@@ -117,8 +109,7 @@ export const CategoryManagerDialog = ({ isOpen, onOpenChange, incomeCategories, 
                         <TabsContent value="expense" className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <CategoryList title="Permanent Expenses" categories={expenseCategories.filter(c => c.nature === 'Permanent')} collectionName="expenseCategories" {...props} nature="Permanent" />
                             <CategoryList title="Seasonal Expenses" categories={expenseCategories.filter(c => c.nature === 'Seasonal')} collectionName="expenseCategories" {...props} nature="Seasonal" />
-                            {/* Display the new hardcoded category */}
-                            <CategoryList {...financialCategories} {...props} />
+                            <CategoryList title="Interest & Loan Payments" categories={expenseCategories.filter(c => c.name === 'Interest & Loan Payments')} collectionName="expenseCategories" {...props} nature="Permanent" />
                         </TabsContent>
                         <TabsContent value="income" className="mt-4">
                             <CategoryList title="Income" categories={incomeCategories} collectionName="incomeCategories" {...props} />

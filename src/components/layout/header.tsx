@@ -18,6 +18,7 @@ import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+import Link from 'next/link';
 
 interface HeaderProps {
   openTabs: MenuItem[];
@@ -32,6 +33,7 @@ interface HeaderProps {
 const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
+    const router = useRouter();
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
@@ -46,6 +48,16 @@ const NotificationBell = () => {
         );
         setPendingNotifications(pending);
     }, [loans]);
+
+    const handleNotificationClick = (loan: Loan) => {
+        const params = new URLSearchParams({
+            loanId: loan.id,
+            amount: String(loan.emiAmount),
+            payee: loan.lenderName || loan.productName || 'Loan Payment',
+            description: `EMI for ${loan.loanName}`
+        });
+        router.push(`/expense-tracker?${params.toString()}`);
+    };
 
     return (
         <Popover>
@@ -66,7 +78,7 @@ const NotificationBell = () => {
                 <div className="mt-2 space-y-2 max-h-72 overflow-y-auto">
                     {pendingNotifications.length > 0 ? (
                         pendingNotifications.map(loan => (
-                             <div key={loan.id} className="p-2 rounded-md hover:bg-accent cursor-pointer">
+                             <div key={loan.id} className="p-2 rounded-md hover:bg-accent cursor-pointer" onClick={() => handleNotificationClick(loan)}>
                                 <p className="text-sm font-semibold">{loan.loanName}</p>
                                 <p className="text-xs text-muted-foreground">
                                     EMI of {formatCurrency(loan.emiAmount)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
