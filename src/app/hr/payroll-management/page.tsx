@@ -12,7 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { Loader2, Pencil, Trash2, PlusCircle, Banknote } from "lucide-react";
+import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calendar as CalendarIcon } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 export default function PayrollManagementPage() {
   const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
@@ -81,7 +85,7 @@ export default function PayrollManagementPage() {
   };
   
   const handleAddNew = () => {
-    setCurrentEntry({});
+    setCurrentEntry({ payPeriod: format(new Date(), 'yyyy-MM') });
     setIsEditDialogOpen(true);
   }
 
@@ -167,14 +171,36 @@ export default function PayrollManagementPage() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="employeeId" className="text-right">Employee</Label>
-              <select id="employeeId" value={currentEntry.employeeId || ""} onChange={(e) => setCurrentEntry({ ...currentEntry, employeeId: e.target.value })} className="col-span-3 p-2 border rounded-md">
-                <option value="">Select Employee</option>
-                {employees.map(e => <option key={e.id} value={e.employeeId}>{e.name} ({e.employeeId})</option>)}
-              </select>
+              <Select value={currentEntry.employeeId || ""} onValueChange={(value) => setCurrentEntry({ ...currentEntry, employeeId: value })}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select Employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map(e => <SelectItem key={e.id} value={e.employeeId}>{e.name} ({e.employeeId})</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="payPeriod" className="text-right">Pay Period</Label>
-              <Input id="payPeriod" value={currentEntry.payPeriod || ""} onChange={(e) => setCurrentEntry({ ...currentEntry, payPeriod: e.target.value })} className="col-span-3" placeholder="e.g., July 2024" />
+               <Popover>
+                  <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("col-span-3 justify-start text-left font-normal", !currentEntry.payPeriod && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {currentEntry.payPeriod ? format(new Date(currentEntry.payPeriod), "MMMM yyyy") : <span>Pick a month</span>}
+                      </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-[51]">
+                      <Calendar
+                          mode="single"
+                          onSelect={(date) => {
+                              if (date) {
+                                  setCurrentEntry({ ...currentEntry, payPeriod: format(date, 'yyyy-MM') });
+                              }
+                          }}
+                          initialFocus
+                      />
+                  </PopoverContent>
+              </Popover>
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">Amount</Label>
