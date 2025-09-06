@@ -53,7 +53,6 @@ const transactionSchema = z.object({
   expenseNature: z.enum(["Permanent", "Seasonal"]).optional(),
   isCalculated: z.boolean(),
   quantity: z.coerce.number().optional(),
-  unit: z.string().optional(),
   rate: z.coerce.number().optional(),
 });
 
@@ -82,7 +81,6 @@ const getInitialFormState = (): Omit<Transaction, 'id' | 'date'> & { date: Date 
     expenseNature: 'Permanent',
     isCalculated: false,
     quantity: 0,
-    unit: '',
     rate: 0,
   };
 };
@@ -214,7 +212,6 @@ export default function IncomeExpenseClient() {
       taxAmount: transaction.taxAmount || 0,
       quantity: transaction.quantity || 0,
       rate: transaction.rate || 0,
-      unit: transaction.unit || '',
       isCalculated: transaction.isCalculated || false,
     });
     setIsAdvanced(!!(transaction.status || transaction.invoiceNumber || transaction.taxAmount || transaction.expenseType || transaction.isRecurring || transaction.mill));
@@ -512,10 +509,6 @@ export default function IncomeExpenseClient() {
                                 <div className="space-y-1">
                                     <Label htmlFor="quantity" className="text-xs">Quantity</Label>
                                     <Controller name="quantity" control={form.control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
-                                </div>
-                                 <div className="space-y-1">
-                                    <Label htmlFor="unit" className="text-xs">Unit</Label>
-                                    <Controller name="unit" control={form.control} render={({ field }) => <Input id="unit" {...field} placeholder="e.g., kg, piece" className="h-8 text-sm" />} />
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="rate" className="text-xs">Rate</Label>
