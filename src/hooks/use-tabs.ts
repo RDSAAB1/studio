@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -32,6 +33,7 @@ import {
   Settings,
   Upload,
   List,
+  Printer,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -122,6 +124,12 @@ export const allMenuItems: MenuItem[] = [
     name: "Data Capture",
     icon: Upload,
     href: "/data-capture",
+  },
+   {
+    id: "printer-settings",
+    name: "Printer Settings",
+    icon: Printer,
+    href: "/settings/printer",
   },
   { 
     id: "settings", 
