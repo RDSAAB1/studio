@@ -193,13 +193,25 @@ export default function CashBankClient() {
     }, [currentLoan.totalAmount, currentLoan.amountPaid, currentLoan.emiAmount, currentLoan.loanType]);
 
     const handleLoanSubmit = async () => {
-        if (!currentLoan || !currentLoan.loanName) {
-            toast({ title: "Loan Name is required", variant: "destructive" });
+        if (!currentLoan) return;
+
+        let loanNameToSave = '';
+        if (currentLoan.loanType === 'Product' && currentLoan.productName) {
+            loanNameToSave = currentLoan.productName;
+        } else if (currentLoan.loanType === 'Bank' && currentLoan.lenderName) {
+            loanNameToSave = `${currentLoan.lenderName} Loan`;
+        } else if (currentLoan.loanType === 'Outsider' && currentLoan.lenderName) {
+             loanNameToSave = `Loan from ${currentLoan.lenderName}`;
+        }
+
+        if (!loanNameToSave) {
+            toast({ title: "Product Name or Lender Name is required", variant: "destructive" });
             return;
         }
 
         const loanData = {
             ...currentLoan,
+            loanName: loanNameToSave,
             remainingAmount: (currentLoan.totalAmount || 0) - (currentLoan.amountPaid || 0)
         };
 
@@ -426,10 +438,6 @@ export default function CashBankClient() {
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] -mr-4 pr-4">
                         <div className="grid gap-4 py-4 pr-1">
-                            <div className="space-y-1">
-                                <Label htmlFor="loanName">Loan Name</Label>
-                                <Input id="loanName" name="loanName" value={currentLoan?.loanName || ''} onChange={handleLoanInputChange} placeholder="e.g., HDFC Car Loan"/>
-                            </div>
                              <div className="space-y-1">
                                 <Label>Loan Type</Label>
                                 <Select name="loanType" value={currentLoan?.loanType || 'Product'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider'}))}>
@@ -492,3 +500,5 @@ export default function CashBankClient() {
         </div>
     );
 }
+
+    
