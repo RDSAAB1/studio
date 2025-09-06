@@ -134,7 +134,7 @@ export default function CashBankClient() {
                 if (t.paymentMethod === 'Cash') cashInHand += t.amount;
             } else if (t.transactionType === 'Expense') {
                  if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand += t.amount;
+                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
             }
         });
         
@@ -197,7 +197,7 @@ export default function CashBankClient() {
 
         let loanNameToSave = '';
         if (currentLoan.loanType === 'Product' && currentLoan.productName) {
-            loanNameToSave = currentLoan.productName;
+            loanNameToSave = currentLoan.productName + ' Loan';
         } else if (currentLoan.loanType === 'Bank' && currentLoan.lenderName) {
             loanNameToSave = `${currentLoan.lenderName} Loan`;
         } else if (currentLoan.loanType === 'Outsider' && currentLoan.lenderName) {
@@ -452,7 +452,7 @@ export default function CashBankClient() {
                             
                             {currentLoan.loanType === 'Product' && (<div className="space-y-4">
                                 <div className="space-y-1"><Label htmlFor="productName">Product Name</Label><Input id="productName" name="productName" value={currentLoan?.productName || ''} onChange={handleLoanInputChange}/></div>
-                                <div className="space-y-1"><Label htmlFor="lenderName">Bank Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange} /></div>
+                                <div className="space-y-1"><Label htmlFor="lenderName">Financed By (Bank/Lender)</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange} /></div>
                                 <div className="space-y-1"><Label htmlFor="totalAmount">Product Cost</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
                                 <div className="space-y-1"><Label htmlFor="amountPaid">Down Payment</Label><Input id="amountPaid" name="amountPaid" type="number" value={currentLoan?.amountPaid || 0} onChange={handleLoanNumberInputChange} /></div>
                                 <div className="space-y-1"><Label htmlFor="emiAmount">EMI Amount</Label><Input id="emiAmount" name="emiAmount" type="number" value={currentLoan?.emiAmount || 0} onChange={handleLoanNumberInputChange} /></div>
@@ -500,5 +500,3 @@ export default function CashBankClient() {
         </div>
     );
 }
-
-    
