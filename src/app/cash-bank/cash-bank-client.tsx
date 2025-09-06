@@ -222,6 +222,19 @@ export default function CashBankClient() {
             } else {
                 await addLoan(loanData as Omit<Loan, 'id'>);
                 toast({ title: "Loan added successfully", variant: "success" });
+                
+                // If it's a new Bank or Outsider loan, create a CapitalInflow transaction
+                if (currentLoan.loanType === 'Bank' || currentLoan.loanType === 'Outsider') {
+                    const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
+                        type: 'CapitalInflow',
+                        source: currentLoan.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
+                        destination: currentLoan.paymentMethod === 'Bank' ? 'BankAccount' : 'CashInHand',
+                        amount: currentLoan.totalAmount || 0,
+                        description: `Capital inflow from ${loanNameToSave}`
+                    };
+                    await addFundTransaction(capitalInflowData);
+                    toast({ title: "Capital inflow recorded", description: `${formatCurrency(currentLoan.totalAmount || 0)} added to ${currentLoan.paymentMethod === 'Bank' ? 'Bank Account' : 'Cash in Hand'}.`, variant: 'success' });
+                }
             }
             setIsLoanDialogOpen(false);
         } catch (error) {
@@ -500,3 +513,5 @@ export default function CashBankClient() {
         </div>
     );
 }
+
+    
