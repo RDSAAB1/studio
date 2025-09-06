@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowDown, ArrowUp, Save, Banknote, Edit, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 
 import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime } from "@/lib/firestore";
 import { cashBankFormSchemas, type CapitalInflowValues, type WithdrawalValues, type DepositValues } from "./formSchemas";
@@ -224,7 +224,8 @@ export default function CashBankClient() {
         const loanData = {
             ...currentLoan,
             loanName: loanNameToSave,
-            remainingAmount: (currentLoan.totalAmount || 0) - (currentLoan.amountPaid || 0)
+            remainingAmount: (currentLoan.totalAmount || 0) - (currentLoan.amountPaid || 0),
+            nextEmiDueDate: currentLoan.startDate ? format(addMonths(new Date(currentLoan.startDate), 1), 'yyyy-MM-dd') : undefined,
         };
 
         try {

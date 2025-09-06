@@ -31,7 +31,7 @@ import { db } from "@/lib/firebase";
 
 import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { format } from "date-fns"
+import { format, addMonths } from "date-fns"
 
 // Zod Schema
 const transactionSchema = z.object({
@@ -320,6 +320,15 @@ export default function IncomeExpenseClient() {
       } else {
         await addDoc(collection(db, "transactions"), transactionData);
         toast({ title: "Transaction saved.", variant: "success" });
+
+        // If this is a loan payment, update the loan's next EMI due date
+        if (transactionData.loanId) {
+            const loanToUpdate = loans.find(l => l.id === transactionData.loanId);
+            if (loanToUpdate && loanToUpdate.nextEmiDueDate) {
+                const newDueDate = addMonths(new Date(loanToUpdate.nextEmiDueDate), 1);
+                await updateLoan(loanToUpdate.id, { nextEmiDueDate: format(newDueDate, 'yyyy-MM-dd')});
+            }
+        }
       }
       
       handleNew();

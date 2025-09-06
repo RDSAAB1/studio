@@ -385,4 +385,5 @@ export type Loan = {
     startDate: string;
     status?: 'Active' | 'Paid';
     paymentMethod: 'Bank' | 'Cash';
+    nextEmiDueDate?: string;
 }

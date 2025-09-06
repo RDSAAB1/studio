@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { Settings, UserCircle, Search, Menu, X, LogOut } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import TabBar from './tab-bar';
@@ -13,7 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import type { User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { getLoansRealtime } from "@/lib/firestore";
+import type { Loan } from "@/lib/definitions";
+import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 interface HeaderProps {
   openTabs: MenuItem[];
@@ -23,6 +27,59 @@ interface HeaderProps {
   toggleSidebar: () => void;
   user: User | null;
   onSignOut: () => void;
+}
+
+const NotificationBell = () => {
+    const [loans, setLoans] = useState<Loan[]>([]);
+    const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
+
+    React.useEffect(() => {
+        const unsubscribe = getLoansRealtime(setLoans, console.error);
+        return () => unsubscribe();
+    }, []);
+
+    React.useEffect(() => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const pending = loans.filter(loan => 
+            loan.nextEmiDueDate && new Date(loan.nextEmiDueDate) <= today
+        );
+        setPendingNotifications(pending);
+    }, [loans]);
+
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {pendingNotifications.length > 0 && (
+                        <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-destructive" />
+                    )}
+                    <span className="sr-only">Notifications</span>
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+                <div className="p-2">
+                    <h4 className="font-medium text-sm">Notifications</h4>
+                    <p className="text-xs text-muted-foreground">You have {pendingNotifications.length} pending EMI payments.</p>
+                </div>
+                <div className="mt-2 space-y-2 max-h-72 overflow-y-auto">
+                    {pendingNotifications.length > 0 ? (
+                        pendingNotifications.map(loan => (
+                             <div key={loan.id} className="p-2 rounded-md hover:bg-accent cursor-pointer">
+                                <p className="text-sm font-semibold">{loan.loanName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    EMI of {formatCurrency(loan.emiAmount)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
+                                </p>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-sm text-muted-foreground p-2 text-center">No new notifications.</p>
+                    )}
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
 }
 
 export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSidebar, user, onSignOut }: HeaderProps) {
@@ -89,6 +146,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
               <Search className="h-5 w-5" />
               <span className="sr-only">Search</span>
             </Button>
+            <NotificationBell />
             <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
                 <Settings className="h-5 w-5" />
                 <span className="sr-only">Settings</span>
