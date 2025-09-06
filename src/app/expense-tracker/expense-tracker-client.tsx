@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,7 @@ const transactionSchema = z.object({
   isCalculated: z.boolean(),
   quantity: z.coerce.number().optional(),
   rate: z.coerce.number().optional(),
+  projectId: z.string().optional(), // Added projectId
 });
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
@@ -82,6 +83,7 @@ const getInitialFormState = (): Omit<Transaction, 'id' | 'date'> & { date: Date 
     isCalculated: false,
     quantity: 0,
     rate: 0,
+    projectId: '',
   };
 };
 
@@ -123,6 +125,7 @@ export default function IncomeExpenseClient() {
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
@@ -179,11 +182,18 @@ export default function IncomeExpenseClient() {
 
     const unsubIncome = getIncomeCategories(setIncomeCategories, console.error);
     const unsubExpense = getExpenseCategories(setExpenseCategories, console.error);
+    
+    const projectsQuery = query(collection(db, 'projects'), orderBy('name', 'asc'));
+    const unsubProjects = onSnapshot(projectsQuery, (snapshot) => {
+        const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as Project));
+        setProjects(projectsData);
+    }, console.error);
 
     return () => {
       unsubscribe();
       unsubIncome();
       unsubExpense();
+      unsubProjects();
     };
   }, []);
 
@@ -214,7 +224,7 @@ export default function IncomeExpenseClient() {
       rate: transaction.rate || 0,
       isCalculated: transaction.isCalculated || false,
     });
-    setIsAdvanced(!!(transaction.status || transaction.invoiceNumber || transaction.taxAmount || transaction.expenseType || transaction.isRecurring || transaction.mill));
+    setIsAdvanced(!!(transaction.status || transaction.invoiceNumber || transaction.taxAmount || transaction.expenseType || transaction.isRecurring || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setActiveTab("form");
   };
@@ -548,21 +558,35 @@ export default function IncomeExpenseClient() {
                                     </InputWithIcon>
                                 </div>
                                 {selectedTransactionType === 'Expense' && (
-                                    <Controller name="expenseType" control={form.control} render={({ field }) => (
-                                        <div className="space-y-2">
-                                            <Label className="text-xs">Expense Type</Label>
-                                            <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                                                <div className="flex items-center space-x-2">
-                                                    <RadioGroupItem value="Business" id="type-business" />
-                                                    <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <RadioGroupItem value="Personal" id="type-personal" />
-                                                    <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
-                                                </div>
-                                            </RadioGroup>
-                                        </div>
-                                    )} />
+                                    <>
+                                        <Controller name="expenseType" control={form.control} render={({ field }) => (
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Expense Type</Label>
+                                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="Business" id="type-business" />
+                                                        <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="Personal" id="type-personal" />
+                                                        <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
+                                                    </div>
+                                                </RadioGroup>
+                                            </div>
+                                        )} />
+                                        <Controller name="projectId" control={form.control} render={({ field }) => (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Project</Label>
+                                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Project (Optional)" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="">None</SelectItem>
+                                                        {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )} />
+                                    </>
                                 )}
                                 <div className="space-y-1">
                                     <Label htmlFor="mill" className="text-xs">Mill</Label>

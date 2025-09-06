@@ -112,6 +112,8 @@ export const allMenuItems: MenuItem[] = [
     icon: Briefcase,
     subMenus: [
         { id: "project-dashboard", name: "Dashboard", icon: ChevronRight, href: "/projects/dashboard" },
+        { id: "tasks", name: "Tasks", icon: ClipboardCheck, href: "/projects/tasks" },
+        { id: "collaboration", name: "Collaboration", icon: Users, href: "/projects/collaboration" },
     ]
   },
   {

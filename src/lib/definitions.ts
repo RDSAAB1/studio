@@ -93,6 +93,7 @@ export type Transaction = {
     isCalculated?: boolean;
     quantity?: number;
     rate?: number;
+    projectId?: string; // Link to a project
 };
 
 export type IncomeCategory = {
@@ -343,3 +344,23 @@ export type ConsolidatedReceiptData = {
 };
 
 export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan';
+
+// Project Management Types
+export type Project = {
+    id: string;
+    name: string;
+    description?: string;
+    status: 'Open' | 'InProgress' | 'Completed' | 'OnHold';
+    startDate: string;
+    endDate?: string;
+};
+
+export type Task = {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  status: 'Open' | 'InProgress' | 'Completed';
+  assignedTo?: string;
+  dueDate?: string;
+};
