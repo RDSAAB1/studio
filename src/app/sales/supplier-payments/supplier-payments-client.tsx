@@ -260,40 +260,6 @@ export default function SupplierPaymentsClient() {
     };
   }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
   
-  const financialState = useMemo(() => {
-        const balances = new Map<string, number>();
-        bankAccounts.forEach(acc => balances.set(acc.id, 0));
-        balances.set('CashInHand', 0);
-        
-        fundTransactions.forEach(t => {
-            if (balances.has(t.source)) {
-                balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
-            }
-            if (balances.has(t.destination)) {
-                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
-            }
-        });
-        
-        transactions.forEach(t => {
-            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
-            if (balanceKey && balances.has(balanceKey)) {
-                if (t.transactionType === 'Income') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
-                } else if (t.transactionType === 'Expense') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
-                }
-            }
-        });
-        
-        return { balances };
-  }, [fundTransactions, transactions, bankAccounts]);
-
-  useEffect(() => {
-    if (paymentType === 'Partial') {
-      setCdAt('paid_amount');
-    }
-  }, [paymentType]);
-  
   useEffect(() => {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
@@ -680,7 +646,7 @@ export default function SupplierPaymentsClient() {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-
+    
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
@@ -791,11 +757,11 @@ export default function SupplierPaymentsClient() {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setPaymentAmount(option.calculatedAmount); // This will trigger the CD calculation useEffect
+        setCdAt('full_amount'); // Set CD type when selecting from generator
+        setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
         setRtgsAmount(option.calculatedAmount);
-        setCdAt('full_amount'); // Set CD type when selecting from generator
         toast({ title: `Amount ${formatCurrency(option.calculatedAmount)} selected.`, variant: 'success' });
     };
 
