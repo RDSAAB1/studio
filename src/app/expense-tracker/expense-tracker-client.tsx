@@ -165,26 +165,26 @@ export default function IncomeExpenseClient() {
   useEffect(() => {
     const loanId = searchParams.get('loanId');
     if (loanId && loans.length > 0) {
-      handleNew();
-      setTimeout(() => {
-        setActiveTab('form');
-        form.setValue('transactionType', 'Expense');
-        form.setValue('amount', Number(searchParams.get('amount') || 0));
-        form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
-        form.setValue('description', searchParams.get('description') || '');
+        handleNew();
+        setActiveTab("form");
 
-        form.setValue('expenseNature', 'Permanent');
-        
-        setTimeout(() => {
-            form.setValue('category', 'Interest & Loan Payments');
+        const loan = loans.find(l => l.id === loanId);
+        if (loan) {
+            form.setValue('transactionType', 'Expense');
+            form.setValue('amount', Number(searchParams.get('amount') || 0));
+            form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
+            form.setValue('description', searchParams.get('description') || '');
+            form.setValue('expenseNature', 'Permanent');
+            
+            // This timeout ensures that the state update for expenseNature
+            // has propagated before setting category and subCategory.
             setTimeout(() => {
-                const loan = loans.find(l => l.id === loanId);
-                if (loan) {
+                form.setValue('category', 'Interest & Loan Payments');
+                setTimeout(() => {
                     form.setValue('subCategory', loan.loanName);
-                }
-            }, 50);
-        }, 50);
-      }, 0);
+                }, 50); // Small delay to allow sub-category options to populate
+            }, 0);
+        }
     }
   }, [searchParams, loans, form, handleNew]);
   
