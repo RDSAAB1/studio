@@ -353,7 +353,7 @@ export default function SupplierEntryClient() {
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            toast({ title: "Payments deleted successfully." });
+            toast({ title: "Payments Deleted", description: "Associated payments removed." });
             const savedEntry = await addSupplier(updatedEntry);
             toast({ title: "Entry updated successfully.", variant: "success" });
             if (callback) callback(savedEntry); else handleNew();

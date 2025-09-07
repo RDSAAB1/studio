@@ -165,28 +165,47 @@ export default function IncomeExpenseClient() {
   useEffect(() => {
     const loanId = searchParams.get('loanId');
     if (loanId && loans.length > 0) {
-        handleNew();
-        setActiveTab("form");
+      handleNew(); // Reset the form first
+      setActiveTab("form");
 
-        const loan = loans.find(l => l.id === loanId);
-        if (loan) {
-            form.setValue('transactionType', 'Expense');
-            form.setValue('amount', Number(searchParams.get('amount') || 0));
-            form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
-            form.setValue('description', searchParams.get('description') || '');
-            form.setValue('expenseNature', 'Permanent');
-            
-            // This timeout ensures that the state update for expenseNature
-            // has propagated before setting category and subCategory.
-            setTimeout(() => {
-                form.setValue('category', 'Interest & Loan Payments');
-                setTimeout(() => {
-                    form.setValue('subCategory', loan.loanName);
-                }, 50); // Small delay to allow sub-category options to populate
-            }, 0);
-        }
+      const loan = loans.find(l => l.id === loanId);
+      if (loan) {
+        form.setValue('transactionType', 'Expense');
+        form.setValue('amount', Number(searchParams.get('amount') || 0));
+        form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
+        form.setValue('description', searchParams.get('description') || '');
+        // Set nature first to trigger category update
+        form.setValue('expenseNature', 'Permanent'); 
+      }
     }
   }, [searchParams, loans, form, handleNew]);
+
+  const availableCategories = useMemo(() => {
+    if (selectedTransactionType === 'Income') {
+        return incomeCategories;
+    }
+    if (selectedTransactionType === 'Expense' && selectedExpenseNature) {
+        return expenseCategories.filter(c => c.nature === selectedExpenseNature);
+    }
+    return [];
+  }, [selectedTransactionType, selectedExpenseNature, incomeCategories, expenseCategories]);
+  
+  useEffect(() => {
+      // This effect runs when availableCategories changes.
+      // If we came from a notification, it sets the category and subCategory.
+      const loanId = searchParams.get('loanId');
+      if (loanId && availableCategories.some(c => c.name === 'Interest & Loan Payments')) {
+          const loan = loans.find(l => l.id === loanId);
+          if (loan) {
+              form.setValue('category', 'Interest & Loan Payments');
+              // A timeout helps ensure the sub-category list is populated before setting its value
+              setTimeout(() => {
+                  form.setValue('subCategory', loan.loanName);
+              }, 50);
+          }
+      }
+  }, [availableCategories, searchParams, loans, form]);
+
   
   useEffect(() => {
     if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
@@ -210,16 +229,6 @@ export default function IncomeExpenseClient() {
       form.setValue('amount', calculatedAmount);
     }
   }, [quantity, rate, isCalculated, form]);
-
-  const availableCategories = useMemo(() => {
-    if (selectedTransactionType === 'Income') {
-        return incomeCategories;
-    }
-    if (selectedTransactionType === 'Expense' && selectedExpenseNature) {
-        return expenseCategories.filter(c => c.nature === selectedExpenseNature);
-    }
-    return [];
-  }, [selectedTransactionType, selectedExpenseNature, incomeCategories, expenseCategories]);
 
   const availableSubCategories = useMemo(() => {
     if (selectedCategory === 'Interest & Loan Payments') {
@@ -808,5 +817,3 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
-
-    
