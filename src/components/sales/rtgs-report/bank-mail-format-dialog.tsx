@@ -53,7 +53,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 'IFSC_Code': p.ifscCode,
                 'Credit_Ac_No': p.acNo,
                 'Beneficiary_Name': toTitleCase(p.supplierName),
-                'Scheme Type': p.type || settings.type || 'SB'
+                'Scheme Type': settings.type || 'SB'
             }));
             const worksheet = XLSX.utils.json_to_sheet(dataToExport);
             const workbook = XLSX.utils.book_new();
@@ -161,7 +161,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                             <td className="p-2">{p.ifscCode}</td>
                                             <td className="p-2">{p.acNo}</td>
                                             <td className="p-2">{toTitleCase(p.supplierName)}</td>
-                                            <td className="p-2">{p.type || settings.type || 'SB'}</td>
+                                            <td className="p-2">{settings.type || 'SB'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
