@@ -104,18 +104,8 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
 
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
-        {/* Top bar for tabs */}
-        <div className="flex h-10 items-center px-4 sm:px-6 border-b border-border">
-            <TabBar 
-            openTabs={openTabs}
-            activeTabId={activeTabId}
-            onTabClick={onTabClick}
-            onCloseTab={onCloseTab}
-            />
-        </div>
-
-        {/* Bottom bar for actions and search */}
-        <div className="flex h-10 items-center justify-between gap-4 bg-card px-4 sm:px-6">
+        {/* Top bar for actions and search */}
+        <div className="relative flex h-10 items-center justify-between gap-4 bg-card px-4 sm:px-6">
             <div className="flex items-center gap-2">
                 <div className="flex-shrink-0 md:hidden">
                 <Button variant="ghost" size="icon" onClick={toggleSidebar}>
@@ -140,11 +130,11 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                 )}
             </div>
 
-            <div className="absolute left-1/2 top-2 -translate-x-1/2">
-                <DynamicIslandToaster />
+            <div className="flex-1 flex justify-center">
+                 <DynamicIslandToaster />
             </div>
             
-            <div className={cn("flex flex-1 items-center justify-end gap-2", isSearchOpen && "hidden")}>
+            <div className={cn("flex items-center justify-end gap-2", isSearchOpen && "hidden")}>
                 <div className={cn(
                 "relative hidden flex-1 md:flex md:grow-0 max-w-xs transition-opacity",
                 hasToasts && "opacity-0 pointer-events-none"
@@ -157,8 +147,8 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                     />
                 </div>
                 <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSearchOpen(true)}>
-                <Search className="h-5 w-5" />
-                <span className="sr-only">Search</span>
+                    <Search className="h-5 w-5" />
+                    <span className="sr-only">Search</span>
                 </Button>
                 <NotificationBell />
                 <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
@@ -182,6 +172,16 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+        </div>
+
+        {/* Bottom bar for tabs */}
+        <div className="flex h-10 items-center px-4 sm:px-6 border-y border-border">
+            <TabBar 
+                openTabs={openTabs}
+                activeTabId={activeTabId}
+                onTabClick={onTabClick}
+                onCloseTab={onCloseTab}
+            />
         </div>
     </header>
   );
