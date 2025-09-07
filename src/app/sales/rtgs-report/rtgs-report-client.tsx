@@ -142,34 +142,7 @@ export default function RtgsReportClient() {
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
-    const handleDownloadExcel = () => {
-        if (filteredReportRows.length === 0) {
-            toast({ title: 'No data to download.', variant: 'destructive' });
-            return;
-        }
-
-        const dataToExport = filteredReportRows.map(p => ({
-            'Date': format(new Date(p.date), 'dd-MMM-yy'),
-            'SR No.': p.srNo,
-            'Payee Name': p.supplierName,
-            "Father's Name": p.fatherName,
-            'A/C No.': p.acNo,
-            'IFSC Code': p.ifscCode,
-            'Bank': p.bank,
-            'Branch': p.branch,
-            'Amount': p.amount,
-            'Check No.': p.checkNo,
-            'Parchi No.': p.parchiNo,
-        }));
-
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
-        XLSX.writeFile(workbook, `RTGS_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-        toast({ title: 'Downloading Excel file...', variant: 'success' });
-    };
-    
-    const handlePrint = () => {
+    const handleDownloadPdf = () => {
         const node = tablePrintRef.current;
         if (!node || !settings) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
@@ -248,8 +221,10 @@ export default function RtgsReportClient() {
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 1000); // Increased timeout for styles to load
+        }, 1000);
     };
+
+    const handlePrint = () => handleDownloadPdf();
 
     if (loading || !settings) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
@@ -410,8 +385,8 @@ export default function RtgsReportClient() {
                         <DialogDescription>A preview of the RTGS report table.</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="p-2 border-b flex justify-end gap-2">
-                        <Button variant="outline" onClick={handleDownloadExcel}>
-                            <Download className="mr-2 h-4 w-4" /> Download Excel
+                        <Button variant="outline" onClick={handleDownloadPdf}>
+                            <Download className="mr-2 h-4 w-4" /> Download in pdf
                         </Button>
                         <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </DialogFooter>
