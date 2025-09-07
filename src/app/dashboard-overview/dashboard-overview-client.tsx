@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { Customer, Transaction, FundTransaction, Payment, BankAccount } from "@/lib/definitions";
+import type { Customer, Transaction, FundTransaction, Payment, BankAccount, Loan } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { TrendingUp, TrendingDown, Scale, Banknote, Landmark, HandCoins, PiggyBa
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { getSuppliersRealtime, getTransactionsRealtime, getFundTransactionsRealtime, getBankAccountsRealtime } from "@/lib/firestore";
+import { getSuppliersRealtime, getTransactionsRealtime, getFundTransactionsRealtime, getBankAccountsRealtime, getLoansRealtime } from "@/lib/firestore";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string; value: string; icon: React.ReactNode; colorClass?: string; description?: string }) => (
   <Card className="bg-card/60 backdrop-blur-sm border-white/10">
@@ -33,6 +33,7 @@ export default function DashboardOverviewClient() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [loans, setLoans] = useState<Loan[]>([]);
     const [isClient, setIsClient] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -51,14 +52,26 @@ export default function DashboardOverviewClient() {
         const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
         const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+        const unsubLoans = getLoansRealtime(setLoans, console.error);
 
         return () => {
             unsubSuppliers();
             unsubTransactions();
             unsubFundTransactions();
             unsubBankAccounts();
+            unsubLoans();
         };
     }, []);
+
+    const loansWithCalculatedRemaining = useMemo(() => {
+        return loans.map(loan => {
+            const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
+            const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
+            const totalPaid = (loan.amountPaid || 0) + totalPaidTowardsPrincipal;
+            const remainingAmount = loan.totalAmount - totalPaid;
+            return { ...loan, remainingAmount, amountPaid: totalPaid };
+        });
+    }, [loans, transactions]);
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -102,19 +115,20 @@ export default function DashboardOverviewClient() {
                 return { name: account?.accountHolderName || 'Unknown Bank', balance };
             });
 
-        const totalBankBalance = bankBalances.reduce((sum, acc) => sum + acc.balance, 0);
+        const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
+        const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount > 0 ? loan.remainingAmount : 0), 0);
 
         return { 
             bankBalances,
             cashInHand: balances.get('CashInHand') || 0,
             cashAtHome: balances.get('CashAtHome') || 0,
-            totalAssets: totalBankBalance + (balances.get('CashInHand') || 0) + (balances.get('CashAtHome') || 0), 
-            totalLiabilities: fundTransactions.filter(t => t.source === 'BankLoan' || t.source === 'ExternalLoan').reduce((sum, t) => sum + t.amount, 0),
+            totalAssets, 
+            totalLiabilities,
             totalIncome,
             totalExpense,
             netProfitLoss: totalIncome - totalExpense
         };
-    }, [transactions, fundTransactions, bankAccounts]);
+    }, [transactions, fundTransactions, bankAccounts, loansWithCalculatedRemaining]);
 
     const salesState = useMemo(() => {
         const totalSalesAmount = suppliers.reduce((sum, c) => sum + c.amount, 0);
@@ -156,6 +170,8 @@ export default function DashboardOverviewClient() {
                     <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
                     <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office" />
                     <StatCard title="Cash at Home" value={formatCurrency(financialState.cashAtHome)} icon={<Home />} colorClass="text-orange-500" />
+                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
                 <CardHeader className="pt-0">
                     <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Bank Balances</CardTitle>

@@ -43,7 +43,9 @@ export default function ProjectManagementPage() {
             description: '',
             status: 'Open',
             startDate: format(new Date(), 'yyyy-MM-dd'),
-            endDate: ''
+            endDate: '',
+            totalCost: 0,
+            totalBilled: 0
         });
         setIsDialogOpen(true);
     };
@@ -156,11 +158,11 @@ export default function ProjectManagementPage() {
                             <div className="grid gap-4 py-4 pr-1">
                                 <div className="space-y-1">
                                     <Label htmlFor="name">Project Name</Label>
-                                    <Input id="name" name="name" value={currentProject.name} onChange={handleInputChange} />
+                                    <Input id="name" name="name" value={currentProject.name || ''} onChange={handleInputChange} />
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="description">Description</Label>
-                                    <Textarea id="description" name="description" value={currentProject.description} onChange={handleInputChange} />
+                                    <Textarea id="description" name="description" value={currentProject.description || ''} onChange={handleInputChange} />
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-1">
@@ -177,15 +179,19 @@ export default function ProjectManagementPage() {
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="startDate">Start Date</Label>
-                                        <Input id="startDate" name="startDate" type="date" value={currentProject.startDate} onChange={handleInputChange} />
+                                        <Input id="startDate" name="startDate" type="date" value={currentProject.startDate || ''} onChange={handleInputChange} />
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="totalCost">Total Cost (Optional)</Label>
-                                        <Input id="totalCost" name="totalCost" type="number" value={currentProject.totalCost || ''} onChange={handleInputChange} />
+                                        <Input id="totalCost" name="totalCost" type="number" value={currentProject.totalCost || 0} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="totalBilled">Total Billed (Optional)</Label>
+                                        <Input id="totalBilled" name="totalBilled" type="number" value={currentProject.totalBilled || 0} onChange={handleInputChange} />
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="endDate">End Date (Optional)</Label>
-                                        <Input id="endDate" name="endDate" type="date" value={currentProject.endDate} onChange={handleInputChange} />
+                                        <Input id="endDate" name="endDate" type="date" value={currentProject.endDate || ''} onChange={handleInputChange} />
                                     </div>
                                 </div>
                             </div>

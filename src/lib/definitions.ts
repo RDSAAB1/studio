@@ -82,7 +82,7 @@ export type Transaction = {
     amount: number;
     payee: string;
     description?: string;
-    paymentMethod: 'Cash' | 'Online' | 'Cheque';
+    paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS';
     status: 'Paid' | 'Pending' | 'Cancelled';
     invoiceNumber?: string;
     taxAmount?: number;
@@ -97,6 +97,7 @@ export type Transaction = {
     rate?: number;
     projectId?: string; // Link to a project
     loanId?: string; // Link to a loan
+    bankAccountId?: string;
 };
 
 export type IncomeCategory = {
@@ -225,6 +226,14 @@ export type BankBranch = {
     branchName: string;
     ifscCode: string;
 };
+
+export type BankAccount = {
+    id: string;
+    accountHolderName: string;
+    bankName: string;
+    accountNumber: string;
+    ifscCode: string;
+}
 
 export type Order = {
   id: string;
@@ -385,6 +394,6 @@ export type Loan = {
     emiAmount: number; // Only for Product loan
     startDate: string;
     status?: 'Active' | 'Paid';
-    paymentMethod: 'BankAccount' | 'CashInHand' | 'CashAtHome';
+    depositTo: 'BankAccount' | 'CashInHand' | 'CashAtHome' | string;
     nextEmiDueDate?: string;
 }

@@ -8,9 +8,9 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { toTitleCase } from '@/lib/utils';
+import { toTitleCase, formatCurrency } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AreaChart, Briefcase, CheckCircle, Clock, ListChecks, Users } from 'lucide-react';
+import { AreaChart, Briefcase, CheckCircle, Clock, ListChecks, Users, DollarSign } from 'lucide-react';
 
 interface Task {
   id: string;
@@ -29,6 +29,8 @@ interface Project {
   endDate: string;
   manager: string;
   team: string[];
+  totalCost?: number;
+  totalBilled?: number;
 }
 
 interface DashboardData {
@@ -41,6 +43,8 @@ interface DashboardData {
   completedTasks: number;
   latestTasks: Task[];
   projectProgress: { name: string; progress: number }[];
+  totalProjectCost: number;
+  totalProjectBilled: number;
 }
 
 const initialDashboardData: DashboardData = {
@@ -53,6 +57,8 @@ const initialDashboardData: DashboardData = {
   completedTasks: 0,
   latestTasks: [],
   projectProgress: [],
+  totalProjectCost: 0,
+  totalProjectBilled: 0,
 };
 
 
@@ -70,6 +76,9 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
       const totalProjects = projects.length;
       const openProjects = projects.filter(p => p.status === 'Open').length;
       const completedProjects = projects.filter(p => p.status === 'Completed').length;
+      const totalProjectCost = projects.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+      const totalProjectBilled = projects.reduce((sum, p) => sum + (p.totalBilled || 0), 0);
+
 
       // Dummy progress calculation for now, assuming progress is based on completed tasks
       const projectProgress = projects.map(project => {
@@ -85,6 +94,8 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
         openProjects,
         completedProjects,
         projectProgress,
+        totalProjectCost,
+        totalProjectBilled
       }));
       setLoading(false);
     });
@@ -152,6 +163,24 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{dashboardData.completedTasks}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Project Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(dashboardData.totalProjectCost)}</div>
+          </CardContent>
+        </Card>
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Billed</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-500">{formatCurrency(dashboardData.totalProjectBilled)}</div>
           </CardContent>
         </Card>
       </div>
