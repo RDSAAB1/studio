@@ -144,14 +144,14 @@ export default function DashboardOverviewClient() {
     const topOutstandingSuppliers = useMemo(() => {
       return suppliers
           .filter(s => (s.netAmount || 0) > 0)
-          .sort((a, b) => Number(b.netAmount || 0) - Number(s.netAmount || 0))
+          .sort((a, b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
           .slice(0, 5);
     }, [suppliers]);
 
     const topOutstandingCustomers = useMemo(() => {
         return customers
             .filter(c => (c.netAmount || 0) > 0)
-            .sort((a, b) => Number(b.netAmount || 0) - Number(c.netAmount || 0))
+            .sort((a, b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
             .slice(0, 5);
     }, [customers]);
 
@@ -244,4 +244,3 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
-
