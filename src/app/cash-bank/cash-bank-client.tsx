@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { FundTransaction, Transaction, Loan } from "@/lib/definitions";
+import type { FundTransaction, Transaction, Loan, BankAccount } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home } from "lucide-react";
 import { format, addMonths } from "date-fns";
 
-import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime } from "@/lib/firestore";
+import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -33,7 +33,7 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
             <div className="text-muted-foreground">{icon}</div>
         </CardHeader>
         <CardContent>
-            <div className={`text-3xl font-bold ${colorClass}`}>{value}</div>
+            <div className={`text-xl font-bold ${colorClass}`}>{value}</div>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </CardContent>
     </Card>
@@ -50,7 +50,7 @@ const initialLoanFormState: Partial<Loan> = {
     tenureMonths: 0,
     interestRate: 0,
     startDate: format(new Date(), 'yyyy-MM-dd'),
-    paymentMethod: "Bank",
+    depositTo: "CashInHand",
     bankLoanType: "Fixed",
 };
 
@@ -59,33 +59,28 @@ export default function CashBankClient() {
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isClient, setIsClient] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
 
+    const formSourcesAndDestinations = useMemo(() => {
+        const accounts = bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }));
+        return [
+            ...accounts,
+            { value: 'CashInHand', label: 'Cash in Hand (Mill)' },
+            { value: 'CashAtHome', label: 'Cash at Home' },
+        ];
+    }, [bankAccounts]);
+
+
     useEffect(() => {
         setIsClient(true);
-        const unsubscribeFunds = getFundTransactionsRealtime((data) => {
-            setFundTransactions(data);
-        }, (error) => {
-            console.error("Error fetching fund transactions:", error);
-            toast({ title: "Error loading fund transactions", variant: "destructive" });
-        });
-
-        const unsubscribeTransactions = getTransactionsRealtime((data) => {
-            setTransactions(data);
-        }, (error) => {
-            console.error("Error fetching income/expense transactions:", error);
-            toast({ title: "Error loading income/expense data", variant: "destructive" });
-        });
-
-        const unsubscribeLoans = getLoansRealtime((data) => {
-            setLoans(data);
-        }, (error) => {
-            console.error("Error fetching loans:", error);
-            toast({ title: "Error loading loan data", variant: "destructive" });
-        });
+        const unsubscribeFunds = getFundTransactionsRealtime(setFundTransactions, (e) => toast({ title: "Error loading fund transactions", variant: "destructive" }));
+        const unsubscribeTransactions = getTransactionsRealtime(setTransactions, (e) => toast({ title: "Error loading income/expense data", variant: "destructive" }));
+        const unsubscribeLoans = getLoansRealtime(setLoans, (e) => toast({ title: "Error loading loan data", variant: "destructive" }));
+        const unsubscribeBankAccounts = getBankAccountsRealtime(setBankAccounts, (e) => toast({ title: "Error loading bank accounts", variant: "destructive" }));
         
         setLoading(false);
 
@@ -93,6 +88,7 @@ export default function CashBankClient() {
             unsubscribeFunds();
             unsubscribeTransactions();
             unsubscribeLoans();
+            unsubscribeBankAccounts();
         };
     }, []);
 
@@ -109,44 +105,42 @@ export default function CashBankClient() {
     }, [loans, transactions]);
 
     const financialState = useMemo(() => {
-        let bankBalance = 0;
-        let cashInHand = 0;
-        let cashAtHome = 0;
-        
+        const balances = new Map<string, number>();
+        bankAccounts.forEach(acc => balances.set(acc.id, 0));
+        balances.set('CashInHand', 0);
+        balances.set('CashAtHome', 0);
+
         fundTransactions.forEach(t => {
-            // Inflows
             if (t.type === 'CapitalInflow') {
-                if(t.destination === 'BankAccount') bankBalance += t.amount;
-                if(t.destination === 'CashInHand') cashInHand += t.amount;
-                if(t.destination === 'CashAtHome') cashAtHome += t.amount;
-            } 
-            // Transfers
-            else if (t.type === 'CashTransfer' || t.type === 'BankWithdrawal' || t.type === 'BankDeposit') {
-                // Decrease from source
-                if (t.source === 'BankAccount') bankBalance -= t.amount;
-                if (t.source === 'CashInHand') cashInHand -= t.amount;
-                if (t.source === 'CashAtHome') cashAtHome -= t.amount;
-                // Increase at destination
-                if(t.destination === 'BankAccount') bankBalance += t.amount;
-                if(t.destination === 'CashInHand') cashInHand += t.amount;
-                if(t.destination === 'CashAtHome') cashAtHome += t.amount;
+                if (balances.has(t.destination)) {
+                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+                }
+            } else if (t.type === 'CashTransfer') {
+                 if (balances.has(t.source)) {
+                    balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+                }
+                if (balances.has(t.destination)) {
+                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+                }
             }
         });
         
         transactions.forEach(t => {
-            if (t.transactionType === 'Income') {
-                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
-                if (t.paymentMethod === 'Cash') cashInHand += t.amount;
-            } else if (t.transactionType === 'Expense') {
-                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
+            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+            if (balanceKey && balances.has(balanceKey)) {
+                if (t.transactionType === 'Income') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+                } else if (t.transactionType === 'Expense') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+                }
             }
         });
         
         const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
+        const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
-        return { bankBalance, cashInHand, cashAtHome, totalAssets: bankBalance + cashInHand + cashAtHome, totalLiabilities };
-    }, [fundTransactions, transactions, loansWithCalculatedRemaining]);
+        return { balances, totalAssets, totalLiabilities };
+    }, [fundTransactions, transactions, loansWithCalculatedRemaining, bankAccounts]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
@@ -166,11 +160,7 @@ export default function CashBankClient() {
             return;
         }
 
-        let availableBalance = 0;
-        if(values.source === 'BankAccount') availableBalance = financialState.bankBalance;
-        if(values.source === 'CashInHand') availableBalance = financialState.cashInHand;
-        if(values.source === 'CashAtHome') availableBalance = financialState.cashAtHome;
-
+        const availableBalance = financialState.balances.get(values.source) || 0;
         if (values.amount > availableBalance) {
              toast({ title: "Insufficient funds in the source account", variant: "destructive" });
             return;
@@ -213,7 +203,7 @@ export default function CashBankClient() {
             const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                 type: 'CapitalInflow',
                 source: 'OwnerCapital',
-                destination: currentLoan.paymentMethod as any,
+                destination: currentLoan.depositTo as any,
                 amount: currentLoan.totalAmount || 0,
                 description: `Owner's capital contribution`
             };
@@ -258,12 +248,14 @@ export default function CashBankClient() {
                     const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                         type: 'CapitalInflow',
                         source: currentLoan.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
-                        destination: currentLoan.paymentMethod as any,
+                        destination: currentLoan.depositTo as any,
                         amount: currentLoan.totalAmount || 0,
                         description: `Capital inflow from ${loanNameToSave}`
                     };
                     await addFundTransaction(capitalInflowData);
-                    toast({ title: "Capital inflow recorded", description: `${formatCurrency(currentLoan.totalAmount || 0)} added to ${toTitleCase(currentLoan.paymentMethod?.replace(/([A-Z])/g, ' $1').trim())}.`, variant: 'success' });
+                    
+                    const destinationName = formSourcesAndDestinations.find(d => d.value === currentLoan.depositTo)?.label || 'account';
+                    toast({ title: "Capital inflow recorded", description: `${formatCurrency(currentLoan.totalAmount || 0)} added to ${destinationName}.`, variant: 'success' });
                 }
             }
             setIsLoanDialogOpen(false);
@@ -299,10 +291,20 @@ export default function CashBankClient() {
                     <CardDescription>A real-time overview of your business's financial health.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    <StatCard title="Total Bank Balance" value={formatCurrency(financialState.bankBalance)} icon={<Landmark />} colorClass="text-blue-500" />
-                    <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
-                    <StatCard title="Cash at Home" value={formatCurrency(financialState.cashAtHome)} icon={<Home />} colorClass="text-orange-500" />
-                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
+                        const account = bankAccounts.find(acc => acc.id === key);
+                        if (account) {
+                            return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
+                        }
+                        if (key === 'CashInHand') {
+                            return <StatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+                        }
+                        if (key === 'CashAtHome') {
+                            return <StatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
+                        }
+                        return null;
+                    })}
+                     <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
             </Card>
@@ -310,7 +312,7 @@ export default function CashBankClient() {
             <Tabs defaultValue="funds" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="funds">Fund Management</TabsTrigger>
-                    <TabsTrigger value="loans">Loan & Capital Management</TabsTrigger>
+                    <TabsTrigger value="loans">Loan &amp; Capital Management</TabsTrigger>
                 </TabsList>
                 <TabsContent value="funds" className="mt-6">
                      <Card>
@@ -328,9 +330,7 @@ export default function CashBankClient() {
                                         <Controller name="source" control={transferForm.control} render={({ field }) => (
                                            <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Select Source" /></SelectTrigger>
                                              <SelectContent>
-                                                 <SelectItem value="BankAccount">Bank Account</SelectItem>
-                                                 <SelectItem value="CashInHand">Cash in Hand (Mill)</SelectItem>
-                                                 <SelectItem value="CashAtHome">Cash at Home</SelectItem>
+                                                {formSourcesAndDestinations.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                                              </SelectContent>
                                            </Select>
                                         )} />
@@ -340,9 +340,7 @@ export default function CashBankClient() {
                                         <Controller name="destination" control={transferForm.control} render={({ field }) => (
                                            <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Select Destination" /></SelectTrigger>
                                              <SelectContent>
-                                                 <SelectItem value="BankAccount">Bank Account</SelectItem>
-                                                 <SelectItem value="CashInHand">Cash in Hand (Mill)</SelectItem>
-                                                 <SelectItem value="CashAtHome">Cash at Home</SelectItem>
+                                                {formSourcesAndDestinations.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                                              </SelectContent>
                                            </Select>
                                         )} />
@@ -366,7 +364,7 @@ export default function CashBankClient() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <CardTitle className="text-xl font-semibold">Loan & Capital Management</CardTitle>
+                                <CardTitle className="text-xl font-semibold">Loan &amp; Capital Management</CardTitle>
                                 <CardDescription>Track all your loans and add capital injections here.</CardDescription>
                             </div>
                             <Button onClick={openLoanDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Entry</Button>
@@ -433,12 +431,10 @@ export default function CashBankClient() {
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
-                                                {t.type === 'BankWithdrawal' && <MinusCircle className="h-4 w-4 text-red-500"/>}
-                                                {t.type === 'BankDeposit' && <PlusCircle className="h-4 w-4 text-blue-500"/>}
                                                 {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
                                                 <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
                                             </div>
-                                            <p className="text-xs text-muted-foreground">{t.source && toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {t.destination && toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
+                                             <p className="text-xs text-muted-foreground">{formSourcesAndDestinations.find(s => s.value === t.source)?.label || toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {formSourcesAndDestinations.find(d => d.value === t.destination)?.label || toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
                                         </TableCell>
                                         <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
                                         <TableCell>{t.description}</TableCell>
@@ -514,12 +510,10 @@ export default function CashBankClient() {
                             </div>
                              <div className="space-y-1">
                                 <Label>Deposit To</Label>
-                                <Select name="paymentMethod" value={currentLoan?.paymentMethod || 'BankAccount'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, paymentMethod: value as any}))}>
+                                <Select name="depositTo" value={currentLoan?.depositTo || 'CashInHand'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, depositTo: value as any}))}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="BankAccount">Bank Account</SelectItem>
-                                    <SelectItem value="CashInHand">Cash in Hand</SelectItem>
-                                    <SelectItem value="CashAtHome">Cash at Home</SelectItem>
+                                    {formSourcesAndDestinations.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                             </div>
@@ -537,5 +531,3 @@ export default function CashBankClient() {
         </div>
     );
 }
-
-    

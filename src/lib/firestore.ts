@@ -20,7 +20,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -29,6 +29,7 @@ const transactionsCollection = collection(db, "transactions");
 const fundTransactionsCollection = collection(db, "fund_transactions");
 const banksCollection = collection(db, "banks");
 const bankBranchesCollection = collection(db, "bankBranches");
+const bankAccountsCollection = collection(db, "bankAccounts");
 const settingsCollection = collection(db, "settings");
 const usersCollection = collection(db, "users");
 const loansCollection = collection(db, "loans");
@@ -202,6 +203,32 @@ export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise
     const docRef = await addDoc(bankBranchesCollection, branchData);
     return { id: docRef.id, ...branchData };
 }
+
+// --- Bank Account Functions ---
+export function getBankAccountsRealtime(callback: (accounts: BankAccount[]) => void, onError: (error: Error) => void): () => void {
+    const q = query(bankAccountsCollection, orderBy("bankName", "asc"));
+    return onSnapshot(q, (snapshot) => {
+        const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
+        callback(accounts);
+    }, onError);
+}
+
+export async function addBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
+    const docRef = await addDoc(bankAccountsCollection, accountData);
+    await updateDoc(docRef, { id: docRef.id });
+    return { id: docRef.id, ...accountData } as BankAccount;
+}
+
+export async function updateBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
+    const docRef = doc(bankAccountsCollection, id);
+    await updateDoc(docRef, accountData);
+}
+
+export async function deleteBankAccount(id: string): Promise<void> {
+    const docRef = doc(bankAccountsCollection, id);
+    await deleteDoc(docRef);
+}
+
 
 // --- Supplier Functions ---
 

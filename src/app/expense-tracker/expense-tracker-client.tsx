@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getTransactionsRealtime, getLoansRealtime, updateLoan } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getTransactionsRealtime, getLoansRealtime, updateLoan, getBankAccountsRealtime } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
@@ -44,6 +44,7 @@ const transactionSchema = z.object({
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
   payee: z.string().min(1, "Payee/Payer is required."),
   paymentMethod: z.string().min(1, "Payment method is required."),
+  bankAccountId: z.string().optional(),
   status: z.string().min(1, "Status is required."),
   description: z.string().optional(),
   invoiceNumber: z.string().optional(),
@@ -136,6 +137,7 @@ export default function IncomeExpenseClient() {
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
@@ -147,6 +149,7 @@ export default function IncomeExpenseClient() {
   });
 
   const selectedTransactionType = form.watch('transactionType');
+  const selectedPaymentMethod = form.watch('paymentMethod');
   const selectedExpenseNature = form.watch('expenseNature');
   const selectedCategory = form.watch('category');
   const selectedSubCategory = form.watch('subCategory');
@@ -252,6 +255,7 @@ export default function IncomeExpenseClient() {
     const unsubLoans = getLoansRealtime(setLoans, console.error);
     const unsubIncome = getIncomeCategories(setIncomeCategories, console.error);
     const unsubExpense = getExpenseCategories(setExpenseCategories, console.error);
+    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
     
     const projectsQuery = query(collection(db, 'projects'), orderBy('name', 'asc'));
     const unsubProjects = onSnapshot(projectsQuery, (snapshot) => {
@@ -266,38 +270,44 @@ export default function IncomeExpenseClient() {
       unsubExpense();
       unsubProjects();
       unsubLoans();
+      unsubBankAccounts();
     };
   }, []);
   
-  const financialState = useMemo(() => {
-        let bankBalance = 0;
-        let cashInHand = 0;
-        
+    const financialState = useMemo(() => {
+        const balances = new Map<string, number>();
+        bankAccounts.forEach(acc => balances.set(acc.id, 0));
+        balances.set('CashInHand', 0);
+
         fundTransactions.forEach(t => {
             if (t.type === 'CapitalInflow') {
-                if(t.destination === 'BankAccount') bankBalance += t.amount;
-                if(t.destination === 'CashInHand') cashInHand += t.amount;
-            } else if (t.type === 'BankWithdrawal') {
-                bankBalance -= t.amount;
-                cashInHand += t.amount;
-            } else if (t.type === 'BankDeposit') {
-                cashInHand -= t.amount;
-                bankBalance += t.amount;
+                if (balances.has(t.destination)) {
+                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+                }
+            } else if (t.type === 'CashTransfer') {
+                 if (balances.has(t.source)) {
+                    balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+                }
+                if (balances.has(t.destination)) {
+                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+                }
             }
         });
         
         transactions.forEach(t => {
-            if (t.transactionType === 'Income') {
-                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
-                if (t.paymentMethod === 'Cash') cashInHand += t.amount;
-            } else if (t.transactionType === 'Expense') {
-                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
+            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+             if (balanceKey && balances.has(balanceKey)) {
+                if (t.transactionType === 'Income') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+                } else if (t.transactionType === 'Expense') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+                }
             }
         });
         
-        return { bankBalance, cashInHand };
-    }, [fundTransactions, transactions]);
+        return { balances };
+    }, [fundTransactions, transactions, bankAccounts]);
+
 
   useEffect(() => {
     form.setValue('category', '');
@@ -349,17 +359,14 @@ export default function IncomeExpenseClient() {
 
   const onSubmit = async (values: TransactionFormValues) => {
     if (values.transactionType === 'Expense') {
-        let availableBalance = 0;
-        if(values.paymentMethod === 'Cash') {
-            availableBalance = financialState.cashInHand;
-        } else if (values.paymentMethod === 'Online' || values.paymentMethod === 'Cheque') {
-            availableBalance = financialState.bankBalance;
-        }
+        const balanceKey = values.bankAccountId || (values.paymentMethod === 'Cash' ? 'CashInHand' : '');
+        const availableBalance = financialState.balances.get(balanceKey) || 0;
 
         if (values.amount > availableBalance) {
+            const accountName = bankAccounts.find(acc => acc.id === balanceKey)?.accountHolderName || 'Cash in Hand';
             toast({
                 title: "Insufficient Balance",
-                description: `Cannot process expense of ${formatCurrency(values.amount)}. Available ${values.paymentMethod} balance is ${formatCurrency(availableBalance)}.`,
+                description: `Cannot process expense of ${formatCurrency(values.amount)}. Available balance in ${accountName} is ${formatCurrency(availableBalance)}.`,
                 variant: "destructive"
             });
             return;
@@ -383,7 +390,10 @@ export default function IncomeExpenseClient() {
       } else {
           delete transactionData.nextDueDate;
       }
-
+      
+      if(values.paymentMethod === 'Cash'){
+          delete transactionData.bankAccountId;
+      }
 
       if (isEditing) {
         await setDoc(doc(db, "transactions", isEditing), transactionData, { merge: true });
@@ -562,7 +572,7 @@ export default function IncomeExpenseClient() {
                                       </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0 z-[51]">
-                                      <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
+                                      <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date()))} initialFocus />
                                   </PopoverContent>
                               </Popover>
                           </div>
@@ -633,13 +643,6 @@ export default function IncomeExpenseClient() {
                           {form.formState.errors.payee && <p className="text-xs text-destructive mt-1">{form.formState.errors.payee.message}</p>}
                       </div>
                       
-                      <div className="space-y-1">
-                          <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
-                          <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
-                          </InputWithIcon>
-                      </div>
-
                       <Controller name="paymentMethod" control={form.control} render={({ field }) => (
                           <div className="space-y-1">
                               <Label className="text-xs">Payment Method</Label>
@@ -653,6 +656,21 @@ export default function IncomeExpenseClient() {
                               </Select>
                           </div>
                       )} />
+                      
+                      {selectedPaymentMethod !== 'Cash' && (
+                         <Controller name="bankAccountId" control={form.control} render={({ field }) => (
+                             <div className="space-y-1">
+                                 <Label className="text-xs">Bank Account</Label>
+                                 <Select onValueChange={field.onChange} value={field.value} disabled={bankAccounts.length === 0}>
+                                     <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Bank" /></SelectTrigger>
+                                     <SelectContent>
+                                         {bankAccounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.accountHolderName}</SelectItem>)}
+                                     </SelectContent>
+                                 </Select>
+                             </div>
+                         )} />
+                      )}
+
 
                         {selectedTransactionType === 'Expense' && (
                            <>
@@ -780,6 +798,12 @@ export default function IncomeExpenseClient() {
                                     <Label htmlFor="mill" className="text-xs">Mill</Label>
                                     <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
                                         <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
+                                    </InputWithIcon>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
+                                    <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                                        <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
                                     </InputWithIcon>
                                 </div>
                             </>

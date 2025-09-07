@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { Customer, Transaction, FundTransaction, Payment } from "@/lib/definitions";
+import type { Customer, Transaction, FundTransaction, Payment, BankAccount } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { TrendingUp, TrendingDown, Scale, Banknote, Landmark, HandCoins, PiggyBa
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { getSuppliersRealtime, getTransactionsRealtime, getFundTransactionsRealtime } from "@/lib/firestore";
+import { getSuppliersRealtime, getTransactionsRealtime, getFundTransactionsRealtime, getBankAccountsRealtime } from "@/lib/firestore";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string; value: string; icon: React.ReactNode; colorClass?: string; description?: string }) => (
   <Card className="bg-card/60 backdrop-blur-sm border-white/10">
@@ -32,6 +32,7 @@ export default function DashboardOverviewClient() {
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isClient, setIsClient] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -41,72 +42,79 @@ export default function DashboardOverviewClient() {
 
         const unsubSuppliers = getSuppliersRealtime((data) => {
             setSuppliers(data);
-            if(loading) setLoading(false); // Set loading to false on first data fetch
+            if(loading) setLoading(false); 
         }, (error) => {
             console.error(error);
             if(loading) setLoading(false);
         });
 
-        const unsubTransactions = getTransactionsRealtime((data) => {
-            setTransactions(data);
-        }, (error) => console.error(error));
-
-        const unsubFundTransactions = getFundTransactionsRealtime((data) => {
-            setFundTransactions(data);
-        }, (error) => console.error(error));
+        const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
+        const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
+        const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
 
         return () => {
             unsubSuppliers();
             unsubTransactions();
             unsubFundTransactions();
+            unsubBankAccounts();
         };
     }, []);
 
     const financialState = useMemo(() => {
-        let bankBalance = 0;
-        let cashInHand = 0;
-        let cashAtHome = 0;
+        const balances = new Map<string, number>();
+        bankAccounts.forEach(acc => balances.set(acc.id, 0));
+        balances.set('CashInHand', 0);
+        balances.set('CashAtHome', 0);
 
         fundTransactions.forEach(t => {
             if (t.type === 'CapitalInflow') {
-                if(t.destination === 'BankAccount') bankBalance += t.amount;
-                if(t.destination === 'CashInHand') cashInHand += t.amount;
-                if(t.destination === 'CashAtHome') cashAtHome += t.amount;
-            } else if (t.type === 'CashTransfer' || t.type === 'BankWithdrawal' || t.type === 'BankDeposit') {
-                if (t.source === 'BankAccount') bankBalance -= t.amount;
-                if (t.source === 'CashInHand') cashInHand -= t.amount;
-                if (t.source === 'CashAtHome') cashAtHome -= t.amount;
-                
-                if(t.destination === 'BankAccount') bankBalance += t.amount;
-                if(t.destination === 'CashInHand') cashInHand += t.amount;
-                if(t.destination === 'CashAtHome') cashAtHome += t.amount;
+                if (balances.has(t.destination)) {
+                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+                }
+            } else if (t.type === 'CashTransfer') {
+                 if (balances.has(t.source)) {
+                    balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+                }
+                if (balances.has(t.destination)) {
+                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+                }
             }
         });
 
         transactions.forEach(t => {
-            if (t.transactionType === 'Income') {
-                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance += t.amount;
-                if (t.paymentMethod === 'Cash') cashInHand += t.amount;
-            } else if (t.transactionType === 'Expense') {
-                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
+            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+            if (balanceKey && balances.has(balanceKey)) {
+                if (t.transactionType === 'Income') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+                } else if (t.transactionType === 'Expense') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+                }
             }
         });
         
         const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
         const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
 
+        const bankBalances = Array.from(balances.entries())
+            .filter(([key]) => key !== 'CashInHand' && key !== 'CashAtHome')
+            .map(([id, balance]) => {
+                const account = bankAccounts.find(acc => acc.id === id);
+                return { name: account?.accountHolderName || 'Unknown Bank', balance };
+            });
+
+        const totalBankBalance = bankBalances.reduce((sum, acc) => sum + acc.balance, 0);
+
         return { 
-            bankBalance, 
-            cashInHand,
-            cashAtHome,
-            totalAssets: bankBalance + cashInHand + cashAtHome, 
+            bankBalances,
+            cashInHand: balances.get('CashInHand') || 0,
+            cashAtHome: balances.get('CashAtHome') || 0,
+            totalAssets: totalBankBalance + (balances.get('CashInHand') || 0) + (balances.get('CashAtHome') || 0), 
             totalLiabilities: fundTransactions.filter(t => t.source === 'BankLoan' || t.source === 'ExternalLoan').reduce((sum, t) => sum + t.amount, 0),
             totalIncome,
             totalExpense,
             netProfitLoss: totalIncome - totalExpense
         };
-    }, [transactions, fundTransactions]);
+    }, [transactions, fundTransactions, bankAccounts]);
 
     const salesState = useMemo(() => {
         const totalSalesAmount = suppliers.reduce((sum, c) => sum + c.amount, 0);
@@ -142,14 +150,20 @@ export default function DashboardOverviewClient() {
                     <CardTitle className="flex items-center gap-2 text-lg"><Scale className="h-5 w-5 text-primary"/>Financial Overview</CardTitle>
                     <CardDescription>A real-time snapshot of your business's financial health.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
                     <StatCard title="Total Income" value={formatCurrency(financialState.totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" />
                     <StatCard title="Total Expense" value={formatCurrency(financialState.totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" />
                     <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
-                    <StatCard title="Total Bank Balance" value={formatCurrency(financialState.bankBalance)} icon={<Landmark />} colorClass="text-blue-500" />
                     <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office" />
                     <StatCard title="Cash at Home" value={formatCurrency(financialState.cashAtHome)} icon={<Home />} colorClass="text-orange-500" />
-                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+                </CardContent>
+                <CardHeader className="pt-0">
+                    <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Bank Balances</CardTitle>
+                </CardHeader>
+                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                     {financialState.bankBalances.map((acc, index) => (
+                        <StatCard key={index} title={acc.name} value={formatCurrency(acc.balance)} icon={<Landmark />} colorClass="text-blue-500" />
+                     ))}
                 </CardContent>
             </Card>
 

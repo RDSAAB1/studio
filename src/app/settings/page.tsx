@@ -5,8 +5,8 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings } from '@/lib/firestore';
-import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings } from '@/lib/definitions';
+import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount } from '@/lib/firestore';
+import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,15 +42,6 @@ const companyDetailsSchema = z.object({
   gmail: z.string().email("Invalid email address."),
 });
 type CompanyFormValues = z.infer<typeof companyDetailsSchema>;
-
-const bankDetailsSchema = z.object({
-  bankName: z.string().min(1, "Bank name is required."),
-  ifscCode: z.string().min(1, "IFSC code is required."),
-  branchName: z.string().min(1, "Branch name is required."),
-  accountNo: z.string().min(1, "Account number is required."),
-  type: z.string().min(1, "Account type is required."),
-});
-type BankFormValues = z.infer<typeof bankDetailsSchema>;
 
 const emailSchema = z.object({
     email: z.string().email("Please enter a valid email address."),
@@ -99,7 +90,7 @@ const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'v
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>Delete {toTitleCase(option.name)}?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><AlertDialogTitle>Delete "{toTitleCase(option.name)}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
                                         <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(collectionName, option.id)}>Delete</AlertDialogAction></AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
@@ -124,13 +115,15 @@ export default function SettingsPage() {
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [isBankAccountDialogOpen, setIsBankAccountDialogOpen] = useState(false);
+    const [currentBankAccount, setCurrentBankAccount] = useState<Partial<BankAccount>>({});
+
 
     // Form Hooks
     const companyForm = useForm<CompanyFormValues>();
-    const bankForm = useForm<BankFormValues>();
     const emailForm = useForm<EmailFormValues>();
     
-    const [isTwoFactorConfirmed, setIsTwoFactorConfirmed] = useState(true);
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
 
     useEffect(() => {
@@ -143,7 +136,6 @@ export default function SettingsPage() {
                 const companySettings = await getRtgsSettings();
                 if(companySettings) {
                     companyForm.reset(companySettings);
-                    bankForm.reset(companySettings);
                 }
                 
                 const emailSettings = await getCompanySettings(currentUser.uid);
@@ -158,9 +150,10 @@ export default function SettingsPage() {
 
                 const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, console.error);
                 const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
+                const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
                 
                 setLoading(false);
-                return () => { unsubVarieties(); unsubPaymentTypes(); };
+                return () => { unsubVarieties(); unsubPaymentTypes(); unsubBankAccounts(); };
             } else {
                 setUser(null);
                 setLoading(false);
@@ -168,22 +161,13 @@ export default function SettingsPage() {
             }
         });
         return () => unsubscribeAuth();
-    }, [router, companyForm, bankForm, emailForm]);
+    }, [router, companyForm, emailForm]);
 
     const onCompanySubmit = async (data: CompanyFormValues) => {
         setSaving(true);
         try {
-            await updateRtgsSettings({ ...bankForm.getValues(), ...data });
+            await updateRtgsSettings({ ...data });
             toast({ title: "Company details updated successfully", variant: "success" });
-        } catch (e) { toast({ title: "Failed to update details", variant: "destructive" }); } 
-        finally { setSaving(false); }
-    };
-    
-    const onBankSubmit = async (data: BankFormValues) => {
-        setSaving(true);
-        try {
-            await updateRtgsSettings({ ...companyForm.getValues(), ...data });
-            toast({ title: "Bank details updated successfully", variant: "success" });
         } catch (e) { toast({ title: "Failed to update details", variant: "destructive" }); } 
         finally { setSaving(false); }
     };
@@ -235,7 +219,33 @@ export default function SettingsPage() {
             toast({ title: "Failed to sign out", variant: "destructive" });
         }
     };
+    
+    const handleBankAccountSave = async () => {
+        if (!currentBankAccount || !currentBankAccount.bankName || !currentBankAccount.accountNumber || !currentBankAccount.accountHolderName) {
+            toast({ title: "Please fill all required bank account fields", variant: "destructive" });
+            return;
+        }
 
+        try {
+            if (currentBankAccount.id) {
+                await updateBankAccount(currentBankAccount.id, currentBankAccount);
+                toast({ title: "Bank account updated", variant: "success" });
+            } else {
+                await addBankAccount(currentBankAccount);
+                toast({ title: "Bank account added", variant: "success" });
+            }
+            setIsBankAccountDialogOpen(false);
+            setCurrentBankAccount({});
+        } catch (error) {
+            console.error("Error saving bank account:", error);
+            toast({ title: "Failed to save bank account", variant: "destructive" });
+        }
+    };
+
+    const handleBankAccountDelete = async (id: string) => {
+        await deleteBankAccount(id);
+        toast({ title: "Bank account deleted", variant: "success" });
+    }
 
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -247,27 +257,25 @@ export default function SettingsPage() {
             <Tabs defaultValue="company" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
                     <TabsTrigger value="company">Company</TabsTrigger>
-                    <TabsTrigger value="email">Bank & Email</TabsTrigger>
+                    <TabsTrigger value="banks">Bank Accounts</TabsTrigger>
                     <TabsTrigger value="receipts">Receipts</TabsTrigger>
                     <TabsTrigger value="data">App Data</TabsTrigger>
                     <TabsTrigger value="account">Account</TabsTrigger>
                 </TabsList>
                 <TabsContent value="company" className="mt-6">
-                    <form onSubmit={companyForm.handleSubmit(onCompanySubmit)}>
-                        <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} /></div>
-                               <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
-                               <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
-                               <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} /></div>
-                               <div className="space-y-1 md:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} /></div>
-                           </div>
-                        </SettingsCard>
-                    </form>
-                </TabsContent>
-                 <TabsContent value="email" className="mt-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <form onSubmit={emailForm.handleSubmit(onEmailSubmit)}>
+                         <form onSubmit={companyForm.handleSubmit(onCompanySubmit)}>
+                            <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                   <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} /></div>
+                                   <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
+                                   <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
+                                   <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} /></div>
+                                   <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} /></div>
+                               </div>
+                            </SettingsCard>
+                        </form>
+                         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)}>
                              <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
                                 <div className="space-y-4">
                                      <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
@@ -291,7 +299,7 @@ export default function SettingsPage() {
                                                                 </Card>
                                                                 
                                                                 <Card>
-                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create & Copy Password</CardTitle></CardHeader>
+                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create &amp; Copy Password</CardTitle></CardHeader>
                                                                     <CardContent className="p-4 pt-0 space-y-2 text-xs">
                                                                         <p className="font-bold">Follow these steps carefully on the Google page:</p>
                                                                         <ul className="list-decimal pl-5 space-y-1">
@@ -325,18 +333,35 @@ export default function SettingsPage() {
                                 </div>
                              </SettingsCard>
                         </form>
-                         <form onSubmit={bankForm.handleSubmit(onBankSubmit)}>
-                            <SettingsCard title="Bank Details" description="This information is used for RTGS reports." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Bank Details</Button>}>
-                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                   <div className="space-y-1"><Label>Bank Name</Label><Input {...bankForm.register("bankName")} /></div>
-                                   <div className="space-y-1"><Label>Branch Name</Label><Input {...bankForm.register("branchName")} /></div>
-                                   <div className="space-y-1"><Label>Account Number</Label><Input {...bankForm.register("accountNo")} /></div>
-                                   <div className="space-y-1"><Label>IFSC Code</Label><Input {...bankForm.register("ifscCode")} /></div>
-                                   <div className="space-y-1 sm:col-span-2"><Label>Account Type</Label><Input {...bankForm.register("type")} placeholder="e.g. SB or CA" /></div>
-                               </div>
-                            </SettingsCard>
-                         </form>
                     </div>
+                </TabsContent>
+                <TabsContent value="banks" className="mt-6">
+                     <SettingsCard title="Bank Accounts" description="Manage all your company bank accounts here." footer={
+                        <Button size="sm" onClick={() => { setCurrentBankAccount({}); setIsBankAccountDialogOpen(true); }}>
+                            <Plus className="mr-2 h-4 w-4"/> Add Bank Account
+                        </Button>
+                     }>
+                        <ScrollArea className="h-80 border rounded-md">
+                            {bankAccounts.map(account => (
+                                <div key={account.id} className="flex items-center justify-between p-3 border-b">
+                                    <div>
+                                        <p className="font-semibold">{account.accountHolderName}</p>
+                                        <p className="text-sm text-muted-foreground">{account.bankName} - ...{account.accountNumber.slice(-4)}</p>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBankAccount(account); setIsBankAccountDialogOpen(true); }}><Pen className="h-4 w-4" /></Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>Delete "{account.accountHolderName}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleBankAccountDelete(account.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                </div>
+                            ))}
+                        </ScrollArea>
+                    </SettingsCard>
                 </TabsContent>
                 <TabsContent value="receipts" className="mt-6">
                      <SettingsCard title="Receipt Fields" description="Choose which fields to display on printed receipts." footer={<Button onClick={handleReceiptFieldsSave} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Receipt Settings</Button>}>
@@ -381,6 +406,35 @@ export default function SettingsPage() {
                     </SettingsCard>
                 </TabsContent>
             </Tabs>
+
+            <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>{currentBankAccount.id ? 'Edit' : 'Add'} Bank Account</DialogTitle></DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-1">
+                            <Label htmlFor="accountHolderName">Account Holder Name</Label>
+                            <Input id="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, accountHolderName: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="bankName">Bank Name</Label>
+                            <Input id="bankName" value={currentBankAccount.bankName || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, bankName: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="accountNumber">Account Number</Label>
+                            <Input id="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, accountNumber: e.target.value }))} />
+                        </div>
+                         <div className="space-y-1">
+                            <Label htmlFor="ifscCode">IFSC Code</Label>
+                            <Input id="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, ifscCode: e.target.value }))} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsBankAccountDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleBankAccountSave}>Save Account</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }
