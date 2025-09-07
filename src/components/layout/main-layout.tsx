@@ -73,20 +73,25 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [pathname, router]);
 
   useEffect(() => {
-    if (!authChecked || !user) return; // Only run when auth is checked and user is logged in
-    
-    if (openTabs.length === 0) {
-        const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
-        if(dashboardTab) setOpenTabs([dashboardTab]);
+    if (!authChecked || UNPROTECTED_ROUTES.includes(pathname)) return;
+
+    // Initialize with dashboard tab if no tabs are open
+    if (user && openTabs.length === 0) {
+      const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
+      if (dashboardTab) {
+        setOpenTabs([dashboardTab]);
+        setActiveTabId(dashboardTab.id);
+      }
     }
     
     const currentTab = findTabForPath(pathname);
-
     if (currentTab) {
-        if (!openTabs.some(tab => tab.id === currentTab.id)) {
-            setOpenTabs(prev => [...prev, currentTab]);
-        }
-        setActiveTabId(currentTab.id);
+      // If the tab is not already open, add it
+      if (!openTabs.some(tab => tab.id === currentTab.id)) {
+        setOpenTabs(prev => [...prev, currentTab]);
+      }
+      // Always set the current tab as active
+      setActiveTabId(currentTab.id);
     }
   }, [authChecked, user, pathname]);
 
