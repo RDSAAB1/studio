@@ -9,8 +9,8 @@ import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { DonutChart } from '@tremor/react';
+import { format, subDays } from 'date-fns';
+import { DonutChart, BarChart, AreaChart } from '@tremor/react';
 import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List } from 'lucide-react';
 import { getExpenseCategories } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -111,42 +111,42 @@ export default function DashboardOverviewClient() {
     }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers]);
 
     const chartData = useMemo(() => {
+        const thirtyDaysAgo = subDays(new Date(), 30);
+        const recentTransactions = transactions.filter(t => new Date(t.date) >= thirtyDaysAgo);
+        
+        const dailyData = recentTransactions.reduce((acc, t) => {
+            const date = format(new Date(t.date), 'dd-MMM');
+            if (!acc[date]) {
+                acc[date] = { date, Income: 0, Expense: 0 };
+            }
+            if (t.transactionType === 'Income') {
+                acc[date].Income += t.amount;
+            } else {
+                acc[date].Expense += t.amount;
+            }
+            return acc;
+        }, {} as { [key: string]: { date: string; Income: number; Expense: number } });
+
+        const timeSeriesData = Object.values(dailyData).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
         const expenseBreakdown = transactions.filter(t => t.transactionType === 'Expense').reduce((acc, t) => {
             const category = toTitleCase(t.category || 'Uncategorized');
             if (!acc[category]) acc[category] = 0;
             acc[category] += t.amount;
             return acc;
         }, {} as { [key: string]: number });
-        
-        const incomeBreakdown = transactions.filter(t => t.transactionType === 'Income').reduce((acc, t) => {
-            const category = toTitleCase(t.category || 'Uncategorized');
-            if (!acc[category]) acc[category] = 0;
-            acc[category] += t.amount;
-            return acc;
-        }, {} as { [key: string]: number });
 
-        const assetBreakdown = Array.from(financialState.balances.entries()).map(([key, value]) => {
-             const account = bankAccounts.find(acc => acc.id === key);
-             let name = 'Unknown';
-             if (account) name = account.accountHolderName;
-             else if (key === 'CashInHand') name = 'Cash in Hand';
-             else if (key === 'CashAtHome') name = 'Cash at Home';
-             return { name, value };
-        });
-        assetBreakdown.push({ name: 'Customer Dues', value: financialState.totalCustomerDues });
-        
-        const liabilitiesBreakdown = [
-            { name: 'Loan Liabilities', value: financialState.loanLiabilities },
-            { name: 'Supplier Dues', value: financialState.totalSupplierDues }
+        const financialHealthData = [
+            { name: "Assets", "Cash & Bank": financialState.totalAssets - financialState.totalCustomerDues, "Customer Dues": financialState.totalCustomerDues },
+            { name: "Liabilities", "Loans": financialState.loanLiabilities, "Supplier Dues": financialState.totalSupplierDues }
         ];
 
         return {
+            timeSeriesData,
             expenseBreakdownChartData: Object.entries(expenseBreakdown).map(([name, value]) => ({ name, value })).filter(item => item.value > 0),
-            incomeBreakdownChartData: Object.entries(incomeBreakdown).map(([name, value]) => ({ name, value })).filter(item => item.value > 0),
-            assetBreakdownChartData: assetBreakdown.filter(item => item.value > 0),
-            liabilitiesBreakdownChartData: liabilitiesBreakdown.filter(item => item.value > 0),
+            financialHealthData,
         };
-    }, [transactions, financialState, bankAccounts]);
+    }, [transactions, financialState]);
 
     if (loading) return <div>Loading Dashboard...</div>;
 
@@ -159,56 +159,69 @@ export default function DashboardOverviewClient() {
                 <StatCard title="Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader><CardTitle>Asset Breakdown</CardTitle><CardDescription>Where your assets are located.</CardDescription></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                         <DonutChart className="h-64" data={chartData.assetBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['blue', 'cyan', 'indigo', 'violet', 'fuchsia']} />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <Card className="lg:col-span-3">
+                    <CardHeader><CardTitle>Income vs Expense (Last 30 Days)</CardTitle><CardDescription>Monitor your cash flow over time.</CardDescription></CardHeader>
+                    <CardContent>
+                         <AreaChart
+                            className="h-80"
+                            data={chartData.timeSeriesData}
+                            index="date"
+                            categories={['Income', 'Expense']}
+                            colors={['emerald', 'rose']}
+                            valueFormatter={formatCurrency}
+                            yAxisWidth={60}
+                        />
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader><CardTitle>Liabilities Breakdown</CardTitle><CardDescription>Your financial obligations.</CardDescription></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                       <DonutChart className="h-64" data={chartData.liabilitiesBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['orange', 'rose']} />
+                 <Card className="lg:col-span-2">
+                    <CardHeader><CardTitle>Financial Health</CardTitle><CardDescription>A comparison of your assets and liabilities.</CardDescription></CardHeader>
+                    <CardContent>
+                        <BarChart
+                            className="mt-6 h-80"
+                            data={chartData.financialHealthData}
+                            index="name"
+                            categories={['Cash & Bank', 'Customer Dues', 'Loans', 'Supplier Dues']}
+                            colors={['blue', 'cyan', 'rose', 'orange']}
+                            valueFormatter={formatCurrency}
+                            yAxisWidth={60}
+                            stack={true}
+                        />
                     </CardContent>
                 </Card>
             </div>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader><CardTitle>Income Sources</CardTitle><CardDescription>Where your revenue is coming from.</CardDescription></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                         <DonutChart className="h-64" data={chartData.incomeBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['emerald', 'teal', 'green', 'lime']} />
-                    </CardContent>
-                </Card>
-                <Card>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                 <Card className="lg:col-span-2">
                     <CardHeader><CardTitle>Expense Breakdown</CardTitle><CardDescription>Spending distribution by category.</CardDescription></CardHeader>
                     <CardContent className="flex items-center justify-center">
-                        <DonutChart className="h-64" data={chartData.expenseBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['slate', 'stone', 'gray', 'zinc', 'neutral']} />
+                        <DonutChart className="h-64 mt-6" data={chartData.expenseBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['slate', 'stone', 'gray', 'zinc', 'neutral']} />
+                    </CardContent>
+                </Card>
+
+                 <Card className="lg:col-span-3">
+                    <CardHeader><CardTitle>Recent Activity</CardTitle><CardDescription>The last 10 transactions recorded.</CardDescription></CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Category</TableHead><TableHead>Payee/Payer</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {transactions.slice(0, 10).map((tx) => (
+                                    <TableRow key={tx.id}>
+                                        <TableCell>{format(new Date(tx.date), 'dd-MMM-yy')}</TableCell>
+                                        <TableCell><Badge variant={tx.transactionType === 'Income' ? 'default' : 'destructive'} className={cn(tx.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80', 'text-white')}>{tx.transactionType}</Badge></TableCell>
+                                        <TableCell>{tx.category}</TableCell>
+                                        <TableCell>{tx.payee}</TableCell>
+                                        <TableCell className={cn("text-right font-semibold", tx.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(tx.amount)}</TableCell>
+                                    </TableRow>
+                                ))}
+                                {transactions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No recent transactions found.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
             </div>
-
-            <Card>
-                <CardHeader><CardTitle>Recent Activity</CardTitle><CardDescription>The last 10 transactions recorded.</CardDescription></CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Category</TableHead><TableHead>Payee/Payer</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {transactions.slice(0, 10).map((tx) => (
-                                <TableRow key={tx.id}>
-                                    <TableCell>{format(new Date(tx.date), 'dd-MMM-yy')}</TableCell>
-                                    <TableCell><Badge variant={tx.transactionType === 'Income' ? 'default' : 'destructive'} className={cn(tx.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80', 'text-white')}>{tx.transactionType}</Badge></TableCell>
-                                    <TableCell>{tx.category}</TableCell>
-                                    <TableCell>{tx.payee}</TableCell>
-                                    <TableCell className={cn("text-right font-semibold", tx.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(tx.amount)}</TableCell>
-                                </TableRow>
-                            ))}
-                            {transactions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No recent transactions found.</TableCell></TableRow>}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
         </div>
     );
+}
 
     
