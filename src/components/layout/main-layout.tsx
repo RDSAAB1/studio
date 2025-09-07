@@ -32,7 +32,8 @@ const findTabForPath = (path: string): MenuItem | undefined => {
             if (subItem) return subItem;
         }
     }
-    return undefined;
+    // Default to dashboard if no specific match is found
+    return allMenuItems.find(item => item.id === 'dashboard');
 };
 
 
@@ -60,7 +61,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             } else if (!rtgsSettings) {
                 if (pathname !== '/setup/company-details') router.replace('/setup/company-details');
             } else if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
-                 router.replace('/sales/supplier-entry');
+                 router.replace('/dashboard-overview');
             }
         } else {
             setUser(null);
