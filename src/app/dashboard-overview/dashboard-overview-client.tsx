@@ -102,20 +102,11 @@ export default function DashboardOverviewClient() {
         const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
         const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
 
-        const bankBalances = Array.from(balances.entries())
-            .filter(([key]) => key !== 'CashInHand' && key !== 'CashAtHome')
-            .map(([id, balance]) => {
-                const account = bankAccounts.find(acc => acc.id === id);
-                return { name: account?.accountHolderName || 'Unknown Bank', balance };
-            });
-
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount > 0 ? loan.remainingAmount : 0), 0);
 
         return { 
-            bankBalances,
-            cashInHand: balances.get('CashInHand') || 0,
-            cashAtHome: balances.get('CashAtHome') || 0,
+            balances,
             totalAssets, 
             totalLiabilities,
             totalIncome,
@@ -162,18 +153,26 @@ export default function DashboardOverviewClient() {
                     <StatCard title="Total Income" value={formatCurrency(financialState.totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" />
                     <StatCard title="Total Expense" value={formatCurrency(financialState.totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" />
                     <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
-                    <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office" />
-                    <StatCard title="Cash at Home" value={formatCurrency(financialState.cashAtHome)} icon={<Home />} colorClass="text-orange-500" />
                     <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
                 <CardHeader className="pt-0">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Bank Balances</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Cash &amp; Bank Balances</CardTitle>
                 </CardHeader>
                  <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                     {financialState.bankBalances.map((acc, index) => (
-                        <StatCard key={index} title={acc.name} value={formatCurrency(acc.balance)} icon={<Landmark />} colorClass="text-blue-500" />
-                     ))}
+                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
+                        const account = bankAccounts.find(acc => acc.id === key);
+                        if (account) {
+                            return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
+                        }
+                        if (key === 'CashInHand') {
+                            return <StatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+                        }
+                        if (key === 'CashAtHome') {
+                            return <StatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
+                        }
+                        return null;
+                    })}
                 </CardContent>
             </Card>
 
