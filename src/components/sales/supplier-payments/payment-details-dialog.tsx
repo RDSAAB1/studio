@@ -20,7 +20,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
     </div>
 );
 
-export const PaymentDetailsDialog = ({ payment, customers, onOpenChange, onShowEntryDetails }: any) => {
+export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowEntryDetails }: any) => {
     if (!payment) return null;
 
     return (
@@ -44,21 +44,21 @@ export const PaymentDetailsDialog = ({ payment, customers, onOpenChange, onShowE
                     <TableHeader>
                         <TableRow>
                             <TableHead>SR No</TableHead>
-                            <TableHead>Customer Name</TableHead>
+                            <TableHead>Supplier Name</TableHead>
                             <TableHead className="text-right">Amount Paid</TableHead>
                             <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {payment.paidFor?.map((pf: any, index: number) => {
-                            const customer = customers.find((c: any) => c.srNo === pf.srNo);
+                            const supplier = suppliers.find((c: any) => c.srNo === pf.srNo);
                             return (
                                 <TableRow key={index}>
                                     <TableCell>{pf.srNo}</TableCell>
-                                    <TableCell>{customer ? toTitleCase(customer.name) : 'N/A'}</TableCell>
+                                    <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
                                     <TableCell className="text-center">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowEntryDetails(customer)}>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowEntryDetails(supplier)}>
                                             <Info className="h-4 w-4" />
                                         </Button>
                                     </TableCell>
