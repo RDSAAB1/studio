@@ -171,14 +171,20 @@ export default function IncomeExpenseClient() {
         form.setValue('amount', Number(searchParams.get('amount') || 0));
         form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
         form.setValue('description', searchParams.get('description') || '');
+
+        // Set nature first, then category, then sub-category for reliable cascading
+        form.setValue('expenseNature', 'Permanent');
         
-        // This ensures the category is set, and the subcategory list is populated before setting the subcategory value
-        form.setValue('category', 'Interest & Loan Payments', { shouldValidate: true });
-        
-        const loan = loans.find(l => l.id === loanId);
-        if (loan) {
-            form.setValue('subCategory', loan.loanName, { shouldValidate: true });
-        }
+        // Use a timeout to allow state to update before setting the next field
+        setTimeout(() => {
+            form.setValue('category', 'Interest & Loan Payments');
+            setTimeout(() => {
+                const loan = loans.find(l => l.id === loanId);
+                if (loan) {
+                    form.setValue('subCategory', loan.loanName);
+                }
+            }, 50); // Small delay for sub-category
+        }, 50); // Small delay for category
     }
 }, [searchParams, loans, form, handleNew]);
   
