@@ -104,85 +104,91 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
 
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
-        {/* Top bar for actions and search */}
-        <div className="relative flex h-10 items-center justify-between gap-4 bg-card px-4 sm:px-6">
-            <div className="flex items-center gap-2">
-                <div className="flex-shrink-0 md:hidden">
-                <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">Toggle Menu</span>
-                </Button>
-                </div>
-                {isSearchOpen && (
-                    <div className="relative md:hidden w-full">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="search"
-                            placeholder="Search..."
-                            className="h-8 w-full rounded-full bg-background pl-8"
-                            autoFocus
-                        />
-                        <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setIsSearchOpen(false)}>
-                            <X className="h-4 w-4" />
-                            <span className="sr-only">Close search</span>
-                        </Button>
-                    </div>
-                )}
-            </div>
-
-            <div className="flex-1 flex justify-center">
-                 <DynamicIslandToaster />
-            </div>
-            
-            <div className={cn("flex items-center justify-end gap-2", isSearchOpen && "hidden")}>
-                <div className={cn(
-                "relative hidden flex-1 md:flex md:grow-0 max-w-xs transition-opacity",
-                hasToasts && "opacity-0 pointer-events-none"
-                )}>
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        placeholder="Search..."
-                        className="h-8 w-full rounded-full bg-background pl-8 md:w-[180px] lg:w-[250px]"
-                    />
-                </div>
-                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSearchOpen(true)}>
-                    <Search className="h-5 w-5" />
-                    <span className="sr-only">Search</span>
-                </Button>
-                <NotificationBell />
-                <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">Settings</span>
-                </Button>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <UserCircle className="h-5 w-5" />
-                            <span className="sr-only">Profile</span>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={onSignOut}>
-                            <LogOut className="mr-2 h-4 w-4" />
-                            <span>Sign out</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-        </div>
-
-        {/* Bottom bar for tabs */}
-        <div className="flex h-10 items-center px-4 sm:px-6 border-y border-border">
-            <TabBar 
-                openTabs={openTabs}
-                activeTabId={activeTabId}
-                onTabClick={onTabClick}
-                onCloseTab={onCloseTab}
+      {/* Top bar for actions and search */}
+      <div className="relative flex h-10 items-center justify-between gap-4 bg-card px-4 sm:px-6">
+        {/* Left Section: Search and Mobile Menu */}
+        <div className="flex flex-1 items-center gap-2">
+          <div className="flex-shrink-0 md:hidden">
+            <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle Menu</span>
+            </Button>
+          </div>
+          {/* Desktop Search */}
+          <div className="relative hidden flex-1 md:flex md:grow-0 max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search..."
+              className="h-8 w-full rounded-full bg-background pl-8 md:w-[180px] lg:w-[250px]"
             />
+          </div>
+           {/* Mobile Search Button */}
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSearchOpen(true)}>
+            <Search className="h-5 w-5" />
+            <span className="sr-only">Search</span>
+          </Button>
+
+          {/* Mobile Search Overlay */}
+          {isSearchOpen && (
+              <div className="absolute inset-0 z-20 flex items-center bg-card px-2 md:hidden">
+                  <div className="relative w-full">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                          type="search"
+                          placeholder="Search..."
+                          className="h-8 w-full rounded-full bg-background pl-8"
+                          autoFocus
+                      />
+                      <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setIsSearchOpen(false)}>
+                          <X className="h-4 w-4" />
+                          <span className="sr-only">Close search</span>
+                      </Button>
+                  </div>
+              </div>
+          )}
         </div>
+
+        {/* Center Section: Dynamic Island Toaster */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <DynamicIslandToaster />
+        </div>
+
+        {/* Right Section: Actions */}
+        <div className={cn("flex flex-1 items-center justify-end gap-2", isSearchOpen && "hidden")}>
+          <NotificationBell />
+          <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
+            <Settings className="h-5 w-5" />
+            <span className="sr-only">Settings</span>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <UserCircle className="h-5 w-5" />
+                <span className="sr-only">Profile</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Bottom bar for tabs */}
+      <div className="flex h-10 items-center px-4 sm:px-6 border-y border-border">
+        <TabBar
+          openTabs={openTabs}
+          activeTabId={activeTabId}
+          onTabClick={onTabClick}
+          onCloseTab={onCloseTab}
+        />
+      </div>
     </header>
   );
 }
