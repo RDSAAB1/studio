@@ -29,6 +29,8 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 const suppliersCollection = collection(db, "suppliers");
+const transactionsCollection = collection(db, "transactions");
+
 
 type PaymentOption = {
   quantity: number;
@@ -640,10 +642,12 @@ export default function SupplierPaymentsClient() {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-    
+
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
+
+                // 1. Restore supplier outstanding amounts
                 const supplierDocRefs = new Map<string, string>();
                 const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
                 if (srNos.length > 0) {
@@ -673,9 +677,18 @@ export default function SupplierPaymentsClient() {
                         transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
+
+                // 2. Find and delete the corresponding expense transaction
+                const expenseQuery = query(transactionsCollection, where("description", "==", `Payment ${paymentToDelete.paymentId} to ${paymentToDelete.supplierName}`));
+                const expenseSnapshot = await getDocs(expenseQuery);
+                expenseSnapshot.forEach(doc => {
+                    transaction.delete(doc.ref);
+                });
+
+                // 3. Delete the payment itself
                 transaction.delete(paymentRef);
             });
-    
+
             toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) {
