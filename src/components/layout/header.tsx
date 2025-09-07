@@ -54,10 +54,11 @@ const NotificationBell = () => {
         setOpen(false); // Close the popover on click
         const params = new URLSearchParams({
             loanId: loan.id,
-            amount: String(loan.emiAmount),
+            amount: String(loan.emiAmount || 0),
             payee: loan.lenderName || loan.productName || 'Loan Payment',
             description: `EMI for ${loan.loanName}`
         });
+        // Corrected the path to ensure it always goes to expense-tracker
         router.push(`/expense-tracker?${params.toString()}`);
     };
 
@@ -83,7 +84,7 @@ const NotificationBell = () => {
                              <div key={loan.id} className="p-2 rounded-md hover:bg-accent active:bg-primary/20 cursor-pointer" onClick={() => handleNotificationClick(loan)}>
                                 <p className="text-sm font-semibold">{loan.loanName}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    EMI of {formatCurrency(loan.emiAmount)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
+                                    EMI of {formatCurrency(loan.emiAmount || 0)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
                                 </p>
                             </div>
                         ))
