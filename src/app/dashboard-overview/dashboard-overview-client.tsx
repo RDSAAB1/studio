@@ -144,33 +144,6 @@ export default function DashboardOverviewClient() {
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg"><Scale className="h-5 w-5 text-primary"/>Financial Overview</CardTitle>
-                    <CardDescription>A real-time snapshot of your business's financial health.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-                    <StatCard title="Total Income" value={formatCurrency(financialState.totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" />
-                    <StatCard title="Total Expense" value={formatCurrency(financialState.totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" />
-                    <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
-                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
-                        const account = bankAccounts.find(acc => acc.id === key);
-                        if (account) {
-                            return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
-                        }
-                        if (key === 'CashInHand') {
-                            return <StatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
-                        }
-                        if (key === 'CashAtHome') {
-                            return <StatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
-                        }
-                        return null;
-                    })}
-                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
-                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
-                </CardContent>
-            </Card>
-
              <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-primary"/>Sales & Supplier Overview</CardTitle>
@@ -252,7 +225,3 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
-
-    
-
-    
