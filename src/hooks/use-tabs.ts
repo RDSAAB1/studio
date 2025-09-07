@@ -46,12 +46,6 @@ export type MenuItem = {
 }
 
 export const allMenuItems: MenuItem[] = [
-  { 
-    id: "dashboard", 
-    name: "Dashboard", 
-    icon: LayoutDashboard, 
-    href: "/sales/dashboard-overview" 
-  },
   {
     id: "supplier",
     name: "Supplier",

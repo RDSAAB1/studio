@@ -68,7 +68,7 @@ export default function CompanyDetailsPage() {
         try {
             await updateRtgsSettings(data);
             toast({ title: "Company details saved!", description: "You're all set up." });
-            router.push('/sales/dashboard-overview');
+            router.push('/sales/supplier-entry');
         } catch (error) {
             console.error("Error saving company details:", error);
             toast({ title: "Error", description: "Failed to save details. Please try again.", variant: "destructive" });

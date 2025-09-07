@@ -60,7 +60,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             } else if (!rtgsSettings) {
                 if (pathname !== '/setup/company-details') router.replace('/setup/company-details');
             } else if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
-                 router.replace('/sales/dashboard-overview');
+                 router.replace('/sales/supplier-entry');
             }
         } else {
             setUser(null);

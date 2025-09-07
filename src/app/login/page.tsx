@@ -45,7 +45,7 @@ export default function LoginPage() {
             
             await signInWithPopup(auth, googleProvider);
             // On successful login, the onAuthStateChanged listener in MainLayout will handle redirection
-            router.push('/sales/dashboard-overview');
+            router.push('/sales/supplier-entry');
             
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
