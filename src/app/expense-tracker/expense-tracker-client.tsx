@@ -153,6 +153,15 @@ export default function IncomeExpenseClient() {
   const quantity = form.watch('quantity');
   const rate = form.watch('rate');
 
+  const handleNew = useCallback(() => {
+    setIsEditing(null); 
+    form.reset(getInitialFormState());
+    setIsAdvanced(false);
+    setIsCalculated(false);
+    setIsRecurring(false);
+    setActiveTab("form");
+  }, [form]);
+
   useEffect(() => {
     const loanId = searchParams.get('loanId');
     if (loanId && loans.length > 0) {
@@ -283,15 +292,6 @@ export default function IncomeExpenseClient() {
   useEffect(() => {
     form.setValue('subCategory', '');
   }, [selectedCategory, form]);
-
-  const handleNew = useCallback(() => {
-    setIsEditing(null); 
-    form.reset(getInitialFormState());
-    setIsAdvanced(false);
-    setIsCalculated(false);
-    setIsRecurring(false);
-    setActiveTab("form");
-  }, [form]);
 
   const handleEdit = (transaction: Transaction) => {
     setIsEditing(transaction.id);
