@@ -122,17 +122,11 @@ export default function CashBankClient() {
         balances.set('CashAtHome', 0);
 
         fundTransactions.forEach(t => {
-            if (t.type === 'CapitalInflow') {
-                if (balances.has(t.destination)) {
-                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
-                }
-            } else if (t.type === 'CashTransfer') {
-                 if (balances.has(t.source)) {
-                    balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
-                }
-                if (balances.has(t.destination)) {
-                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
-                }
+            if (balances.has(t.source)) {
+                balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+            }
+            if (balances.has(t.destination)) {
+                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
             }
         });
         
