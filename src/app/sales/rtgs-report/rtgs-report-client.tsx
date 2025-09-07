@@ -148,78 +148,93 @@ export default function RtgsReportClient() {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
             return;
         }
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
-            document.body.removeChild(iframe);
-            return;
-        }
-
-        const title = 'RTGS Payment Report';
-        
-        const tableHtml = node.outerHTML;
-
-        iframeDoc.open();
-        iframeDoc.write(`
-            <html>
-                <head>
-                    <title>${title}</title>
-                    <style>
-                        @media print {
+    
+        const newWindow = window.open('', '_blank', 'height=800,width=1200');
+        if (newWindow) {
+            newWindow.document.open();
+            newWindow.document.write(`
+                <html>
+                    <head>
+                        <title>RTGS Payment Report</title>
+                        <style>
                             @page { 
                                 size: landscape; 
                                 margin: 10mm; 
                             }
                             body { 
-                                -webkit-print-color-adjust: exact !important;
-                                print-color-adjust: exact !important;
                                 font-family: sans-serif;
+                                -webkit-print-color-adjust: exact;
+                                print-color-adjust: exact;
                             }
                             table {
-                                font-size: 8pt !important;
-                                border-collapse: collapse !important;
-                                width: 100% !important;
+                                font-size: 8pt;
+                                border-collapse: collapse;
+                                width: 100%;
                             }
                             th, td {
-                                padding: 4px 6px !important;
-                                border: 1px solid #ccc !important;
-                                white-space: nowrap !important;
+                                padding: 4px 6px;
+                                border: 1px solid #ccc;
+                                white-space: nowrap;
                                 text-align: left;
                             }
                             thead {
-                                background-color: #f2f2f2 !important;
-                                color: #000 !important;
+                                background-color: #f2f2f2;
                             }
                             .print-header {
                                 margin-bottom: 1rem;
                             }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="print-header">
-                      <h2 style="font-size: 1.5rem; font-weight: bold;">${toTitleCase(settings.companyName)} - ${title}</h2>
-                      <p style="font-size: 0.875rem;">Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
-                    </div>
-                    ${tableHtml}
-                </body>
-            </html>
-        `);
-        iframeDoc.close();
+                        </style>
+                    </head>
+                    <body>
+                        <div class="print-header">
+                          <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
+                          <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+                        </div>
+                        ${node.outerHTML}
+                    </body>
+                </html>
+            `);
+            newWindow.document.close();
+            newWindow.focus();
+            setTimeout(() => {
+                newWindow.print();
+                newWindow.close();
+            }, 250);
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not open print window. Please disable pop-up blockers.' });
+        }
+    };
+    
+    const handleDownloadExcel = () => {
+        if (filteredReportRows.length === 0) {
+            toast({ title: "No data to export", variant: "destructive" });
+            return;
+        }
 
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500);
+        const dataToExport = filteredReportRows.map(p => ({
+            'Date': format(new Date(p.date), 'dd-MMM-yy'),
+            'SR No.': p.srNo,
+            'Name': p.supplierName,
+            'Father Name': p.fatherName,
+            'Contact': p.contact,
+            'A/C No.': p.acNo,
+            'IFSC': p.ifscCode,
+            'Bank': p.bank,
+            'Branch': p.branch,
+            'Amount': p.amount,
+            'Check No.': p.checkNo,
+            'Type': p.type,
+            'Rate': p.rate,
+            'Weight': p.weight,
+            '6R No.': p.sixRNo,
+            '6R Date': p.sixRDate ? format(new Date(p.sixRDate), 'dd-MMM-yy') : '',
+            'Parchi No.': p.parchiNo,
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+        XLSX.writeFile(workbook, `RTGS_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     };
 
     if (loading || !settings) {
@@ -305,8 +320,8 @@ export default function RtgsReportClient() {
                     )}
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-auto h-[60vh] border rounded-md" ref={tablePrintRef}>
-                        <Table>
+                    <div className="overflow-auto h-[60vh] border rounded-md">
+                        <Table ref={tablePrintRef}>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date / SR No.</TableHead>
@@ -379,13 +394,73 @@ export default function RtgsReportClient() {
                         <DialogDescription>A preview of the RTGS report table.</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="p-2 border-b flex justify-end gap-2">
+                         <Button variant="outline" onClick={handleDownloadExcel}>
+                            <Download className="mr-2 h-4 w-4" /> Download Excel
+                        </Button>
                         <Button variant="outline" onClick={handlePrint}>
-                            <Download className="mr-2 h-4 w-4" /> Download in pdf
+                            <Printer className="mr-2 h-4 w-4" /> Download in pdf
                         </Button>
                         <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </DialogFooter>
                     <div className="p-4 overflow-auto flex-grow">
-                         <div dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
+                         <div ref={tablePrintRef}>
+                            <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Date / SR No.</TableHead>
+                                    <TableHead>Payee / Father's Name</TableHead>
+                                    <TableHead>Bank / Branch / IFSC</TableHead>
+                                    <TableHead>A/C No. / Mobile</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Check / Parchi No.</TableHead>
+                                    <TableHead>6R No. / Date</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredReportRows.length > 0 ? (
+                                    filteredReportRows.map((row, index) => (
+                                        <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
+                                                <div className="text-xs text-muted-foreground">{row.srNo}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.supplierName}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.fatherName}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.bank}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.branch}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.ifscCode}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.acNo}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.contact}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-bold whitespace-nowrap">{formatCurrency(row.amount)}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
+                                                <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="h-24 text-center">
+                                            No RTGS reports found for the selected filter.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                            </Table>
+                         </div>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -400,3 +475,4 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+
