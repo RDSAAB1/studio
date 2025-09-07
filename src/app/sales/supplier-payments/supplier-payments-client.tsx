@@ -591,7 +591,8 @@ export default function SupplierPaymentsClient() {
             }
 
             // 5. Add new expense transaction
-            const expenseData: Omit<Transaction, 'id'> = {
+            const expenseData: Partial<Transaction> = {
+                id: '', // will be set by firestore
                 date: new Date().toISOString().split('T')[0],
                 transactionType: 'Expense',
                 category: 'Supplier Payments',
@@ -602,10 +603,15 @@ export default function SupplierPaymentsClient() {
                 paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
                 status: 'Paid',
                 isRecurring: false,
-                bankAccountId: paymentMethod !== 'Cash' ? selectedAccountId : undefined,
             };
+            
+            if (paymentMethod !== 'Cash') {
+                expenseData.bankAccountId = selectedAccountId;
+            }
+
             const newTransactionRef = doc(collection(db, 'transactions'));
-            transaction.set(newTransactionRef, { ...expenseData, id: newTransactionRef.id });
+            expenseData.id = newTransactionRef.id;
+            transaction.set(newTransactionRef, expenseData);
         });
 
         toast({ title: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, variant: 'success' });
@@ -675,7 +681,7 @@ export default function SupplierPaymentsClient() {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-
+    
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
@@ -999,5 +1005,7 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
 
     
