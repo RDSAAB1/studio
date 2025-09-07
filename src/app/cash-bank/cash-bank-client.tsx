@@ -18,11 +18,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 
-import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowDown, ArrowUp, Save, Banknote, Edit, Trash2 } from "lucide-react";
+import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home } from "lucide-react";
 import { format, addMonths } from "date-fns";
 
 import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime } from "@/lib/firestore";
-import { cashBankFormSchemas, type WithdrawalValues, type DepositValues } from "./formSchemas";
+import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 
@@ -35,18 +35,6 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
         <CardContent>
             <div className={`text-3xl font-bold ${colorClass}`}>{value}</div>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
-        </CardContent>
-    </Card>
-);
-
-const TransactionFormCard = ({ title, description, children }: { title: string, description: string, children: React.ReactNode}) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-            {children}
         </CardContent>
     </Card>
 );
@@ -108,8 +96,7 @@ export default function CashBankClient() {
         };
     }, []);
 
-    const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(cashBankFormSchemas.withdrawalSchema), defaultValues: { amount: 0, description: "" } });
-    const depositForm = useForm<DepositValues>({ resolver: zodResolver(cashBankFormSchemas.depositSchema), defaultValues: { amount: 0, description: "" } });
+    const transferForm = useForm<TransferValues>({ resolver: zodResolver(cashBankFormSchemas.transferSchema), defaultValues: { amount: 0, description: "" } });
     
     const loansWithCalculatedRemaining = useMemo(() => {
         return loans.map(loan => {
@@ -124,17 +111,25 @@ export default function CashBankClient() {
     const financialState = useMemo(() => {
         let bankBalance = 0;
         let cashInHand = 0;
+        let cashAtHome = 0;
         
         fundTransactions.forEach(t => {
+            // Inflows
             if (t.type === 'CapitalInflow') {
                 if(t.destination === 'BankAccount') bankBalance += t.amount;
                 if(t.destination === 'CashInHand') cashInHand += t.amount;
-            } else if (t.type === 'BankWithdrawal') {
-                bankBalance -= t.amount;
-                cashInHand += t.amount;
-            } else if (t.type === 'BankDeposit') {
-                cashInHand -= t.amount;
-                bankBalance += t.amount;
+                if(t.destination === 'CashAtHome') cashAtHome += t.amount;
+            } 
+            // Transfers
+            else if (t.type === 'CashTransfer' || t.type === 'BankWithdrawal' || t.type === 'BankDeposit') {
+                // Decrease from source
+                if (t.source === 'BankAccount') bankBalance -= t.amount;
+                if (t.source === 'CashInHand') cashInHand -= t.amount;
+                if (t.source === 'CashAtHome') cashAtHome -= t.amount;
+                // Increase at destination
+                if(t.destination === 'BankAccount') bankBalance += t.amount;
+                if(t.destination === 'CashInHand') cashInHand += t.amount;
+                if(t.destination === 'CashAtHome') cashAtHome += t.amount;
             }
         });
         
@@ -150,7 +145,7 @@ export default function CashBankClient() {
         
         const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
         
-        return { bankBalance, cashInHand, totalAssets: bankBalance + cashInHand, totalLiabilities };
+        return { bankBalance, cashInHand, cashAtHome, totalAssets: bankBalance + cashInHand + cashAtHome, totalLiabilities };
     }, [fundTransactions, transactions, loansWithCalculatedRemaining]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
@@ -165,15 +160,26 @@ export default function CashBankClient() {
             });
     };
 
-    const onWithdrawalSubmit = (values: WithdrawalValues) => {
-        handleAddFundTransaction({ type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: values.amount, description: values.description })
-          .then(() => withdrawalForm.reset({ amount: 0, description: "" }));
+    const onTransferSubmit = (values: TransferValues) => {
+        if (values.source === values.destination) {
+            toast({ title: "Source and destination cannot be the same", variant: "destructive" });
+            return;
+        }
+
+        let availableBalance = 0;
+        if(values.source === 'BankAccount') availableBalance = financialState.bankBalance;
+        if(values.source === 'CashInHand') availableBalance = financialState.cashInHand;
+        if(values.source === 'CashAtHome') availableBalance = financialState.cashAtHome;
+
+        if (values.amount > availableBalance) {
+             toast({ title: "Insufficient funds in the source account", variant: "destructive" });
+            return;
+        }
+        
+        handleAddFundTransaction({ type: 'CashTransfer', source: values.source, destination: values.destination, amount: values.amount, description: values.description })
+          .then(() => transferForm.reset({ amount: 0, description: "" }));
     };
 
-    const onDepositSubmit = (values: DepositValues) => {
-        handleAddFundTransaction({ type: 'BankDeposit', source: 'CashInHand', destination: 'BankAccount', amount: values.amount, description: values.description })
-          .then(() => depositForm.reset({ amount: 0, description: "" }));
-    };
 
     const handleLoanInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (!currentLoan) return;
@@ -207,7 +213,7 @@ export default function CashBankClient() {
             const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                 type: 'CapitalInflow',
                 source: 'OwnerCapital',
-                destination: currentLoan.paymentMethod === 'Bank' ? 'BankAccount' : 'CashInHand',
+                destination: currentLoan.paymentMethod as any,
                 amount: currentLoan.totalAmount || 0,
                 description: `Owner's capital contribution`
             };
@@ -252,12 +258,12 @@ export default function CashBankClient() {
                     const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                         type: 'CapitalInflow',
                         source: currentLoan.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
-                        destination: currentLoan.paymentMethod === 'Bank' ? 'BankAccount' : 'CashInHand',
+                        destination: currentLoan.paymentMethod as any,
                         amount: currentLoan.totalAmount || 0,
                         description: `Capital inflow from ${loanNameToSave}`
                     };
                     await addFundTransaction(capitalInflowData);
-                    toast({ title: "Capital inflow recorded", description: `${formatCurrency(currentLoan.totalAmount || 0)} added to ${currentLoan.paymentMethod === 'Bank' ? 'Bank Account' : 'Cash in Hand'}.`, variant: 'success' });
+                    toast({ title: "Capital inflow recorded", description: `${formatCurrency(currentLoan.totalAmount || 0)} added to ${toTitleCase(currentLoan.paymentMethod?.replace(/([A-Z])/g, ' $1').trim())}.`, variant: 'success' });
                 }
             }
             setIsLoanDialogOpen(false);
@@ -292,9 +298,10 @@ export default function CashBankClient() {
                     <CardTitle className="flex items-center gap-2"><Scale className="h-5 w-5 text-primary"/>Financial Overview</CardTitle>
                     <CardDescription>A real-time overview of your business's financial health.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <StatCard title="Total Bank Balance" value={formatCurrency(financialState.bankBalance)} icon={<Landmark />} colorClass="text-blue-500" />
-                    <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" />
+                    <StatCard title="Cash in Hand" value={formatCurrency(financialState.cashInHand)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+                    <StatCard title="Cash at Home" value={formatCurrency(financialState.cashAtHome)} icon={<Home />} colorClass="text-orange-500" />
                     <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
@@ -306,37 +313,54 @@ export default function CashBankClient() {
                     <TabsTrigger value="loans">Loan & Capital Management</TabsTrigger>
                 </TabsList>
                 <TabsContent value="funds" className="mt-6">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <TransactionFormCard title="Withdraw from Bank" description="Move funds from your bank to cash in hand.">
-                            <form onSubmit={withdrawalForm.handleSubmit(onWithdrawalSubmit)} className="space-y-4">
-                                <div className="space-y-1">
-                                <Label htmlFor="withdrawal-amount">Amount <span className="text-destructive">*</span></Label>
-                                    <Input id="withdrawal-amount" type="number" {...withdrawalForm.register('amount')} />
-                                    {withdrawalForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{withdrawalForm.formState.errors.amount.message}</p>}
-                                </div>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <ArrowLeftRight className="h-5 w-5 text-primary"/>Fund Transfer
+                            </CardTitle>
+                            <CardDescription>Move funds between your accounts.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                           <form onSubmit={transferForm.handleSubmit(onTransferSubmit)} className="space-y-4">
+                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                   <div className="space-y-1">
+                                        <Label>From</Label>
+                                        <Controller name="source" control={transferForm.control} render={({ field }) => (
+                                           <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Select Source" /></SelectTrigger>
+                                             <SelectContent>
+                                                 <SelectItem value="BankAccount">Bank Account</SelectItem>
+                                                 <SelectItem value="CashInHand">Cash in Hand (Mill)</SelectItem>
+                                                 <SelectItem value="CashAtHome">Cash at Home</SelectItem>
+                                             </SelectContent>
+                                           </Select>
+                                        )} />
+                                   </div>
                                     <div className="space-y-1">
-                                    <Label htmlFor="withdrawal-description">Description</Label>
-                                    <Textarea id="withdrawal-description" {...withdrawalForm.register('description')} />
-                                </div>
-                                <Button type="submit"><ArrowDown className="mr-2"/> Withdraw</Button>
-                            </form>
-                        </TransactionFormCard>
-
-                        <TransactionFormCard title="Deposit to Bank" description="Move cash from hand to your bank account.">
-                            <form onSubmit={depositForm.handleSubmit(onDepositSubmit)} className="space-y-4">
-                                    <div className="space-y-1">
-                                    <Label htmlFor="deposit-amount">Amount <span className="text-destructive">*</span></Label>
-                                    <Input id="deposit-amount" type="number" {...depositForm.register('amount')} />
-                                    {depositForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{depositForm.formState.errors.amount.message}</p>}
-                                </div>
+                                        <Label>To</Label>
+                                        <Controller name="destination" control={transferForm.control} render={({ field }) => (
+                                           <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Select Destination" /></SelectTrigger>
+                                             <SelectContent>
+                                                 <SelectItem value="BankAccount">Bank Account</SelectItem>
+                                                 <SelectItem value="CashInHand">Cash in Hand (Mill)</SelectItem>
+                                                 <SelectItem value="CashAtHome">Cash at Home</SelectItem>
+                                             </SelectContent>
+                                           </Select>
+                                        )} />
+                                   </div>
+                                   <div className="space-y-1">
+                                        <Label htmlFor="transfer-amount">Amount <span className="text-destructive">*</span></Label>
+                                        <Input id="transfer-amount" type="number" {...transferForm.register('amount')} />
+                                        {transferForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{transferForm.formState.errors.amount.message}</p>}
+                                    </div>
+                               </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="deposit-description">Description</Label>
-                                    <Textarea id="deposit-description" {...depositForm.register('description')} />
+                                    <Label htmlFor="transfer-description">Description</Label>
+                                    <Textarea id="transfer-description" {...transferForm.register('description')} />
                                 </div>
-                                <Button type="submit"><ArrowUp className="mr-2"/> Deposit</Button>
+                                <Button type="submit">Transfer Funds</Button>
                             </form>
-                        </TransactionFormCard>
-                    </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
                  <TabsContent value="loans" className="mt-6">
                     <Card>
@@ -411,6 +435,7 @@ export default function CashBankClient() {
                                                 {t.type === 'CapitalInflow' && <PlusCircle className="h-4 w-4 text-green-500"/>}
                                                 {t.type === 'BankWithdrawal' && <MinusCircle className="h-4 w-4 text-red-500"/>}
                                                 {t.type === 'BankDeposit' && <PlusCircle className="h-4 w-4 text-blue-500"/>}
+                                                {t.type === 'CashTransfer' && <ArrowLeftRight className="h-4 w-4 text-purple-500"/>}
                                                 <span className="font-medium">{toTitleCase(t.type.replace(/([A-Z])/g, ' $1').trim())}</span>
                                             </div>
                                             <p className="text-xs text-muted-foreground">{t.source && toTitleCase(t.source.replace(/([A-Z])/g, ' $1').trim())} &rarr; {t.destination && toTitleCase(t.destination.replace(/([A-Z])/g, ' $1').trim())}</p>
@@ -488,12 +513,13 @@ export default function CashBankClient() {
                                 <Input id="startDate" name="startDate" type="date" value={currentLoan?.startDate || ''} onChange={(e) => setCurrentLoan(prev => ({...prev, startDate: e.target.value}))} />
                             </div>
                              <div className="space-y-1">
-                                <Label>Payment Method</Label>
-                                <Select name="paymentMethod" value={currentLoan?.paymentMethod || 'Bank'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, paymentMethod: value as 'Bank' | 'Cash'}))}>
+                                <Label>Deposit To</Label>
+                                <Select name="paymentMethod" value={currentLoan?.paymentMethod || 'BankAccount'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, paymentMethod: value as any}))}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="Bank">Bank Account</SelectItem>
-                                    <SelectItem value="Cash">Cash in Hand</SelectItem>
+                                    <SelectItem value="BankAccount">Bank Account</SelectItem>
+                                    <SelectItem value="CashInHand">Cash in Hand</SelectItem>
+                                    <SelectItem value="CashAtHome">Cash at Home</SelectItem>
                                   </SelectContent>
                                 </Select>
                             </div>

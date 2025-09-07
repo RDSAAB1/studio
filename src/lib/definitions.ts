@@ -114,9 +114,9 @@ export type ExpenseCategory = {
 export type FundTransaction = {
     id: string;
     date: string;
-    type: 'CapitalInflow' | 'BankWithdrawal' | 'BankDeposit';
-    source: 'OwnerCapital' | 'BankLoan' | 'ExternalLoan' | 'BankAccount' | 'CashInHand';
-    destination: 'BankAccount' | 'CashInHand';
+    type: 'CapitalInflow' | 'BankWithdrawal' | 'BankDeposit' | 'CashTransfer';
+    source: 'OwnerCapital' | 'BankLoan' | 'ExternalLoan' | 'BankAccount' | 'CashInHand' | 'CashAtHome';
+    destination: 'BankAccount' | 'CashInHand' | 'CashAtHome';
     amount: number;
     description?: string;
 }
@@ -373,7 +373,7 @@ export type Task = {
 export type Loan = {
     id: string;
     loanName: string;
-    loanType: 'Product' | 'Bank' | 'Outsider';
+    loanType: 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital';
     bankLoanType?: 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit';
     lenderName?: string; // For Bank or Outsider
     productName?: string; // For Product loan
@@ -385,6 +385,6 @@ export type Loan = {
     emiAmount: number; // Only for Product loan
     startDate: string;
     status?: 'Active' | 'Paid';
-    paymentMethod: 'Bank' | 'Cash';
+    paymentMethod: 'BankAccount' | 'CashInHand' | 'CashAtHome';
     nextEmiDueDate?: string;
 }
