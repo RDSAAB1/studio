@@ -89,7 +89,7 @@ export const PaymentForm = ({
                     </div>
                     {cdEnabled && <>
                         <div className="space-y-1"><Label htmlFor="cd-percent" className="text-xs">CD %</Label><Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>
-                        <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt} disabled={paymentType === 'Partial'}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
                         <div className="space-y-1"><Label className="text-xs">CD Amount</Label><Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" /></div>
                     </>}
                 </>

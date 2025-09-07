@@ -289,12 +289,6 @@ export default function SupplierPaymentsClient() {
   }, [fundTransactions, transactions, bankAccounts]);
 
   useEffect(() => {
-    if (paymentType === 'Partial') {
-      setCdAt('paid_amount');
-    }
-  }, [paymentType]);
-
-  useEffect(() => {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
   
