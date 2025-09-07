@@ -81,11 +81,11 @@ export default function DashboardOverviewClient() {
 
         transactions.forEach(t => {
             if (t.transactionType === 'Income') {
-                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
+                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance += t.amount;
                 if (t.paymentMethod === 'Cash') cashInHand += t.amount;
             } else if (t.transactionType === 'Expense') {
-                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand += t.amount;
+                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance -= t.amount;
+                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
             }
         });
         
@@ -226,3 +226,4 @@ export default function DashboardOverviewClient() {
             </div>
         </div>
     );
+

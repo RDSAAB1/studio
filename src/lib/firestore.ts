@@ -360,6 +360,14 @@ export function getTransactionsRealtime(callback: (transactions: Transaction[]) 
   }, onError);
 }
 
+export async function addTransaction(transactionData: Omit<Transaction, 'id'>): Promise<Transaction> {
+    const docRef = await addDoc(transactionsCollection, transactionData);
+    const finalTransaction = { ...transactionData, id: docRef.id };
+    await updateDoc(docRef, { id: docRef.id });
+    return finalTransaction;
+}
+
+
 // --- Fund Transaction Functions ---
 
 export function getFundTransactionsRealtime(callback: (transactions: FundTransaction[]) => void, onError: (error: Error) => void): () => void {

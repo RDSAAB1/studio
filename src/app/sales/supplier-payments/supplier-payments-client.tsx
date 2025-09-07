@@ -5,9 +5,9 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime } from '@/lib/firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction } from '@/lib/firestore';
 import { db } from "@/lib/firebase";
-import { collection, runTransaction, doc, getDocs, query, where } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, addDoc } from "firebase/firestore";
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -264,10 +264,10 @@ export default function SupplierPaymentsClient() {
         
         transactions.forEach(t => {
             if (t.transactionType === 'Income') {
-                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance += t.amount;
+                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance += t.amount;
                 if (t.paymentMethod === 'Cash') cashInHand += t.amount;
             } else if (t.transactionType === 'Expense') {
-                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
+                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance -= t.amount;
                  if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
             }
         });
@@ -554,6 +554,23 @@ export default function SupplierPaymentsClient() {
                     transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
                     finalPaymentData = { id: newPaymentRef.id, ...paymentData };
                 }
+
+                // Add expense transaction
+                const expenseData: Omit<Transaction, 'id'> = {
+                    date: new Date().toISOString().split('T')[0],
+                    transactionType: 'Expense',
+                    category: 'Supplier Payments',
+                    subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
+                    amount: finalPaymentAmount,
+                    payee: supplierDetails.name,
+                    description: `Payment ${paymentData.paymentId} to ${supplierDetails.name}`,
+                    paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
+                    status: 'Paid',
+                    isRecurring: false,
+                };
+                const newTransactionRef = doc(collection(db, 'transactions'));
+                transaction.set(newTransactionRef, { ...expenseData, id: newTransactionRef.id });
+
             });
 
             toast({ title: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, variant: 'success' });
