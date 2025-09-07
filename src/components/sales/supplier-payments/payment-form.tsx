@@ -73,25 +73,6 @@ export const PaymentForm = ({
                     <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs font-mono" /></div>
                     <div className="space-y-1"><Label className="text-xs">Payment Type</Label><Select value={paymentType} onValueChange={setPaymentType}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full">Full</SelectItem><SelectItem value="Partial">Partial</SelectItem></SelectContent></Select></div>
                     {paymentType === 'Partial' && (<div className="space-y-1"><Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label><Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" /></div>)}
-                    <div className="flex items-center space-x-2 pb-1">
-                         <button
-                            type="button"
-                            onClick={() => setCdEnabled(!cdEnabled)}
-                            className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
-                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
-                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !cdEnabled ? 'text-primary' : 'text-muted-foreground')}>Off</span>
-                            <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", cdEnabled ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
-                                <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", cdEnabled ? 'bg-primary' : 'bg-secondary' )}>
-                                    <span className="text-xs font-bold text-primary-foreground">CD</span>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                    {cdEnabled && <>
-                        <div className="space-y-1"><Label htmlFor="cd-percent" className="text-xs">CD %</Label><Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>
-                        <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
-                        <div className="space-y-1"><Label className="text-xs">CD Amount</Label><Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" /></div>
-                    </>}
                 </>
                 )}
                  {paymentMethod !== 'Cash' && (
@@ -114,6 +95,88 @@ export const PaymentForm = ({
                 )}
                 </CardContent>
             </Card>
+            
+            <Card className="p-2 mt-3">
+                <CardHeader className="p-1 pb-2 flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm">Cash Discount (CD)</CardTitle>
+                    <div className="flex items-center space-x-2 pb-1">
+                         <button
+                            type="button"
+                            onClick={() => setCdEnabled(!cdEnabled)}
+                            className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
+                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
+                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !cdEnabled ? 'text-primary' : 'text-muted-foreground')}>Off</span>
+                            <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", cdEnabled ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
+                                <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", cdEnabled ? 'bg-primary' : 'bg-secondary' )}>
+                                    <span className="text-xs font-bold text-primary-foreground">CD</span>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </CardHeader>
+                {cdEnabled && (
+                    <CardContent className="p-1 grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div className="space-y-1"><Label htmlFor="cd-percent" className="text-xs">CD %</Label><Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>
+                        <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-xs">CD Amount</Label><Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" /></div>
+                    </CardContent>
+                )}
+            </Card>
+
+            {paymentMethod === 'RTGS' && (
+                <Card className="mt-3">
+                    <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
+                        <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
+                        <div className="flex items-center gap-2">
+                                <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                <Switch id="round-figure-toggle" checked={roundFigureToggle} onCheckedChange={setRoundFigureToggle} />
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-2 space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Target Amount</Label>
+                                <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Min Amount</Label>
+                                <Input type="number" value={calcMinRate} onChange={(e) => setCalcMinRate(Number(e.target.value))} className="h-8 text-xs" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Max Amount</Label>
+                                <Input type="number" value={calcMaxRate} onChange={(e) => setCalcMaxRate(Number(e.target.value))} className="h-8 text-xs" />
+                            </div>
+                        </div>
+                        <Button onClick={handleGeneratePaymentOptions} size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4" />Generate Combinations</Button>
+                        <div className="p-2 border rounded-lg bg-background min-h-[100px] max-h-60 overflow-y-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('quantity')} className="text-xs p-1">Qty <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('rate')} className="text-xs p-1">Rate <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('calculatedAmount')} className="text-xs p-1">Amount <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('amountRemaining')} className="text-xs p-1">Remain <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                        <TableHead className="h-8 p-1">Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {sortedPaymentOptions.length > 0 ? sortedPaymentOptions.map((option: any, index: number) => (
+                                        <TableRow key={index}>
+                                            <TableCell className="p-1 text-xs">{option.quantity.toFixed(2)}</TableCell>
+                                            <TableCell className="p-1 text-xs">{option.rate}</TableCell>
+                                            <TableCell className="p-1 text-xs">{formatCurrency(option.calculatedAmount)}</TableCell>
+                                            <TableCell className="p-1 text-xs">{formatCurrency(option.amountRemaining)}</TableCell>
+                                            <TableCell className="p-1 text-xs"><Button variant="outline" size="sm" className="h-6 p-1 text-xs" onClick={() => selectPaymentAmount(option)}>Select</Button></TableCell>
+                                        </TableRow>
+                                    )) : (
+                                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs h-24">Generated payment combinations will appear here.</TableCell></TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {paymentMethod === 'RTGS' && (
                 <>
@@ -150,58 +213,6 @@ export const PaymentForm = ({
                                 </Popover>
                             </div>
                             <div className="space-y-1 col-span-2 md:col-span-4"><Label className="text-xs">Parchi No. (SR#)</Label><Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs"/></div>
-                        </CardContent>
-                    </Card>
-                    <Card className="mt-3">
-                        <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
-                            <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
-                            <div className="flex items-center gap-2">
-                                 <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
-                                 <Switch id="round-figure-toggle" checked={roundFigureToggle} onCheckedChange={setRoundFigureToggle} />
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-2 space-y-2">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Target Amount</Label>
-                                    <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Min Amount</Label>
-                                    <Input type="number" value={calcMinRate} onChange={(e) => setCalcMinRate(Number(e.target.value))} className="h-8 text-xs" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Max Amount</Label>
-                                    <Input type="number" value={calcMaxRate} onChange={(e) => setCalcMaxRate(Number(e.target.value))} className="h-8 text-xs" />
-                                </div>
-                            </div>
-                            <Button onClick={handleGeneratePaymentOptions} size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4" />Generate Combinations</Button>
-                            <div className="p-2 border rounded-lg bg-background min-h-[100px] max-h-60 overflow-y-auto">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('quantity')} className="text-xs p-1">Qty <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                            <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('rate')} className="text-xs p-1">Rate <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                            <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('calculatedAmount')} className="text-xs p-1">Amount <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                            <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('amountRemaining')} className="text-xs p-1">Remain <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                            <TableHead className="h-8 p-1">Action</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {sortedPaymentOptions.length > 0 ? sortedPaymentOptions.map((option: any, index: number) => (
-                                            <TableRow key={index}>
-                                                <TableCell className="p-1 text-xs">{option.quantity.toFixed(2)}</TableCell>
-                                                <TableCell className="p-1 text-xs">{option.rate}</TableCell>
-                                                <TableCell className="p-1 text-xs">{formatCurrency(option.calculatedAmount)}</TableCell>
-                                                <TableCell className="p-1 text-xs">{formatCurrency(option.amountRemaining)}</TableCell>
-                                                <TableCell className="p-1 text-xs"><Button variant="outline" size="sm" className="h-6 p-1 text-xs" onClick={() => selectPaymentAmount(option)}>Select</Button></TableCell>
-                                            </TableRow>
-                                        )) : (
-                                            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs h-24">Generated payment combinations will appear here.</TableCell></TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
                         </CardContent>
                     </Card>
                 </>

@@ -521,7 +521,7 @@ export default function SupplierPaymentsClient() {
 
             // 2. Revert previous payment amounts if editing
             if (tempEditingPayment && rtgsFor === 'Supplier') {
-                for (const detail of tempEditingPayment.paidFor || []) {
+                 for (const detail of tempEditingPayment.paidFor || []) {
                     const supplier = suppliers.find(s => s.srNo === detail.srNo);
                     if (supplier && supplierDocs.has(supplier.id)) {
                         const currentNetAmount = Number(supplierDocs.get(supplier.id).netAmount) || 0;
@@ -716,7 +716,7 @@ export default function SupplierPaymentsClient() {
                         const docId = supplierDocRefs.get(detail.srNo)!;
                         const supplierDocRef = doc(db, "suppliers", docId);
                         const currentNetAmount = Number(supplierData.netAmount) || 0;
-                        const amountToRestore = detail.amount;
+                        const amountToRestore = detail.amount + (detail.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
                         transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
@@ -791,11 +791,11 @@ export default function SupplierPaymentsClient() {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setPaymentAmount(option.calculatedAmount);
+        setPaymentAmount(option.calculatedAmount); // This will trigger the CD calculation useEffect
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
         setRtgsAmount(option.calculatedAmount);
-        setCdAt('full_amount');
+        setCdAt('full_amount'); // Set CD type when selecting from generator
         toast({ title: `Amount ${formatCurrency(option.calculatedAmount)} selected.`, variant: 'success' });
     };
 
