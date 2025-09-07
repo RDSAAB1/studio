@@ -86,17 +86,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
 
   useEffect(() => {
-    if (!authChecked || !user || UNPROTECTED_ROUTES.includes(pathname)) return;
+    if (!authChecked || UNPROTECTED_ROUTES.includes(pathname)) return;
 
     const currentTabInfo = findTabForPath(pathname);
-
+    
     if (currentTabInfo) {
       setActiveTabId(currentTabInfo.id);
-      if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
-        setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
-      }
+      
+      setOpenTabs(prevTabs => {
+        if (prevTabs.some(tab => tab.id === currentTabInfo.id)) {
+          return prevTabs;
+        }
+        return [...prevTabs, currentTabInfo];
+      });
     }
-  }, [pathname, authChecked, user, openTabs]);
+  }, [pathname, authChecked]);
 
   const handleTabClick = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
