@@ -173,9 +173,12 @@ export default function IncomeExpenseClient() {
   
   useEffect(() => {
     if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
-        const loan = loans.find(l => l.loanName === selectedSubCategory);
-        if (loan) {
-            form.setValue('loanId', loan.id);
+        const matchingLoans = loans.filter(l => l.loanName === selectedSubCategory);
+        if (matchingLoans.length > 0) {
+             // If there are multiple loans with the same name, we can't definitively pick one here.
+             // The ideal solution would be to make loan names unique or provide more context.
+             // For now, we'll pick the first one, but this might need refinement.
+            form.setValue('loanId', matchingLoans[0].id);
         } else {
             form.setValue('loanId', '');
         }
@@ -203,7 +206,8 @@ export default function IncomeExpenseClient() {
 
   const availableSubCategories = useMemo(() => {
     if (selectedCategory === 'Interest & Loan Payments') {
-        return loans.map(l => l.loanName);
+        const uniqueLoanNames = Array.from(new Set(loans.map(l => l.loanName)));
+        return uniqueLoanNames;
     }
     const categoryObj = availableCategories.find(c => c.name === selectedCategory);
     return categoryObj?.subCategories || [];
@@ -796,3 +800,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
