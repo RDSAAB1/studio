@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, type ReactNode } from "react";
+import React, { useState, useEffect, type ReactNode, useCallback } from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import CustomSidebar from "./custom-sidebar";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,21 @@ type MainLayoutProps = {
 const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
 const SETUP_ROUTES = ['/setup/connect-gmail', '/setup/company-details'];
 
+const findTabForPath = (path: string): MenuItem | undefined => {
+    const basePath = path.split('?')[0];
+    for (const item of allMenuItems) {
+        if (item.href === basePath) {
+            return item;
+        }
+        if (item.subMenus) {
+            const subItem = item.subMenus.find(sub => sub.href === basePath);
+            if (subItem) return subItem;
+        }
+    }
+    return undefined;
+};
+
+
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
@@ -35,18 +50,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         if (currentUser) {
             setUser(currentUser);
-            // Check for setup completion only if user is logged in
             const companySettings = await getCompanySettings(currentUser.uid);
             const rtgsSettings = await getRtgsSettings();
 
             if (!companySettings || !companySettings.appPassword) {
-                if (pathname !== '/setup/connect-gmail') {
-                    router.replace('/setup/connect-gmail');
-                }
+                if (pathname !== '/setup/connect-gmail') router.replace('/setup/connect-gmail');
             } else if (!rtgsSettings) {
-                if (pathname !== '/setup/company-details') {
-                    router.replace('/setup/company-details');
-                }
+                if (pathname !== '/setup/company-details') router.replace('/setup/company-details');
             } else if (UNPROTECTED_ROUTES.includes(pathname)) {
                  router.replace('/sales/dashboard-overview');
             }
@@ -63,38 +73,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [pathname, router]);
 
   useEffect(() => {
-    if (loading || UNPROTECTED_ROUTES.includes(pathname)) return;
-
-    const basePath = pathname.split('?')[0];
-
-    let currentTab: MenuItem | undefined;
-    for (const item of allMenuItems) {
-        if (item.href === basePath) {
-            currentTab = item;
-            break;
-        }
-        if (item.subMenus) {
-            currentTab = item.subMenus.find(sub => sub.href === basePath);
-            if (currentTab) break;
-        }
+    if (!authChecked || !user) return; // Only run when auth is checked and user is logged in
+    
+    if (openTabs.length === 0) {
+        const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
+        if(dashboardTab) setOpenTabs([dashboardTab]);
     }
     
+    const currentTab = findTabForPath(pathname);
+
     if (currentTab) {
-        if (!openTabs.some(tab => tab.id === currentTab!.id)) {
-            setOpenTabs(prev => [...prev, currentTab!]);
+        if (!openTabs.some(tab => tab.id === currentTab.id)) {
+            setOpenTabs(prev => [...prev, currentTab]);
         }
         setActiveTabId(currentTab.id);
-    } else if (openTabs.length === 0 && basePath !== '/' && user) {
-        // If no tab matches and we are not on the root, maybe select a default
-        const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-        if (dashboard) {
-            setOpenTabs([dashboard]);
-            setActiveTabId(dashboard.id);
-            router.replace(dashboard.href!);
-        }
     }
-}, [user, loading, pathname, router]);
-
+  }, [authChecked, user, pathname]);
 
   const handleTabClick = (tabId: string) => {
     setActiveTabId(tabId);
@@ -109,23 +103,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
     
     if (tabId === 'dashboard') return;
 
-    const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
-    let newActiveTabId = activeTabId;
-    let newPath = '';
-    
-    if(activeTabId === tabId) {
-        newActiveTabId = openTabs[tabIndex - 1]?.id || 'dashboard';
-        const newActiveTab = allMenuItems.flatMap(i => i.subMenus || i).find(t => t.id === newActiveTabId);
-        newPath = newActiveTab?.href || '/';
-    } else {
-        const currentActiveTab = openTabs.find(tab => tab.id === activeTabId);
-        if (currentActiveTab) newPath = currentActiveTab.href || '/';
-    }
-    
-    const newOpenTabs = openTabs.filter(tab => tab.id !== tabId);
-    setOpenTabs(newOpenTabs);
-    setActiveTabId(newActiveTabId);
-    if (newPath) router.push(newPath);
+    setOpenTabs(prevTabs => {
+        const tabIndex = prevTabs.findIndex(tab => tab.id === tabId);
+        const newTabs = prevTabs.filter(tab => tab.id !== tabId);
+
+        if (activeTabId === tabId) {
+            const newActiveTab = newTabs[tabIndex - 1] || newTabs[0];
+            if (newActiveTab && newActiveTab.href) {
+                router.push(newActiveTab.href);
+            }
+        }
+        return newTabs;
+    });
   };
 
   const handleSidebarItemClick = (item: MenuItem) => {
@@ -137,7 +126,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
       if (window.innerWidth < 1024) {
           setIsSidebarActive(false);
       } else {
-        // Collapse sidebar on item click on desktop as well
         setIsSidebarActive(false);
       }
     }
@@ -149,7 +137,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     try {
       const auth = getFirebaseAuth();
       await signOut(auth);
-      setOpenTabs([]); // Clear tabs on sign out
+      setOpenTabs([]);
       router.replace('/login');
     } catch (error) {
       console.error("Error signing out: ", error);
@@ -164,11 +152,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
       );
   }
   
-  if (!user && !SETUP_ROUTES.includes(pathname)) {
-    return <>{children}</>;
+  if (!user && !UNPROTECTED_ROUTES.includes(pathname)) {
+    // If not authenticated and not on a public route, show loading or nothing while redirecting
+    return (
+        <div className="flex h-screen w-screen items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
   }
 
-  if (user && SETUP_ROUTES.includes(pathname)) {
+  // If user is on an unprotected route, just render children without the layout
+  if (UNPROTECTED_ROUTES.includes(pathname)) {
     return <>{children}</>;
   }
   
