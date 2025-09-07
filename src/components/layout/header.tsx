@@ -108,14 +108,14 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
       <div className="relative flex h-10 items-center justify-between gap-4 bg-card px-4 sm:px-6">
         {/* Left Section: Search and Mobile Menu */}
         <div className="flex flex-1 items-center gap-2">
-          <div className="flex-shrink-0 md:hidden">
+          <div className="flex-shrink-0 lg:hidden">
             <Button variant="ghost" size="icon" onClick={toggleSidebar}>
               <Menu className="h-5 w-5" />
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </div>
           {/* Desktop Search */}
-          <div className="relative hidden flex-1 md:flex md:grow-0 max-w-xs">
+          <div className="relative hidden flex-1 lg:flex lg:grow-0 max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -124,14 +124,14 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
             />
           </div>
            {/* Mobile Search Button */}
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSearchOpen(true)}>
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSearchOpen(true)}>
             <Search className="h-5 w-5" />
             <span className="sr-only">Search</span>
           </Button>
 
           {/* Mobile Search Overlay */}
           {isSearchOpen && (
-              <div className="absolute inset-0 z-20 flex items-center bg-card px-2 md:hidden">
+              <div className="absolute inset-0 z-20 flex items-center bg-card px-2 lg:hidden">
                   <div className="relative w-full">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
