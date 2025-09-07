@@ -16,19 +16,21 @@ export function DynamicIslandToaster() {
   return (
     <div
       className={cn(
-        "relative z-[100] transition-all duration-500 ease-in-out",
+        "relative z-[100] transition-all duration-300 ease-in-out",
         "bg-background text-primary border border-border/50 shadow-lg",
         "flex items-center justify-center rounded-full",
-        "h-8 min-h-[2rem]",
-        "w-48",
-        { "w-96": hasToasts }
+        "h-8",
+        {
+          "w-8": !hasToasts, // Punch-hole size when no toasts
+          "w-auto min-w-48 max-w-sm px-4": hasToasts, // Expands with content
+        }
       )}
     >
       <div
         key={toast?.id || 'empty'}
         className={cn(
           "w-full h-full flex items-center justify-center transition-opacity duration-300",
-          { "opacity-100 animate-in fade-in": hasToasts, "opacity-0": !hasToasts }
+          { "opacity-100": hasToasts, "opacity-0": !hasToasts }
         )}
       >
         {hasToasts && (
