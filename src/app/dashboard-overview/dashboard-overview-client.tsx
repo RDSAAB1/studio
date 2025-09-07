@@ -153,17 +153,7 @@ export default function DashboardOverviewClient() {
                     <StatCard title="Total Income" value={formatCurrency(financialState.totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" />
                     <StatCard title="Total Expense" value={formatCurrency(financialState.totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" />
                     <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
-                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
-                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
-                </CardContent>
-            </Card>
-
-            <Card>
-                 <CardHeader className="pt-4">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Cash & Bank Balances</CardTitle>
-                </CardHeader>
-                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
+                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
                         const account = bankAccounts.find(acc => acc.id === key);
                         if (account) {
                             return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
@@ -176,6 +166,8 @@ export default function DashboardOverviewClient() {
                         }
                         return null;
                     })}
+                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
             </Card>
 
@@ -260,5 +252,7 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
+
+    
 
     
