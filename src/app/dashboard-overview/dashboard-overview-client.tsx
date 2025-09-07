@@ -28,6 +28,19 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
     </Card>
 );
 
+const BalanceStatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
+    <Card className="bg-card/60 backdrop-blur-sm border-white/10">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <div className="text-muted-foreground">{icon}</div>
+        </CardHeader>
+        <CardContent>
+            <div className={`text-xl font-bold ${colorClass}`}>{value}</div>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </CardContent>
+    </Card>
+);
+
 export default function DashboardOverviewClient() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
@@ -169,6 +182,29 @@ export default function DashboardOverviewClient() {
                 <StatCard title="Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
                 <StatCard title="Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Cash & Bank Balances</CardTitle>
+                    <CardDescription>A real-time overview of your liquid assets.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
+                        const account = bankAccounts.find(acc => acc.id === key);
+                        if (account) {
+                            return <BalanceStatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
+                        }
+                        if (key === 'CashInHand') {
+                            return <BalanceStatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+                        }
+                        if (key === 'CashAtHome') {
+                            return <BalanceStatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
+                        }
+                        return null;
+                    })}
+                </CardContent>
+            </Card>
+
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-2">
