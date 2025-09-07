@@ -374,6 +374,7 @@ export type Loan = {
     id: string;
     loanName: string;
     loanType: 'Product' | 'Bank' | 'Outsider';
+    bankLoanType?: 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit';
     lenderName?: string; // For Bank or Outsider
     productName?: string; // For Product loan
     totalAmount: number; // Total cost for Product, Limit for Bank, Principal for Outsider

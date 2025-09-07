@@ -63,6 +63,7 @@ const initialLoanFormState: Partial<Loan> = {
     interestRate: 0,
     startDate: format(new Date(), 'yyyy-MM-dd'),
     paymentMethod: "Bank",
+    bankLoanType: "Fixed",
 };
 
 export default function CashBankClient() {
@@ -210,8 +211,8 @@ export default function CashBankClient() {
         let loanNameToSave = '';
         if (currentLoan.loanType === 'Product' && currentLoan.productName) {
             loanNameToSave = currentLoan.productName + ' Loan';
-        } else if (currentLoan.loanType === 'Bank' && currentLoan.lenderName) {
-            loanNameToSave = `${currentLoan.lenderName} Loan`;
+        } else if (currentLoan.loanType === 'Bank' && currentLoan.lenderName && currentLoan.bankLoanType) {
+            loanNameToSave = `${currentLoan.lenderName} ${toTitleCase(currentLoan.bankLoanType)} Loan`;
         } else if (currentLoan.loanType === 'Outsider' && currentLoan.lenderName) {
              loanNameToSave = `Loan from ${currentLoan.lenderName}`;
         }
@@ -493,6 +494,17 @@ export default function CashBankClient() {
                             </div>)}
                             
                             {currentLoan.loanType === 'Bank' && (<div className="space-y-4">
+                               <div className="space-y-1"><Label>Bank Loan Type</Label>
+                                <Select name="bankLoanType" value={currentLoan?.bankLoanType || 'Fixed'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, bankLoanType: value as 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit'}))}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Fixed">Fixed Loan</SelectItem>
+                                    <SelectItem value="Limit">Limit Loan</SelectItem>
+                                    <SelectItem value="Overdraft">Overdraft Loan</SelectItem>
+                                    <SelectItem value="CashCredit">Cash Credit</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                               </div>
                                <div className="space-y-1"><Label htmlFor="lenderName">Bank Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
                                <div className="space-y-1"><Label htmlFor="totalAmount">Limit Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
                                <div className="space-y-1"><Label htmlFor="interestRate">Interest Rate (%)</Label><Input id="interestRate" name="interestRate" type="number" value={currentLoan?.interestRate || 0} onChange={handleLoanNumberInputChange} /></div>
