@@ -142,7 +142,7 @@ export default function RtgsReportClient() {
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
-    const handleDownloadPdf = () => {
+    const handlePrint = () => {
         const node = tablePrintRef.current;
         if (!node || !settings) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
@@ -165,12 +165,13 @@ export default function RtgsReportClient() {
 
         const title = 'RTGS Payment Report';
         
+        const tableHtml = node.outerHTML;
+
         iframeDoc.open();
         iframeDoc.write(`
             <html>
                 <head>
                     <title>${title}</title>
-                    <link rel="stylesheet" href="${window.location.origin}/globals.css">
                     <style>
                         @media print {
                             @page { 
@@ -180,38 +181,35 @@ export default function RtgsReportClient() {
                             body { 
                                 -webkit-print-color-adjust: exact !important;
                                 print-color-adjust: exact !important;
-                                color: #000 !important;
-                                background-color: #fff !important;
+                                font-family: sans-serif;
                             }
                             table {
-                                font-size: 8px !important;
+                                font-size: 8pt !important;
                                 border-collapse: collapse !important;
                                 width: 100% !important;
                             }
                             th, td {
-                                padding: 2px 4px !important;
+                                padding: 4px 6px !important;
                                 border: 1px solid #ccc !important;
                                 white-space: nowrap !important;
+                                text-align: left;
                             }
                             thead {
                                 background-color: #f2f2f2 !important;
+                                color: #000 !important;
                             }
-                            .print-header, .print-footer {
-                                display: block !important;
+                            .print-header {
                                 margin-bottom: 1rem;
-                            }
-                             .no-print {
-                                display: none !important;
                             }
                         }
                     </style>
                 </head>
-                <body class="bg-white text-black p-4">
+                <body>
                     <div class="print-header">
-                      <h2 class="text-xl font-bold">${toTitleCase(settings.companyName)} - ${title}</h2>
-                      <p class="text-sm">Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+                      <h2 style="font-size: 1.5rem; font-weight: bold;">${toTitleCase(settings.companyName)} - ${title}</h2>
+                      <p style="font-size: 0.875rem;">Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
                     </div>
-                    ${node.outerHTML}
+                    ${tableHtml}
                 </body>
             </html>
         `);
@@ -221,10 +219,8 @@ export default function RtgsReportClient() {
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 1000);
+        }, 500);
     };
-
-    const handlePrint = () => handleDownloadPdf();
 
     if (loading || !settings) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
@@ -309,65 +305,63 @@ export default function RtgsReportClient() {
                     )}
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-auto h-[60vh] border rounded-md">
-                        <div ref={tablePrintRef}>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date / SR No.</TableHead>
-                                        <TableHead>Payee / Father's Name</TableHead>
-                                        <TableHead>Bank / Branch / IFSC</TableHead>
-                                        <TableHead>A/C No. / Mobile</TableHead>
-                                        <TableHead>Amount</TableHead>
-                                        <TableHead>Check / Parchi No.</TableHead>
-                                        <TableHead>6R No. / Date</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredReportRows.length > 0 ? (
-                                        filteredReportRows.map((row, index) => (
-                                            <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
-                                                <TableCell>
-                                                    <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
-                                                    <div className="text-xs text-muted-foreground">{row.srNo}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium whitespace-nowrap">{row.supplierName}</div>
-                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.fatherName}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium whitespace-nowrap">{row.bank}</div>
-                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.branch}</div>
-                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.ifscCode}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium whitespace-nowrap">{row.acNo}</div>
-                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.contact}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-bold whitespace-nowrap">{formatCurrency(row.amount)}</div>
-                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
-                                                    <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
-                                                    <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="h-24 text-center">
-                                                No RTGS reports found.
+                    <div className="overflow-auto h-[60vh] border rounded-md" ref={tablePrintRef}>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Date / SR No.</TableHead>
+                                    <TableHead>Payee / Father's Name</TableHead>
+                                    <TableHead>Bank / Branch / IFSC</TableHead>
+                                    <TableHead>A/C No. / Mobile</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Check / Parchi No.</TableHead>
+                                    <TableHead>6R No. / Date</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredReportRows.length > 0 ? (
+                                    filteredReportRows.map((row, index) => (
+                                        <TableRow key={`${row.paymentId}-${row.srNo}-${index}`}>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{format(new Date(row.date), 'dd-MMM-yy')}</div>
+                                                <div className="text-xs text-muted-foreground">{row.srNo}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.supplierName}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.fatherName}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.bank}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.branch}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.ifscCode}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.acNo}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.contact}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-bold whitespace-nowrap">{formatCurrency(row.amount)}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.rate > 0 ? `${row.rate.toFixed(2)} @ ${row.weight.toFixed(2)} Qtl` : ''}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.checkNo}</div>
+                                                <div className="text-xs text-muted-foreground max-w-24 truncate" title={row.parchiNo}>{row.parchiNo}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium whitespace-nowrap">{row.sixRNo}</div>
+                                                <div className="text-xs text-muted-foreground whitespace-nowrap">{row.sixRDate ? format(new Date(row.sixRDate), 'dd-MMM-yy') : ''}</div>
                                             </TableCell>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="h-24 text-center">
+                                            No RTGS reports found.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
                 </CardContent>
             </Card>
@@ -385,13 +379,13 @@ export default function RtgsReportClient() {
                         <DialogDescription>A preview of the RTGS report table.</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="p-2 border-b flex justify-end gap-2">
-                        <Button variant="outline" onClick={handleDownloadPdf}>
+                        <Button variant="outline" onClick={handlePrint}>
                             <Download className="mr-2 h-4 w-4" /> Download in pdf
                         </Button>
                         <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </DialogFooter>
                     <div className="p-4 overflow-auto flex-grow">
-                        <div dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
+                         <div dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
                     </div>
                 </DialogContent>
             </Dialog>
