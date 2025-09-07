@@ -74,24 +74,28 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
    useEffect(() => {
     if (!authChecked || !user || UNPROTECTED_ROUTES.includes(pathname)) return;
+    
+    const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
+    if (!dashboardTab) return;
 
-    // Initialize with dashboard tab if no tabs are open
+    // On initial load or if tabs are empty, set dashboard tab
     if (openTabs.length === 0) {
-      const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
-      if (dashboardTab) {
         setOpenTabs([dashboardTab]);
         setActiveTabId(dashboardTab.id);
-      }
     }
     
     const currentTabInfo = findTabForPath(pathname);
+
     if (currentTabInfo) {
+      // Set the active tab ID immediately
       setActiveTabId(currentTabInfo.id);
+      
+      // If the tab is not already open, add it to the list
       if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
     }
-  }, [authChecked, user, pathname]);
+  }, [pathname, authChecked, user]);
 
   const handleTabClick = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
