@@ -73,11 +73,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [pathname, router]);
 
    useEffect(() => {
-    if (!authChecked || !user) return;
+    if (!authChecked || !user || openTabs.length > 0) return;
 
     // Set the dashboard as the initial tab if no tabs are open.
     const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
-    if (dashboardTab && openTabs.length === 0) {
+    if (dashboardTab) {
         setOpenTabs([dashboardTab]);
         setActiveTabId(dashboardTab.id);
     }
@@ -90,12 +90,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
     const currentTabInfo = findTabForPath(pathname);
     
     if (currentTabInfo) {
-      // Logic to add the tab if it's not already open
+      setActiveTabId(currentTabInfo.id);
       if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
-      // Always set the active tab, even if it's already open
-      setActiveTabId(currentTabInfo.id);
     }
   }, [pathname, authChecked, user]);
 
@@ -192,7 +190,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               openTabs={openTabs}
               activeTabId={activeTabId}
               onTabClick={handleTabClick}
-              onCloseTab={handleCloseTab}
+              onCloseTab={onCloseTab}
               toggleSidebar={toggleSidebar}
               user={user}
               onSignOut={handleSignOut}
