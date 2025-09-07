@@ -11,9 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { format, subDays } from 'date-fns';
 import { DonutChart, BarChart, AreaChart } from '@tremor/react';
-import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List } from 'lucide-react';
+import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List, Bank } from 'lucide-react';
 import { getExpenseCategories } from '@/lib/firestore';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm">
@@ -107,7 +106,7 @@ export default function DashboardOverviewClient() {
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalAssets = cashAndBankAssets + totalCustomerDues;
         
-        return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues, loanLiabilities };
+        return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues, loanLiabilities, cashAndBankAssets };
     }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers]);
 
     const chartData = useMemo(() => {
@@ -116,14 +115,9 @@ export default function DashboardOverviewClient() {
         
         const dailyData = recentTransactions.reduce((acc, t) => {
             const date = format(new Date(t.date), 'dd-MMM');
-            if (!acc[date]) {
-                acc[date] = { date, Income: 0, Expense: 0 };
-            }
-            if (t.transactionType === 'Income') {
-                acc[date].Income += t.amount;
-            } else {
-                acc[date].Expense += t.amount;
-            }
+            if (!acc[date]) acc[date] = { date, Income: 0, Expense: 0 };
+            if (t.transactionType === 'Income') acc[date].Income += t.amount;
+            else acc[date].Expense += t.amount;
             return acc;
         }, {} as { [key: string]: { date: string; Income: number; Expense: number } });
 
@@ -136,22 +130,50 @@ export default function DashboardOverviewClient() {
             return acc;
         }, {} as { [key: string]: number });
 
-        const financialHealthData = [
-            { name: "Assets", "Cash & Bank": financialState.totalAssets - financialState.totalCustomerDues, "Customer Dues": financialState.totalCustomerDues },
-            { name: "Liabilities", "Loans": financialState.loanLiabilities, "Supplier Dues": financialState.totalSupplierDues }
+        const incomeBreakdown = transactions.filter(t => t.transactionType === 'Income').reduce((acc, t) => {
+            const category = toTitleCase(t.category || 'Uncategorized');
+            if (!acc[category]) acc[category] = 0;
+            acc[category] += t.amount;
+            return acc;
+        }, {} as { [key: string]: number });
+
+        const assetsBreakdown = [
+            { name: 'Cash & Bank', value: financialState.cashAndBankAssets },
+            { name: 'Receivables', value: financialState.totalCustomerDues },
         ];
+        
+        const liabilitiesBreakdown = [
+            { name: 'Loans', value: financialState.loanLiabilities },
+            { name: 'Payables', value: financialState.totalSupplierDues },
+        ];
+
+        const financialHealthData = [
+            { name: "Assets", "Amount": financialState.totalAssets },
+            { name: "Liabilities", "Amount": financialState.totalLiabilities }
+        ];
+
+        const topCustomers = customers
+            .filter(c => (c.netAmount || 0) > 0)
+            .sort((a,b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
+            .slice(0, 5)
+            .map(c => ({ name: toTitleCase(c.name), "Amount": c.netAmount }));
 
         return {
             timeSeriesData,
             expenseBreakdownChartData: Object.entries(expenseBreakdown).map(([name, value]) => ({ name, value })).filter(item => item.value > 0),
+            incomeBreakdownChartData: Object.entries(incomeBreakdown).map(([name, value]) => ({ name, value })).filter(item => item.value > 0),
+            assetsBreakdownChartData: assetsBreakdown.filter(item => item.value > 0),
+            liabilitiesBreakdownChartData: liabilitiesBreakdown.filter(item => item.value > 0),
             financialHealthData,
+            topCustomersChartData: topCustomers
         };
-    }, [transactions, financialState]);
+    }, [transactions, financialState, customers]);
 
     if (loading) return <div>Loading Dashboard...</div>;
 
     return (
         <div className="space-y-6">
+            {/* Top Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, and Receivables" />
                 <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Loans and Payables" />
@@ -159,12 +181,41 @@ export default function DashboardOverviewClient() {
                 <StatCard title="Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                <Card className="lg:col-span-3">
-                    <CardHeader><CardTitle>Income vs Expense (Last 30 Days)</CardTitle><CardDescription>Monitor your cash flow over time.</CardDescription></CardHeader>
+            {/* 4 Pie/Donut Charts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Assets Breakdown</CardTitle></CardHeader>
+                    <CardContent className="flex items-center justify-center">
+                        <DonutChart className="h-48" data={chartData.assetsBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['sky', 'blue']} />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Liabilities Breakdown</CardTitle></CardHeader>
+                    <CardContent className="flex items-center justify-center">
+                         <DonutChart className="h-48" data={chartData.liabilitiesBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['rose', 'orange']} />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Income Sources</CardTitle></CardHeader>
+                    <CardContent className="flex items-center justify-center">
+                        <DonutChart className="h-48" data={chartData.incomeBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['emerald', 'teal', 'cyan']} />
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader><CardTitle className="text-base">Expense Categories</CardTitle></CardHeader>
+                    <CardContent className="flex items-center justify-center">
+                        <DonutChart className="h-48" data={chartData.expenseBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['slate', 'stone', 'gray', 'zinc', 'neutral']} />
+                    </CardContent>
+                </Card>
+            </div>
+            
+            {/* 4 Other Graphs/Tables */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                    <CardHeader><CardTitle>Income vs Expense (Last 30 Days)</CardTitle></CardHeader>
                     <CardContent>
                          <AreaChart
-                            className="h-80"
+                            className="h-72"
                             data={chartData.timeSeriesData}
                             index="date"
                             categories={['Income', 'Expense']}
@@ -174,47 +225,50 @@ export default function DashboardOverviewClient() {
                         />
                     </CardContent>
                 </Card>
-                 <Card className="lg:col-span-2">
-                    <CardHeader><CardTitle>Financial Health</CardTitle><CardDescription>A comparison of your assets and liabilities.</CardDescription></CardHeader>
+                <Card>
+                    <CardHeader><CardTitle>Financial Health</CardTitle></CardHeader>
                     <CardContent>
                         <BarChart
-                            className="mt-6 h-80"
+                            className="mt-6 h-72"
                             data={chartData.financialHealthData}
                             index="name"
-                            categories={['Cash & Bank', 'Customer Dues', 'Loans', 'Supplier Dues']}
-                            colors={['blue', 'cyan', 'rose', 'orange']}
+                            categories={['Amount']}
+                            colors={['blue']}
                             valueFormatter={formatCurrency}
                             yAxisWidth={60}
-                            stack={true}
                         />
                     </CardContent>
                 </Card>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                 <Card className="lg:col-span-2">
-                    <CardHeader><CardTitle>Expense Breakdown</CardTitle><CardDescription>Spending distribution by category.</CardDescription></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                        <DonutChart className="h-64 mt-6" data={chartData.expenseBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['slate', 'stone', 'gray', 'zinc', 'neutral']} />
+                 <Card>
+                    <CardHeader><CardTitle>Top 5 Outstanding Customers</CardTitle></CardHeader>
+                    <CardContent>
+                       <BarChart
+                            className="mt-6 h-72"
+                            data={chartData.topCustomersChartData}
+                            index="name"
+                            categories={["Amount"]}
+                            colors={["sky"]}
+                            valueFormatter={formatCurrency}
+                            yAxisWidth={60}
+                            layout="vertical"
+                        />
                     </CardContent>
                 </Card>
-
-                 <Card className="lg:col-span-3">
-                    <CardHeader><CardTitle>Recent Activity</CardTitle><CardDescription>The last 10 transactions recorded.</CardDescription></CardHeader>
+                 <Card>
+                    <CardHeader><CardTitle>Recent Activity</CardTitle></CardHeader>
                     <CardContent>
                         <Table>
-                            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Category</TableHead><TableHead>Payee/Payer</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Payee/Payer</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {transactions.slice(0, 10).map((tx) => (
+                                {transactions.slice(0, 5).map((tx) => (
                                     <TableRow key={tx.id}>
                                         <TableCell>{format(new Date(tx.date), 'dd-MMM-yy')}</TableCell>
                                         <TableCell><Badge variant={tx.transactionType === 'Income' ? 'default' : 'destructive'} className={cn(tx.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80', 'text-white')}>{tx.transactionType}</Badge></TableCell>
-                                        <TableCell>{tx.category}</TableCell>
                                         <TableCell>{tx.payee}</TableCell>
                                         <TableCell className={cn("text-right font-semibold", tx.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(tx.amount)}</TableCell>
                                     </TableRow>
                                 ))}
-                                {transactions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No recent transactions found.</TableCell></TableRow>}
+                                {transactions.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">No recent transactions.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </CardContent>
@@ -223,5 +277,3 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
-
-    
