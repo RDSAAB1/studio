@@ -92,7 +92,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             }
         }
     }
-  }, [pathname, authChecked, user, openTabs.length, router]);
+  }, [pathname, authChecked, user, openTabs, router]);
 
 
   const handleTabClick = (tabId: string) => {
