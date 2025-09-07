@@ -156,20 +156,22 @@ export default function IncomeExpenseClient() {
   useEffect(() => {
     const loanId = searchParams.get('loanId');
     if (loanId && loans.length > 0) {
-      handleNew();
-      setActiveTab('form');
-      form.setValue('transactionType', 'Expense');
-      form.setValue('amount', Number(searchParams.get('amount') || 0));
-      form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
-      form.setValue('description', searchParams.get('description') || '');
-      form.setValue('category', 'Interest & Loan Payments');
-      
-      const loan = loans.find(l => l.id === loanId);
-      if(loan) {
-        setTimeout(() => form.setValue('subCategory', loan.loanName), 100);
-      }
+        handleNew();
+        setActiveTab('form');
+        form.setValue('transactionType', 'Expense');
+        form.setValue('amount', Number(searchParams.get('amount') || 0));
+        form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
+        form.setValue('description', searchParams.get('description') || '');
+        
+        // This ensures the category is set, and the subcategory list is populated before setting the subcategory value
+        form.setValue('category', 'Interest & Loan Payments', { shouldValidate: true });
+        
+        const loan = loans.find(l => l.id === loanId);
+        if (loan) {
+            form.setValue('subCategory', loan.loanName, { shouldValidate: true });
+        }
     }
-  }, [searchParams, loans, form]);
+}, [searchParams, loans, form, handleNew]);
   
   useEffect(() => {
     if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
