@@ -46,14 +46,14 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 body,
             });
 
-            const dataToExport = payments.map((p: any) => ({
-                'Sr.No': p.srNo,
+            const dataToExport = payments.map((p: any, index: number) => ({
+                'Sr.No': index + 1,
                 'Debit_Ac_No': settings.accountNo,
                 'Amount': p.amount,
                 'IFSC_Code': p.ifscCode,
                 'Credit_Ac_No': p.acNo,
                 'Beneficiary_Name': toTitleCase(p.supplierName),
-                'Scheme Type': settings.type || 'SB'
+                'Scheme Type': p.type || 'SB'
             }));
             const worksheet = XLSX.utils.json_to_sheet(dataToExport);
             const workbook = XLSX.utils.book_new();
@@ -173,15 +173,15 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {payments.map((p: any) => (
+                                    {payments.map((p: any, index: number) => (
                                         <tr key={p.srNo} className="border-t">
-                                            <td className="p-2">{p.srNo}</td>
+                                            <td className="p-2">{index + 1}</td>
                                             <td className="p-2">{settings.accountNo}</td>
                                             <td className="p-2 text-right font-medium">{p.amount}</td>
                                             <td className="p-2">{p.ifscCode}</td>
                                             <td className="p-2">{p.acNo}</td>
                                             <td className="p-2">{toTitleCase(p.supplierName)}</td>
-                                            <td className="p-2">{settings.type || 'SB'}</td>
+                                            <td className="p-2">{p.type || 'SB'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
