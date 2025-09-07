@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth } from 'date-fns';
-import { AreaChart, DonutChart, BarChart } from '@tremor/react';
+import { AreaChart, BarChart } from '@tremor/react';
 import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, AlertTriangle, Home, FileText, CheckCircle, Users, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -67,11 +67,11 @@ export default function DashboardOverviewClient() {
             setBankAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount)));
         });
 
-        const unsubSuppliers = onSnapshot(query(collection(db, "suppliers"), orderBy("netAmount", "desc")), (snapshot) => {
+        const unsubSuppliers = onSnapshot(query(collection(db, "suppliers")), (snapshot) => {
             setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         });
 
-        const unsubCustomers = onSnapshot(query(collection(db, "customers"), orderBy("netAmount", "desc")), (snapshot) => {
+        const unsubCustomers = onSnapshot(query(collection(db, "customers")), (snapshot) => {
             setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         });
         
@@ -132,7 +132,7 @@ export default function DashboardOverviewClient() {
         return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues };
     }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers]);
 
-    const chartData = useMemo(() => {
+    const incomeExpenseChartData = useMemo(() => {
         const monthlyData: { [key: string]: { Income: number; Expense: number } } = {};
         
         transactions.forEach(t => {
@@ -145,28 +145,16 @@ export default function DashboardOverviewClient() {
 
         return Object.entries(monthlyData).map(([date, values]) => ({ date, ...values }));
     }, [transactions]);
-
-    const expenseByCategory = useMemo(() => {
-        const categoryMap: { [key: string]: number } = {};
-        transactions.filter(t => t.transactionType === 'Expense').forEach(t => {
-            categoryMap[t.category] = (categoryMap[t.category] || 0) + t.amount;
-        });
-        return Object.entries(categoryMap).map(([name, value]) => ({ name, value }));
-    }, [transactions]);
-
-    const topOutstandingSuppliers = useMemo(() => {
-      return suppliers
-          .filter(s => (s.netAmount || 0) > 0)
-          .sort((a, b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
-          .slice(0, 5);
-    }, [suppliers]);
-
-    const topOutstandingCustomers = useMemo(() => {
-        return customers
-            .filter(c => (c.netAmount || 0) > 0)
-            .sort((a, b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
-            .slice(0, 5);
-    }, [customers]);
+    
+     const financialHealthChartData = [
+        {
+            name: "Financial Health",
+            "Total Assets": financialState.totalAssets,
+            "Total Liabilities": financialState.totalLiabilities,
+            "Customer Dues": financialState.totalCustomerDues,
+            "Supplier Dues": financialState.totalSupplierDues,
+        }
+    ];
 
     if (loading) {
         return <div>Loading Dashboard...</div>;
@@ -185,37 +173,32 @@ export default function DashboardOverviewClient() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Cash & Bank Balances</CardTitle>
-                    <CardDescription>A real-time overview of your liquid assets.</CardDescription>
+                    <CardTitle>Financial Health</CardTitle>
+                    <CardDescription>A visual comparison of your assets and liabilities.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
-                        const account = bankAccounts.find(acc => acc.id === key);
-                        if (account) {
-                            return <BalanceStatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
-                        }
-                        if (key === 'CashInHand') {
-                            return <BalanceStatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
-                        }
-                        if (key === 'CashAtHome') {
-                            return <BalanceStatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
-                        }
-                        return null;
-                    })}
+                <CardContent>
+                    <BarChart
+                        className="h-72"
+                        data={financialHealthChartData}
+                        index="name"
+                        categories={["Total Assets", "Total Liabilities", "Customer Dues", "Supplier Dues"]}
+                        colors={["emerald", "rose", "blue", "orange"]}
+                        valueFormatter={formatCurrency}
+                        yAxisWidth={80}
+                    />
                 </CardContent>
             </Card>
 
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card className="lg:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <Card className="lg:col-span-3">
                     <CardHeader>
                         <CardTitle>Income vs Expense</CardTitle>
                         <CardDescription>Monthly financial performance.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <AreaChart
-                            className="h-72"
-                            data={chartData}
+                            className="h-80"
+                            data={incomeExpenseChartData}
                             index="date"
                             categories={['Income', 'Expense']}
                             colors={['emerald', 'rose']}
@@ -224,58 +207,27 @@ export default function DashboardOverviewClient() {
                         />
                     </CardContent>
                 </Card>
-                 <Card>
+                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle>Expense Breakdown</CardTitle>
-                         <CardDescription>Top spending categories.</CardDescription>
+                        <CardTitle>Cash & Bank Balances</CardTitle>
+                        <CardDescription>Your liquid assets.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                       <DonutChart
-                            className="h-72"
-                            data={expenseByCategory}
-                            category="value"
-                            index="name"
-                            valueFormatter={formatCurrency}
-                            colors={["cyan", "blue", "indigo", "violet", "fuchsia"]}
-                        />
+                    <CardContent className="space-y-4">
+                        {Array.from(financialState.balances.entries()).map(([key, balance]) => {
+                            const account = bankAccounts.find(acc => acc.id === key);
+                            if (account) {
+                                return <BalanceStatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
+                            }
+                            if (key === 'CashInHand') {
+                                return <BalanceStatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
+                            }
+                            if (key === 'CashAtHome') {
+                                return <BalanceStatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
+                            }
+                            return null;
+                        })}
                     </CardContent>
                 </Card>
-            </div>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <Card>
-                     <CardHeader><CardTitle>Top 5 Outstanding Suppliers</CardTitle></CardHeader>
-                     <CardContent>
-                        <Table>
-                            <TableHeader><TableRow><TableHead>Supplier</TableHead><TableHead className="text-right">Amount Due</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {topOutstandingSuppliers.map(s => (
-                                    <TableRow key={s.id}>
-                                        <TableCell>{toTitleCase(s.name)}</TableCell>
-                                        <TableCell className="text-right text-destructive font-semibold">{formatCurrency(s.netAmount as number)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {topOutstandingSuppliers.length === 0 && <TableRow><TableCell colSpan={2} className="text-center h-24">No outstanding supplier dues.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                     </CardContent>
-                 </Card>
-                 <Card>
-                     <CardHeader><CardTitle>Top 5 Outstanding Customers</CardTitle></CardHeader>
-                     <CardContent>
-                          <Table>
-                            <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Amount Due</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {topOutstandingCustomers.map(c => (
-                                    <TableRow key={c.id}>
-                                        <TableCell>{toTitleCase(c.name)}</TableCell>
-                                        <TableCell className="text-right text-green-500 font-semibold">{formatCurrency(c.netAmount as number)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {topOutstandingCustomers.length === 0 && <TableRow><TableCell colSpan={2} className="text-center h-24">No outstanding customer dues.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                     </CardContent>
-                 </Card>
             </div>
         </div>
     );
