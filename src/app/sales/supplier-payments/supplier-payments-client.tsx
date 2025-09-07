@@ -533,7 +533,7 @@ export default function SupplierPaymentsClient() {
                 
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-                    rtgsSrNo: paymentMethod === 'RTGS' ? (tempEditingPayment ? tempEditingPayment.rtgsSrNo : rtgsSrNo) : undefined,
+                    ...(paymentMethod === 'RTGS' && { rtgsSrNo: tempEditingPayment ? tempEditingPayment.rtgsSrNo : rtgsSrNo }),
                     customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                     date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
