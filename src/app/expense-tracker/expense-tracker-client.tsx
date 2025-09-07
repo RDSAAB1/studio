@@ -652,6 +652,7 @@ export default function IncomeExpenseClient() {
                                       <SelectItem value="Cash">Cash</SelectItem>
                                       <SelectItem value="Online">Online</SelectItem>
                                       <SelectItem value="Cheque">Cheque</SelectItem>
+                                       <SelectItem value="RTGS">RTGS</SelectItem>
                                   </SelectContent>
                               </Select>
                           </div>
