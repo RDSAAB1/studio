@@ -9,7 +9,8 @@ import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format, isPast } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
+import { AreaChart, DonutChart, BarChart } from '@tremor/react';
 import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, AlertTriangle, Home, FileText, CheckCircle, Users, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,7 @@ export default function DashboardOverviewClient() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubTransactions = onSnapshot(query(collection(db, "transactions"), orderBy("date", "desc"), limit(200)), (snapshot) => {
+        const unsubTransactions = onSnapshot(query(collection(db, "transactions"), orderBy("date", "desc")), (snapshot) => {
             setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
         });
 
@@ -53,11 +54,11 @@ export default function DashboardOverviewClient() {
             setBankAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount)));
         });
 
-        const unsubSuppliers = onSnapshot(query(collection(db, "suppliers"), orderBy("date", "desc")), (snapshot) => {
+        const unsubSuppliers = onSnapshot(query(collection(db, "suppliers"), orderBy("netAmount", "desc")), (snapshot) => {
             setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         });
 
-        const unsubCustomers = onSnapshot(query(collection(db, "customers"), orderBy("date", "desc")), (snapshot) => {
+        const unsubCustomers = onSnapshot(query(collection(db, "customers"), orderBy("netAmount", "desc")), (snapshot) => {
             setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         });
         
@@ -73,16 +74,6 @@ export default function DashboardOverviewClient() {
         };
     }, []);
     
-    const loansWithCalculatedRemaining = useMemo(() => {
-        return loans.map(loan => {
-            const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
-            const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
-            const totalPaid = (loan.amountPaid || 0) + totalPaidTowardsPrincipal;
-            const remainingAmount = loan.totalAmount - totalPaid;
-            return { ...loan, remainingAmount, amountPaid: totalPaid };
-        });
-    }, [loans, transactions]);
-
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
         bankAccounts.forEach(acc => balances.set(acc.id, 0));
@@ -113,28 +104,56 @@ export default function DashboardOverviewClient() {
         const totalSupplierDues = suppliers.reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
         const totalCustomerDues = customers.reduce((sum, c) => sum + Number(c.netAmount || 0), 0);
         
-        const loanLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount > 0 ? loan.remainingAmount : 0), 0);
+        const loanLiabilities = loans.reduce((sum, loan) => {
+            const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
+            const totalPaidTowardsPrincipal = paidTransactions.reduce((subSum, t) => subSum + t.amount, 0);
+            const totalPaid = (loan.amountPaid || 0) + totalPaidTowardsPrincipal;
+            const remainingAmount = loan.totalAmount - totalPaid;
+            return sum + (remainingAmount > 0 ? remainingAmount : 0);
+        }, 0);
         const totalLiabilities = loanLiabilities + totalSupplierDues;
         
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalAssets = cashAndBankAssets + totalCustomerDues;
         
-        const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
-        const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
-        const netProfitLoss = totalIncome - totalExpense;
-        
-        return { balances, totalAssets, totalLiabilities, totalIncome, totalExpense, netProfitLoss, totalSupplierDues, totalCustomerDues };
-    }, [fundTransactions, transactions, loansWithCalculatedRemaining, bankAccounts, suppliers, customers]);
+        return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues };
+    }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers]);
 
-    const recentTransactions = useMemo(() => {
-        return transactions.slice(0, 5);
+    const chartData = useMemo(() => {
+        const monthlyData: { [key: string]: { Income: number; Expense: number } } = {};
+        
+        transactions.forEach(t => {
+            const month = format(startOfMonth(new Date(t.date)), 'MMM yyyy');
+            if (!monthlyData[month]) {
+                monthlyData[month] = { Income: 0, Expense: 0 };
+            }
+            monthlyData[month][t.transactionType] += t.amount;
+        });
+
+        return Object.entries(monthlyData).map(([date, values]) => ({ date, ...values }));
     }, [transactions]);
 
-    const pendingEMIs = useMemo(() => {
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        return loansWithCalculatedRemaining.filter(l => l.remainingAmount > 0 && l.nextEmiDueDate && new Date(l.nextEmiDueDate) <= today);
-    }, [loansWithCalculatedRemaining]);
+    const expenseByCategory = useMemo(() => {
+        const categoryMap: { [key: string]: number } = {};
+        transactions.filter(t => t.transactionType === 'Expense').forEach(t => {
+            categoryMap[t.category] = (categoryMap[t.category] || 0) + t.amount;
+        });
+        return Object.entries(categoryMap).map(([name, value]) => ({ name, value }));
+    }, [transactions]);
+
+    const topOutstandingSuppliers = useMemo(() => {
+      return suppliers
+          .filter(s => (s.netAmount || 0) > 0)
+          .sort((a, b) => Number(b.netAmount || 0) - Number(s.netAmount || 0))
+          .slice(0, 5);
+    }, [suppliers]);
+
+    const topOutstandingCustomers = useMemo(() => {
+        return customers
+            .filter(c => (c.netAmount || 0) > 0)
+            .sort((a, b) => Number(b.netAmount || 0) - Number(c.netAmount || 0))
+            .slice(0, 5);
+    }, [customers]);
 
     if (loading) {
         return <div>Loading Dashboard...</div>;
@@ -143,130 +162,86 @@ export default function DashboardOverviewClient() {
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold">Dashboard</h1>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold flex items-center gap-2"><Scale /> Financial Overview</CardTitle>
-                    <CardDescription>A real-time overview of your business's financial health.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <StatCard title="Total Income" value={formatCurrency(financialState.totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" />
-                    <StatCard title="Total Expense" value={formatCurrency(financialState.totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" />
-                    <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
-                    <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
-                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
-                    <StatCard title="Total Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
-                    <StatCard title="Total Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
-                </CardContent>
-            </Card>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, and Receivables" />
+                <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Loans and Payables" />
+                <StatCard title="Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
+                <StatCard title="Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
+            </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold flex items-center gap-2"><Landmark /> Cash & Bank Balances</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {Array.from(financialState.balances.entries()).map(([key, balance]) => {
-                        const account = bankAccounts.find(acc => acc.id === key);
-                        if (account) {
-                            return <StatCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
-                        }
-                        if (key === 'CashInHand') {
-                            return <StatCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
-                        }
-                        if (key === 'CashAtHome') {
-                            return <StatCard key={key} title="Cash at Home" value={formatCurrency(balance)} icon={<Home />} colorClass="text-orange-500" />
-                        }
-                        return null;
-                    })}
-                </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><FileText /> Loan Overview</CardTitle>
+                        <CardTitle>Income vs Expense</CardTitle>
+                        <CardDescription>Monthly financial performance.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Loan</TableHead>
-                                    <TableHead className="text-right">Remaining</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loansWithCalculatedRemaining.filter(l => l.remainingAmount > 0).map(loan => (
-                                    <TableRow key={loan.id}>
-                                        <TableCell>{loan.loanName}</TableCell>
-                                        <TableCell className="text-right text-destructive font-semibold">{formatCurrency(loan.remainingAmount)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {loansWithCalculatedRemaining.filter(l => l.remainingAmount > 0).length === 0 && (
-                                     <TableRow><TableCell colSpan={2} className="text-center h-24">No active loans.</TableCell></TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                        <AreaChart
+                            className="h-72"
+                            data={chartData}
+                            index="date"
+                            categories={['Income', 'Expense']}
+                            colors={['emerald', 'rose']}
+                            valueFormatter={formatCurrency}
+                            yAxisWidth={60}
+                        />
                     </CardContent>
                 </Card>
-                <Card>
+                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><AlertTriangle className="text-yellow-500" /> Pending Loan EMIs</CardTitle>
+                        <CardTitle>Expense Breakdown</CardTitle>
+                         <CardDescription>Top spending categories.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {pendingEMIs.length > 0 ? (
-                             <ul className="space-y-3">
-                                {pendingEMIs.map(loan => (
-                                    <li key={loan.id} className="flex justify-between items-center bg-muted/50 p-3 rounded-lg">
-                                        <div>
-                                            <p className="font-semibold">{loan.loanName}</p>
-                                            <p className="text-xs text-muted-foreground">Due: {format(new Date(loan.nextEmiDueDate!), 'dd-MMM-yyyy')} - {formatCurrency(loan.emiAmount || 0)}</p>
-                                        </div>
-                                        <Button size="sm" asChild>
-                                            <Link href={`/expense-tracker?loanId=${loan.id}&amount=${loan.emiAmount || 0}&payee=${loan.lenderName || loan.productName || 'Loan Payment'}&description=EMI for ${loan.loanName}`}>Pay Now</Link>
-                                        </Button>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-center">
-                                <CheckCircle className="h-10 w-10 text-green-500 mb-2"/>
-                                <p className="font-semibold">All loan payments are up to date!</p>
-                            </div>
-                        )}
+                       <DonutChart
+                            className="h-72"
+                            data={expenseByCategory}
+                            category="value"
+                            index="name"
+                            valueFormatter={formatCurrency}
+                            colors={["cyan", "blue", "indigo", "violet", "fuchsia"]}
+                        />
                     </CardContent>
                 </Card>
             </div>
-            
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold">Recent Transactions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Category</TableHead>
-                                <TableHead>Payee/Payer</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {recentTransactions.map((tx) => (
-                                <TableRow key={tx.id}>
-                                    <TableCell>{format(new Date(tx.date), 'dd-MMM-yy')}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={tx.transactionType === 'Income' ? 'default' : 'destructive'} className={tx.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{tx.transactionType}</Badge>
-                                    </TableCell>
-                                    <TableCell>{tx.category}</TableCell>
-                                    <TableCell>{toTitleCase(tx.payee)}</TableCell>
-                                    <TableCell className={cn("text-right font-medium", tx.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(tx.amount)}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <Card>
+                     <CardHeader><CardTitle>Top 5 Outstanding Suppliers</CardTitle></CardHeader>
+                     <CardContent>
+                        <Table>
+                            <TableHeader><TableRow><TableHead>Supplier</TableHead><TableHead className="text-right">Amount Due</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {topOutstandingSuppliers.map(s => (
+                                    <TableRow key={s.id}>
+                                        <TableCell>{toTitleCase(s.name)}</TableCell>
+                                        <TableCell className="text-right text-destructive font-semibold">{formatCurrency(s.netAmount as number)}</TableCell>
+                                    </TableRow>
+                                ))}
+                                {topOutstandingSuppliers.length === 0 && <TableRow><TableCell colSpan={2} className="text-center h-24">No outstanding supplier dues.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                     </CardContent>
+                 </Card>
+                 <Card>
+                     <CardHeader><CardTitle>Top 5 Outstanding Customers</CardTitle></CardHeader>
+                     <CardContent>
+                          <Table>
+                            <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Amount Due</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {topOutstandingCustomers.map(c => (
+                                    <TableRow key={c.id}>
+                                        <TableCell>{toTitleCase(c.name)}</TableCell>
+                                        <TableCell className="text-right text-green-500 font-semibold">{formatCurrency(c.netAmount as number)}</TableCell>
+                                    </TableRow>
+                                ))}
+                                {topOutstandingCustomers.length === 0 && <TableRow><TableCell colSpan={2} className="text-center h-24">No outstanding customer dues.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                     </CardContent>
+                 </Card>
+            </div>
         </div>
     );
 }
+
