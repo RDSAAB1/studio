@@ -63,37 +63,37 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [pathname, router]);
 
   useEffect(() => {
-    if (loading || !user || UNPROTECTED_ROUTES.includes(pathname)) return;
+    if (loading || UNPROTECTED_ROUTES.includes(pathname)) return;
 
-    // Remove query parameters to match hrefs in allMenuItems
     const basePath = pathname.split('?')[0];
 
-    let initialTab: MenuItem | undefined;
+    let currentTab: MenuItem | undefined;
     for (const item of allMenuItems) {
         if (item.href === basePath) {
-            initialTab = item;
+            currentTab = item;
             break;
         }
         if (item.subMenus) {
-            initialTab = item.subMenus.find(sub => sub.href === basePath);
-            if (initialTab) break;
+            currentTab = item.subMenus.find(sub => sub.href === basePath);
+            if (currentTab) break;
         }
     }
     
-    if (initialTab) {
-        if (!openTabs.some(tab => tab.id === initialTab!.id)) {
-            setOpenTabs(prev => [...prev, initialTab!]);
+    if (currentTab) {
+        if (!openTabs.some(tab => tab.id === currentTab!.id)) {
+            setOpenTabs(prev => [...prev, currentTab!]);
         }
-        setActiveTabId(initialTab.id);
-    } else if (openTabs.length === 0 && basePath !== '/') {
+        setActiveTabId(currentTab.id);
+    } else if (openTabs.length === 0 && basePath !== '/' && user) {
         // If no tab matches and we are not on the root, maybe select a default
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
             setOpenTabs([dashboard]);
             setActiveTabId(dashboard.id);
+            router.replace(dashboard.href!);
         }
     }
-}, [user, loading, pathname, router, openTabs]);
+}, [user, loading, pathname, router]);
 
 
   const handleTabClick = (tabId: string) => {
