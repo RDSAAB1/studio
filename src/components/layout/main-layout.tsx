@@ -72,21 +72,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => unsubscribe();
   }, [pathname, router]);
 
-   useEffect(() => {
-    if (!authChecked || !user || openTabs.length > 0) return;
-
-    // Set the dashboard as the initial tab if no tabs are open.
-    const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
-    if (dashboardTab) {
-        setOpenTabs([dashboardTab]);
-        setActiveTabId(dashboardTab.id);
-    }
-  }, [authChecked, user, openTabs.length]);
-
-
   useEffect(() => {
-    if (!authChecked || !user || UNPROTECTED_ROUTES.includes(pathname)) return;
-    
+    if (!authChecked || UNPROTECTED_ROUTES.includes(pathname)) return;
+
     const currentTabInfo = findTabForPath(pathname);
     
     if (currentTabInfo) {
@@ -94,8 +82,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
       if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
+    } else if (openTabs.length === 0 && user) {
+        const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
+        if (dashboardTab) {
+            setOpenTabs([dashboardTab]);
+            setActiveTabId(dashboardTab.id);
+            if (pathname === '/') {
+              router.replace(dashboardTab.href!);
+            }
+        }
     }
-  }, [pathname, authChecked, user]);
+  }, [pathname, authChecked, user, openTabs.length, router]);
+
 
   const handleTabClick = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
@@ -190,7 +188,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               openTabs={openTabs}
               activeTabId={activeTabId}
               onTabClick={handleTabClick}
-              onCloseTab={onCloseTab}
+              onCloseTab={handleCloseTab}
               toggleSidebar={toggleSidebar}
               user={user}
               onSignOut={handleSignOut}
