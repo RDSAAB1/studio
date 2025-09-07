@@ -17,11 +17,12 @@ import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home } from "lucide-react";
+import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths } from "date-fns";
 
-import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime } from "@/lib/firestore";
+import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -64,6 +65,8 @@ export default function CashBankClient() {
     const [loading, setLoading] = useState(true);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
+    const [isFundTransactionDialogOpen, setIsFundTransactionDialogOpen] = useState(false);
+    const [currentFundTransaction, setCurrentFundTransaction] = useState<Partial<FundTransaction> | null>(null);
 
     const formSourcesAndDestinations = useMemo(() => {
         const accounts = bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }));
@@ -280,6 +283,36 @@ export default function CashBankClient() {
         setIsLoanDialogOpen(true);
     };
 
+    const handleEditFundTransaction = (transaction: FundTransaction) => {
+        setCurrentFundTransaction(transaction);
+        setIsFundTransactionDialogOpen(true);
+    };
+
+    const handleUpdateFundTransaction = async () => {
+        if (!currentFundTransaction || !currentFundTransaction.id) return;
+        try {
+            await updateFundTransaction(currentFundTransaction.id, {
+                amount: currentFundTransaction.amount,
+                description: currentFundTransaction.description,
+            });
+            toast({ title: 'Transaction updated successfully', variant: 'success' });
+            setIsFundTransactionDialogOpen(false);
+        } catch (error) {
+            toast({ title: 'Failed to update transaction', variant: 'destructive' });
+            console.error(error);
+        }
+    };
+
+    const handleDeleteFundTransaction = async (id: string) => {
+        try {
+            await deleteFundTransaction(id);
+            toast({ title: 'Transaction deleted successfully', variant: 'success' });
+        } catch (error) {
+            toast({ title: 'Failed to delete transaction', variant: 'destructive' });
+            console.error(error);
+        }
+    };
+
 
     if (!isClient || loading) return <div>Loading...</div>;
 
@@ -422,6 +455,7 @@ export default function CashBankClient() {
                                     <TableHead>Type</TableHead>
                                     <TableHead className="text-right">Amount</TableHead>
                                     <TableHead>Description</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -438,8 +472,21 @@ export default function CashBankClient() {
                                         </TableCell>
                                         <TableCell className="text-right font-mono">{formatCurrency(t.amount)}</TableCell>
                                         <TableCell>{t.description}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => handleEditFundTransaction(t)}><Pen className="h-4 w-4" /></Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Delete Transaction?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the transaction of {formatCurrency(t.amount)}. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteFundTransaction(t.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
+                                {fundTransactions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No fund transactions found.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </div>
@@ -524,6 +571,38 @@ export default function CashBankClient() {
                             <Button variant="outline">Cancel</Button>
                          </DialogClose>
                         <Button onClick={handleLoanSubmit}>{currentLoan?.id ? 'Save Changes' : 'Add Entry'}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isFundTransactionDialogOpen} onOpenChange={setIsFundTransactionDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Fund Transaction</DialogTitle>
+                    </DialogHeader>
+                    {currentFundTransaction && (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-1">
+                                <Label>Amount</Label>
+                                <Input 
+                                    type="number" 
+                                    value={currentFundTransaction.amount || 0}
+                                    onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, amount: Number(e.target.value)} : null)}
+                                    readOnly={currentFundTransaction.type === 'CapitalInflow'}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label>Description</Label>
+                                <Textarea 
+                                    value={currentFundTransaction.description || ''}
+                                    onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsFundTransactionDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleUpdateFundTransaction}>Save Changes</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

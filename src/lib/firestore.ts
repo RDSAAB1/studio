@@ -411,6 +411,17 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
   return { id: docRef.id, ...finalData };
 }
 
+export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
+    const docRef = doc(fundTransactionsCollection, id);
+    await updateDoc(docRef, data);
+}
+
+export async function deleteFundTransaction(id: string): Promise<void> {
+    const docRef = doc(fundTransactionsCollection, id);
+    await deleteDoc(docRef);
+}
+
+
 // --- Income/Expense Category Functions ---
 
 export function getIncomeCategories(callback: (data: IncomeCategory[]) => void, onError: (error: Error) => void) {
