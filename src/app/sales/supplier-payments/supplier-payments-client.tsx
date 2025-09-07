@@ -156,6 +156,40 @@ export default function SupplierPaymentsClient() {
     return summary;
   }, [suppliers]);
   
+  const financialState = useMemo(() => {
+    const balances = new Map<string, number>();
+    bankAccounts.forEach(acc => balances.set(acc.id, 0));
+    balances.set('CashInHand', 0);
+
+    fundTransactions.forEach(t => {
+        if (t.type === 'CapitalInflow') {
+            if (balances.has(t.destination)) {
+                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+            }
+        } else if (t.type === 'CashTransfer') {
+             if (balances.has(t.source)) {
+                balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+            }
+            if (balances.has(t.destination)) {
+                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+            }
+        }
+    });
+    
+    transactions.forEach(t => {
+        const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+         if (balanceKey && balances.has(balanceKey)) {
+            if (t.transactionType === 'Income') {
+                balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+            } else if (t.transactionType === 'Expense') {
+                balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+            }
+        }
+    });
+    
+    return { balances };
+  }, [fundTransactions, transactions, bankAccounts]);
+
   const selectedEntries = useMemo(() => {
     return suppliers.filter(s => selectedEntryIds.has(s.id));
   }, [suppliers, selectedEntryIds]);
@@ -682,7 +716,7 @@ export default function SupplierPaymentsClient() {
                         const docId = supplierDocRefs.get(detail.srNo)!;
                         const supplierDocRef = doc(db, "suppliers", docId);
                         const currentNetAmount = Number(supplierData.netAmount) || 0;
-                        const amountToRestore = detail.amount + (detail.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                        const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
                         transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
