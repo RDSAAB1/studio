@@ -7,16 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { formatCurrency, toTitleCase, formatSrNo } from '@/lib/utils';
-import { Loader2, Edit, Save, X, Printer, Mail } from 'lucide-react';
+import { Loader2, Edit, Save, X, Printer, Mail, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import * as XLSX from 'xlsx';
 
 
 interface RtgsReportRow {
@@ -140,6 +141,33 @@ export default function RtgsReportClient() {
         }
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
+    
+    const handleDownloadExcel = () => {
+        if (filteredReportRows.length === 0) {
+            toast({ title: 'No data to download.', variant: 'destructive' });
+            return;
+        }
+
+        const dataToExport = filteredReportRows.map(p => ({
+            'Date': format(new Date(p.date), 'dd-MMM-yy'),
+            'SR No.': p.srNo,
+            'Payee Name': p.supplierName,
+            "Father's Name": p.fatherName,
+            'A/C No.': p.acNo,
+            'IFSC Code': p.ifscCode,
+            'Bank': p.bank,
+            'Branch': p.branch,
+            'Amount': p.amount,
+            'Check No.': p.checkNo,
+            'Parchi No.': p.parchiNo,
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "RTGS Report");
+        XLSX.writeFile(workbook, `RTGS_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+        toast({ title: 'Downloading Excel file...', variant: 'success' });
+    };
     
     const handlePrint = () => {
         const node = tablePrintRef.current;
@@ -371,10 +399,6 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>RTGS Print Preview</DialogTitle>
-                        <DialogDescription>A preview of the consolidated RTGS report for printing.</DialogDescription>
-                    </DialogHeader>
                     <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />
                 </DialogContent>
             </Dialog>
@@ -385,12 +409,15 @@ export default function RtgsReportClient() {
                         <DialogTitle>Table Print Preview</DialogTitle>
                         <DialogDescription>A preview of the RTGS report table.</DialogDescription>
                     </DialogHeader>
-                    <div className="flex justify-end p-2 border-b">
-                         <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
+                    <DialogFooter className="p-2 border-b flex justify-end gap-2">
+                        <Button variant="outline" onClick={handleDownloadExcel}>
+                            <Download className="mr-2 h-4 w-4" /> Download Excel
+                        </Button>
+                        <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
+                    </DialogFooter>
+                    <div className="p-4 overflow-auto flex-grow">
+                        <div dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
                     </div>
-                    <ScrollArea className="flex-grow">
-                        <div className="p-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: tablePrintRef.current?.outerHTML || "" }} />
-                    </ScrollArea>
                 </DialogContent>
             </Dialog>
 
