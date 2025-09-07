@@ -675,11 +675,11 @@ export default function SupplierPaymentsClient() {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-    
+
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
-
+    
                 // --- READ PHASE ---
                 const supplierDocRefs = new Map<string, string>();
                 const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
@@ -690,7 +690,7 @@ export default function SupplierPaymentsClient() {
                         supplierDocRefs.set(doc.data().srNo, doc.id);
                     });
                 }
-    
+        
                 const expenseQuery = query(transactionsCollection, where("description", "==", `Payment ${paymentToDelete.paymentId} to ${paymentToDelete.supplierName}`));
                 const expenseSnapshot = await getDocs(expenseQuery);
                 const expenseDocsToDelete = expenseSnapshot.docs.map(doc => doc.ref);
@@ -711,11 +711,11 @@ export default function SupplierPaymentsClient() {
                         const docId = supplierDocRefs.get(detail.srNo)!;
                         const supplierDocRef = doc(db, "suppliers", docId);
                         const currentNetAmount = Number(supplierData.netAmount) || 0;
-                        const amountToRestore = detail.amount;
+                        const amountToRestore = detail.amount + (detail.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
                         transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
-
+    
                 expenseDocsToDelete.forEach(ref => transaction.delete(ref));
                 transaction.delete(paymentRef);
             });
@@ -910,7 +910,7 @@ export default function SupplierPaymentsClient() {
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
@@ -999,3 +999,5 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
