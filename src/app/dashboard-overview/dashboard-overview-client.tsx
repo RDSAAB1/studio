@@ -157,7 +157,7 @@ export default function DashboardOverviewClient() {
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
                  <CardHeader className="pt-0">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Cash &amp; Bank Balances</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Cash & Bank Balances</CardTitle>
                 </CardHeader>
                  <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                      {Array.from(financialState.balances.entries()).map(([key, balance]) => {
@@ -178,7 +178,7 @@ export default function DashboardOverviewClient() {
 
              <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-primary"/>Sales &amp; Supplier Overview</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-primary"/>Sales & Supplier Overview</CardTitle>
                     <CardDescription>Key metrics from your sales and supplier activities.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
