@@ -216,6 +216,7 @@ export default function DashboardOverviewClient() {
                                         <TableCell className={cn("text-right font-medium", t.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(t.amount)}</TableCell>
                                     </TableRow>
                                 ))}
+                                {recentTransactions.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">No recent transactions.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </CardContent>
@@ -247,6 +248,7 @@ export default function DashboardOverviewClient() {
                                         <TableCell className="text-right font-medium">{formatCurrency(Number(c.netAmount))}</TableCell>
                                     </TableRow>
                                 ))}
+                                {recentSuppliers.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">No recent supplier entries.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </CardContent>
