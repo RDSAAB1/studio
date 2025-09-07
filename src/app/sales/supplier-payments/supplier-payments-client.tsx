@@ -525,9 +525,7 @@ export default function SupplierPaymentsClient() {
                     const supplier = suppliers.find(s => s.srNo === detail.srNo);
                     if (supplier && supplierDocs.has(supplier.id)) {
                         const currentNetAmount = Number(supplierDocs.get(supplier.id).netAmount) || 0;
-                        const amountToRestore = tempEditingPayment.cdApplied 
-                            ? detail.amount + (tempEditingPayment.cdAmount || 0)
-                            : detail.amount;
+                        const amountToRestore = detail.amount + (tempEditingPayment.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
                         const supplierRef = doc(db, "suppliers", supplier.id);
                         transaction.update(supplierRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
@@ -918,7 +916,7 @@ export default function SupplierPaymentsClient() {
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
@@ -1007,3 +1005,6 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+
+    
