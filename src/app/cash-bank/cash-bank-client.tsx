@@ -22,7 +22,7 @@ import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Sc
 import { format, addMonths } from "date-fns";
 
 import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime } from "@/lib/firestore";
-import { cashBankFormSchemas, type CapitalInflowValues, type WithdrawalValues, type DepositValues } from "./formSchemas";
+import { cashBankFormSchemas, type WithdrawalValues, type DepositValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 
@@ -108,7 +108,6 @@ export default function CashBankClient() {
         };
     }, []);
 
-    const capitalInflowForm = useForm<CapitalInflowValues>({ resolver: zodResolver(cashBankFormSchemas.capitalInflowSchema), defaultValues: { source: undefined, destination: undefined, amount: 0, description: "" } });
     const withdrawalForm = useForm<WithdrawalValues>({ resolver: zodResolver(cashBankFormSchemas.withdrawalSchema), defaultValues: { amount: 0, description: "" } });
     const depositForm = useForm<DepositValues>({ resolver: zodResolver(cashBankFormSchemas.depositSchema), defaultValues: { amount: 0, description: "" } });
     
@@ -165,11 +164,6 @@ export default function CashBankClient() {
                 throw error; // Re-throw to handle in the caller
             });
     };
-    
-    const onCapitalInflowSubmit = (values: CapitalInflowValues) => {
-        handleAddFundTransaction({ type: 'CapitalInflow', source: values.source, destination: values.destination, amount: values.amount, description: values.description })
-          .then(() => capitalInflowForm.reset({ source: undefined, destination: undefined, amount: 0, description: "" }));
-    };
 
     const onWithdrawalSubmit = (values: WithdrawalValues) => {
         handleAddFundTransaction({ type: 'BankWithdrawal', source: 'BankAccount', destination: 'CashInHand', amount: values.amount, description: values.description })
@@ -207,6 +201,22 @@ export default function CashBankClient() {
 
     const handleLoanSubmit = async () => {
         if (!currentLoan) return;
+        
+        // Handle Owner's Capital as a direct fund transaction
+        if(currentLoan.loanType === 'OwnerCapital') {
+            const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
+                type: 'CapitalInflow',
+                source: 'OwnerCapital',
+                destination: currentLoan.paymentMethod === 'Bank' ? 'BankAccount' : 'CashInHand',
+                amount: currentLoan.totalAmount || 0,
+                description: `Owner's capital contribution`
+            };
+            await addFundTransaction(capitalInflowData);
+            toast({ title: "Capital added successfully", variant: 'success' });
+            setIsLoanDialogOpen(false);
+            return;
+        }
+
 
         let loanNameToSave = '';
         if (currentLoan.loanType === 'Product' && currentLoan.productName) {
@@ -293,91 +303,49 @@ export default function CashBankClient() {
             <Tabs defaultValue="funds" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="funds">Fund Management</TabsTrigger>
-                    <TabsTrigger value="loans">Loan Management</TabsTrigger>
+                    <TabsTrigger value="loans">Loan & Capital Management</TabsTrigger>
                 </TabsList>
                 <TabsContent value="funds" className="mt-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <TransactionFormCard title="Add Capital" description="Add funds from various sources into your business.">
-                            <form onSubmit={capitalInflowForm.handleSubmit(onCapitalInflowSubmit)} className="space-y-4">
-                                <Controller name="source" control={capitalInflowForm.control} render={({ field }) => (
-                                    <div className="space-y-1">
-                                        <Label>Source of Capital</Label>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <SelectTrigger><SelectValue placeholder="Select Source" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="OwnerCapital">Owner's Capital</SelectItem>
-                                                <SelectItem value="BankLoan">Bank Loan</SelectItem>
-                                                <SelectItem value="ExternalLoan">External Loan</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )} />
-                                <Controller name="destination" control={capitalInflowForm.control} render={({ field }) => (
-                                    <div className="space-y-1">
-                                        <Label>Deposit To</Label>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <SelectTrigger><SelectValue placeholder="Select Destination" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="BankAccount">Bank Account</SelectItem>
-                                                <SelectItem value="CashInHand">Cash in Hand</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )} />
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <TransactionFormCard title="Withdraw from Bank" description="Move funds from your bank to cash in hand.">
+                            <form onSubmit={withdrawalForm.handleSubmit(onWithdrawalSubmit)} className="space-y-4">
                                 <div className="space-y-1">
-                                    <Label htmlFor="capital-amount">Amount</Label>
-                                    <Input id="capital-amount" type="number" {...capitalInflowForm.register('amount')} />
-                                    {capitalInflowForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{capitalInflowForm.formState.errors.amount.message}</p>}
+                                <Label htmlFor="withdrawal-amount">Amount <span className="text-destructive">*</span></Label>
+                                    <Input id="withdrawal-amount" type="number" {...withdrawalForm.register('amount')} />
+                                    {withdrawalForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{withdrawalForm.formState.errors.amount.message}</p>}
                                 </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="capital-description">Description</Label>
-                                    <Textarea id="capital-description" {...capitalInflowForm.register('description')} />
+                                    <div className="space-y-1">
+                                    <Label htmlFor="withdrawal-description">Description</Label>
+                                    <Textarea id="withdrawal-description" {...withdrawalForm.register('description')} />
                                 </div>
-                                <Button type="submit"><Save className="mr-2"/> Add Capital</Button>
+                                <Button type="submit"><ArrowDown className="mr-2"/> Withdraw</Button>
                             </form>
                         </TransactionFormCard>
 
-                        <div className="space-y-6">
-                            <TransactionFormCard title="Withdraw from Bank" description="Move funds from your bank to cash in hand.">
-                                <form onSubmit={withdrawalForm.handleSubmit(onWithdrawalSubmit)} className="space-y-4">
+                        <TransactionFormCard title="Deposit to Bank" description="Move cash from hand to your bank account.">
+                            <form onSubmit={depositForm.handleSubmit(onDepositSubmit)} className="space-y-4">
                                     <div className="space-y-1">
-                                    <Label htmlFor="withdrawal-amount">Amount <span className="text-destructive">*</span></Label>
-                                        <Input id="withdrawal-amount" type="number" {...withdrawalForm.register('amount')} />
-                                        {withdrawalForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{withdrawalForm.formState.errors.amount.message}</p>}
-                                    </div>
-                                     <div className="space-y-1">
-                                        <Label htmlFor="withdrawal-description">Description</Label>
-                                        <Textarea id="withdrawal-description" {...withdrawalForm.register('description')} />
-                                    </div>
-                                    <Button type="submit"><ArrowDown className="mr-2"/> Withdraw</Button>
-                                </form>
-                            </TransactionFormCard>
-
-                            <TransactionFormCard title="Deposit to Bank" description="Move cash from hand to your bank account.">
-                                <form onSubmit={depositForm.handleSubmit(onDepositSubmit)} className="space-y-4">
-                                     <div className="space-y-1">
-                                        <Label htmlFor="deposit-amount">Amount <span className="text-destructive">*</span></Label>
-                                        <Input id="deposit-amount" type="number" {...depositForm.register('amount')} />
-                                        {depositForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{depositForm.formState.errors.amount.message}</p>}
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor="deposit-description">Description</Label>
-                                        <Textarea id="deposit-description" {...depositForm.register('description')} />
-                                    </div>
-                                    <Button type="submit"><ArrowUp className="mr-2"/> Deposit</Button>
-                                </form>
-                            </TransactionFormCard>
-                        </div>
+                                    <Label htmlFor="deposit-amount">Amount <span className="text-destructive">*</span></Label>
+                                    <Input id="deposit-amount" type="number" {...depositForm.register('amount')} />
+                                    {depositForm.formState.errors.amount && <p className="text-xs text-destructive mt-1">{depositForm.formState.errors.amount.message}</p>}
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="deposit-description">Description</Label>
+                                    <Textarea id="deposit-description" {...depositForm.register('description')} />
+                                </div>
+                                <Button type="submit"><ArrowUp className="mr-2"/> Deposit</Button>
+                            </form>
+                        </TransactionFormCard>
                     </div>
                 </TabsContent>
                  <TabsContent value="loans" className="mt-6">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <CardTitle className="text-xl font-semibold">Loan Management</CardTitle>
-                                <CardDescription>Track all your bank and external loans here.</CardDescription>
+                                <CardTitle className="text-xl font-semibold">Loan & Capital Management</CardTitle>
+                                <CardDescription>Track all your loans and add capital injections here.</CardDescription>
                             </div>
-                            <Button onClick={openLoanDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Loan</Button>
+                            <Button onClick={openLoanDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Entry</Button>
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto">
@@ -460,22 +428,27 @@ export default function CashBankClient() {
              <Dialog open={isLoanDialogOpen} onOpenChange={setIsLoanDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{currentLoan?.id ? 'Edit Loan' : 'Add New Loan'}</DialogTitle>
-                        <DialogDescription>Fill in the details of the loan below.</DialogDescription>
+                        <DialogTitle>{currentLoan?.id ? 'Edit Entry' : 'Add New Entry'}</DialogTitle>
+                        <DialogDescription>Fill in the details of the capital or loan below.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] -mr-4 pr-4">
                         <div className="grid gap-4 py-4 pr-1">
                              <div className="space-y-1">
-                                <Label>Loan Type</Label>
-                                <Select name="loanType" value={currentLoan?.loanType || 'Product'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider'}))}>
+                                <Label>Type</Label>
+                                <Select name="loanType" value={currentLoan?.loanType || 'Product'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital'}))}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="OwnerCapital">Owner's Capital</SelectItem>
                                     <SelectItem value="Product">Product Loan</SelectItem>
                                     <SelectItem value="Bank">Bank Loan</SelectItem>
                                     <SelectItem value="Outsider">Outsider Loan</SelectItem>
                                   </SelectContent>
                                 </Select>
                             </div>
+
+                            {currentLoan.loanType === 'OwnerCapital' && (<div className="space-y-4">
+                                <div className="space-y-1"><Label htmlFor="totalAmount">Capital Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
+                            </div>)}
                             
                             {currentLoan.loanType === 'Product' && (<div className="space-y-4">
                                 <div className="space-y-1"><Label htmlFor="productName">Product Name</Label><Input id="productName" name="productName" value={currentLoan?.productName || ''} onChange={handleLoanInputChange}/></div>
@@ -519,8 +492,8 @@ export default function CashBankClient() {
                                 <Select name="paymentMethod" value={currentLoan?.paymentMethod || 'Bank'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, paymentMethod: value as 'Bank' | 'Cash'}))}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="Bank">Bank</SelectItem>
-                                    <SelectItem value="Cash">Cash</SelectItem>
+                                    <SelectItem value="Bank">Bank Account</SelectItem>
+                                    <SelectItem value="Cash">Cash in Hand</SelectItem>
                                   </SelectContent>
                                 </Select>
                             </div>
@@ -530,7 +503,7 @@ export default function CashBankClient() {
                          <DialogClose asChild>
                             <Button variant="outline">Cancel</Button>
                          </DialogClose>
-                        <Button onClick={handleLoanSubmit}>{currentLoan?.id ? 'Save Changes' : 'Add Loan'}</Button>
+                        <Button onClick={handleLoanSubmit}>{currentLoan?.id ? 'Save Changes' : 'Add Entry'}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
