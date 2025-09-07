@@ -37,6 +37,17 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     useEffect(() => {
         if (isOpen && settings) {
             const today = format(new Date(), 'dd-MMM-yyyy');
+            
+            // Determine the check number for the filename
+            let checkNoStr = '';
+            if (payments.length > 0) {
+                const firstCheckNo = payments[0].checkNo;
+                if (firstCheckNo && payments.every((p: any) => p.checkNo === firstCheckNo)) {
+                    checkNoStr = `_Check_${firstCheckNo}`;
+                }
+            }
+            const filename = `RTGS_Report_${today}${checkNoStr}.xlsx`;
+
             const subject = `RTGS Payment Advice - ${settings.companyName} - ${today}`;
             const body = `Dear Team,\n\nPlease find the RTGS payment advice for today, ${today}, attached with this email.\n\nThank you,\n${settings.companyName}`;
             
@@ -61,7 +72,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             
             setAttachments([{
-                filename: `RTGS_Report_${today}.xlsx`,
+                filename: filename,
                 buffer: Array.from(new Uint8Array(excelBuffer)),
                 contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             }]);
@@ -174,7 +185,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                 </thead>
                                 <tbody>
                                     {payments.map((p: any, index: number) => (
-                                        <tr key={p.srNo} className="border-t">
+                                        <tr key={p.srNo || index} className="border-t">
                                             <td className="p-2">{index + 1}</td>
                                             <td className="p-2">{settings.accountNo}</td>
                                             <td className="p-2 text-right font-medium">{p.amount}</td>
