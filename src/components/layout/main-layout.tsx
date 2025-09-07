@@ -65,14 +65,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     if (loading || !user || UNPROTECTED_ROUTES.includes(pathname)) return;
 
+    // Remove query parameters to match hrefs in allMenuItems
+    const basePath = pathname.split('?')[0];
+
     let initialTab: MenuItem | undefined;
     for (const item of allMenuItems) {
-        if (item.href === pathname) {
+        if (item.href === basePath) {
             initialTab = item;
             break;
         }
         if (item.subMenus) {
-            initialTab = item.subMenus.find(sub => sub.href === pathname);
+            initialTab = item.subMenus.find(sub => sub.href === basePath);
             if (initialTab) break;
         }
     }
@@ -82,7 +85,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             setOpenTabs(prev => [...prev, initialTab!]);
         }
         setActiveTabId(initialTab.id);
-    } else if (openTabs.length === 0 && pathname !== '/') {
+    } else if (openTabs.length === 0 && basePath !== '/') {
         // If no tab matches and we are not on the root, maybe select a default
         const dashboard = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboard) {
