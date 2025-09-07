@@ -78,6 +78,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
     if (!dashboardTab) return;
 
+    // Initialize with dashboard tab if no tabs are open
     if (openTabs.length === 0 && pathname === '/sales/dashboard-overview') {
         setOpenTabs([dashboardTab]);
         setActiveTabId(dashboardTab.id);
@@ -86,21 +87,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
 
   useEffect(() => {
-    if (!authChecked || UNPROTECTED_ROUTES.includes(pathname)) return;
-
+    if (!authChecked || !user || UNPROTECTED_ROUTES.includes(pathname)) return;
+    
     const currentTabInfo = findTabForPath(pathname);
     
     if (currentTabInfo) {
       setActiveTabId(currentTabInfo.id);
       
       setOpenTabs(prevTabs => {
+        // If tab already exists, just make sure it's the active one
         if (prevTabs.some(tab => tab.id === currentTabInfo.id)) {
           return prevTabs;
         }
+        // If tab doesn't exist, add it to the list
         return [...prevTabs, currentTabInfo];
       });
     }
-  }, [pathname, authChecked]);
+  }, [pathname, authChecked, user]);
 
   const handleTabClick = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
@@ -123,6 +126,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             const newActiveTab = newTabs[tabIndex - 1] || newTabs[0];
             if (newActiveTab && newActiveTab.href) {
                 router.push(newActiveTab.href);
+                setActiveTabId(newActiveTab.id);
             }
         }
         return newTabs;
