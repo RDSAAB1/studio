@@ -35,7 +35,9 @@ export const PaymentForm = ({
     // Combination Generator Props
     calcTargetAmount, setCalcTargetAmount, calcMinRate, setCalcMinRate, calcMaxRate, setCalcMaxRate,
     handleGeneratePaymentOptions, paymentOptions, selectPaymentAmount, requestSort, sortedPaymentOptions,
-    roundFigureToggle, setRoundFigureToggle
+    roundFigureToggle, setRoundFigureToggle,
+    // Bank Account Props
+    bankAccounts, selectedAccountId, setSelectedAccountId, financialState
 }: any) => {
 
     const availableBranches = React.useMemo(() => {
@@ -91,6 +93,24 @@ export const PaymentForm = ({
                         <div className="space-y-1"><Label className="text-xs">CD Amount</Label><Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" /></div>
                     </>}
                 </>
+                )}
+                 {paymentMethod !== 'Cash' && (
+                    <div className="space-y-1">
+                        <Label className="text-xs">Payment From</Label>
+                        <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                            <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select Account" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="CashInHand">Cash In Hand</SelectItem>
+                                {bankAccounts.map((acc: any) => (
+                                    <SelectItem key={acc.id} value={acc.id}>
+                                        {acc.accountHolderName} ({formatCurrency(financialState.balances.get(acc.id) || 0)})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 )}
                 </CardContent>
             </Card>

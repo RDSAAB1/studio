@@ -2,10 +2,10 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction } from '@/lib/firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -52,6 +52,7 @@ export default function SupplierPaymentsClient() {
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -61,6 +62,7 @@ export default function SupplierPaymentsClient() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('CashInHand');
   
   const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -180,7 +182,16 @@ export default function SupplierPaymentsClient() {
   
   useEffect(() => {
     setIsClient(true);
+    const lastUsedAccount = localStorage.getItem('lastSelectedAccountId');
+    if (lastUsedAccount) {
+      setSelectedAccountId(lastUsedAccount);
+    }
   }, []);
+
+  const handleSetSelectedAccount = (accountId: string) => {
+    setSelectedAccountId(accountId);
+    localStorage.setItem('lastSelectedAccountId', accountId);
+  }
 
   useEffect(() => {
     if(!isClient) return;
@@ -218,6 +229,7 @@ export default function SupplierPaymentsClient() {
     
     const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
     const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
+    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
     
     const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
       if(isSubscribed) console.error("Error fetching banks:", error);
@@ -242,40 +254,39 @@ export default function SupplierPaymentsClient() {
       unsubPayments();
       unsubTransactions();
       unsubFunds();
+      unsubBankAccounts();
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
   }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
   
   const financialState = useMemo(() => {
-        let bankBalance = 0;
-        let cashInHand = 0;
+        const balances = new Map<string, number>();
+        bankAccounts.forEach(acc => balances.set(acc.id, 0));
+        balances.set('CashInHand', 0);
         
         fundTransactions.forEach(t => {
-            if (t.type === 'CapitalInflow') {
-                if(t.destination === 'BankAccount') bankBalance += t.amount;
-                if(t.destination === 'CashInHand') cashInHand += t.amount;
-            } else if (t.type === 'BankWithdrawal') {
-                bankBalance -= t.amount;
-                cashInHand += t.amount;
-            } else if (t.type === 'BankDeposit') {
-                cashInHand -= t.amount;
-                bankBalance += t.amount;
+            if (balances.has(t.source)) {
+                balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+            }
+            if (balances.has(t.destination)) {
+                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
             }
         });
         
         transactions.forEach(t => {
-            if (t.transactionType === 'Income') {
-                if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance += t.amount;
-                if (t.paymentMethod === 'Cash') cashInHand += t.amount;
-            } else if (t.transactionType === 'Expense') {
-                 if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque' || t.paymentMethod === 'RTGS') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
+            const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+            if (balanceKey && balances.has(balanceKey)) {
+                if (t.transactionType === 'Income') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+                } else if (t.transactionType === 'Expense') {
+                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+                }
             }
         });
         
-        return { bankBalance, cashInHand };
-  }, [fundTransactions, transactions]);
+        return { balances };
+  }, [fundTransactions, transactions, bankAccounts]);
 
   useEffect(() => {
     if (paymentType === 'Partial') {
@@ -437,17 +448,14 @@ export default function SupplierPaymentsClient() {
 
         const finalPaymentAmount = rtgsAmount || paymentAmount;
         
-        let availableBalance = 0;
-        if (paymentMethod === 'Cash') {
-            availableBalance = financialState.cashInHand;
-        } else if (paymentMethod === 'Online' || paymentMethod === 'RTGS' || paymentMethod === 'Cheque') {
-            availableBalance = financialState.bankBalance;
-        }
-
+        const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
+        const availableBalance = financialState.balances.get(accountIdForPayment) || 0;
+        
         if (finalPaymentAmount > availableBalance) {
+            const accountName = bankAccounts.find(acc => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
             toast({
                 title: "Insufficient Balance",
-                description: `Cannot process payment of ${formatCurrency(finalPaymentAmount)}. Available ${paymentMethod} balance is ${formatCurrency(availableBalance)}.`,
+                description: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.`,
                 variant: "destructive"
             });
             return;
@@ -585,6 +593,7 @@ export default function SupplierPaymentsClient() {
                     paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
                     status: 'Paid',
                     isRecurring: false,
+                    bankAccountId: paymentMethod !== 'Cash' ? selectedAccountId : undefined,
                 };
                 const newTransactionRef = doc(collection(db, 'transactions'));
                 transaction.set(newTransactionRef, { ...expenseData, id: newTransactionRef.id });
@@ -913,6 +922,10 @@ export default function SupplierPaymentsClient() {
                         sortedPaymentOptions={sortedPaymentOptions}
                         roundFigureToggle={roundFigureToggle}
                         setRoundFigureToggle={setRoundFigureToggle}
+                        bankAccounts={bankAccounts}
+                        selectedAccountId={selectedAccountId}
+                        setSelectedAccountId={handleSetSelectedAccount}
+                        financialState={financialState}
                     />
                 )}
             </TabsContent>
