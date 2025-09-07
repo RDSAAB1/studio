@@ -65,13 +65,11 @@ export default function DashboardOverviewClient() {
     const financialState = useMemo(() => {
         let bankBalance = 0;
         let cashInHand = 0;
-        let totalLiabilities = 0;
-
+        
         fundTransactions.forEach(t => {
             if (t.type === 'CapitalInflow') {
                 if(t.destination === 'BankAccount') bankBalance += t.amount;
                 if(t.destination === 'CashInHand') cashInHand += t.amount;
-                if(t.source === 'BankLoan' || t.source === 'ExternalLoan') totalLiabilities += t.amount;
             } else if (t.type === 'BankWithdrawal') {
                 bankBalance -= t.amount;
                 cashInHand += t.amount;
@@ -87,7 +85,7 @@ export default function DashboardOverviewClient() {
                 if (t.paymentMethod === 'Cash') cashInHand += t.amount;
             } else if (t.transactionType === 'Expense') {
                  if (t.paymentMethod === 'Online' || t.paymentMethod === 'Cheque') bankBalance -= t.amount;
-                 if (t.paymentMethod === 'Cash') cashInHand -= t.amount;
+                 if (t.paymentMethod === 'Cash') cashInHand += t.amount;
             }
         });
         
@@ -98,7 +96,7 @@ export default function DashboardOverviewClient() {
             bankBalance, 
             cashInHand, 
             totalAssets: bankBalance + cashInHand, 
-            totalLiabilities,
+            totalLiabilities: fundTransactions.filter(t => t.source === 'BankLoan' || t.source === 'ExternalLoan').reduce((sum, t) => sum + t.amount, 0),
             totalIncome,
             totalExpense,
             netProfitLoss: totalIncome - totalExpense
@@ -152,7 +150,7 @@ export default function DashboardOverviewClient() {
 
              <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-primary"/>Sales & Supplier Overview</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-primary"/>Sales &amp; Supplier Overview</CardTitle>
                     <CardDescription>Key metrics from your sales and supplier activities.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -228,4 +226,3 @@ export default function DashboardOverviewClient() {
             </div>
         </div>
     );
-}
