@@ -4,13 +4,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Transaction, FundTransaction, Loan, BankAccount } from "@/lib/definitions";
+import type { Transaction, FundTransaction, Loan, BankAccount, Customer } from "@/lib/definitions";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, isPast } from 'date-fns';
-import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, AlertTriangle, Home, FileText, CheckCircle } from 'lucide-react';
+import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, AlertTriangle, Home, FileText, CheckCircle, Users, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +32,8 @@ export default function DashboardOverviewClient() {
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [suppliers, setSuppliers] = useState<Customer[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -50,6 +52,14 @@ export default function DashboardOverviewClient() {
         const unsubBankAccounts = onSnapshot(query(collection(db, "bankAccounts"), orderBy("bankName", "asc")), (snapshot) => {
             setBankAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount)));
         });
+
+        const unsubSuppliers = onSnapshot(query(collection(db, "suppliers"), orderBy("date", "desc")), (snapshot) => {
+            setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+        });
+
+        const unsubCustomers = onSnapshot(query(collection(db, "customers"), orderBy("date", "desc")), (snapshot) => {
+            setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+        });
         
         setLoading(false);
 
@@ -58,6 +68,8 @@ export default function DashboardOverviewClient() {
             unsubFunds();
             unsubLoans();
             unsubBankAccounts();
+            unsubSuppliers();
+            unsubCustomers();
         };
     }, []);
     
@@ -97,15 +109,22 @@ export default function DashboardOverviewClient() {
                 }
             }
         });
+
+        const totalSupplierDues = suppliers.reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
+        const totalCustomerDues = customers.reduce((sum, c) => sum + Number(c.netAmount || 0), 0);
         
-        const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount > 0 ? loan.remainingAmount : 0), 0);
-        const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
+        const loanLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount > 0 ? loan.remainingAmount : 0), 0);
+        const totalLiabilities = loanLiabilities + totalSupplierDues;
+        
+        const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
+        const totalAssets = cashAndBankAssets + totalCustomerDues;
+        
         const totalIncome = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
         const totalExpense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
         const netProfitLoss = totalIncome - totalExpense;
         
-        return { balances, totalAssets, totalLiabilities, totalIncome, totalExpense, netProfitLoss };
-    }, [fundTransactions, transactions, loansWithCalculatedRemaining, bankAccounts]);
+        return { balances, totalAssets, totalLiabilities, totalIncome, totalExpense, netProfitLoss, totalSupplierDues, totalCustomerDues };
+    }, [fundTransactions, transactions, loansWithCalculatedRemaining, bankAccounts, suppliers, customers]);
 
     const recentTransactions = useMemo(() => {
         return transactions.slice(0, 5);
@@ -129,12 +148,14 @@ export default function DashboardOverviewClient() {
                     <CardTitle className="text-xl font-semibold flex items-center gap-2"><Scale /> Financial Overview</CardTitle>
                     <CardDescription>A real-time overview of your business's financial health.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard title="Total Income" value={formatCurrency(financialState.totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" />
                     <StatCard title="Total Expense" value={formatCurrency(financialState.totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" />
                     <StatCard title="Net Profit/Loss" value={formatCurrency(financialState.netProfitLoss)} icon={<Scale />} colorClass={financialState.netProfitLoss >= 0 ? "text-green-500" : "text-red-500"} />
                     <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
-                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
+                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
+                    <StatCard title="Total Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
+                    <StatCard title="Total Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
                 </CardContent>
             </Card>
 
