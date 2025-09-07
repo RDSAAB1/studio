@@ -57,7 +57,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 if (pathname !== '/setup/connect-gmail') router.replace('/setup/connect-gmail');
             } else if (!rtgsSettings) {
                 if (pathname !== '/setup/company-details') router.replace('/setup/company-details');
-            } else if (UNPROTECTED_ROUTES.includes(pathname)) {
+            } else if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
                  router.replace('/sales/dashboard-overview');
             }
         } else {
@@ -82,14 +82,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
       if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
-    } else if (openTabs.length === 0 && user && pathname === '/') {
-        // Fallback for the root path if no other tab is active
-        const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
-        if (dashboardTab) {
-            setOpenTabs([dashboardTab]);
-            setActiveTabId(dashboardTab.id);
-            router.replace(dashboardTab.href!);
-        }
     }
   }, [pathname, authChecked, user, router]);
 
