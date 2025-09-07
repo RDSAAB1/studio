@@ -115,7 +115,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
         </div>
 
         {/* Bottom bar for actions and search */}
-        <div className="flex h-10 items-center justify-between gap-4 bg-muted px-4 sm:px-6">
+        <div className="flex h-10 items-center justify-between gap-4 bg-card px-4 sm:px-6">
             <div className="flex items-center gap-2">
                 <div className="flex-shrink-0 md:hidden">
                 <Button variant="ghost" size="icon" onClick={toggleSidebar}>
