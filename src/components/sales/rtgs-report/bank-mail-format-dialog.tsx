@@ -144,24 +144,24 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                 <thead className="sticky top-0 bg-muted">
                                     <tr>
                                         <th className="p-2 text-left">Sr.No</th>
-                                        <th className="p-2 text-left">Beneficiary</th>
-                                        <th className="p-2 text-left">Bank Name</th>
-                                        <th className="p-2 text-left">Branch</th>
-                                        <th className="p-2 text-left">A/C No.</th>
-                                        <th className="p-2 text-left">IFSC</th>
+                                        <th className="p-2 text-left">Debit_Ac_No</th>
                                         <th className="p-2 text-right">Amount</th>
+                                        <th className="p-2 text-left">IFSC_Code</th>
+                                        <th className="p-2 text-left">Credit_Ac_No</th>
+                                        <th className="p-2 text-left">Beneficiary_Name</th>
+                                        <th className="p-2 text-left">Scheme Type</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {payments.map((p: any) => (
                                         <tr key={p.srNo} className="border-t">
                                             <td className="p-2">{p.srNo}</td>
-                                            <td className="p-2">{p.supplierName}</td>
-                                            <td className="p-2">{p.bank}</td>
-                                            <td className="p-2">{p.branch}</td>
-                                            <td className="p-2">{p.acNo}</td>
-                                            <td className="p-2">{p.ifscCode}</td>
+                                            <td className="p-2">{settings.accountNo}</td>
                                             <td className="p-2 text-right font-medium">{p.amount}</td>
+                                            <td className="p-2">{p.ifscCode}</td>
+                                            <td className="p-2">{p.acNo}</td>
+                                            <td className="p-2">{toTitleCase(p.supplierName)}</td>
+                                            <td className="p-2">{p.type || settings.type || 'SB'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
