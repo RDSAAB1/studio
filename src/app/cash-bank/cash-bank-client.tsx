@@ -95,7 +95,15 @@ export default function CashBankClient() {
         };
     }, []);
 
-    const transferForm = useForm<TransferValues>({ resolver: zodResolver(cashBankFormSchemas.transferSchema), defaultValues: { amount: 0, description: "" } });
+    const transferForm = useForm<TransferValues>({ 
+        resolver: zodResolver(cashBankFormSchemas.transferSchema), 
+        defaultValues: { 
+            amount: 0, 
+            description: "",
+            source: "",
+            destination: ""
+        } 
+    });
     
     const loansWithCalculatedRemaining = useMemo(() => {
         return loans.map(loan => {
@@ -170,7 +178,7 @@ export default function CashBankClient() {
         }
         
         handleAddFundTransaction({ type: 'CashTransfer', source: values.source, destination: values.destination, amount: values.amount, description: values.description })
-          .then(() => transferForm.reset({ amount: 0, description: "" }));
+          .then(() => transferForm.reset({ amount: 0, description: "", source: "", destination: "" }));
     };
 
 
