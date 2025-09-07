@@ -592,7 +592,6 @@ export default function SupplierPaymentsClient() {
 
             // 5. Add new expense transaction
             const expenseData: Partial<Transaction> = {
-                id: '', // will be set by firestore
                 date: new Date().toISOString().split('T')[0],
                 transactionType: 'Expense',
                 category: 'Supplier Payments',
@@ -681,11 +680,11 @@ export default function SupplierPaymentsClient() {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-    
+
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
-    
+
                 // --- READ PHASE ---
                 const supplierDocRefs = new Map<string, string>();
                 const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
@@ -717,7 +716,7 @@ export default function SupplierPaymentsClient() {
                         const docId = supplierDocRefs.get(detail.srNo)!;
                         const supplierDocRef = doc(db, "suppliers", docId);
                         const currentNetAmount = Number(supplierData.netAmount) || 0;
-                        const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) : 0);
+                        const amountToRestore = detail.amount;
                         transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
