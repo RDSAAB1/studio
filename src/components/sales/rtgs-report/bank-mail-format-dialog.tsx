@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Loader2, Paperclip, FileSpreadsheet, X } from 'lucide-react';
+import { Mail, Loader2, Paperclip, FileSpreadsheet, X, Download } from 'lucide-react';
 import { toTitleCase } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -130,6 +130,26 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
         }
     };
 
+    const handleDownloadExcel = () => {
+        if (attachments.length === 0) {
+            toast({ title: "No Excel file generated", variant: "destructive" });
+            return;
+        }
+        const excelAttachment = attachments.find(att => att.filename.endsWith('.xlsx'));
+        if (!excelAttachment) {
+            toast({ title: "Excel attachment not found", variant: "destructive" });
+            return;
+        }
+        const blob = new Blob([new Uint8Array(excelAttachment.buffer)], { type: excelAttachment.contentType });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = excelAttachment.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({ title: "Excel file downloading...", variant: "success" });
+    };
+
     if (isPreview) {
         return (
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -168,8 +188,11 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                             </table>
                         </div>
                     </ScrollArea>
-                    <DialogFooter>
+                    <DialogFooter className="gap-2">
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button variant="secondary" onClick={handleDownloadExcel}>
+                            <Download className="mr-2 h-4 w-4" /> Download Excel
+                        </Button>
                         <Button onClick={() => setIsPreview(false)}>Compose Email</Button>
                     </DialogFooter>
                 </DialogContent>
