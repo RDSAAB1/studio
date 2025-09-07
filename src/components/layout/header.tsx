@@ -104,8 +104,18 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
 
   return (
     <header className="sticky top-0 z-30 flex flex-col bg-card">
-        {/* Top bar for actions and search */}
-        <div className="flex h-10 items-center justify-between gap-4 bg-background px-4 sm:px-6">
+        {/* Top bar for tabs */}
+        <div className="flex h-10 items-center px-4 sm:px-6 border-b border-border">
+            <TabBar 
+            openTabs={openTabs}
+            activeTabId={activeTabId}
+            onTabClick={onTabClick}
+            onCloseTab={onCloseTab}
+            />
+        </div>
+
+        {/* Bottom bar for actions and search */}
+        <div className="flex h-10 items-center justify-between gap-4 bg-muted px-4 sm:px-6">
             <div className="flex items-center gap-2">
                 <div className="flex-shrink-0 md:hidden">
                 <Button variant="ghost" size="icon" onClick={toggleSidebar}>
@@ -119,7 +129,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                         <Input
                             type="search"
                             placeholder="Search..."
-                            className="h-8 w-full rounded-full bg-muted pl-8"
+                            className="h-8 w-full rounded-full bg-background pl-8"
                             autoFocus
                         />
                         <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setIsSearchOpen(false)}>
@@ -143,7 +153,7 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                     <Input
                         type="search"
                         placeholder="Search..."
-                        className="h-8 w-full rounded-full bg-muted pl-8 md:w-[180px] lg:w-[250px]"
+                        className="h-8 w-full rounded-full bg-background pl-8 md:w-[180px] lg:w-[250px]"
                     />
                 </div>
                 <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSearchOpen(true)}>
@@ -172,16 +182,6 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
-        </div>
-
-        {/* Bottom bar for tabs */}
-        <div className="flex h-10 items-center px-4 sm:px-6 border-b border-border">
-            <TabBar 
-            openTabs={openTabs}
-            activeTabId={activeTabId}
-            onTabClick={onTabClick}
-            onCloseTab={onCloseTab}
-            />
         </div>
     </header>
   );
