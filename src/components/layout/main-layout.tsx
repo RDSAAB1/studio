@@ -82,17 +82,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
       if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
-    } else if (openTabs.length === 0 && user) {
+    } else if (openTabs.length === 0 && user && pathname === '/') {
+        // Fallback for the root path if no other tab is active
         const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
         if (dashboardTab) {
             setOpenTabs([dashboardTab]);
             setActiveTabId(dashboardTab.id);
-            if (pathname === '/') {
-              router.replace(dashboardTab.href!);
-            }
+            router.replace(dashboardTab.href!);
         }
     }
-  }, [pathname, authChecked, user, openTabs, router]);
+  }, [pathname, authChecked, user, router]);
 
 
   const handleTabClick = (tabId: string) => {
