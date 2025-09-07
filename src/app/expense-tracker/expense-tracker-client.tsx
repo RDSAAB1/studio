@@ -368,16 +368,22 @@ export default function IncomeExpenseClient() {
   
     setLoading(true);
     try {
-      const transactionData: TransactionFormData = {
+      const transactionData: Partial<TransactionFormData> = {
         ...values,
         isCalculated,
         isRecurring,
         date: format(values.date, "yyyy-MM-dd"), 
-        nextDueDate: values.nextDueDate ? format(values.nextDueDate, "yyyy-MM-dd") : undefined,
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
         projectId: values.projectId === 'none' ? '' : values.projectId,
       };
+
+      if (values.isRecurring && values.nextDueDate) {
+          transactionData.nextDueDate = format(values.nextDueDate, "yyyy-MM-dd");
+      } else {
+          delete transactionData.nextDueDate;
+      }
+
 
       if (isEditing) {
         await setDoc(doc(db, "transactions", isEditing), transactionData, { merge: true });
