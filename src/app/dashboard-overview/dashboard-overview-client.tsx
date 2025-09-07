@@ -156,7 +156,10 @@ export default function DashboardOverviewClient() {
                     <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" />
                 </CardContent>
-                 <CardHeader className="pt-0">
+            </Card>
+
+            <Card>
+                 <CardHeader className="pt-4">
                     <CardTitle className="flex items-center gap-2 text-base font-semibold"><Landmark className="h-4 w-4"/>Cash & Bank Balances</CardTitle>
                 </CardHeader>
                  <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -257,3 +260,5 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
+
+    
