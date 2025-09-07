@@ -20,7 +20,9 @@ const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-de
 const SETUP_ROUTES = ['/setup/connect-gmail', '/setup/company-details'];
 
 const findTabForPath = (path: string): MenuItem | undefined => {
-    const basePath = path.split('?')[0];
+    // Normalize path to remove trailing slash if it exists, but not if it's the root path
+    const basePath = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path.split('?')[0];
+
     for (const item of allMenuItems) {
         if (item.href === basePath) {
             return item;
@@ -83,7 +85,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
     }
-  }, [pathname, authChecked, user, router]);
+  }, [pathname, authChecked, user, openTabs]);
 
 
   const handleTabClick = (tabId: string) => {
@@ -108,6 +110,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
             if (newActiveTab && newActiveTab.href) {
                 router.push(newActiveTab.href);
                 setActiveTabId(newActiveTab.id);
+            } else if (newTabs.length === 0 && allMenuItems[0]?.href) {
+                // Fallback to dashboard if all tabs are closed
+                router.push(allMenuItems[0].href);
+                setActiveTabId(allMenuItems[0].id);
+                return [allMenuItems[0]];
             }
         }
         return newTabs;
