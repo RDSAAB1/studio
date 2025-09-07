@@ -73,13 +73,16 @@ export const allMenuItems: MenuItem[] = [
     ],
   },
   {
-    id: "finance",
-    name: "Finance",
-    icon: Scale,
-    subMenus: [
-        { id: "income-expense", name: "Income & Expense", icon: ChevronRight, href: "/expense-tracker" },
-        { id: "cash-bank", name: "Cash & Bank", icon: ChevronRight, href: "/cash-bank" },
-    ]
+    id: "cash-bank",
+    name: "Cash & Bank",
+    icon: Landmark,
+    href: "/cash-bank",
+  },
+  { 
+    id: "income-expense", 
+    name: "Income & Expense", 
+    icon: Scale, 
+    href: "/expense-tracker" 
   },
   {
     id: "reports",
