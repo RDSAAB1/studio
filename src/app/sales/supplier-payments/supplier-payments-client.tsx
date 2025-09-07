@@ -545,7 +545,7 @@ export default function SupplierPaymentsClient() {
                 
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-                    ...(paymentMethod === 'RTGS' && { rtgsSrNo: tempEditingPayment && tempEditingPayment.rtgsSrNo ? tempEditingPayment.rtgsSrNo : rtgsSrNo }),
+                    rtgsSrNo: paymentMethod === 'RTGS' ? (tempEditingPayment && tempEditingPayment.rtgsSrNo ? tempEditingPayment.rtgsSrNo : rtgsSrNo) : undefined,
                     customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                     date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
@@ -605,7 +605,7 @@ export default function SupplierPaymentsClient() {
     const handleEditPayment = async (paymentToEdit: Payment) => {
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         
-        if (paymentToEdit.rtgsFor === 'Supplier') {
+        if (paymentToEdit.rtgsFor === 'Supplier' && srNosInPayment.length > 0) {
           const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
           const supplierDocs = await getDocs(q);
           const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
