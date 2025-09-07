@@ -132,7 +132,7 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
     if (isPreview) {
         return (
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl">
+                <DialogContent className="max-w-5xl">
                     <DialogHeader>
                         <DialogTitle>RTGS Data Preview</DialogTitle>
                         <DialogDescription>Review the data that will be included in the Excel file before composing the email.</DialogDescription>
@@ -144,6 +144,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                     <tr>
                                         <th className="p-2 text-left">Sr.No</th>
                                         <th className="p-2 text-left">Beneficiary</th>
+                                        <th className="p-2 text-left">Bank Name</th>
+                                        <th className="p-2 text-left">Branch</th>
                                         <th className="p-2 text-left">A/C No.</th>
                                         <th className="p-2 text-left">IFSC</th>
                                         <th className="p-2 text-right">Amount</th>
@@ -154,6 +156,8 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                                         <tr key={p.srNo} className="border-t">
                                             <td className="p-2">{p.srNo}</td>
                                             <td className="p-2">{p.supplierName}</td>
+                                            <td className="p-2">{p.bank}</td>
+                                            <td className="p-2">{p.branch}</td>
                                             <td className="p-2">{p.acNo}</td>
                                             <td className="p-2">{p.ifscCode}</td>
                                             <td className="p-2 text-right font-medium">{p.amount}</td>
