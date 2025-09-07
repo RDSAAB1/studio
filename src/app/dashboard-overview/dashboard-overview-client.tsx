@@ -155,6 +155,11 @@ export default function DashboardOverviewClient() {
             "Supplier Dues": financialState.totalSupplierDues,
         }
     ];
+    
+    const recentTransactions = useMemo(() => {
+        return transactions.slice(0, 10);
+    }, [transactions]);
+
 
     if (loading) {
         return <div>Loading Dashboard...</div>;
@@ -229,6 +234,50 @@ export default function DashboardOverviewClient() {
                     </CardContent>
                 </Card>
             </div>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>Recent Transactions</CardTitle>
+                    <CardDescription>The last 10 recorded income and expense transactions.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Payee/Payer</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {recentTransactions.map((tx) => (
+                                <TableRow key={tx.id}>
+                                    <TableCell>{format(new Date(tx.date), 'dd-MMM-yy')}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={tx.transactionType === 'Income' ? 'default' : 'destructive'} className={tx.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>
+                                            {tx.transactionType}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>{tx.category}</TableCell>
+                                    <TableCell>{tx.payee}</TableCell>
+                                    <TableCell className={cn("text-right font-semibold", tx.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>
+                                        {formatCurrency(tx.amount)}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            {recentTransactions.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center h-24">No recent transactions found.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
         </div>
     );
 }
+
+    
