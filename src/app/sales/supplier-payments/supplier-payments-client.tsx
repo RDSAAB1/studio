@@ -289,6 +289,12 @@ export default function SupplierPaymentsClient() {
   }, [fundTransactions, transactions, bankAccounts]);
 
   useEffect(() => {
+    if (paymentType === 'Partial') {
+      setCdAt('paid_amount');
+    }
+  }, [paymentType]);
+  
+  useEffect(() => {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
   
@@ -678,7 +684,7 @@ export default function SupplierPaymentsClient() {
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
-
+                
                 // --- READ PHASE ---
                 const supplierDocRefs = new Map<string, string>();
                 const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
@@ -789,6 +795,7 @@ export default function SupplierPaymentsClient() {
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
         setRtgsAmount(option.calculatedAmount);
+        setCdAt('full_amount');
         toast({ title: `Amount ${formatCurrency(option.calculatedAmount)} selected.`, variant: 'success' });
     };
 
