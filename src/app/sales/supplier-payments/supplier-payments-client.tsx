@@ -470,6 +470,18 @@ export default function SupplierPaymentsClient() {
                 const tempEditingPayment = editingPayment;
                 let paidForDetails: PaidFor[] = [];
                 
+                // If editing, find and delete the old expense transaction first
+                if (tempEditingPayment) {
+                    const expenseQuery = query(
+                        transactionsCollection, 
+                        where("description", "==", `Payment ${tempEditingPayment.paymentId} to ${tempEditingPayment.supplierName}`)
+                    );
+                    const expenseSnapshot = await getDocs(expenseQuery);
+                    expenseSnapshot.forEach(doc => {
+                        transaction.delete(doc.ref);
+                    });
+                }
+                
                 const supplierDocRefsToRead = new Set<string>();
 
                 if (rtgsFor === 'Supplier') {
@@ -533,7 +545,7 @@ export default function SupplierPaymentsClient() {
                 
                 const paymentData: Omit<Payment, 'id'> = {
                     paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-                    ...(paymentMethod === 'RTGS' && { rtgsSrNo: tempEditingPayment ? tempEditingPayment.rtgsSrNo : rtgsSrNo }),
+                    ...(paymentMethod === 'RTGS' && { rtgsSrNo: tempEditingPayment && tempEditingPayment.rtgsSrNo ? tempEditingPayment.rtgsSrNo : rtgsSrNo }),
                     customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                     date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                     cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
@@ -546,6 +558,10 @@ export default function SupplierPaymentsClient() {
                     bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
                     rtgsFor: rtgsFor,
                 };
+                
+                 if (paymentMethod !== 'RTGS') {
+                    delete (paymentData as Partial<Payment>).rtgsSrNo;
+                }
 
                 if (tempEditingPayment) {
                     const paymentRef = doc(db, "payments", tempEditingPayment.id);
@@ -642,7 +658,7 @@ export default function SupplierPaymentsClient() {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-
+    
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
@@ -688,7 +704,7 @@ export default function SupplierPaymentsClient() {
                 // 3. Delete the payment itself
                 transaction.delete(paymentRef);
             });
-
+    
             toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) {
