@@ -149,6 +149,7 @@ export default function IncomeExpenseClient() {
   const selectedTransactionType = form.watch('transactionType');
   const selectedExpenseNature = form.watch('expenseNature');
   const selectedCategory = form.watch('category');
+  const selectedSubCategory = form.watch('subCategory');
   const quantity = form.watch('quantity');
   const rate = form.watch('rate');
 
@@ -158,14 +159,30 @@ export default function IncomeExpenseClient() {
       handleNew();
       setActiveTab('form');
       form.setValue('transactionType', 'Expense');
-      form.setValue('loanId', loanId);
       form.setValue('amount', Number(searchParams.get('amount') || 0));
       form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
       form.setValue('description', searchParams.get('description') || '');
       form.setValue('category', 'Interest & Loan Payments');
-      setTimeout(() => form.setValue('subCategory', 'Loan Repayment'), 100);
+      
+      const loan = loans.find(l => l.id === loanId);
+      if(loan) {
+        setTimeout(() => form.setValue('subCategory', loan.loanName), 100);
+      }
     }
   }, [searchParams, loans, form]);
+  
+  useEffect(() => {
+    if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
+        const loan = loans.find(l => l.loanName === selectedSubCategory);
+        if (loan) {
+            form.setValue('loanId', loan.id);
+        } else {
+            form.setValue('loanId', '');
+        }
+    } else {
+        form.setValue('loanId', '');
+    }
+  }, [selectedCategory, selectedSubCategory, loans, form]);
 
   useEffect(() => {
     if (isCalculated) {
@@ -185,9 +202,12 @@ export default function IncomeExpenseClient() {
   }, [selectedTransactionType, selectedExpenseNature, incomeCategories, expenseCategories]);
 
   const availableSubCategories = useMemo(() => {
+    if (selectedCategory === 'Interest & Loan Payments') {
+        return loans.map(l => l.loanName);
+    }
     const categoryObj = availableCategories.find(c => c.name === selectedCategory);
     return categoryObj?.subCategories || [];
-  }, [selectedCategory, availableCategories]);
+  }, [selectedCategory, availableCategories, loans]);
 
   useEffect(() => {
     const unsubTransactions = getTransactionsRealtime((data) => {
@@ -269,6 +289,13 @@ export default function IncomeExpenseClient() {
 
   const handleEdit = (transaction: Transaction) => {
     setIsEditing(transaction.id);
+    let subCategoryToSet = transaction.subCategory;
+    
+    if (transaction.category === 'Interest & Loan Payments' && transaction.loanId) {
+        const loan = loans.find(l => l.id === transaction.loanId);
+        if (loan) subCategoryToSet = loan.loanName;
+    }
+    
     form.reset({
       ...transaction,
       date: new Date(transaction.date), 
@@ -277,6 +304,7 @@ export default function IncomeExpenseClient() {
       rate: transaction.rate || 0,
       isCalculated: transaction.isCalculated || false,
       nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
+      subCategory: subCategoryToSet,
     });
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
@@ -328,7 +356,6 @@ export default function IncomeExpenseClient() {
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
         projectId: values.projectId === 'none' ? '' : values.projectId,
-        loanId: values.loanId === 'none' ? '' : values.loanId,
       };
 
       if (isEditing) {
@@ -612,20 +639,6 @@ export default function IncomeExpenseClient() {
                                         <SelectContent>
                                             <SelectItem value="none">None</SelectItem>
                                             {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )} />
-                            <Controller name="loanId" control={form.control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Loan Payment</Label>
-                                    <Select onValueChange={field.onChange} value={field.value || 'none'}>
-                                        <SelectTrigger className="h-9 text-sm">
-                                            <div className="flex items-center gap-2"><HandCoins className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Loan (Optional)" /></div>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">None</SelectItem>
-                                            {loans.map(l => <SelectItem key={l.id} value={l.id}>{l.loanName}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>

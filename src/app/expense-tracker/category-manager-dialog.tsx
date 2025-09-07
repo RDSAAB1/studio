@@ -27,7 +27,7 @@ interface CategoryManagerDialogProps {
   onDeleteSubCategory: (collection: 'incomeCategories' | 'expenseCategories', categoryId: string, subCategoryName: string) => Promise<void>;
 }
 
-const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpdateCategoryName, onDeleteCategory, onAddSubCategory, onDeleteSubCategory, nature }: any) => {
+const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpdateCategoryName, onDeleteCategory, onAddSubCategory, onDeleteSubCategory, nature, specialCategory = false }: any) => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSubCategory, setNewSubCategory] = useState<{ [key: string]: string }>({});
 
@@ -51,19 +51,23 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
         <CardDescription>Manage {title.toLowerCase()} categories and sub-categories.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <Input placeholder="New Category Name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
-          <Button onClick={handleAddCategory}><PlusCircle className="mr-2 h-4 w-4"/>Add Category</Button>
-        </div>
+        {!specialCategory && (
+            <div className="flex gap-2">
+              <Input placeholder="New Category Name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
+              <Button onClick={handleAddCategory}><PlusCircle className="mr-2 h-4 w-4"/>Add Category</Button>
+            </div>
+        )}
         <ScrollArea className="h-72 p-2 border rounded-md">
           {categories.map((cat: any) => (
             <div key={cat.id} className="mb-4 p-3 rounded-lg bg-muted/50">
               <div className="flex justify-between items-center mb-2">
                 <span className="font-semibold">{toTitleCase(cat.name)}</span>
+                {!specialCategory && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
                   <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete "{cat.name}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone and will delete all sub-categories.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteCategory(collectionName, cat.id)}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                 </AlertDialog>
+                )}
               </div>
               <ul className="list-disc list-inside pl-4 text-sm space-y-1">
                 {cat.subCategories?.map((sub: string) => (
@@ -93,6 +97,10 @@ const CategoryList = ({ title, categories, collectionName, onAddCategory, onUpda
 
 export const CategoryManagerDialog = ({ isOpen, onOpenChange, incomeCategories, expenseCategories, ...props }: CategoryManagerDialogProps) => {
     
+    const permanentExpenses = expenseCategories.filter(c => c.nature === 'Permanent' && c.name !== 'Interest & Loan Payments');
+    const seasonalExpenses = expenseCategories.filter(c => c.nature === 'Seasonal');
+    const loanPaymentsCategory = expenseCategories.filter(c => c.name === 'Interest & Loan Payments');
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
@@ -107,9 +115,9 @@ export const CategoryManagerDialog = ({ isOpen, onOpenChange, incomeCategories, 
                             <TabsTrigger value="income">Income</TabsTrigger>
                         </TabsList>
                         <TabsContent value="expense" className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            <CategoryList title="Permanent Expenses" categories={expenseCategories.filter(c => c.nature === 'Permanent')} collectionName="expenseCategories" {...props} nature="Permanent" />
-                            <CategoryList title="Seasonal Expenses" categories={expenseCategories.filter(c => c.nature === 'Seasonal')} collectionName="expenseCategories" {...props} nature="Seasonal" />
-                            <CategoryList title="Interest & Loan Payments" categories={expenseCategories.filter(c => c.name === 'Interest & Loan Payments')} collectionName="expenseCategories" {...props} nature="Permanent" />
+                            <CategoryList title="Permanent Expenses" categories={permanentExpenses} collectionName="expenseCategories" {...props} nature="Permanent" />
+                            <CategoryList title="Seasonal Expenses" categories={seasonalExpenses} collectionName="expenseCategories" {...props} nature="Seasonal" />
+                            <CategoryList title="Interest & Loan Payments" categories={loanPaymentsCategory} collectionName="expenseCategories" {...props} specialCategory={true} />
                         </TabsContent>
                         <TabsContent value="income" className="mt-4">
                             <CategoryList title="Income" categories={incomeCategories} collectionName="incomeCategories" {...props} />
