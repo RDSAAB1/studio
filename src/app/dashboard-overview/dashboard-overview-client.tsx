@@ -109,8 +109,13 @@ export default function DashboardOverviewClient() {
             }
         });
 
-        const totalSupplierDues = suppliers.reduce((sum, s) => sum + (s.netAmount || 0), 0);
-        const totalCustomerDues = customers.reduce((sum, c) => sum + Number(c.netAmount || 0), 0);
+        const totalSupplierRawDues = suppliers.reduce((sum, s) => sum + (s.netAmount || 0), 0);
+        const totalCdFromSuppliers = payments.filter(p => p.customerId.startsWith('s')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        const totalSupplierDues = totalSupplierRawDues - totalCdFromSuppliers;
+
+        const totalCustomerRawDues = customers.reduce((sum, c) => sum + Number(c.netAmount || 0), 0);
+        const totalCdToCustomers = payments.filter(p => p.customerId.startsWith('c')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        const totalCustomerDues = totalCustomerRawDues - totalCdToCustomers;
         
         const loanLiabilities = loans.reduce((sum, loan) => {
             const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
@@ -133,7 +138,7 @@ export default function DashboardOverviewClient() {
         const totalCdReceived = payments.filter(p => p.customerId.startsWith('s')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
-        const totalAssets = cashAndBankAssets + totalCustomerDues + totalCdReceived;
+        const totalAssets = cashAndBankAssets + totalCustomerDues;
         
         return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues, loanLiabilities, cashAndBankAssets, totalCdReceived };
     }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers, payments]);
@@ -169,7 +174,6 @@ export default function DashboardOverviewClient() {
         const assetsBreakdown = [
             { name: 'Cash & Bank', value: financialState.cashAndBankAssets },
             { name: 'Receivables', value: financialState.totalCustomerDues },
-            { name: 'CD Received', value: financialState.totalCdReceived },
         ];
         
         const liabilitiesBreakdown = [
@@ -205,7 +209,7 @@ export default function DashboardOverviewClient() {
         <div className="space-y-6">
             {/* Top Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, Receivables, CD" />
+                <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, Receivables" />
                 <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Loans and Payables" />
                 <StatCard title="Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
                 <StatCard title="Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
