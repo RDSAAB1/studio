@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
