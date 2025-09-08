@@ -18,6 +18,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as XLSX from 'xlsx';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 
 interface RtgsReportRow {
@@ -56,8 +60,8 @@ export default function RtgsReportClient() {
     const [searchSrNo, setSearchSrNo] = useState('');
     const [searchCheckNo, setSearchCheckNo] = useState('');
     const [searchName, setSearchName] = useState('');
-    const [startDate, setStartDate] = useState<string>(''); // YYYY-MM-DD
-    const [endDate, setEndDate] = useState<string>(''); // YYYY-MM-DD
+    const [startDate, setStartDate] = useState<Date | undefined>();
+    const [endDate, setEndDate] = useState<Date | undefined>();
 
     useEffect(() => {
         setLoading(true);
@@ -115,16 +119,17 @@ export default function RtgsReportClient() {
         let filtered = reportRows;
 
         if (searchSrNo) {
-            filtered = filtered.filter(row => row.srNo.toLowerCase().includes(searchSrNo.toLowerCase()));
+            filtered = filtered.filter(row => row.srNo.toLowerCase() === searchSrNo.toLowerCase());
         }
         if (searchCheckNo) {
-            filtered = filtered.filter(row => row.checkNo.toLowerCase().includes(searchCheckNo.toLowerCase()));
+            filtered = filtered.filter(row => row.checkNo.toLowerCase() === searchCheckNo.toLowerCase());
         }
         if (searchName) {
             filtered = filtered.filter(row => row.supplierName.toLowerCase().includes(searchName.toLowerCase()));
         }
         if (startDate && endDate) {
             const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
             const end = new Date(endDate);
             end.setHours(23, 59, 59, 999);
             filtered = filtered.filter(row => {
@@ -133,6 +138,7 @@ export default function RtgsReportClient() {
             });
         } else if (startDate) {
             const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
             filtered = filtered.filter(row => new Date(row.date) >= start);
         } else if (endDate) {
             const end = new Date(endDate);
@@ -278,22 +284,28 @@ export default function RtgsReportClient() {
                             />
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="startDate">Start Date</Label>
-                            <Input
-                                id="startDate"
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                            />
+                            <Label>Start Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                            </Popover>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="endDate">End Date</Label>
-                            <Input
-                                id="endDate"
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                            />
+                            <Label>End Date</Label>
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                            </Popover>
                         </div>
                     </div>
                 </CardContent>
