@@ -41,16 +41,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
   
   const pathname = usePathname();
   const router = useRouter();
-
-  // Initialize tabs only once
-  useEffect(() => {
-      const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
-      if (dashboardTab) {
-          setOpenTabs([dashboardTab]);
-          setActiveTabId(dashboardTab.id);
-      }
-  }, []);
   
+  // Ref to store the page content cache
+  const pagesCache = useRef<Record<string, ReactNode>>({});
+
   useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -78,27 +72,50 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => unsubscribe();
   }, [pathname, router]);
 
+  const handleMenuItemClick = useCallback((item: MenuItem) => {
+    if (!item.href) return;
+
+    setActiveTabId(item.id);
+    setOpenTabs(prevTabs => {
+      if (prevTabs.some(tab => tab.id === item.id)) {
+        return prevTabs;
+      }
+      return [...prevTabs, item];
+    });
+    
+    if (window.innerWidth < 1024) {
+        setIsSidebarActive(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (loading || UNPROTECTED_ROUTES.includes(pathname) || !pathname) return;
 
     const currentTabInfo = findTabForPath(pathname);
     
     if (currentTabInfo) {
-      setActiveTabId(currentTabInfo.id);
-      
-      setOpenTabs(prevTabs => {
-          if (!prevTabs.some(tab => tab.id === currentTabInfo.id)) {
-              return [...prevTabs, currentTabInfo];
-          }
-          return prevTabs;
-      });
+      if (currentTabInfo.id !== activeTabId) {
+          setActiveTabId(currentTabInfo.id);
+      }
+      // Do NOT update openTabs here, as it causes re-renders. 
+      // It should only be updated on explicit user action (clicking a menu item).
     }
-  }, [pathname, loading]);
+  }, [pathname, loading, activeTabId]);
+
+  // Initialize dashboard tab on first load
+  useEffect(() => {
+    const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
+    if(dashboardTab && openTabs.length === 0){
+        setOpenTabs([dashboardTab]);
+        setActiveTabId(dashboardTab.id);
+    }
+  }, [openTabs.length]);
 
 
   const handleTabClick = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
     if (tab?.href && pathname !== tab.href) {
+        setActiveTabId(tabId);
         router.push(tab.href);
     }
   };
@@ -112,27 +129,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
         const newTabs = prevTabs.filter(tab => tab.id !== tabId);
 
         if (activeTabId === tabId) {
-            const newActiveTab = newTabs[tabIndex] || newTabs[tabIndex - 1] || newTabs[0];
+            const newActiveTab = newTabs[tabIndex -1] || newTabs[0]; // move to previous tab or first tab
             if (newActiveTab?.href) {
                 router.push(newActiveTab.href);
-            } else if (newTabs.length === 0) {
-                const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-                if (dashboard) {
-                    router.push(dashboard.href!);
-                    // Since this is an edge case (closing the last tab), we can directly set it.
-                    return [dashboard];
-                }
+                setActiveTabId(newActiveTab.id);
             }
         }
         return newTabs;
     });
-  };
-
-  const handleSidebarItemClick = (item: MenuItem) => {
-    // Let the <Link> component in the sidebar handle the navigation
-    if (window.innerWidth < 1024) {
-        setIsSidebarActive(false);
-    }
   };
   
   const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
@@ -173,7 +177,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <div onMouseEnter={() => setIsSidebarActive(true)}>
             <CustomSidebar 
                 isSidebarActive={isSidebarActive}
-                onMenuItemClick={handleSidebarItemClick}
+                onMenuItemClick={handleMenuItemClick}
             />
         </div>
         <div 
