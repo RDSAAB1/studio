@@ -7,7 +7,7 @@ import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
-import { collection, runTransaction, doc, getDocs, query, where, addDoc } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc } from "firebase/firestore";
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -310,27 +310,7 @@ export default function SupplierPaymentsClient() {
     let baseAmountForCd = 0;
     
     if (cdAt === 'paid_amount') {
-        if (paymentType === 'Partial') {
-            baseAmountForCd = paymentAmount;
-        } else {
-            let totalEligiblePaidAmount = 0;
-            const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-            const paymentsForSelectedEntries = paymentHistory.filter(p => 
-                p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
-            );
-
-            paymentsForSelectedEntries.forEach(p => {
-                if (!p.cdApplied) {
-                    p.paidFor?.forEach(pf => {
-                        const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
-                        if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
-                            totalEligiblePaidAmount += pf.amount;
-                        }
-                    });
-                }
-            });
-            baseAmountForCd = totalEligiblePaidAmount;
-        }
+        baseAmountForCd = paymentAmount;
     } else if (cdAt === 'unpaid_amount') {
         const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
         baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
@@ -546,7 +526,7 @@ export default function SupplierPaymentsClient() {
                     const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
                     if (paymentForThisEntry > 0) {
-                        paidForDetails.push({ 
+                         paidForDetails.push({ 
                             srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
                             supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
                             supplierContact: entryData.contact,
@@ -675,60 +655,73 @@ export default function SupplierPaymentsClient() {
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string) => {
-        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
-        if (!paymentToDelete || !paymentToDelete.id) {
-            toast({ title: "Payment not found or ID missing.", variant: "destructive" });
-            return;
-        }
-    
-        try {
-            await runTransaction(db, async (transaction) => {
-                const paymentRef = doc(db, "payments", paymentIdToDelete);
-                const totalPaidAmount = paymentToDelete.amount + (paymentToDelete.cdAmount || 0);
+      const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
+      if (!paymentToDelete || !paymentToDelete.id) {
+          toast({ title: "Payment not found or ID missing.", variant: "destructive" });
+          return;
+      }
+  
+      try {
+          await runTransaction(db, async (transaction) => {
+              const paymentRef = doc(db, "payments", paymentIdToDelete);
+              
+              // --- READ PHASE ---
+              const supplierDocRefs = new Map<string, string>();
+              const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
+              if (srNos.length > 0) {
+                  const q = query(suppliersCollection, where('srNo', 'in', srNos));
+                  const supplierQuerySnapshot = await getDocs(q);
+                  supplierQuerySnapshot.forEach(doc => {
+                      supplierDocRefs.set(doc.data().srNo, doc.id);
+                  });
+              }
+              
+              const supplierDocsData = new Map<string, any>();
+              for (const [srNo, docId] of supplierDocRefs.entries()) {
+                  const docRef = doc(db, "suppliers", docId);
+                  const supplierDoc = await transaction.get(docRef);
+                  if (supplierDoc.exists()) {
+                      supplierDocsData.set(srNo, supplierDoc.data());
+                  }
+              }
 
-                // --- READ PHASE ---
-                const supplierDocRefs = new Map<string, string>();
-                const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
-                if (srNos.length > 0) {
-                    const q = query(suppliersCollection, where('srNo', 'in', srNos));
-                    const supplierDocs = await getDocs(q);
-                    supplierDocs.forEach(doc => {
-                        supplierDocRefs.set(doc.data().srNo, doc.id);
-                    });
-                }
-                
-                const supplierDocsData = new Map<string, any>();
-                for (const [srNo, docId] of supplierDocRefs.entries()) {
-                    const docRef = doc(db, "suppliers", docId);
-                    const supplierDoc = await transaction.get(docRef);
-                    if (supplierDoc.exists()) {
-                        supplierDocsData.set(srNo, supplierDoc.data());
-                    }
-                }
-                
-                // --- WRITE PHASE ---
-                if(paymentToDelete.paidFor && paymentToDelete.paidFor.length > 0) {
-                     for (const detail of paymentToDelete.paidFor) {
-                        const supplierData = supplierDocsData.get(detail.srNo);
-                        if (supplierData) {
-                            const docId = supplierDocRefs.get(detail.srNo)!;
-                            const supplierDocRef = doc(db, "suppliers", docId);
-                            const currentNetAmount = Number(supplierData.netAmount) || 0;
-                            transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + detail.amount) });
-                        }
-                    }
-                }
-                
-                transaction.delete(paymentRef);
-            });
-    
-            toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
-            if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
-        } catch (error) {
-            console.error("Error deleting payment:", error);
-            toast({ title: "Failed to delete payment.", variant: "destructive" });
-        }
-    };
+              // Also find the associated expense transaction
+              const expenseQuery = query(
+                  transactionsCollection,
+                  where("description", "==", `Payment ${paymentToDelete.paymentId} to ${paymentToDelete.supplierName}`)
+              );
+              const expenseSnapshot = await getDocs(expenseQuery);
+              const expenseDocsToDelete = expenseSnapshot.docs.map(d => d.ref);
+              
+              // --- WRITE PHASE ---
+              // Revert supplier netAmount
+              if(paymentToDelete.paidFor && paymentToDelete.paidFor.length > 0) {
+                   for (const detail of paymentToDelete.paidFor) {
+                      const supplierData = supplierDocsData.get(detail.srNo);
+                      if (supplierData) {
+                          const docId = supplierDocRefs.get(detail.srNo)!;
+                          const supplierDocRef = doc(db, "suppliers", docId);
+                          const currentNetAmount = Number(supplierData.netAmount) || 0;
+                          const amountToRestore = detail.amount + (detail.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor.length) : 0);
+                          transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
+                      }
+                  }
+              }
+              
+              // Delete the expense transaction
+              expenseDocsToDelete.forEach(ref => transaction.delete(ref));
+              
+              // Delete the payment itself
+              transaction.delete(paymentRef);
+          });
+  
+          toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
+          if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
+      } catch (error) {
+          console.error("Error deleting payment:", error);
+          toast({ title: "Failed to delete payment.", variant: "destructive" });
+      }
+  };
     
     const handlePaySelectedOutstanding = () => {
         if (selectedEntryIds.size === 0) {
@@ -788,11 +781,11 @@ export default function SupplierPaymentsClient() {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setCdAt('full_amount'); // Set CD type when selecting from generator
         setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
         setRtgsAmount(option.calculatedAmount);
+        setCdAt('full_amount'); // Set CD type when selecting from generator
         toast({ title: `Amount ${formatCurrency(option.calculatedAmount)} selected.`, variant: 'success' });
     };
 
@@ -1002,3 +995,4 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
