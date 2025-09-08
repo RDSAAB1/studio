@@ -17,22 +17,16 @@ type MainLayoutProps = {
 }
 
 const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
-const SETUP_ROUTES = ['/setup/connect-gmail', '/setup/company-details'];
 
 const findTabForPath = (path: string): MenuItem | undefined => {
-    // Normalize path to remove trailing slash if it exists, but not if it's the root path
     const basePath = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path.split('?')[0];
-
     for (const item of allMenuItems) {
-        if (item.href === basePath) {
-            return item;
-        }
+        if (item.href === basePath) return item;
         if (item.subMenus) {
             const subItem = item.subMenus.find(sub => sub.href === basePath);
             if (subItem) return subItem;
         }
     }
-    // Default to dashboard if no specific match is found
     return allMenuItems.find(item => item.id === 'dashboard');
 };
 
@@ -44,7 +38,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
   const [pageCache, setPageCache] = useState<PageCache>({});
 
   const pathname = usePathname();
@@ -53,6 +46,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        setLoading(true);
         if (currentUser) {
             setUser(currentUser);
             const companySettings = await getCompanySettings(currentUser.uid);
@@ -71,14 +65,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 router.replace('/login');
             }
         }
-        setAuthChecked(true);
         setLoading(false);
     });
     return () => unsubscribe();
   }, [pathname, router]);
 
   useEffect(() => {
-    if (!authChecked || UNPROTECTED_ROUTES.includes(pathname)) return;
+    if (loading || UNPROTECTED_ROUTES.includes(pathname)) return;
 
     const currentTabInfo = findTabForPath(pathname);
     
@@ -94,47 +87,43 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
     }
-  }, [pathname, authChecked, user, openTabs, children]);
+  }, [pathname, loading, children, openTabs]);
 
 
   const handleTabClick = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
-    if (tab?.href) {
-        setActiveTabId(tabId);
+    if (tab?.href && pathname !== tab.href) {
         router.push(tab.href);
     }
   };
 
   const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    
     if (tabId === 'dashboard') return;
 
-    // Remove the page from the cache
     setPageCache(prevCache => {
         const newCache = { ...prevCache };
         delete newCache[tabId];
         return newCache;
     });
 
-    setOpenTabs(prevTabs => {
-        const tabIndex = prevTabs.findIndex(tab => tab.id === tabId);
-        const newTabs = prevTabs.filter(tab => tab.id !== tabId);
+    const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
+    const newTabs = openTabs.filter(tab => tab.id !== tabId);
 
-        if (activeTabId === tabId) {
-            const newActiveTab = newTabs[tabIndex - 1] || newTabs[0];
-            if (newActiveTab && newActiveTab.href) {
-                router.push(newActiveTab.href);
-                setActiveTabId(newActiveTab.id);
-            } else if (newTabs.length === 0 && allMenuItems[0]?.href) {
-                // Fallback to dashboard if all tabs are closed
-                router.push(allMenuItems[0].href);
-                setActiveTabId(allMenuItems[0].id);
-                return [allMenuItems[0]];
+    if (activeTabId === tabId) {
+        const newActiveTab = newTabs[tabIndex] || newTabs[tabIndex - 1] || newTabs[0];
+        if (newActiveTab?.href) {
+            router.push(newActiveTab.href);
+        } else if (newTabs.length === 0) {
+            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+            if (dashboard) {
+                router.push(dashboard.href!);
+                setOpenTabs([dashboard]);
+                setActiveTabId(dashboard.id);
             }
         }
-        return newTabs;
-    });
+    }
+    setOpenTabs(newTabs);
   };
 
   const handleSidebarItemClick = (item: MenuItem) => {
@@ -143,10 +132,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setOpenTabs([...openTabs, item]);
       }
       setActiveTabId(item.id);
+      router.push(item.href);
       if (window.innerWidth < 1024) {
           setIsSidebarActive(false);
-      } else {
-        setIsSidebarActive(false);
       }
     }
   };
@@ -158,13 +146,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
       const auth = getFirebaseAuth();
       await signOut(auth);
       setOpenTabs([]);
+      setPageCache({});
       router.replace('/login');
     } catch (error) {
       console.error("Error signing out: ", error);
     }
   };
 
-  if (!authChecked) {
+  if (loading) {
       return (
           <div className="flex h-screen w-screen items-center justify-center bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -173,7 +162,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
   
   if (!user && !UNPROTECTED_ROUTES.includes(pathname)) {
-    // If not authenticated and not on a public route, show loading or nothing while redirecting
     return (
         <div className="flex h-screen w-screen items-center justify-center bg-background">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -181,7 +169,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
     );
   }
 
-  // If user is on an unprotected route, just render children without the layout
   if (UNPROTECTED_ROUTES.includes(pathname)) {
     return <>{children}</>;
   }
