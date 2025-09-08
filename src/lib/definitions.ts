@@ -164,6 +164,7 @@ export type Payment = {
     bankIfsc?: string;
     rtgsFor?: 'Supplier' | 'Outsider';
     rtgsSrNo?: string; // New field for RTGS serial number
+    expenseTransactionId?: string; // ID of the corresponding expense transaction
 }
 
 export type CustomerSummary = {
