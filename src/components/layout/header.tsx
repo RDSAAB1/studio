@@ -106,7 +106,13 @@ export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
         <div className="flex flex-1 items-center gap-2">
-          <div className="flex-shrink-0 lg:hidden">
+          <div className="lg:hidden">
+            <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle Menu</span>
+            </Button>
+          </div>
+           <div className="hidden lg:block">
             <Button variant="ghost" size="icon" onClick={toggleSidebar}>
               <Menu className="h-5 w-5" />
               <span className="sr-only">Toggle Menu</span>

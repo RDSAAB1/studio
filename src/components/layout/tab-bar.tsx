@@ -4,16 +4,16 @@
 import React from 'react';
 import { Tab } from './tab';
 import { useRouter } from 'next/navigation';
-import { useTabs } from '@/app/layout';
 
-const TabBar: React.FC = () => {
+const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab }) => {
   const router = useRouter();
-  const { openTabs, activeTabId, setActiveTabId, closeTab } = useTabs();
+
+  if (!openTabs) return null;
 
   return (
     <div className="tab-bar-container flex-1 min-w-0">
       <div className="flex items-end">
-        {openTabs.map((tab, index) => {
+        {openTabs.map((tab: any, index: number) => {
             const isActive = tab.id === activeTabId;
             const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
 
