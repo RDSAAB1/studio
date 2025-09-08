@@ -36,7 +36,6 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 );
 
 export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
-    const statementRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
     if (!data) return null;
@@ -73,54 +72,53 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const closingBalance = totalDebit - totalCredit;
 
     const handlePrint = () => {
-        const nodeToPrint = statementRef.current;
-        if (!nodeToPrint) {
-            toast({ title: 'Error', description: 'Could not find statement content to print.', variant: 'destructive' });
-            return;
-        }
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-
-        document.body.appendChild(iframe);
-
-        const doc = iframe.contentWindow?.document;
-        if (!doc) {
-             toast({ title: 'Error', description: 'Could not open print window.', variant: 'destructive' });
-            return;
-        }
-        
-        doc.open();
-        doc.write('<html><head><title>Print Statement</title></head><body></body></html>');
-
-        // Copy all style tags and link tags from head
-        const styles = document.head.querySelectorAll('style, link[rel="stylesheet"]');
-        styles.forEach(style => {
-            doc.head.appendChild(style.cloneNode(true));
-        });
-
-        doc.body.innerHTML = nodeToPrint.innerHTML;
-        doc.close();
-
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500); // Wait for styles to load
+        window.print();
     };
 
     return (
     <>
+        <style jsx global>{`
+            @media print {
+                body > * {
+                    display: none !important;
+                }
+                body > .printable-statement-container, 
+                body > .printable-statement-container * {
+                    display: block !important;
+                }
+                .printable-statement-container {
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 100% !important;
+                    height: auto !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: visible !important;
+                }
+                 .printable-statement-dialog {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    height: auto !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                }
+                 .printable-statement-scroll-area > div {
+                    height: auto !important;
+                }
+                .no-print {
+                    display: none !important;
+                }
+            }
+        `}</style>
+
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
              <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
              A detailed summary and transaction history for {data.name}.
              </DialogDescription>
         </DialogHeader>
-        <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
+        <div id="printable-statement" className="bg-background p-4 sm:p-6 font-sans text-foreground">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
@@ -235,7 +233,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             </div>
         </div>
         <DialogFooter className="p-4 border-t no-print">
-            <Button variant="outline" onClick={() => (document.querySelector('[data-state="open"] [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
+            <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
             <div className="flex-grow" />
             <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
             <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
@@ -733,10 +731,12 @@ export default function SupplierProfilePage() {
       />
 
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-        <DialogContent className="max-w-5xl p-0">
-          <ScrollArea className="max-h-[90vh]">
-            <StatementPreview data={selectedSupplierData} />
-          </ScrollArea>
+        <DialogContent className="max-w-5xl p-0 printable-statement-container">
+            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
+                <div className="printable-statement-dialog">
+                    <StatementPreview data={selectedSupplierData} />
+                </div>
+            </ScrollArea>
         </DialogContent>
       </Dialog>
       
