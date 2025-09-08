@@ -34,7 +34,7 @@ import { Info, Pen, Printer, Trash2, Loader2, ChevronsUpDown, Check, RefreshCw, 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction, getDocs, where, deleteDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction, getDocs, where, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { getReceiptSettings, getBankAccountsRealtime, getTransactionsRealtime, getFundTransactionsRealtime, getCustomerPaymentsRealtime, addCustomerPayment, deleteCustomerPayment } from "@/lib/firestore";
