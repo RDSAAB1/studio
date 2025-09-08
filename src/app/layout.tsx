@@ -157,7 +157,9 @@ export default function RootLayout({
     return () => unsubscribe();
   }, [pathname, router]);
 
-  const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
+  const toggleSidebar = () => {
+    setIsSidebarActive(!isSidebarActive);
+  };
 
   const handleSignOut = async () => {
     try {
@@ -199,6 +201,42 @@ export default function RootLayout({
        </html>
     );
   }
+  
+  const TabManager = () => {
+    const { openTabs, activeTabId, setActiveTabId, closeTab } = useTabs();
+    const router = useRouter();
+
+    return (
+      <div className="main_container">
+        <Header 
+            toggleSidebar={toggleSidebar}
+            user={user}
+            onSignOut={handleSignOut}
+        />
+        <TabBar 
+            openTabs={openTabs}
+            activeTabId={activeTabId}
+            onTabClick={(id) => {
+                const tab = openTabs.find(t => t.id === id);
+                if (tab && tab.href) {
+                    setActiveTabId(id);
+                    router.push(tab.href);
+                }
+            }}
+            onCloseTab={(tabId, e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                closeTab(tabId);
+            }}
+          />
+        <main className="content">
+          {children}
+        </main>
+          {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
+      </div>
+    );
+  };
+
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
@@ -206,18 +244,7 @@ export default function RootLayout({
         <TabProvider>
             <div className={cn("wrapper", isSidebarActive && "active")}>
                 <CustomSidebar isSidebarActive={isSidebarActive} />
-                <div className="main_container">
-                  <Header 
-                      toggleSidebar={toggleSidebar}
-                      user={user}
-                      onSignOut={handleSignOut}
-                  />
-                  <TabBar />
-                  <main className="content">
-                    {children}
-                  </main>
-                    {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
-                </div>
+                <TabManager />
             </div>
         </TabProvider>
       </body>

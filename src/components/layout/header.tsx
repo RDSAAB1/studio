@@ -16,8 +16,6 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import Link from 'next/link';
-import TabBar from "./tab-bar";
-import { useTabs } from "@/app/layout";
 
 
 interface HeaderProps {
@@ -104,7 +102,6 @@ const NotificationBell = () => {
 
 export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
   const router = useRouter();
-  const { openTabs, activeTabId, setActiveTabId, closeTab } = useTabs();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
@@ -115,22 +112,6 @@ export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </div>
-          <TabBar 
-            openTabs={openTabs}
-            activeTabId={activeTabId}
-            onTabClick={(id) => {
-                const tab = openTabs.find(t => t.id === id);
-                if (tab && tab.href) {
-                    setActiveTabId(id);
-                    router.push(tab.href);
-                }
-            }}
-            onCloseTab={(tabId, e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              closeTab(tabId);
-            }}
-          />
         </div>
 
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
