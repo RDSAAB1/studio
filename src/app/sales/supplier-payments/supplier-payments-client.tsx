@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Pen } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
@@ -66,6 +66,8 @@ export default function SupplierPaymentsClient() {
   
   const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
+  const [isPayeeEditing, setIsPayeeEditing] = useState(false);
+  
   const [sixRNo, setSixRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
@@ -601,6 +603,9 @@ export default function SupplierPaymentsClient() {
 };
 
     const handleEditPayment = async (paymentToEdit: Payment) => {
+        if (!paymentToEdit.id) return;
+        
+        // Fill the form first
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         
         if (paymentToEdit.rtgsFor === 'Supplier' && srNosInPayment.length > 0) {
@@ -647,10 +652,13 @@ export default function SupplierPaymentsClient() {
             bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
         });
         setActiveTab('processing');
-        toast({ title: `Now editing payment ${paymentToEdit.paymentId}.` });
+        
+        // Then, delete the payment to allow reprocessing
+        await handleDeletePayment(paymentToEdit.id, true); // Pass a flag to prevent toast
+        toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
     };
 
-    const handleDeletePayment = async (paymentIdToDelete: string) => {
+    const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
         const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
@@ -687,8 +695,9 @@ export default function SupplierPaymentsClient() {
                 // Delete the payment itself
                 transaction.delete(paymentRef);
             });
-
-            toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
+            if (!isEditing) {
+                toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
+            }
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) {
             console.error("Error deleting payment:", error);
@@ -798,7 +807,7 @@ export default function SupplierPaymentsClient() {
   return (
     <div className="space-y-3">
         <Tabs value={paymentMethod} onValueChange={setPaymentMethod}>
-            <TabsList className="grid w-full grid-cols-4 h-9"><TabsTrigger value="Cash">Cash</TabsTrigger><TabsTrigger value="Online">Online</TabsTrigger><TabsTrigger value="RTGS">RTGS</TabsTrigger><TabsTrigger value="Cheque">Cheque</TabsTrigger></TabsList>
+            <TabsList className="grid w-full grid-cols-3 h-9"><TabsTrigger value="Cash">Cash</TabsTrigger><TabsTrigger value="Online">Online</TabsTrigger><TabsTrigger value="RTGS">RTGS</TabsTrigger></TabsList>
         </Tabs>
         
         {paymentMethod === 'RTGS' && (
@@ -872,8 +881,9 @@ export default function SupplierPaymentsClient() {
 
                 {(selectedCustomerKey || rtgsFor === 'Outsider') && (
                     <PaymentForm
-                        paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails}
-                        setSupplierDetails={setSupplierDetails} bankDetails={bankDetails} setBankDetails={setBankDetails}
+                        paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails} setSupplierDetails={setSupplierDetails}
+                        isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
+                        bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
@@ -968,5 +978,3 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
