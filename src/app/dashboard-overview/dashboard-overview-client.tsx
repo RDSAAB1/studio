@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Transaction, FundTransaction, Loan, BankAccount, Customer, ExpenseCategory } from "@/lib/definitions";
+import type { Transaction, FundTransaction, Loan, BankAccount, Customer, ExpenseCategory, Payment } from "@/lib/definitions";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,6 +43,7 @@ const BalanceCard = ({ title, value, icon, colorClass, description }: { title: s
 export default function DashboardOverviewClient() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -56,6 +57,9 @@ export default function DashboardOverviewClient() {
         });
         const unsubFunds = onSnapshot(query(collection(db, "fund_transactions"), orderBy("date", "desc")), (snapshot) => {
             setFundTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction)));
+        });
+        const unsubPayments = onSnapshot(query(collection(db, "payments"), orderBy("date", "desc")), (snapshot) => {
+            setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment)));
         });
         const unsubLoans = onSnapshot(query(collection(db, "loans"), orderBy("startDate", "desc")), (snapshot) => {
             setLoans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan)));
@@ -76,6 +80,7 @@ export default function DashboardOverviewClient() {
         return () => {
             unsubTransactions();
             unsubFunds();
+            unsubPayments();
             unsubLoans();
             unsubBankAccounts();
             unsubSuppliers();
@@ -104,7 +109,11 @@ export default function DashboardOverviewClient() {
             }
         });
 
-        const totalSupplierDues = suppliers.reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
+        const totalOriginalSupplierAmount = suppliers.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0);
+        const totalPaymentsToSuppliers = payments.reduce((sum, p) => sum + p.amount, 0);
+        const totalCdFromSuppliers = payments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        const totalSupplierDues = totalOriginalSupplierAmount - totalPaymentsToSuppliers - totalCdFromSuppliers;
+        
         const totalCustomerDues = customers.reduce((sum, c) => sum + Number(c.netAmount || 0), 0);
         
         const loanLiabilities = loans.reduce((sum, loan) => {
@@ -120,7 +129,7 @@ export default function DashboardOverviewClient() {
         const totalAssets = cashAndBankAssets + totalCustomerDues;
         
         return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues, loanLiabilities, cashAndBankAssets };
-    }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers]);
+    }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers, payments]);
 
     const chartData = useMemo(() => {
         const thirtyDaysAgo = subDays(new Date(), 30);
