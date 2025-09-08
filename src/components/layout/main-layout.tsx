@@ -36,6 +36,7 @@ const findTabForPath = (path: string): MenuItem | undefined => {
     return allMenuItems.find(item => item.id === 'dashboard');
 };
 
+type PageCache = { [key: string]: React.ReactNode };
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
@@ -44,6 +45,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const [pageCache, setPageCache] = useState<PageCache>({});
 
   const pathname = usePathname();
   const router = useRouter();
@@ -82,19 +84,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
     
     if (currentTabInfo) {
       setActiveTabId(currentTabInfo.id);
+      
+      setPageCache(prevCache => ({
+        ...prevCache,
+        [currentTabInfo.id]: children,
+      }));
+
       if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
     }
-  }, [pathname, authChecked, user, openTabs]);
+  }, [pathname, authChecked, user, openTabs, children]);
 
 
   const handleTabClick = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
     if (tab?.href) {
         setActiveTabId(tabId);
-        // We no longer use router.push to prevent state loss.
-        // The visibility of the page content will be handled by CSS.
+        router.push(tab.href);
     }
   };
 
@@ -102,6 +109,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
     e.stopPropagation();
     
     if (tabId === 'dashboard') return;
+
+    // Remove the page from the cache
+    setPageCache(prevCache => {
+        const newCache = { ...prevCache };
+        delete newCache[tabId];
+        return newCache;
+    });
 
     setOpenTabs(prevTabs => {
         const tabIndex = prevTabs.findIndex(tab => tab.id === tabId);
@@ -194,13 +208,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onSignOut={handleSignOut}
             />
             <div className="content">
-                 <div style={{ display: pathname === '/dashboard-overview' ? 'block' : 'none' }}>
-                    {/* Render the children only if it's the active route */}
-                    {pathname === '/dashboard-overview' && children}
-                </div>
-                {openTabs.filter(tab => tab.id !== 'dashboard').map(tab => (
+                 {openTabs.map(tab => (
                     <div key={tab.id} style={{ display: activeTabId === tab.id ? 'block' : 'none' }}>
-                        {activeTabId === tab.id && children}
+                        {pageCache[tab.id]}
                     </div>
                 ))}
             </div>
