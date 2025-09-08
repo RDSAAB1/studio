@@ -54,6 +54,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         font-size: 14px !important;
                     }
                     .printable-area {
+                        background-color: #fff !important;
                         color: #000 !important;
                     }
                     .printable-area * {
@@ -61,12 +62,9 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         border-color: #e5e7eb !important;
                     }
                     .printable-area .bg-gray-800 {
-                        background-color: #1f2937 !important;
+                        background-color: #f2f2f2 !important; /* Light gray for print */
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
-                    }
-                    .printable-area .bg-gray-800 th {
-                        color: #fff !important;
                     }
                 }
                 `}
@@ -108,7 +106,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                 {/* Items Table */}
                 <table className="w-full text-left mb-4 print-table">
                     <thead>
-                        <tr className="bg-gray-800 text-white uppercase text-xs">
+                        <tr className="bg-gray-800 text-black uppercase text-xs">
                             <th className="p-2 font-semibold text-center w-[5%]">#</th>
                             <th className="p-2 font-semibold w-[55%]">Item & Description</th>
                             <th className="p-2 font-semibold text-center w-[15%]">Qty (Qtl)</th>
@@ -143,7 +141,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         </div>
                     </div>
                     <div className="w-2/5">
-                        <div className="flex justify-between p-2 mt-1 bg-gray-800 text-white font-bold rounded-lg text-lg">
+                        <div className="flex justify-between p-2 mt-1 bg-gray-800 text-black font-bold rounded-lg text-lg">
                             <span>Total Amount:</span>
                             <span>{formatCurrency(totalAmount)}</span>
                         </div>

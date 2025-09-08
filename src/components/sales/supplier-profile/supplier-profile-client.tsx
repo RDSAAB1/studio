@@ -85,6 +85,8 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             .no-print { display: none; }
                              @media print {
                                 body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                                .printable-area { background-color: #fff !important; color: #000 !important; }
+                                .printable-area * { color: #000 !important; border-color: #ccc !important; }
                              }
                         </style>
                     </head>
@@ -143,7 +145,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
              A detailed summary and transaction history for {data.name}.
              </DialogDescription>
         </DialogHeader>
-        <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
+        <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">

@@ -47,6 +47,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                               print-color-adjust: exact !important;
                             }
                             .printable-area {
+                                background-color: #fff !important;
                                 color: #000 !important;
                             }
                             .printable-area * {
@@ -54,10 +55,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                                 border-color: #e5e7eb !important;
                             }
                             .printable-area .bg-gray-800 {
-                                background-color: #1f2937 !important;
-                            }
-                             .printable-area .bg-gray-800 th {
-                                color: #fff !important;
+                                background-color: #f2f2f2 !important; /* Light gray for print */
                             }
                           }
                         `}
@@ -97,7 +95,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                         {/* Information Table */}
                          <table className="w-full text-left mb-4 print-table text-base">
                             <thead className="print-bg-orange">
-                                <tr className="bg-gray-800 text-white uppercase text-xs">
+                                <tr className="bg-gray-800 text-black uppercase text-xs">
                                     <th className="p-2 font-semibold w-[20%]">Payee Name</th>
                                     <th className="p-2 font-semibold w-[20%]">Bank Name</th>
                                     <th className="p-2 font-semibold w-[15%]">Branch</th>

@@ -157,10 +157,10 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     font-size: 12px;
                 }
                 .page-break-after { page-break-after: always !important; }
-                .printable-area { color: #000 !important; }
+                .printable-area { background-color: #fff !important; color: #000 !important; }
                 .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                .bg-gray-800 { background-color: #1f2937 !important; }
-                .bg-gray-800 th { color: #fff !important; }
+                .bg-gray-800 { background-color: #f2f2f2 !important; }
+                .bg-gray-800 th, .bg-gray-800 td { color: #000 !important; }
             }
         `;
         iframeDoc.head.appendChild(printStyles);
@@ -198,7 +198,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                 <div className="flex-grow overflow-x-auto">
                                     <table className="w-full text-left print-table text-sm">
                                         <thead className="text-[10px]">
-                                            <tr className="bg-gray-800 text-white uppercase">
+                                            <tr className="bg-gray-800 text-black uppercase">
                                                 <th className="py-1 px-2 font-semibold text-center">#</th>
                                                 <th className="py-1 px-2 font-semibold">Payee Name</th>
                                                 <th className="py-1 px-2 font-semibold">Bank Name</th>
