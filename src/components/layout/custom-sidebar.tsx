@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -50,17 +51,16 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
     return (
       <li className={cn((isActive || isSubMenuActive) && "active")}>
         {(isActive || isSubMenuActive) && <span className="top_curve"></span>}
-        <Link 
-            href={item.href || '#'}
-            onClick={(e) => { 
-                if (item.subMenus) {
-                    e.preventDefault(); 
-                    handleSubMenuToggle(item.id);
-                } else {
-                    handleItemClick(item);
-                }
-            }}
-            passHref
+        <Link
+          href={item.href || '#'}
+          onClick={(e) => { 
+            if (item.subMenus) {
+              e.preventDefault(); 
+              handleSubMenuToggle(item.id);
+            } else {
+              handleItemClick(item);
+            }
+          }}
         >
             <span className="icon">{React.createElement(item.icon)}</span>
             <span className="item">{item.name}</span>
@@ -84,7 +84,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
                 <ul className={cn("submenu", openSubMenu === item.id && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <Link href={subItem.href || '#'} onClick={() => handleItemClick(subItem)} passHref>
+                      <Link href={subItem.href || '#'} onClick={() => handleItemClick(subItem)}>
                          {subItem.name}
                       </Link>
                     </li>
