@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
@@ -18,10 +17,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { SupplierProfileView } from './supplier-profile-view';
+import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
+import { DetailsDialog } from "@/components/sales/details-dialog";
+import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -121,31 +122,13 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     
     return (
     <>
-        <style>
-            {`
-            @media print {
-                body * {
-                    visibility: hidden;
-                }
-                .printable-statement, .printable-statement * {
-                    visibility: visible;
-                }
-                .printable-statement {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                }
-            }
-            `}
-        </style>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
-             <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
+             <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
              A detailed summary and transaction history for {data.name}.
              </DialogDescription>
         </DialogHeader>
-        <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
+        <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
@@ -519,17 +502,19 @@ export default function SupplierProfilePage() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={!!detailsCustomer} onOpenChange={(open) => !open && setDetailsCustomer(null)}>
-        <DialogContent className="max-w-4xl p-0">
-            {/* Details Dialog Content */}
-        </DialogContent>
-      </Dialog>
+      <DetailsDialog 
+          isOpen={!!detailsCustomer}
+          onOpenChange={(open) => !open && setDetailsCustomer(null)}
+          customer={detailsCustomer}
+          paymentHistory={paymentHistory}
+      />
       
-      <Dialog open={!!selectedPaymentForDetails} onOpenChange={(open) => !open && setSelectedPaymentForDetails(null)}>
-        <DialogContent className="max-w-2xl">
-            {/* Payment Details Dialog Content */}
-        </DialogContent>
-      </Dialog>
+      <PaymentDetailsDialog
+        payment={selectedPaymentForDetails}
+        suppliers={suppliers}
+        onOpenChange={() => setSelectedPaymentForDetails(null)}
+        onShowEntryDetails={setDetailsCustomer}
+      />
       
     </div>
   );

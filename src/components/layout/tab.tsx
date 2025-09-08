@@ -1,7 +1,7 @@
-
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -39,32 +39,33 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
   return (
     <div 
       className="relative flex-shrink min-w-0" 
-      onClick={(e) => {
-        e.preventDefault(); // Prevent default link behavior
-        onClick();
-        router.push(path, { scroll: false }); // Use router for navigation without full page reload
-      }}
       style={cornerStyle as React.CSSProperties}
     >
-      <div className={tabClasses}>
-        <div className="flex items-center z-10 overflow-hidden min-w-0">
-          {icon}
-          <span className="whitespace-nowrap ml-2 truncate">{title}</span>
-        </div>
-        {isClosable && (
-            <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-                "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
-                isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
-            )}
-            onClick={onClose}
-            >
-            <X className="h-3 w-3" />
-            </Button>
-        )}
-      </div>
+      <Link href={path} onClick={(e) => { e.preventDefault(); onClick();}} passHref legacyBehavior>
+        <a className={tabClasses}>
+          <div className="flex items-center z-10 overflow-hidden min-w-0">
+            {icon}
+            <span className="whitespace-nowrap ml-2 truncate">{title}</span>
+          </div>
+          {isClosable && (
+              <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                  "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
+                  isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
+              )}
+              onClick={(e) => {
+                  e.stopPropagation(); // Prevent the tab click when closing
+                  e.preventDefault();
+                  onClose(e);
+              }}
+              >
+              <X className="h-3 w-3" />
+              </Button>
+          )}
+        </a>
+      </Link>
 
       {isActive && (
         <>

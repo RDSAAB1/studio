@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -80,12 +79,19 @@ const NotificationBell = () => {
                 <div className="mt-2 space-y-2 max-h-72 overflow-y-auto">
                     {pendingNotifications.length > 0 ? (
                         pendingNotifications.map(loan => (
-                             <div key={loan.id} className="p-2 rounded-md hover:bg-accent active:bg-primary/20 cursor-pointer" onClick={() => handleNotificationClick(loan)}>
-                                <p className="text-sm font-semibold">{loan.loanName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                    EMI of {formatCurrency(loan.emiAmount || 0)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
-                                </p>
-                            </div>
+                             <Link key={loan.id} href={`/expense-tracker?${new URLSearchParams({
+                                loanId: loan.id,
+                                amount: String(loan.emiAmount || 0),
+                                payee: loan.lenderName || loan.productName || 'Loan Payment',
+                                description: `EMI for ${loan.loanName}`
+                             }).toString()}`} passHref>
+                                <div className="p-2 rounded-md hover:bg-accent active:bg-primary/20 cursor-pointer" onClick={() => setOpen(false)}>
+                                    <p className="text-sm font-semibold">{loan.loanName}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        EMI of {formatCurrency(loan.emiAmount || 0)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
+                                    </p>
+                                </div>
+                             </Link>
                         ))
                     ) : (
                         <p className="text-sm text-muted-foreground p-2 text-center">No new notifications.</p>

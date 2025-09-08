@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -61,9 +60,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
                     handleItemClick(item);
                 }
             }}
+            passHref
         >
-          <span className="icon">{React.createElement(item.icon)}</span>
-          <span className="item">{item.name}</span>
+            <span className="icon">{React.createElement(item.icon)}</span>
+            <span className="item">{item.name}</span>
         </Link>
         {(isActive || isSubMenuActive) && <span className="bottom_curve"></span>}
       </li>
@@ -84,7 +84,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
                 <ul className={cn("submenu", openSubMenu === item.id && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <Link href={subItem.href} onClick={() => handleItemClick(subItem)}>
+                      <Link href={subItem.href || '#'} onClick={() => handleItemClick(subItem)} passHref>
                          {subItem.name}
                       </Link>
                     </li>
