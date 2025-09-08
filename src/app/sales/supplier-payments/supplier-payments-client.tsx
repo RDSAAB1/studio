@@ -690,7 +690,7 @@ export default function SupplierPaymentsClient() {
                           const docId = supplierDocRefs.get(detail.srNo)!;
                           const supplierDocRef = doc(db, "suppliers", docId);
                           const currentNetAmount = Number(supplierData.netAmount) || 0;
-                          const amountToRestore = detail.amount + (detail.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor.length) : 0);
+                          const amountToRestore = detail.amount + (detail.cdApplied && paymentToDelete.paidFor?.length ? (paymentToDelete.cdAmount || 0) / paymentToDelete.paidFor.length : 0);
                           transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                       }
                   }
