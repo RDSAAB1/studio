@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { Customer, CustomerSummary, Payment, BankAccount, Transaction, FundTransaction, PaidFor } from "@/lib/definitions";
+import type { Customer, CustomerSummary, CustomerPayment, BankAccount, Transaction, FundTransaction, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatSrNo, formatCurrency, cn } from "@/lib/utils";
 import {
   Card,
@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction, getDocs, where, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
-import { getReceiptSettings, getBankAccountsRealtime, getTransactionsRealtime, getFundTransactionsRealtime } from "@/lib/firestore";
+import { getReceiptSettings, getBankAccountsRealtime, getTransactionsRealtime, getFundTransactionsRealtime, getCustomerPaymentsRealtime, addCustomerPayment, deleteCustomerPayment } from "@/lib/firestore";
 import type { ReceiptSettings } from "@/lib/definitions";
 import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
@@ -53,7 +53,7 @@ const transactionsCollection = collection(db, "transactions");
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
@@ -67,10 +67,10 @@ export default function CustomerPaymentsPage() {
   const [receiptNo, setReceiptNo] = useState('');
   
   const [loading, setLoading] = useState(true);
-  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [editingPayment, setEditingPayment] = useState<CustomerPayment | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-  const [paymentDetails, setPaymentDetails] = useState<Payment | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<CustomerPayment | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Customer | null>(null);
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false);
@@ -107,7 +107,7 @@ export default function CustomerPaymentsPage() {
     return newSummary;
   }, [customers, paymentHistory]);
 
-  const getNextReceiptNo = useCallback((payments: Payment[]) => {
+  const getNextReceiptNo = useCallback((payments: CustomerPayment[]) => {
       if (!payments || payments.length === 0) {
           return formatSrNo(1, 'CR');
       }
@@ -123,15 +123,13 @@ export default function CustomerPaymentsPage() {
   useEffect(() => {
     setLoading(true);
     const customersQuery = query(collection(db, "customers"), orderBy("date", "desc"));
-    const paymentsQuery = query(collection(db, "payments"), orderBy("date", "desc"));
 
     const unsubCustomers = onSnapshot(customersQuery, (snapshot) => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
       setLoading(false);
     }, (error) => toast({ variant: 'destructive', title: "Error", description: "Failed to load customer data." }));
     
-    const unsubPayments = onSnapshot(paymentsQuery, (snapshot) => {
-        const paymentsData = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as Payment));
+    const unsubPayments = getCustomerPaymentsRealtime((paymentsData) => {
         setPaymentHistory(paymentsData);
         if (!editingPayment) setReceiptNo(getNextReceiptNo(paymentsData));
     }, (error) => toast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." }));
@@ -173,13 +171,15 @@ export default function CustomerPaymentsPage() {
 
     try {
         await runTransaction(db, async (transaction) => {
-            const paymentData = {
-                id: editingPayment ? editingPayment.id : receiptNo,
+            const paymentData: Omit<CustomerPayment, 'id'> = {
                 paymentId: editingPayment ? editingPayment.paymentId : receiptNo,
-                customerId: selectedCustomerKey, date: new Date().toISOString().split('T')[0],
-                amount: paymentAmount, type: paymentType, receiptType: 'Cash',
-                notes: selectedEntries.map(e => e.srNo).join(', '), paidFor: [],
-                cdAmount: 0, cdApplied: false,
+                customerId: selectedCustomerKey!, 
+                date: new Date().toISOString().split('T')[0],
+                amount: paymentAmount, 
+                type: paymentType as 'Full' | 'Partial', 
+                paymentMethod: selectedAccountId === 'CashInHand' ? 'Cash' : 'Online',
+                notes: `Payment for SR# ${selectedEntries.map(e => e.srNo).join(', ')}`,
+                paidFor: [],
             };
 
             let remainingPayment = paymentAmount;
@@ -202,11 +202,19 @@ export default function CustomerPaymentsPage() {
                 bankAccountId: selectedAccountId === 'CashInHand' ? undefined : selectedAccountId,
                 status: 'Paid', isRecurring: false
             };
+            
             const newTransactionRef = doc(collection(db, 'transactions'));
             transaction.set(newTransactionRef, {...incomeTransaction, id: newTransactionRef.id});
+            paymentData.incomeTransactionId = newTransactionRef.id;
+            paymentData.bankAccountId = selectedAccountId === 'CashInHand' ? undefined : selectedAccountId;
             
-            const paymentRef = doc(db, "payments", paymentData.id);
-            transaction.set(paymentRef, {...paymentData, expenseTransactionId: newTransactionRef.id});
+            if (editingPayment && editingPayment.id) {
+                const paymentRef = doc(db, "customer_payments", editingPayment.id);
+                transaction.set(paymentRef, paymentData);
+            } else {
+                const newPaymentRef = doc(collection(db, "customer_payments"));
+                transaction.set(newPaymentRef, {...paymentData, id: newPaymentRef.id});
+            }
         });
 
         toast({ title: "Success", description: "Payment recorded successfully." });
@@ -218,7 +226,7 @@ export default function CustomerPaymentsPage() {
     }
   };
   
-    const handleEditPayment = async (paymentToEdit: Payment) => {
+    const handleEditPayment = async (paymentToEdit: CustomerPayment) => {
         if (!paymentToEdit.id) return;
         
         setActiveTab('processing');
@@ -227,6 +235,7 @@ export default function CustomerPaymentsPage() {
         setReceiptNo(paymentToEdit.paymentId);
         setPaymentAmount(paymentToEdit.amount);
         setPaymentType(paymentToEdit.type);
+        setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
 
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         
@@ -259,7 +268,7 @@ export default function CustomerPaymentsPage() {
 
         try {
             await runTransaction(db, async (transaction) => {
-                const paymentRef = doc(db, "payments", paymentIdToDelete);
+                const paymentRef = doc(db, "customer_payments", paymentIdToDelete);
                 
                 if (paymentToDelete.paidFor) {
                     for (const detail of paymentToDelete.paidFor) {
@@ -268,16 +277,16 @@ export default function CustomerPaymentsPage() {
                         if (!customerDocsSnapshot.empty) {
                             const customerDoc = customerDocsSnapshot.docs[0];
                             const currentCustomer = customerDoc.data() as Customer;
-                            const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                            const amountToRestore = detail.amount;
                             const newNetAmount = (currentCustomer.netAmount as number) + amountToRestore;
                             transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
                         }
                     }
                 }
                 
-                if (paymentToDelete.expenseTransactionId) {
-                    const expenseDocRef = doc(transactionsCollection, paymentToDelete.expenseTransactionId);
-                    transaction.delete(expenseDocRef);
+                if (paymentToDelete.incomeTransactionId) {
+                    const incomeDocRef = doc(transactionsCollection, paymentToDelete.incomeTransactionId);
+                    transaction.delete(incomeDocRef);
                 }
                 
                 transaction.delete(paymentRef);
@@ -295,7 +304,7 @@ export default function CustomerPaymentsPage() {
         }
     };
   
-  const customerPayments = selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey && !p.paymentId.startsWith('S')) : [];
+  const customerPayments = selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey) : [];
   
   return (
     <div className="space-y-6">
@@ -349,7 +358,7 @@ export default function CustomerPaymentsPage() {
                     <CardHeader><CardTitle className="text-base">Full Payment History (Customers)</CardTitle></CardHeader>
                     <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-center">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
-                        {paymentHistory.filter(p => p.customerId !== 'OUTSIDER' && !p.paymentId.startsWith('S')).map(p => {
+                        {paymentHistory.map(p => {
                             const customerName = customerSummary.get(p.customerId)?.name;
                             return (
                             <TableRow key={p.id}>
