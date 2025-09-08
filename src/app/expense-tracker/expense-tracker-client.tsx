@@ -512,7 +512,7 @@ export default function IncomeExpenseClient() {
                         <TableCell>{transaction.payee}</TableCell>
                         <TableCell>{transaction.mill}</TableCell>
                         <TableCell className="text-center">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={()={() => handleEdit(transaction)}}><Pen className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
@@ -848,5 +848,7 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
 
     
