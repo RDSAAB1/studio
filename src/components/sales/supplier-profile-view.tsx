@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 type ChartType = 'financial' | 'variety';
 
@@ -48,7 +49,9 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 
 
 export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+    const { toast } = useToast();
     const statementRef = React.useRef<HTMLDivElement>(null);
+
     if (!data) return null;
 
     const transactions = useMemo(() => {
@@ -84,7 +87,10 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
      const handlePrint = () => {
         const node = statementRef.current;
-        if (!node) return;
+        if (!node) {
+            toast({ title: 'Error', description: 'Could not find printable content.', variant: 'destructive'});
+            return;
+        }
 
         const newWindow = window.open('', '', 'height=800,width=1200');
         if (newWindow) {
@@ -95,7 +101,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         <title>Print Statement</title>
                         <style>
                             /* Include basic styles for printing */
-                            body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; color: #000 !important; }
+                            body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; }
                             table { width: 100%; border-collapse: collapse; }
                             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
                             th { background-color: #f2f2f2; }
@@ -131,13 +137,15 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 newWindow.print();
                 newWindow.close();
             }, 500);
+        } else {
+            toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
         }
     };
     
     return (
     <>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
-             <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
+            <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
              A detailed summary and transaction history for {data.name}.
              </DialogDescription>
@@ -257,7 +265,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             </div>
         </div>
         <DialogFooter className="p-4 border-t no-print">
-            <Button variant="outline" onClick={() => (document.querySelector('[data-state="open"] [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
+            <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
             <div className="flex-grow" />
             <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
             <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
@@ -503,5 +511,3 @@ export const SupplierProfileView = ({
         </div>
     );
 };
-
-    

@@ -156,8 +156,8 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {paymentsForDetailsEntry.map((payment, index) => {
-                                                    const paidForThis = payment.paidFor?.find(pf => pf.srNo === customer?.srNo);
+                                                {paymentsForDetailsEntry.map((payment: any, index: number) => {
+                                                    const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
                                                     return (
                                                         <TableRow key={payment.id || index}>
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
