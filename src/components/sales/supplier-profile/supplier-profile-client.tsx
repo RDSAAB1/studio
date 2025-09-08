@@ -23,6 +23,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from '@/hooks/use-toast';
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
+const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: string | number | null | undefined, className?: string }) => (
     <div className={cn("flex items-start gap-3", className)}>
@@ -72,64 +73,43 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const closingBalance = totalDebit - totalCredit;
 
     const handlePrint = () => {
-        const node = statementRef.current;
-        if (!node) {
+        const nodeToPrint = statementRef.current;
+        if (!nodeToPrint) {
             toast({ title: 'Error', description: 'Could not find statement content to print.', variant: 'destructive' });
             return;
         }
 
-        const newWindow = window.open('', '_blank', 'height=800,width=1200');
-        if (!newWindow) {
-            toast({ title: 'Error', description: 'Could not open print window. Please disable pop-up blockers.', variant: 'destructive' });
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow?.document;
+        if (!doc) {
+             toast({ title: 'Error', description: 'Could not open print window.', variant: 'destructive' });
             return;
         }
-
-        const styles = Array.from(document.styleSheets)
-            .map(styleSheet => {
-                try {
-                    return Array.from(styleSheet.cssRules)
-                        .map(rule => rule.cssText)
-                        .join('');
-                } catch (e) {
-                    console.warn('Could not read stylesheet rules:', e);
-                    return '';
-                }
-            })
-            .filter(Boolean)
-            .join('\n');
         
-        const printStyles = `
-            @media print {
-                @page { size: A4; margin: 15mm; }
-                body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                .no-print { display: none !important; }
-                .summary-grid {
-                    display: grid !important;
-                    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-                    gap: 1.5rem !important;
-                }
-            }
-        `;
+        doc.open();
+        doc.write('<html><head><title>Print Statement</title></head><body></body></html>');
 
-        newWindow.document.write(`
-            <html>
-                <head>
-                    <title>Account Statement - ${data.name}</title>
-                    <style>${styles}</style>
-                    <style>${printStyles}</style>
-                </head>
-                <body>
-                    ${node.innerHTML}
-                </body>
-            </html>
-        `);
+        // Copy all style tags and link tags from head
+        const styles = document.head.querySelectorAll('style, link[rel="stylesheet"]');
+        styles.forEach(style => {
+            doc.head.appendChild(style.cloneNode(true));
+        });
 
-        newWindow.document.close();
+        doc.body.innerHTML = nodeToPrint.innerHTML;
+        doc.close();
+
         setTimeout(() => {
-            newWindow.focus();
-            newWindow.print();
-            newWindow.close();
-        }, 500);
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+        }, 500); // Wait for styles to load
     };
 
     return (
