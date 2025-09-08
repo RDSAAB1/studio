@@ -99,43 +99,26 @@ const TabProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const currentItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(i => i.href === pathname);
     if (currentItem) {
+        if (!openTabs.some(tab => tab.id === currentItem.id)) {
+          openTab(currentItem);
+        }
         if (!pages[currentItem.id]) {
             setPages(prev => ({...prev, [currentItem.id]: children}));
         }
         setActiveTabId(currentItem.id);
     }
-  }, [pathname, children, pages]);
+  }, [pathname, children, pages, openTab, openTabs]);
 
 
   const value = { openTabs, activeTabId, openTab, closeTab, setActiveTabId };
 
   return (
     <TabContext.Provider value={value}>
-       <div className="flex-1 flex flex-col min-h-0">
-          <TabBar 
-            openTabs={openTabs}
-            activeTabId={activeTabId}
-            onTabClick={(id) => {
-                const tab = openTabs.find(t => t.id === id);
-                if (tab && tab.href) {
-                    setActiveTabId(id);
-                    router.push(tab.href);
-                }
-            }}
-            onCloseTab={(tabId, e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              closeTab(tabId);
-            }}
-          />
-          <main className="content">
-            {Object.keys(pages).map(pageId => (
-                <div key={pageId} style={{ display: pageId === activeTabId ? 'block' : 'none' }} className="h-full">
-                    {pages[pageId]}
-                </div>
-            ))}
-          </main>
-        </div>
+        {Object.keys(pages).map(pageId => (
+            <div key={pageId} style={{ display: pageId === activeTabId ? 'block' : 'none' }} className="h-full">
+                {pages[pageId]}
+            </div>
+        ))}
     </TabContext.Provider>
   );
 };
@@ -220,22 +203,24 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
+        <TabProvider>
             <div className={cn("wrapper", isSidebarActive && "active")}>
                 <div onMouseEnter={() => setIsSidebarActive(true)} onMouseLeave={() => setIsSidebarActive(false)}>
                     <CustomSidebar isSidebarActive={isSidebarActive} />
                 </div>
                 <div className="main_container">
-                    <TabProvider>
-                        <Header 
-                            toggleSidebar={toggleSidebar}
-                            user={user}
-                            onSignOut={handleSignOut}
-                        />
-                        {children}
-                    </TabProvider>
+                  <Header 
+                      toggleSidebar={toggleSidebar}
+                      user={user}
+                      onSignOut={handleSignOut}
+                  />
+                  <main className="content">
+                    {children}
+                  </main>
                     {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
                 </div>
             </div>
+        </TabProvider>
       </body>
     </html>
   );
