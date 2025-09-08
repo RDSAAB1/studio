@@ -113,7 +113,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             gap: 1.5rem;
                         }
                         @media print {
-                            body { -webkit-print-color-adjust: economy; }
+                            body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                             .no-print { display: none !important; }
                         }
                     </style>
