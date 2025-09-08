@@ -43,15 +43,8 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
             <style>
                 {`
                 @media print {
-                    @page {
-                        size: A4;
-                        margin: 0;
-                    }
-                    html, body {
-                        height: 100%;
-                        margin: 0;
-                        padding: 0;
-                        font-size: 14px !important;
+                    body {
+                        background-color: #fff !important;
                     }
                     .printable-area {
                         background-color: #fff !important;
@@ -61,7 +54,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         color: #000 !important;
                         border-color: #e5e7eb !important;
                     }
-                    .printable-area .bg-gray-800 {
+                    .print-bg-gray-800 {
                         background-color: #f2f2f2 !important; /* Light gray for print */
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
@@ -106,7 +99,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                 {/* Items Table */}
                 <table className="w-full text-left mb-4 print-table">
                     <thead>
-                        <tr className="bg-gray-800 text-black uppercase text-xs">
+                        <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
                             <th className="p-2 font-semibold text-center w-[5%]">#</th>
                             <th className="p-2 font-semibold w-[55%]">Item & Description</th>
                             <th className="p-2 font-semibold text-center w-[15%]">Qty (Qtl)</th>
@@ -141,7 +134,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         </div>
                     </div>
                     <div className="w-2/5">
-                        <div className="flex justify-between p-2 mt-1 bg-gray-800 text-black font-bold rounded-lg text-lg">
+                        <div className="flex justify-between p-2 mt-1 print-bg-gray-800 bg-gray-800 text-black font-bold rounded-lg text-lg">
                             <span>Total Amount:</span>
                             <span>{formatCurrency(totalAmount)}</span>
                         </div>

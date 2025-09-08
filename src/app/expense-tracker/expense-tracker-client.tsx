@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -641,6 +642,13 @@ export default function IncomeExpenseClient() {
                            </InputWithIcon>
                           {form.formState.errors.payee && <p className="text-xs text-destructive mt-1">{form.formState.errors.payee.message}</p>}
                       </div>
+
+                       <div className="space-y-1">
+                          <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
+                           <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
+                               <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
+                           </InputWithIcon>
+                      </div>
                       
                       <Controller name="paymentMethod" control={form.control} render={({ field }) => (
                           <div className="space-y-1">
@@ -797,12 +805,6 @@ export default function IncomeExpenseClient() {
                                     <Label htmlFor="mill" className="text-xs">Mill</Label>
                                     <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
                                         <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
-                                    </InputWithIcon>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
-                                    <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                                        <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
                                     </InputWithIcon>
                                 </div>
                             </>

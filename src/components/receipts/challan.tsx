@@ -18,15 +18,8 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
              <style>
                 {`
                 @media print {
-                    @page {
-                        size: A4;
-                        margin: 0;
-                    }
-                    html, body {
-                        height: 100%;
-                        margin: 0;
-                        padding: 0;
-                        font-size: 14px !important;
+                    body {
+                        background-color: #fff !important;
                     }
                     .printable-area {
                         background-color: #fff !important;
@@ -36,7 +29,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
                         color: #000 !important;
                         border-color: #e5e7eb !important;
                     }
-                    .printable-area .bg-gray-800 {
+                    .print-bg-gray-800 {
                         background-color: #f2f2f2 !important; /* Light gray for print */
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
@@ -87,7 +80,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
                 {/* Items Table */}
                 <table className="w-full text-left mb-4 print-table">
                     <thead>
-                        <tr className="bg-gray-800 text-black uppercase text-xs">
+                        <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
                             <th className="p-2 font-semibold text-center w-[5%]">#</th>
                             <th className="p-2 font-semibold w-[65%]">Description of Goods</th>
                             <th className="p-2 font-semibold text-center w-[15%]">Quantity (Qtl)</th>

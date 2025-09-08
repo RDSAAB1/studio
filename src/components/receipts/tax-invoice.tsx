@@ -83,15 +83,8 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
             <style>
                 {`
                 @media print {
-                    @page {
-                        size: A4;
-                        margin: 0;
-                    }
-                    html, body {
-                        height: 100%;
-                        margin: 0;
-                        padding: 0;
-                        font-size: 14px !important;
+                    body {
+                        background-color: #fff !important;
                     }
                     .printable-area {
                         background-color: #fff !important;
@@ -101,7 +94,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         color: #000 !important;
                         border-color: #e5e7eb !important;
                     }
-                    .printable-area .bg-gray-800 {
+                    .print-bg-gray-800 {
                         background-color: #f2f2f2 !important; /* Light gray for print */
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
@@ -159,7 +152,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 {/* Items Table */}
                 <table className="w-full text-left mb-6 print-table text-base">
                     <thead>
-                        <tr className="bg-gray-800 text-black uppercase text-xs">
+                        <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
                             <th className="p-3 font-semibold text-center w-[5%]">#</th>
                             <th className="p-3 font-semibold w-[45%]">Item & Description</th>
                             <th className="p-3 font-semibold text-center w-[15%]">HSN/SAC</th>
@@ -208,7 +201,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                             <span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span>
                             <span>{formatCurrency(sgstAmount)}</span>
                         </div>
-                        <div className="flex justify-between p-3 mt-1 bg-gray-800 text-black font-bold rounded-lg text-xl">
+                        <div className="flex justify-between p-3 mt-1 print-bg-gray-800 bg-gray-800 text-black font-bold rounded-lg text-xl">
                             <span>Balance Due:</span>
                             <span>{formatCurrency(totalInvoiceValue)}</span>
                         </div>

@@ -38,13 +38,8 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                      <style>
                         {`
                           @media print {
-                            @page {
-                              size: A4;
-                              margin: 0;
-                            }
                             body {
-                              -webkit-print-color-adjust: exact !important;
-                              print-color-adjust: exact !important;
+                                background-color: #fff !important;
                             }
                             .printable-area {
                                 background-color: #fff !important;
@@ -54,8 +49,10 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                                 color: #000 !important;
                                 border-color: #e5e7eb !important;
                             }
-                            .printable-area .bg-gray-800 {
+                            .print-bg-gray-800 {
                                 background-color: #f2f2f2 !important; /* Light gray for print */
+                                -webkit-print-color-adjust: exact;
+                                print-color-adjust: exact;
                             }
                           }
                         `}
@@ -95,7 +92,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                         {/* Information Table */}
                          <table className="w-full text-left mb-4 print-table text-base">
                             <thead className="print-bg-orange">
-                                <tr className="bg-gray-800 text-black uppercase text-xs">
+                                <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
                                     <th className="p-2 font-semibold w-[20%]">Payee Name</th>
                                     <th className="p-2 font-semibold w-[20%]">Bank Name</th>
                                     <th className="p-2 font-semibold w-[15%]">Branch</th>
