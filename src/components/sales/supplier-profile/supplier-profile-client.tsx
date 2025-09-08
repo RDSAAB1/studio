@@ -78,64 +78,57 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             return;
         }
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ title: 'Error', description: 'Could not create print view.', variant: 'destructive' });
+        const newWindow = window.open('', '_blank', 'height=800,width=1200');
+        if (!newWindow) {
+            toast({ title: 'Error', description: 'Could not open print window. Please disable pop-up blockers.', variant: 'destructive' });
             return;
         }
+
+        const styles = Array.from(document.styleSheets)
+            .map(styleSheet => {
+                try {
+                    return Array.from(styleSheet.cssRules)
+                        .map(rule => rule.cssText)
+                        .join('');
+                } catch (e) {
+                    console.warn('Could not read stylesheet rules:', e);
+                    return '';
+                }
+            })
+            .filter(Boolean)
+            .join('\n');
         
-        iframeDoc.open();
-        iframeDoc.write(`
+        const printStyles = `
+            @media print {
+                @page { size: A4; margin: 15mm; }
+                body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                .no-print { display: none !important; }
+                .summary-grid {
+                    display: grid !important;
+                    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                    gap: 1.5rem !important;
+                }
+            }
+        `;
+
+        newWindow.document.write(`
             <html>
                 <head>
-                    <title>Print Statement</title>
+                    <title>Account Statement - ${data.name}</title>
+                    <style>${styles}</style>
+                    <style>${printStyles}</style>
                 </head>
                 <body>
+                    ${node.innerHTML}
                 </body>
             </html>
         `);
-        
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const style = iframeDoc.createElement('style');
-                style.textContent = Array.from(styleSheet.cssRules)
-                    .map(rule => rule.cssText)
-                    .join('');
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
-            }
-        });
-        
-        const printStyles = iframeDoc.createElement('style');
-        printStyles.textContent = `
-            @media print {
-                @page {
-                    size: A4;
-                    margin: 15mm;
-                }
-                body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                .no-print { display: none !important; }
-            }
-        `;
-        iframeDoc.head.appendChild(printStyles);
 
-        const printableContent = node.cloneNode(true) as HTMLElement;
-        iframeDoc.body.appendChild(printableContent);
-        
-        iframeDoc.close();
-
+        newWindow.document.close();
         setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
+            newWindow.focus();
+            newWindow.print();
+            newWindow.close();
         }, 500);
     };
 
@@ -174,7 +167,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             {/* Summary Section */}
              <Card className="mb-6">
                 <CardContent className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6">
+                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
                         {/* Operational Summary */}
                         <div className="text-sm">
                             <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Operational</h3>
@@ -782,5 +775,3 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
-
-    
