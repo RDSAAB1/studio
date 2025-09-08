@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, type ReactNode, createContext, useContext, useCallback } from "react";
 import { usePathname, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import CustomSidebar from '@/components/layout/custom-sidebar';
@@ -158,7 +157,7 @@ export default function RootLayout({
   }, [pathname, router]);
 
   const toggleSidebar = () => {
-    setIsSidebarActive(!isSidebarActive);
+    setIsSidebarActive(prev => !prev);
   };
 
   const handleSignOut = async () => {
@@ -243,8 +242,19 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <div className={cn("wrapper", isSidebarActive && "active")}>
             <TabProvider>
-                <CustomSidebar isSidebarActive={isSidebarActive} />
-                <TabManager />
+                <CustomSidebar isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar} />
+                 <div className="main_container">
+                    <Header 
+                        toggleSidebar={toggleSidebar}
+                        user={user}
+                        onSignOut={handleSignOut}
+                    />
+                    <TabBar />
+                    <main className="content">
+                      {children}
+                    </main>
+                      {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
+                  </div>
             </TabProvider>
         </div>
       </body>
