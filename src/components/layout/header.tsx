@@ -5,13 +5,14 @@ import { useState, useEffect } from "react";
 import { Settings, UserCircle, Search, Menu, X, LogOut, Bell } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { MenuItem } from "@/hooks/use-tabs";
+import TabBar from "./tab-bar";
+import { MenuItem, allMenuItems } from "@/hooks/use-tabs";
 import { cn } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import type { User } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
@@ -23,6 +24,10 @@ interface HeaderProps {
   toggleSidebar: () => void;
   user: User | null;
   onSignOut: () => void;
+  openTabs: MenuItem[];
+  activeTabId: string;
+  onTabClick: (id: string) => void;
+  onCloseTab: (id: string, e: React.MouseEvent) => void;
 }
 
 const NotificationBell = () => {
@@ -96,7 +101,7 @@ const NotificationBell = () => {
     )
 }
 
-export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
+export function Header({ toggleSidebar, user, onSignOut, openTabs, activeTabId, onTabClick, onCloseTab }: HeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const router = useRouter();
 
@@ -110,39 +115,14 @@ export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </div>
-          {/* Desktop Search */}
-          <div className="relative hidden flex-1 lg:flex lg:grow-0 max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="h-8 w-full rounded-full bg-background pl-8 md:w-[180px] lg:w-[250px]"
+          <div className="hidden lg:block">
+            <TabBar 
+                openTabs={openTabs}
+                activeTabId={activeTabId}
+                onTabClick={onTabClick}
+                onCloseTab={onCloseTab}
             />
           </div>
-           {/* Mobile Search Button */}
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSearchOpen(true)}>
-            <Search className="h-5 w-5" />
-            <span className="sr-only">Search</span>
-          </Button>
-
-          {/* Mobile Search Overlay */}
-          {isSearchOpen && (
-              <div className="absolute inset-0 z-20 flex items-center bg-card px-2 lg:hidden">
-                  <div className="relative w-full">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                          type="search"
-                          placeholder="Search..."
-                          className="h-8 w-full rounded-full bg-background pl-8"
-                          autoFocus
-                      />
-                      <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setIsSearchOpen(false)}>
-                          <X className="h-4 w-4" />
-                          <span className="sr-only">Close search</span>
-                      </Button>
-                  </div>
-              </div>
-          )}
         </div>
 
         {/* Center Section: Dynamic Island Toaster */}
