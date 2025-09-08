@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
@@ -37,6 +37,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 
 export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const { toast } = useToast();
+    const statementRef = useRef<HTMLDivElement>(null);
 
     if (!data) return null;
 
@@ -72,53 +73,51 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const closingBalance = totalDebit - totalCredit;
 
     const handlePrint = () => {
-        window.print();
+        const node = statementRef.current;
+        if (!node) {
+            toast({ title: 'Error', description: 'Could not find printable content.', variant: 'destructive'});
+            return;
+        }
+
+        const newWindow = window.open('', '', 'height=800,width=1200');
+        if (newWindow) {
+            const document = newWindow.document;
+            document.write('<html><head><title>Print Statement</title>');
+            
+            // Copy all stylesheets from the main window to the new window
+            Array.from(window.document.styleSheets).forEach(styleSheet => {
+                try {
+                    const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                    const styleElement = document.createElement('style');
+                    styleElement.appendChild(document.createTextNode(css));
+                    newWindow.document.head.appendChild(styleElement);
+                } catch (e) {
+                    console.warn('Could not copy stylesheet:', e);
+                }
+            });
+
+            document.write('</head><body></body></html>');
+            document.body.innerHTML = node.innerHTML;
+            
+            setTimeout(() => {
+                newWindow.focus();
+                newWindow.print();
+                newWindow.close();
+            }, 500); // Wait for styles to apply
+        } else {
+            toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
+        }
     };
 
     return (
     <>
-        <style jsx global>{`
-            @media print {
-                body > * {
-                    display: none !important;
-                }
-                body > .printable-statement-container, 
-                body > .printable-statement-container * {
-                    display: block !important;
-                }
-                .printable-statement-container {
-                    position: absolute !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    width: 100% !important;
-                    height: auto !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    overflow: visible !important;
-                }
-                 .printable-statement-dialog {
-                    width: 100% !important;
-                    max-width: 100% !important;
-                    height: auto !important;
-                    box-shadow: none !important;
-                    border: none !important;
-                }
-                 .printable-statement-scroll-area > div {
-                    height: auto !important;
-                }
-                .no-print {
-                    display: none !important;
-                }
-            }
-        `}</style>
-
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
              <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
              A detailed summary and transaction history for {data.name}.
              </DialogDescription>
         </DialogHeader>
-        <div id="printable-statement" className="bg-background p-4 sm:p-6 font-sans text-foreground">
+        <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
@@ -480,6 +479,7 @@ export const SupplierProfileView = ({
         </div>
     );
 };
+
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
@@ -649,15 +649,7 @@ export default function SupplierProfilePage() {
   }, [suppliers, paymentHistory]);
 
   const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
-  const isMillSelected = selectedSupplierKey === MILL_OVERVIEW_KEY;
-
-  const paymentsForDetailsEntry = useMemo(() => {
-    if (!detailsCustomer) return [];
-    return paymentHistory.filter(p => 
-      p.paidFor?.some(pf => pf.srNo === detailsCustomer.srNo)
-    );
-  }, [detailsCustomer, paymentHistory]);
-
+  
   if (!isClient || loading) {
     return (
         <div className="flex items-center justify-center h-64">
@@ -724,7 +716,7 @@ export default function SupplierProfilePage() {
 
       <SupplierProfileView 
         selectedSupplierData={selectedSupplierData}
-        isMillSelected={isMillSelected}
+        isMillSelected={selectedSupplierKey === MILL_OVERVIEW_KEY}
         onShowDetails={setDetailsCustomer}
         onShowPaymentDetails={setSelectedPaymentForDetails}
         onGenerateStatement={() => setIsStatementOpen(true)}
@@ -733,9 +725,7 @@ export default function SupplierProfilePage() {
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
         <DialogContent className="max-w-5xl p-0 printable-statement-container">
             <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <div className="printable-statement-dialog">
-                    <StatementPreview data={selectedSupplierData} />
-                </div>
+                <StatementPreview data={selectedSupplierData} />
             </ScrollArea>
         </DialogContent>
       </Dialog>
