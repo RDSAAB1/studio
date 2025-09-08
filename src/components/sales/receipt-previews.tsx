@@ -8,7 +8,7 @@ import { formatCurrency, toTitleCase } from '@/lib/utils';
 export const ReceiptPreview = ({ data, settings, isCustomer = false }: { data: Customer; settings: ReceiptSettings; isCustomer?: boolean }) => {
     const { fields } = settings;
     return (
-        <div className="text-black bg-white font-sans p-4">
+        <div className="text-black bg-white font-sans p-4 printable-area">
              <style>
                 {`
                   @media print {
@@ -17,8 +17,8 @@ export const ReceiptPreview = ({ data, settings, isCustomer = false }: { data: C
                       margin: 5mm;
                     }
                     body {
-                      -webkit-print-color-adjust: exact;
-                      print-color-adjust: exact;
+                      -webkit-print-color-adjust: exact !important;
+                      print-color-adjust: exact !important;
                     }
                     .receipt-container {
                         page-break-after: always;
@@ -120,7 +120,7 @@ export const ConsolidatedReceiptPreview = ({ data, settings, isCustomer = false 
     }).length;
 
     return (
-        <div className="text-black bg-white font-sans p-4">
+        <div className="text-black bg-white font-sans p-4 printable-area">
              <style>
                 {`
                   @media print {

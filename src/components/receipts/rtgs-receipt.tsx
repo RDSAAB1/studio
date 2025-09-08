@@ -27,7 +27,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
 
     return (
         <>
-            <DialogHeader className="p-4 pb-0">
+            <DialogHeader className="p-4 pb-0 print:hidden">
                 <DialogTitle className="sr-only">Print RTGS Receipt</DialogTitle>
                 <DialogDescription className="sr-only">
                     Preview of the RTGS receipt for payment ID: {payment.paymentId}.
@@ -56,7 +56,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                             .printable-area .bg-gray-800 {
                                 background-color: #1f2937 !important;
                             }
-                             .printable-area .bg-gray-800 * {
+                             .printable-area .bg-gray-800 th {
                                 color: #fff !important;
                             }
                           }
@@ -66,18 +66,18 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                         {/* Header */}
                          <div className="flex justify-between items-start mb-8">
                             <div className="w-1/2">
-                                <h2 className="font-bold text-3xl mb-2" style={{ color: '#000' }}>{settings.companyName}</h2>
-                                <p className="text-gray-600 text-sm" style={{ color: '#000' }}>{settings.companyAddress1}, {settings.companyAddress2}</p>
-                                <p className="text-gray-600 text-sm" style={{ color: '#000' }}>Phone: {settings.contactNo} | Email: {settings.gmail}</p>
+                                <h2 className="font-bold text-3xl mb-2">{settings.companyName}</h2>
+                                <p className="text-gray-600 text-sm">{settings.companyAddress1}, {settings.companyAddress2}</p>
+                                <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
                             </div>
                             <div className="text-right">
-                                <h1 className="text-4xl font-bold text-gray-800 uppercase mb-2" style={{ color: '#000' }}>RTGS ADVICE</h1>
+                                <h1 className="text-4xl font-bold text-gray-800 uppercase mb-2">RTGS ADVICE</h1>
                                 <div className="text-base text-gray-700">
                                     <div className="grid grid-cols-2 text-left">
-                                        <span className="font-bold pr-2" style={{ color: '#000' }}>Date:</span>
-                                        <span style={{ color: '#000' }}>{format(new Date(payment.date), "dd MMM, yyyy")}</span>
-                                        <span className="font-bold pr-2" style={{ color: '#000' }}>Check #:</span>
-                                        <span style={{ color: '#000' }}>{checkNo}</span>
+                                        <span className="font-bold pr-2">Date:</span>
+                                        <span>{format(new Date(payment.date), "dd MMM, yyyy")}</span>
+                                        <span className="font-bold pr-2">Check #:</span>
+                                        <span>{checkNo}</span>
                                     </div>
                                 </div>
                             </div>
@@ -86,16 +86,16 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                         
                         {/* Our Bank Details */}
                         <div className="border border-gray-200 p-4 rounded-lg mb-6">
-                            <h3 className="font-bold text-gray-500 mb-3 uppercase tracking-wider text-sm" style={{ color: '#000' }}>Our Bank Details</h3>
+                            <h3 className="font-bold text-gray-500 mb-3 uppercase tracking-wider text-sm">Our Bank Details</h3>
                              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-base">
-                                <div><span className="font-semibold" style={{ color: '#000' }}>Bank:</span> <span style={{ color: '#000' }}>{settings.bankName}, {settings.branchName}</span></div>
-                                <div><span className="font-semibold" style={{ color: '#000' }}>A/C No:</span> <span style={{ color: '#000' }}>{settings.accountNo}</span></div>
-                                <div><span className="font-semibold" style={{ color: '#000' }}>IFSC:</span> <span style={{ color: '#000' }}>{settings.ifscCode}</span></div>
+                                <div><span className="font-semibold">Bank:</span> <span>{settings.bankName}, {settings.branchName}</span></div>
+                                <div><span className="font-semibold">A/C No:</span> <span>{settings.accountNo}</span></div>
+                                <div><span className="font-semibold">IFSC:</span> <span>{settings.ifscCode}</span></div>
                             </div>
                         </div>
 
                         {/* Information Table */}
-                         <table className="w-full text-left mb-4 print-table">
+                         <table className="w-full text-left mb-4 print-table text-base">
                             <thead className="print-bg-orange">
                                 <tr className="bg-gray-800 text-white uppercase text-xs">
                                     <th className="p-2 font-semibold w-[20%]">Payee Name</th>
@@ -108,14 +108,14 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                             </thead>
                             <tbody>
                                 <tr className="border-b border-gray-200">
-                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>
-                                        <p style={{ color: '#000' }}>{toTitleCase(payment.supplierName || '')}</p>
+                                    <td className="p-2 border-x border-gray-200">
+                                        <p>{toTitleCase(payment.supplierName || '')}</p>
                                     </td>
-                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankName}</td>
-                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{toTitleCase(payment.bankBranch || '')}</td>
-                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankAcNo}</td>
-                                    <td className="p-2 border-x border-gray-200" style={{ color: '#000' }}>{payment.bankIfsc}</td>
-                                    <td className="p-2 text-right font-semibold border-x border-gray-200" style={{ color: '#000' }}>{formatCurrency(totalAmount)}</td>
+                                    <td className="p-2 border-x border-gray-200">{payment.bankName}</td>
+                                    <td className="p-2 border-x border-gray-200">{toTitleCase(payment.bankBranch || '')}</td>
+                                    <td className="p-2 border-x border-gray-200">{payment.bankAcNo}</td>
+                                    <td className="p-2 border-x border-gray-200">{payment.bankIfsc}</td>
+                                    <td className="p-2 text-right font-semibold border-x border-gray-200">{formatCurrency(totalAmount)}</td>
                                 </tr>
                                  {Array.from({ length: 8 }).map((_, i) => (
                                     <tr key={i} className="border-b border-gray-200"><td className="p-2 h-6 border-x border-gray-200" colSpan={6}></td></tr>
@@ -123,8 +123,8 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                             </tbody>
                              <tfoot>
                                 <tr className="bg-gray-100 font-bold">
-                                    <td className="p-2 text-right" colSpan={5} style={{ color: '#000' }}>TOTAL</td>
-                                    <td className="p-2 text-right" style={{ color: '#000' }}>{formatCurrency(totalAmount)}</td>
+                                    <td className="p-2 text-right" colSpan={5}>TOTAL</td>
+                                    <td className="p-2 text-right">{formatCurrency(totalAmount)}</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -135,14 +135,14 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                         <div className="border-t border-gray-300 pt-4 mt-4">
                             <div className="flex justify-between items-end">
                                 <div className="w-3/5">
-                                    <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs" style={{ color: '#000' }}>Notes</h4>
-                                    <p className="text-gray-600 text-[10px]" style={{ color: '#000' }}>This is a computer-generated advice and does not require a signature.</p>
+                                    <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Notes</h4>
+                                    <p className="text-gray-600 text-[10px]">This is a computer-generated advice and does not require a signature.</p>
                                 </div>
                                 <div className="w-2/5 text-center">
                                     <div className="h-16"></div>
                                     <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
-                                        <p className="font-bold text-sm" style={{ color: '#000' }}>Authorised Signatory</p>
-                                        <p className="text-gray-600 text-xs" style={{ color: '#000' }}>For {settings.companyName}</p>
+                                        <p className="font-bold text-sm">Authorised Signatory</p>
+                                        <p className="text-gray-600 text-xs">For {settings.companyName}</p>
                                     </div>
                                 </div>
                             </div>

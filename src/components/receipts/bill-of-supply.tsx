@@ -39,7 +39,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
     const totalAmount = Number(customer.amount);
 
     return (
-        <div className="p-6 bg-white text-black font-sans text-[12px] leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
+        <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
             <style>
                 {`
                 @media print {
@@ -51,6 +51,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                         height: 100%;
                         margin: 0;
                         padding: 0;
+                        font-size: 14px !important;
                     }
                     .printable-area {
                         color: #000 !important;
@@ -61,8 +62,10 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                     }
                     .printable-area .bg-gray-800 {
                         background-color: #1f2937 !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
                     }
-                    .printable-area .bg-gray-800 * {
+                    .printable-area .bg-gray-800 th {
                         color: #fff !important;
                     }
                 }
@@ -74,8 +77,8 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings }
                  <div className="flex justify-between items-start mb-4">
                     <div className="w-1/2">
                          <h2 className="font-bold text-2xl mb-1">{settings.companyName}</h2>
-                         <p className="text-gray-600 text-[11px]">{settings.address1}, {settings.address2}</p>
-                         <p className="text-gray-600 text-[11px]">Phone: {settings.contactNo} | Email: {settings.email}</p>
+                         <p className="text-gray-600 text-xs">{settings.address1}, {settings.address2}</p>
+                         <p className="text-gray-600 text-xs">Phone: {settings.contactNo} | Email: {settings.email}</p>
                     </div>
                      <div className="text-right">
                         <h1 className="text-3xl font-bold text-gray-800 uppercase mb-1">BILL OF SUPPLY</h1>

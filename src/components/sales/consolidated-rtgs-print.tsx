@@ -133,6 +133,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         iframeDoc.open();
         iframeDoc.write('<html><head><title>RTGS Advice</title>');
         
+        // This is a more robust way to copy styles
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const style = iframeDoc.createElement('style');
@@ -148,16 +149,18 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             @media print {
                 @page {
                     size: A4 landscape;
-                    margin: 15px;
+                    margin: 15mm;
                 }
                 body {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
+                    font-size: 12px;
                 }
                 .page-break-after { page-break-after: always !important; }
+                .printable-area { color: #000 !important; }
+                .printable-area * { color: #000 !important; border-color: #ccc !important; }
                 .bg-gray-800 { background-color: #1f2937 !important; }
-                .bg-gray-800 * { color: #fff !important; }
-                .text-black { color: #000 !important; }
+                .bg-gray-800 th { color: #fff !important; }
             }
         `;
         iframeDoc.head.appendChild(printStyles);
@@ -193,7 +196,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                 <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
                                 
                                 <div className="flex-grow overflow-x-auto">
-                                    <table className="w-full text-left print-table">
+                                    <table className="w-full text-left print-table text-sm">
                                         <thead className="text-[10px]">
                                             <tr className="bg-gray-800 text-white uppercase">
                                                 <th className="py-1 px-2 font-semibold text-center">#</th>
@@ -208,36 +211,36 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                         <tbody>
                                             {chunk.map((payment, index) => (
                                                 <tr key={payment.paymentId} className="border-b border-gray-200">
-                                                    <td className="py-1 px-2 text-xs text-center border-x border-gray-200 text-black">{pageIndex * CHUNK_SIZE + index + 1}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.supplierName || '')}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.bank}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{toTitleCase(payment.branch || '')}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.acNo}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200 text-black">{payment.ifscCode}</td>
-                                                    <td className="py-1 px-2 text-xs font-semibold text-right border-x border-gray-200 text-black">{formatCurrency(payment.amount)}</td>
+                                                    <td className="py-1 px-2 text-xs text-center border-x border-gray-200">{pageIndex * CHUNK_SIZE + index + 1}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{toTitleCase(payment.supplierName || '')}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{payment.bank}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{toTitleCase(payment.branch || '')}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{payment.acNo}</td>
+                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{payment.ifscCode}</td>
+                                                    <td className="py-1 px-2 text-xs font-semibold text-right border-x border-gray-200">{formatCurrency(payment.amount)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         <tfoot className="font-bold border-t-2 border-black">
                                             {paymentChunks.length === 1 ? (
                                                 <tr>
-                                                    <td className="py-1 px-2 text-right text-black" colSpan={6}>GRAND TOTAL</td>
-                                                    <td className="py-1 px-2 text-right text-black">{formatCurrency(cumulativeTotal)}</td>
+                                                    <td className="py-1 px-2 text-right" colSpan={6}>GRAND TOTAL</td>
+                                                    <td className="py-1 px-2 text-right">{formatCurrency(cumulativeTotal)}</td>
                                                 </tr>
                                             ) : (
                                                 <>
                                                     <tr>
-                                                        <td className="py-1 px-2 text-right text-black text-xs" colSpan={6}>Page Total</td>
-                                                        <td className="py-1 px-2 text-right text-black text-xs">{formatCurrency(pageTotal)}</td>
+                                                        <td className="py-1 px-2 text-right text-xs" colSpan={6}>Page Total</td>
+                                                        <td className="py-1 px-2 text-right text-xs">{formatCurrency(pageTotal)}</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="py-1 px-2 text-right text-black text-xs" colSpan={6}>Cumulative Total</td>
-                                                        <td className="py-1 px-2 text-right text-black text-xs">{formatCurrency(cumulativeTotal)}</td>
+                                                        <td className="py-1 px-2 text-right text-xs" colSpan={6}>Cumulative Total</td>
+                                                        <td className="py-1 px-2 text-right text-xs">{formatCurrency(cumulativeTotal)}</td>
                                                     </tr>
                                                     {isLastPage && (
                                                         <tr className="bg-gray-200">
-                                                            <td className="py-1 px-2 text-right text-black" colSpan={6}>GRAND TOTAL</td>
-                                                            <td className="py-1 px-2 text-right text-black">{formatCurrency(cumulativeTotal)}</td>
+                                                            <td className="py-1 px-2 text-right" colSpan={6}>GRAND TOTAL</td>
+                                                            <td className="py-1 px-2 text-right">{formatCurrency(cumulativeTotal)}</td>
                                                         </tr>
                                                     )}
                                                 </>

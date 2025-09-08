@@ -54,12 +54,20 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
         iframeDoc.write(`
             <style>
                 @media print {
+                    @page {
+                        size: A6 landscape;
+                        margin: 5mm;
+                    }
                     body {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
                     .receipt-container { 
                         page-break-after: always;
+                    }
+                    .printable-area * {
+                        color: #000 !important;
+                        border-color: #ccc !important;
                     }
                 }
             </style>
@@ -144,11 +152,19 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
         iframeDoc.write(`
             <style>
                 @media print {
+                    @page {
+                        size: A4;
+                        margin: 10mm;
+                    }
                     body {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
                     .receipt-container { page-break-after: always; }
+                    .printable-area * {
+                        color: #000 !important;
+                        border-color: #ccc !important;
+                    }
                 }
             </style>
         </head><body></body></html>`);

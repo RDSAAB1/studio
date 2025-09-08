@@ -21,23 +21,13 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { useToast } from '@/hooks/use-toast';
+import { SupplierProfileView } from './supplier-profile-view';
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
-const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
-
-const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: string | number | null | undefined, className?: string }) => (
-    <div className={cn("flex items-start gap-3", className)}>
-        {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
-        <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="font-semibold text-sm break-words">{String(value) || '-'}</p>
-        </div>
-    </div>
-);
 
 export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const { toast } = useToast();
-    const statementRef = useRef<HTMLDivElement>(null);
+    const statementRef = React.useRef<HTMLDivElement>(null);
 
     if (!data) return null;
 
@@ -72,7 +62,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
     const closingBalance = totalDebit - totalCredit;
 
-    const handlePrint = () => {
+     const handlePrint = () => {
         const node = statementRef.current;
         if (!node) {
             toast({ title: 'Error', description: 'Could not find printable content.', variant: 'destructive'});
@@ -82,9 +72,28 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
         const newWindow = window.open('', '', 'height=800,width=1200');
         if (newWindow) {
             const document = newWindow.document;
-            document.write('<html><head><title>Print Statement</title>');
-            
-            // Copy all stylesheets from the main window to the new window
+            document.write(`
+                <html>
+                    <head>
+                        <title>Print Statement</title>
+                        <style>
+                            /* Include basic styles for printing */
+                            body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; }
+                            table { width: 100%; border-collapse: collapse; }
+                            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+                            th { background-color: #f2f2f2; }
+                            .no-print { display: none; }
+                             @media print {
+                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                             }
+                        </style>
+                    </head>
+                    <body>
+                    </body>
+                </html>
+            `);
+
+            // Use a more robust method to clone and append styles
             Array.from(window.document.styleSheets).forEach(styleSheet => {
                 try {
                     const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
@@ -96,21 +105,38 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 }
             });
 
-            document.write('</head><body></body></html>');
             document.body.innerHTML = node.innerHTML;
             
             setTimeout(() => {
                 newWindow.focus();
                 newWindow.print();
                 newWindow.close();
-            }, 500); // Wait for styles to apply
+            }, 500);
         } else {
             toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
         }
     };
-
+    
     return (
     <>
+        <style>
+            {`
+            @media print {
+                body * {
+                    visibility: hidden;
+                }
+                .printable-statement, .printable-statement * {
+                    visibility: visible;
+                }
+                .printable-statement {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                }
+            }
+            `}
+        </style>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
              <DialogTitle className="sr-only">Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
@@ -238,245 +264,6 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
         </DialogFooter>
     </>
-    );
-};
-
-
-export const SupplierProfileView = ({
-    selectedSupplierData,
-    isMillSelected,
-    onShowDetails,
-    onShowPaymentDetails,
-    onGenerateStatement
-}: {
-    selectedSupplierData: CustomerSummary | null;
-    isMillSelected: boolean;
-    onShowDetails: (supplier: Supplier) => void;
-    onShowPaymentDetails: (payment: Payment) => void;
-    onGenerateStatement: () => void;
-}) => {
-    const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
-
-    const financialPieChartData = useMemo(() => {
-        if (!selectedSupplierData) return [];
-        return [
-          { name: 'Total Paid', value: selectedSupplierData.totalPaid + selectedSupplierData.totalCdAmount! },
-          { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
-        ];
-      }, [selectedSupplierData]);
-    
-      const varietyPieChartData = useMemo(() => {
-        if (!selectedSupplierData?.transactionsByVariety) return [];
-        return Object.entries(selectedSupplierData.transactionsByVariety).map(([name, value]) => ({ name, value }));
-      }, [selectedSupplierData]);
-    
-      const chartData = useMemo(() => {
-        return selectedChart === 'financial' ? financialPieChartData : varietyPieChartData;
-      }, [selectedChart, financialPieChartData, varietyPieChartData]);
-
-    const currentPaymentHistory = useMemo(() => {
-        if (!selectedSupplierData) return [];
-        if (isMillSelected) {
-            return selectedSupplierData.allPayments || [];
-        }
-        return selectedSupplierData.paymentHistory || [];
-    }, [selectedSupplierData, isMillSelected]);
-
-    if (!selectedSupplierData) {
-        return (
-            <Card className="flex items-center justify-center h-64">
-                <CardContent className="text-center text-muted-foreground">
-                    <p>Please select a profile to view details.</p>
-                </CardContent>
-            </Card>
-        )
-    }
-
-    return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                        <div>
-                            <CardTitle>{toTitleCase(selectedSupplierData.name)}</CardTitle>
-                            <CardDescription>
-                                {isMillSelected ? "A complete financial and transactional overview of the entire business." : `S/O: ${toTitleCase(selectedSupplierData.so || '')} | Contact: ${selectedSupplierData.contact}`}
-                            </CardDescription>
-                        </div>
-                        <Button onClick={onGenerateStatement} size="sm">Generate Statement</Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <Card>
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Transactions</span><span className="font-semibold">{`${selectedSupplierData.totalTransactions} Entries`}</span></div>
-                             <div className="flex justify-between font-bold text-destructive"><span>Outstanding Entries</span><span>{`${selectedSupplierData.totalOutstandingTransactions} Entries`}</span></div>
-                        </CardContent>
-                    </Card>
-
-                     <Card>
-                        <CardHeader className="p-4 pb-2">
-                             <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total Karta <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Other</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                            <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Total Original Amount</p>
-                                <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                     <Card>
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Original Amount <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
-                             <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Outstanding</p>
-                                <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Visual Overview</CardTitle>
-                        <div className="w-48">
-                            <Select value={selectedChart} onValueChange={(val: ChartType) => setSelectedChart(val)}>
-                                <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="Select chart" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="financial">Financial Overview</SelectItem>
-                                    <SelectItem value="variety">Transactions by Variety</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? `${formatCurrency(value)}` : value} />
-                            <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
-                                {chartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
-                            </Pie>
-                            <Legend wrapperStyle={{ fontSize: '12px' }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                 <div className="grid grid-cols-1 gap-6">
-                  <Card>
-                      <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
-                      <CardContent>
-                          <ScrollArea className="h-[14rem]">
-                            <div className="overflow-x-auto">
-                              <Table>
-                                  <TableHeader>
-                                      <TableRow>
-                                          <TableHead>SR No</TableHead>
-                                          <TableHead>Amount</TableHead>
-                                          <TableHead>Status</TableHead>
-                                          <TableHead className="text-right">Actions</TableHead>
-                                      </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                      {(selectedSupplierData.allTransactions || []).map(entry => (
-                                          <TableRow key={entry.id}>
-                                              <TableCell className="font-mono">{entry.srNo}</TableCell>
-                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
-                                              <TableCell>
-                                                  <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
-                                                  {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
-                                                  </Badge>
-                                              </TableCell>
-                                              <TableCell className="text-right">
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
-                                                      <Info className="h-4 w-4" />
-                                                  </Button>
-                                              </TableCell>
-                                          </TableRow>
-                                      ))}
-                                      {(selectedSupplierData.allTransactions || []).length === 0 && (
-                                          <TableRow>
-                                              <TableCell colSpan={4} className="text-center text-muted-foreground">No transactions found.</TableCell>
-                                          </TableRow>
-                                      )}
-                                  </TableBody>
-                              </Table>
-                            </div>
-                          </ScrollArea>
-                      </CardContent>
-                  </Card>
-                   <Card>
-                      <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-                      <CardContent>
-                          <ScrollArea className="h-[14rem]">
-                             <div className="overflow-x-auto">
-                              <Table>
-                                  <TableHeader>
-                                      <TableRow>
-                                          <TableHead>ID</TableHead>
-                                          <TableHead>Date</TableHead>
-                                          <TableHead>Paid For (SR No.)</TableHead>
-                                          <TableHead className="text-right">Amount</TableHead>
-                                          <TableHead className="text-right">Actions</TableHead>
-                                      </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                      {currentPaymentHistory.map(payment => (
-                                          <TableRow key={payment.id}>
-                                              <TableCell className="font-mono">{payment.paymentId}</TableCell>
-                                              <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
-                                              <TableCell className="text-xs">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
-                                              <TableCell className="font-semibold text-right">{formatCurrency(payment.amount)}</TableCell>
-                                               <TableCell className="text-right">
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowPaymentDetails(payment)}>
-                                                      <Info className="h-4 w-4" />
-                                                  </Button>
-                                              </TableCell>
-                                          </TableRow>
-                                      ))}
-                                       {currentPaymentHistory.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center text-muted-foreground">No payments found.</TableCell>
-                                        </TableRow>
-                                    )}
-                                  </TableBody>
-                              </Table>
-                             </div>
-                          </ScrollArea>
-                      </CardContent>
-                  </Card>
-                </div>
-            </div>
-        </div>
     );
 };
 
