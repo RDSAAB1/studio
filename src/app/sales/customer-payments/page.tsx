@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { Customer, CustomerSummary, Payment, BankAccount, Transaction, FundTransaction } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, BankAccount, Transaction, FundTransaction, PaidFor } from "@/lib/definitions";
 import { toTitleCase, formatSrNo, formatCurrency, cn } from "@/lib/utils";
 import {
   Card,
@@ -34,7 +34,7 @@ import { Info, Pen, Printer, Trash2, Loader2, ChevronsUpDown, Check, RefreshCw, 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction, getDocs, where, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { getReceiptSettings, getBankAccountsRealtime, getTransactionsRealtime, getFundTransactionsRealtime } from "@/lib/firestore";
@@ -46,6 +46,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { OutstandingEntriesDialog } from "@/components/sales/supplier-payments/outstanding-entries-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+
+const customersCollection = collection(db, "customers");
+const transactionsCollection = collection(db, "transactions");
 
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
@@ -215,6 +218,83 @@ export default function CustomerPaymentsPage() {
     }
   };
   
+    const handleEditPayment = async (paymentToEdit: Payment) => {
+        if (!paymentToEdit.id) return;
+        
+        setActiveTab('processing');
+        setSelectedCustomerKey(paymentToEdit.customerId);
+        setEditingPayment(paymentToEdit);
+        setReceiptNo(paymentToEdit.paymentId);
+        setPaymentAmount(paymentToEdit.amount);
+        setPaymentType(paymentToEdit.type);
+
+        const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
+        
+        if (srNosInPayment.length > 0) {
+          const q = query(customersCollection, where('srNo', 'in', srNosInPayment));
+          const customerDocs = await getDocs(q);
+          const foundSrNos = new Set(customerDocs.docs.map(d => d.data().srNo));
+          
+          if (foundSrNos.size !== srNosInPayment.length) {
+              toast({ title: "Cannot Edit", description: "One or more original entries for this payment are missing.", variant: "destructive" });
+              return;
+          }
+
+          const newSelectedEntryIds = new Set<string>();
+          customerDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
+          setSelectedEntryIds(newSelectedEntryIds);
+        } else {
+            setSelectedEntryIds(new Set());
+        }
+        
+        toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
+    };
+
+    const handleDeletePayment = async (paymentIdToDelete: string) => {
+        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
+        if (!paymentToDelete || !paymentToDelete.id) {
+            toast({ title: "Payment not found.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const paymentRef = doc(db, "payments", paymentIdToDelete);
+                
+                if (paymentToDelete.paidFor) {
+                    for (const detail of paymentToDelete.paidFor) {
+                        const q = query(customersCollection, where('srNo', '==', detail.srNo), limit(1));
+                        const customerDocsSnapshot = await getDocs(q);
+                        if (!customerDocsSnapshot.empty) {
+                            const customerDoc = customerDocsSnapshot.docs[0];
+                            const currentCustomer = customerDoc.data() as Customer;
+                            const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                            const newNetAmount = (currentCustomer.netAmount as number) + amountToRestore;
+                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        }
+                    }
+                }
+                
+                if (paymentToDelete.expenseTransactionId) {
+                    const expenseDocRef = doc(transactionsCollection, paymentToDelete.expenseTransactionId);
+                    transaction.delete(expenseDocRef);
+                }
+                
+                transaction.delete(paymentRef);
+            });
+
+            toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success' });
+            if (editingPayment?.id === paymentIdToDelete) {
+              setSelectedEntryIds(new Set());
+              setPaymentAmount(0);
+              setEditingPayment(null);
+            }
+        } catch (error) {
+            console.error("Error deleting payment:", error);
+            toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
+        }
+    };
+  
   const customerPayments = selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey && !p.paymentId.startsWith('S')) : [];
   
   return (
@@ -267,12 +347,29 @@ export default function CustomerPaymentsPage() {
            <TabsContent value="history" className="mt-4">
                  <Card>
                     <CardHeader><CardTitle className="text-base">Full Payment History (Customers)</CardTitle></CardHeader>
-                    <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                    <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-center">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                         {paymentHistory.filter(p => p.customerId !== 'OUTSIDER' && !p.paymentId.startsWith('S')).map(p => {
                             const customerName = customerSummary.get(p.customerId)?.name;
                             return (
-                            <TableRow key={p.id}><TableCell className="font-mono text-xs">{p.paymentId}</TableCell><TableCell className="text-xs">{new Date(p.date).toLocaleDateString('en-GB')}</TableCell><TableCell className="text-xs">{customerName}</TableCell><TableCell className="text-xs text-muted-foreground">{p.notes}</TableCell><TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell></TableRow>
+                            <TableRow key={p.id}>
+                                <TableCell className="font-mono text-xs">{p.paymentId}</TableCell>
+                                <TableCell className="text-xs">{new Date(p.date).toLocaleDateString('en-GB')}</TableCell>
+                                <TableCell className="text-xs">{customerName}</TableCell><TableCell className="text-xs text-muted-foreground">{p.notes}</TableCell>
+                                <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
+                                <TableCell className="text-center">
+                                    <div className="flex justify-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditPayment(p)}><Pen className="h-3 w-3"/></Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Trash2 className="h-3 w-3 text-destructive"/></Button></AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                            <AlertDialogHeader><AlertDialogTitle>Delete Payment?</AlertDialogTitle><AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding balance. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePayment(p.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
                         )})}
                     </TableBody>
                     </Table></div></CardContent>

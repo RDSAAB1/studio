@@ -21,7 +21,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { SupplierProfileView } from "./supplier-profile-view";
+import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
