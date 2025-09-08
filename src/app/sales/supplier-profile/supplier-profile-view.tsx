@@ -442,7 +442,7 @@ export const SupplierProfileView = ({
                                       {(selectedSupplierData.allTransactions || []).map(entry => (
                                           <TableRow key={entry.id}>
                                               <TableCell className="font-mono">{entry.srNo}</TableCell>
-                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount || entry.amount)))}</TableCell>
+                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
                                               <TableCell>
                                                   <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
                                                   {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
