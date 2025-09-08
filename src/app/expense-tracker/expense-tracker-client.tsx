@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -214,10 +213,10 @@ export default function IncomeExpenseClient() {
     if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
         const matchingLoans = loans.filter(l => l.loanName === selectedSubCategory);
         if (matchingLoans.length > 0) {
-             // If there are multiple loans with the same name, we can't definitively pick one here.
-             // The ideal solution would be to make loan names unique or provide more context.
-             // For now, we'll pick the first one, but this might need refinement.
-            form.setValue('loanId', matchingLoans[0].id);
+              // If there are multiple loans with the same name, we can't definitively pick one here.
+              // The ideal solution would be to make loan names unique or provide more context.
+              // For now, we'll pick the first one, but this might need refinement.
+              form.setValue('loanId', matchingLoans[0].id);
         } else {
             form.setValue('loanId', '');
         }
@@ -285,13 +284,13 @@ export default function IncomeExpenseClient() {
                     balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
                 }
             } else if (t.type === 'CashTransfer') {
-                 if (balances.has(t.source)) {
-                    balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+                    if (balances.has(t.source)) {
+                        balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+                    }
+                    if (balances.has(t.destination)) {
+                        balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+                    }
                 }
-                if (balances.has(t.destination)) {
-                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
-                }
-            }
         });
         
         transactions.forEach(t => {
@@ -547,34 +546,34 @@ export default function IncomeExpenseClient() {
                       
                       <Controller name="transactionType" control={form.control} render={({ field }) => (
                           <div className="space-y-2">
-                              <Label className="text-xs">Transaction Type</Label>
-                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="Income" id="type-income" />
-                                      <Label htmlFor="type-income" className="font-normal text-sm flex items-center gap-2">Income</Label>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                      <RadioGroupItem value="Expense" id="type-expense" />
-                                      <Label htmlFor="type-expense" className="font-normal text-sm flex items-center gap-2">Expense</Label>
-                                  </div>
-                              </RadioGroup>
+                            <Label className="text-xs">Transaction Type</Label>
+                            <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="Income" id="type-income" />
+                                <Label htmlFor="type-income" className="font-normal text-sm flex items-center gap-2">Income</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="Expense" id="type-expense" />
+                                <Label htmlFor="type-expense" className="font-normal text-sm flex items-center gap-2">Expense</Label>
+                              </div>
+                            </RadioGroup>
                           </div>
                       )} />
                       
                       <Controller name="date" control={form.control} render={({ field }) => (
                           <div className="space-y-1">
-                              <Label className="text-xs">Date</Label>
-                              <Popover>
-                                  <PopoverTrigger asChild>
-                                      <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
-                                          <CalendarIcon className="mr-2 h-4 w-4" />
-                                          {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                      </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0 z-[51]">
-                                      <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date()))} initialFocus />
-                                  </PopoverContent>
-                              </Popover>
+                            <Label className="text-xs">Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 z-[51]">
+                                    <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
+                                </PopoverContent>
+                            </Popover>
                           </div>
                       )} />
 
@@ -638,44 +637,43 @@ export default function IncomeExpenseClient() {
                             {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                           </Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" />} />
-                          </InputWithIcon>
+                               <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" />} />
+                           </InputWithIcon>
                           {form.formState.errors.payee && <p className="text-xs text-destructive mt-1">{form.formState.errors.payee.message}</p>}
                       </div>
                       
                       <Controller name="paymentMethod" control={form.control} render={({ field }) => (
                           <div className="space-y-1">
-                              <Label className="text-xs">Payment Method</Label>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="Cash">Cash</SelectItem>
-                                      <SelectItem value="Online">Online</SelectItem>
-                                      <SelectItem value="Cheque">Cheque</SelectItem>
-                                       <SelectItem value="RTGS">RTGS</SelectItem>
-                                  </SelectContent>
-                              </Select>
+                            <Label className="text-xs">Payment Method</Label>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Cash">Cash</SelectItem>
+                                    <SelectItem value="Online">Online</SelectItem>
+                                    <SelectItem value="Cheque">Cheque</SelectItem>
+                                     <SelectItem value="RTGS">RTGS</SelectItem>
+                                </SelectContent>
+                            </Select>
                           </div>
                       )} />
                       
                       {selectedPaymentMethod !== 'Cash' && (
-                         <Controller name="bankAccountId" control={form.control} render={({ field }) => (
-                             <div className="space-y-1">
-                                 <Label className="text-xs">Bank Account</Label>
-                                 <Select onValueChange={field.onChange} value={field.value} disabled={bankAccounts.length === 0}>
-                                     <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Bank" /></SelectTrigger>
-                                     <SelectContent>
-                                         {bankAccounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.accountHolderName}</SelectItem>)}
-                                     </SelectContent>
-                                 </Select>
-                             </div>
-                         )} />
+                           <Controller name="bankAccountId" control={form.control} render={({ field }) => (
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Bank Account</Label>
+                                    <Select onValueChange={field.onChange} value={field.value} disabled={bankAccounts.length === 0}>
+                                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Bank" /></SelectTrigger>
+                                        <SelectContent>
+                                            {bankAccounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.accountHolderName}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                           )} />
                       )}
 
-
                         {selectedTransactionType === 'Expense' && (
-                           <>
-                            <Controller name="projectId" control={form.control} render={({ field }) => (
+                            <>
+                             <Controller name="projectId" control={form.control} render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Project</Label>
                                     <Select onValueChange={field.onChange} value={field.value || 'none'}>
@@ -688,8 +686,8 @@ export default function IncomeExpenseClient() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                            )} />
-                           </>
+                             )} />
+                            </>
                         )}
 
                         <div className="flex items-center space-x-2 pt-6">
@@ -697,7 +695,7 @@ export default function IncomeExpenseClient() {
                             <Label htmlFor="calculate-toggle" className="text-sm font-normal flex items-center gap-2"><Calculator className="h-4 w-4"/> Calculate Amount</Label>
                         </div>
                       
-                        {isCalculated && (
+                      {isCalculated && (
                             <>
                                 <div className="space-y-1">
                                     <Label htmlFor="quantity" className="text-xs">Quantity</Label>
@@ -732,20 +730,20 @@ export default function IncomeExpenseClient() {
                                     </div>
                                 )} />
                                 <Controller name="nextDueDate" control={form.control} render={({ field }) => (
-                                  <div className="space-y-1">
-                                      <Label className="text-xs">Next Due Date</Label>
-                                      <Popover>
-                                          <PopoverTrigger asChild>
-                                              <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
-                                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                                  {field.value ? format(field.value, "PPP") : <span>Pick next due date</span>}
-                                              </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-auto p-0 z-[51]">
-                                              <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date)} initialFocus />
-                                          </PopoverContent>
-                                      </Popover>
-                                  </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Next Due Date</Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {field.value ? format(field.value, "PPP") : <span>Pick next due date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0 z-[51]">
+                                                <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date)} initialFocus />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
                                 )} />
                             </>
                         )}
@@ -829,7 +827,7 @@ export default function IncomeExpenseClient() {
                         </Button>
                       )}
                     </div>
-                </form>
+                  </form>
               </CardContent>
            </SectionCard>
         </TabsContent>

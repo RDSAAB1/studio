@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import DynamicExpenseTrackerClient from './dynamic-expense-tracker';
 import type { PageProps } from '@/app/types';
 
