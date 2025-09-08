@@ -44,10 +44,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
     >
       <Link 
         href={path} 
-        onClick={(e) => { 
-            e.preventDefault(); 
-            onClick();
-        }} 
+        onClick={onClick}
         className={tabClasses}
       >
         <div className="flex items-center z-10 overflow-hidden min-w-0">
@@ -63,7 +60,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
                 isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
             )}
             onClick={(e) => {
-                e.stopPropagation(); // Prevent the tab click when closing
+                e.stopPropagation();
                 e.preventDefault();
                 onClose(e);
             }}

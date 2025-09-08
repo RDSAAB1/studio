@@ -14,15 +14,6 @@ interface TabBarProps {
 }
 
 const TabBar: React.FC<TabBarProps> = ({ openTabs, activeTabId, onTabClick, onCloseTab }) => {
-  const router = useRouter();
-
-  const handleTabClick = (tab: MenuItem) => {
-    onTabClick(tab.id);
-    if(tab.href) {
-        router.push(tab.href);
-    }
-  };
-  
   return (
     <div className="tab-bar-container flex-1 min-w-0">
       <div className="flex items-end">
@@ -39,7 +30,7 @@ const TabBar: React.FC<TabBarProps> = ({ openTabs, activeTabId, onTabClick, onCl
                 path={tab.href || '#'}
                 isActive={isActive}
                 isNextTabActive={isNextTabActive}
-                onClick={() => handleTabClick(tab)}
+                onClick={() => onTabClick(tab.id)}
                 onClose={(e) => onCloseTab(tab.id, e)}
                 isClosable={tab.id !== 'dashboard'} // Dashboard is not closable
               />

@@ -30,16 +30,13 @@ const findTabForPath = (path: string): MenuItem | undefined => {
     return allMenuItems.find(item => item.id === 'dashboard');
 };
 
-type PageCache = { [key: string]: React.ReactNode };
-
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pageCache, setPageCache] = useState<PageCache>({});
-
+  
   const pathname = usePathname();
   const router = useRouter();
 
@@ -78,16 +75,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
     if (currentTabInfo) {
       setActiveTabId(currentTabInfo.id);
       
-      setPageCache(prevCache => ({
-        ...prevCache,
-        [currentTabInfo.id]: children,
-      }));
-
       if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
         setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
       }
     }
-  }, [pathname, loading, children, openTabs]);
+  }, [pathname, loading, openTabs]);
 
 
   const handleTabClick = (tabId: string) => {
@@ -100,12 +92,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (tabId === 'dashboard') return;
-
-    setPageCache(prevCache => {
-        const newCache = { ...prevCache };
-        delete newCache[tabId];
-        return newCache;
-    });
 
     const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
     const newTabs = openTabs.filter(tab => tab.id !== tabId);
@@ -132,7 +118,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setOpenTabs([...openTabs, item]);
       }
       setActiveTabId(item.id);
-      router.push(item.href);
+      // Let the <Link> component handle the navigation
       if (window.innerWidth < 1024) {
           setIsSidebarActive(false);
       }
@@ -146,7 +132,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
       const auth = getFirebaseAuth();
       await signOut(auth);
       setOpenTabs([]);
-      setPageCache({});
       router.replace('/login');
     } catch (error) {
       console.error("Error signing out: ", error);
@@ -195,11 +180,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onSignOut={handleSignOut}
             />
             <div className="content">
-                 {openTabs.map(tab => (
-                    <div key={tab.id} style={{ display: activeTabId === tab.id ? 'block' : 'none' }}>
-                        {pageCache[tab.id]}
-                    </div>
-                ))}
+                 {children}
             </div>
             {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
         </div>
