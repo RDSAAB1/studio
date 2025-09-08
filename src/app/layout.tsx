@@ -241,12 +241,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
-        <TabProvider>
-            <div className={cn("wrapper", isSidebarActive && "active")}>
+        <div className={cn("wrapper", isSidebarActive && "active")}>
+            <TabProvider>
                 <CustomSidebar isSidebarActive={isSidebarActive} />
                 <TabManager />
-            </div>
-        </TabProvider>
+            </TabProvider>
+        </div>
       </body>
     </html>
   );
