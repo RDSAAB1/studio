@@ -125,7 +125,7 @@ export default function RtgsReportClient() {
             filtered = filtered.filter(row => row.checkNo.toLowerCase() === searchCheckNo.toLowerCase());
         }
         if (searchName) {
-            filtered = filtered.filter(row => row.supplierName.toLowerCase().includes(searchName.toLowerCase()));
+            filtered = filtered.filter(row => row.supplierName.toLowerCase() === searchName.toLowerCase());
         }
         if (startDate && endDate) {
             const start = new Date(startDate);
