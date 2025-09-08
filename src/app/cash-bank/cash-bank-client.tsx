@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
-import { format, addMonths } from "date-fns";
+import { format, addMonths, differenceInMonths } from "date-fns";
 
 import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
@@ -109,8 +109,18 @@ export default function CashBankClient() {
         return loans.map(loan => {
             const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
             const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
+            
+            let accumulatedInterest = 0;
+            if (loan.loanType === 'Outsider' && loan.interestRate > 0) {
+                const monthsPassed = differenceInMonths(new Date(), new Date(loan.startDate));
+                if (monthsPassed > 0) {
+                    // Simple interest calculation for now
+                    accumulatedInterest = (loan.totalAmount * (loan.interestRate / 100) * monthsPassed) / 12;
+                }
+            }
+
             const totalPaid = (loan.amountPaid || 0) + totalPaidTowardsPrincipal;
-            const remainingAmount = loan.totalAmount - totalPaid;
+            const remainingAmount = loan.totalAmount + accumulatedInterest - totalPaid;
             return { ...loan, remainingAmount, amountPaid: totalPaid };
         });
     }, [loans, transactions]);
@@ -612,3 +622,5 @@ export default function CashBankClient() {
         </div>
     );
 }
+
+    

@@ -9,9 +9,9 @@ import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format, subDays } from 'date-fns';
+import { format, subDays, differenceInMonths } from 'date-fns';
 import { DonutChart, BarChart, AreaChart } from '@tremor/react';
-import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List, Bank } from 'lucide-react';
+import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List, Bank, Percent } from 'lucide-react';
 import { getExpenseCategories } from '@/lib/firestore';
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
@@ -109,26 +109,33 @@ export default function DashboardOverviewClient() {
             }
         });
 
-        const totalOriginalSupplierAmount = suppliers.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0);
-        const totalPaymentsToSuppliers = payments.reduce((sum, p) => sum + p.amount, 0);
-        const totalCdFromSuppliers = payments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        const totalSupplierDues = totalOriginalSupplierAmount - totalPaymentsToSuppliers - totalCdFromSuppliers;
-        
+        const totalSupplierDues = suppliers.reduce((sum, s) => sum + (s.netAmount || 0), 0);
         const totalCustomerDues = customers.reduce((sum, c) => sum + Number(c.netAmount || 0), 0);
         
         const loanLiabilities = loans.reduce((sum, loan) => {
             const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
             const totalPaidTowardsPrincipal = paidTransactions.reduce((subSum, t) => subSum + t.amount, 0);
+
+            let accumulatedInterest = 0;
+            if (loan.loanType === 'Outsider' && loan.interestRate > 0) {
+                const monthsPassed = differenceInMonths(new Date(), new Date(loan.startDate));
+                if (monthsPassed > 0) {
+                    accumulatedInterest = (loan.totalAmount * (loan.interestRate / 100) * monthsPassed) / 12;
+                }
+            }
+
             const totalPaid = (loan.amountPaid || 0) + totalPaidTowardsPrincipal;
-            const remainingAmount = loan.totalAmount - totalPaid;
+            const remainingAmount = loan.totalAmount + accumulatedInterest - totalPaid;
             return sum + (remainingAmount > 0 ? remainingAmount : 0);
         }, 0);
+
         const totalLiabilities = loanLiabilities + totalSupplierDues;
+        const totalCdReceived = payments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
-        const totalAssets = cashAndBankAssets + totalCustomerDues;
+        const totalAssets = cashAndBankAssets + totalCustomerDues + totalCdReceived;
         
-        return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues, loanLiabilities, cashAndBankAssets };
+        return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues, loanLiabilities, cashAndBankAssets, totalCdReceived };
     }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers, payments]);
 
     const chartData = useMemo(() => {
@@ -196,11 +203,12 @@ export default function DashboardOverviewClient() {
     return (
         <div className="space-y-6">
             {/* Top Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, and Receivables" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, Receivables, CD" />
                 <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Loans and Payables" />
                 <StatCard title="Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
                 <StatCard title="Customer Dues" value={formatCurrency(financialState.totalCustomerDues)} icon={<Users />} colorClass="text-blue-500" description="Accounts Receivable" />
+                <StatCard title="Total CD Received" value={formatCurrency(financialState.totalCdReceived)} icon={<Percent />} colorClass="text-green-400" description="From Suppliers"/>
             </div>
 
             <Card>
@@ -321,3 +329,5 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
+
+    
