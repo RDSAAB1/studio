@@ -3,10 +3,12 @@
 
 import React, { useState, useEffect, type ReactNode, createContext, useContext, useCallback } from "react";
 import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import CustomSidebar from '@/components/layout/custom-sidebar';
 import { Header } from "@/components/layout/header";
+import TabBar from "@/components/layout/tab-bar";
 import { cn } from "@/lib/utils";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
@@ -70,7 +72,7 @@ const TabProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const closeTab = useCallback((tabId: string) => {
-    if (tabId === 'dashboard') return;
+    if (tabId === 'dashboard') return; // Cannot close dashboard
 
     setOpenTabs(prevTabs => {
       const tabIndex = prevTabs.findIndex(tab => tab.id === tabId);
@@ -100,21 +102,40 @@ const TabProvider = ({ children }: { children: ReactNode }) => {
         if (!pages[currentItem.id]) {
             setPages(prev => ({...prev, [currentItem.id]: children}));
         }
-        openTab(currentItem);
         setActiveTabId(currentItem.id);
     }
-  }, [pathname, children, pages, openTab]);
+  }, [pathname, children, pages]);
 
 
   const value = { openTabs, activeTabId, openTab, closeTab, setActiveTabId };
 
   return (
     <TabContext.Provider value={value}>
-        {Object.keys(pages).map(pageId => (
-            <div key={pageId} style={{ display: pageId === activeTabId ? 'block' : 'none' }}>
-                {pages[pageId]}
-            </div>
-        ))}
+       <div className="flex-1 flex flex-col min-h-0">
+          <TabBar 
+            openTabs={openTabs}
+            activeTabId={activeTabId}
+            onTabClick={(id) => {
+                const tab = openTabs.find(t => t.id === id);
+                if (tab && tab.href) {
+                    setActiveTabId(id);
+                    router.push(tab.href);
+                }
+            }}
+            onCloseTab={(tabId, e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              closeTab(tabId);
+            }}
+          />
+          <main className="content">
+            {Object.keys(pages).map(pageId => (
+                <div key={pageId} style={{ display: pageId === activeTabId ? 'block' : 'none' }} className="h-full">
+                    {pages[pageId]}
+                </div>
+            ))}
+          </main>
+        </div>
     </TabContext.Provider>
   );
 };
@@ -199,24 +220,22 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
-        <TabProvider>
             <div className={cn("wrapper", isSidebarActive && "active")}>
                 <div onMouseEnter={() => setIsSidebarActive(true)} onMouseLeave={() => setIsSidebarActive(false)}>
                     <CustomSidebar isSidebarActive={isSidebarActive} />
                 </div>
                 <div className="main_container">
-                     <Header 
-                        toggleSidebar={toggleSidebar}
-                        user={user}
-                        onSignOut={handleSignOut}
-                    />
-                    <main className="content">
+                    <TabProvider>
+                        <Header 
+                            toggleSidebar={toggleSidebar}
+                            user={user}
+                            onSignOut={handleSignOut}
+                        />
                         {children}
-                    </main>
+                    </TabProvider>
                     {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
                 </div>
             </div>
-        </TabProvider>
       </body>
     </html>
   );

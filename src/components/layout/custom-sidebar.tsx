@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
-import { useTabs } from '@/app/layout'; // Changed import
+import { useTabs } from '@/app/layout';
 import { cn } from '@/lib/utils';
 
 interface CustomSidebarProps {
@@ -40,7 +40,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
   const handleMenuItemClick = (item: MenuItemType) => {
     if (item.href) {
         openTab(item);
-        setActiveTabId(item.id);
         router.push(item.href); // Still need to navigate
     } else if (item.subMenus) {
         handleSubMenuToggle(item.id);
@@ -54,7 +53,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
     return (
       <li className={cn((isActive || isSubMenuActive) && "active")}>
         {(isActive || isSubMenuActive) && <span className="top_curve"></span>}
-        <a
+        <Link
           href={item.href || '#'}
           onClick={(e) => {
             e.preventDefault(); 
@@ -63,7 +62,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
         >
             <span className="icon">{React.createElement(item.icon)}</span>
             <span className="item">{item.name}</span>
-        </a>
+        </Link>
         {(isActive || isSubMenuActive) && <span className="bottom_curve"></span>}
       </li>
     );
@@ -82,7 +81,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
                 <ul className={cn("submenu", openSubMenu === item.id && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <a 
+                      <Link
                         href={subItem.href || '#'}
                         onClick={(e) => {
                            e.preventDefault();
@@ -90,7 +89,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
                         }}
                       >
                          {subItem.name}
-                      </a>
+                      </Link>
                     </li>
                   ))}
                 </ul>

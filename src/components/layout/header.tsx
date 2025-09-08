@@ -16,8 +16,6 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import Link from 'next/link';
-import { useTabs } from "@/app/layout";
-import TabBar from "./tab-bar";
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -30,7 +28,6 @@ const NotificationBell = () => {
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
     const router = useRouter();
-    const { openTab } = useTabs();
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
@@ -49,7 +46,6 @@ const NotificationBell = () => {
     const handleNotificationClick = (e: React.MouseEvent, href: string) => {
         e.preventDefault();
         router.push(href, { scroll: false });
-        // The tab opening is now handled by the RootLayout's useEffect on pathname change
         setOpen(false); 
     };
 
@@ -79,7 +75,7 @@ const NotificationBell = () => {
                                 description: `EMI for ${loan.loanName}`
                             }).toString()}`;
                             return (
-                             <a 
+                             <Link
                                 key={loan.id} 
                                 href={href}
                                 onClick={(e) => handleNotificationClick(e, href)}
@@ -91,7 +87,7 @@ const NotificationBell = () => {
                                         EMI of {formatCurrency(loan.emiAmount || 0)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
                                     </p>
                                 </div>
-                             </a>
+                             </Link>
                             )
                         })
                     ) : (
@@ -105,10 +101,9 @@ const NotificationBell = () => {
 
 export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
   const router = useRouter();
-  const { openTabs, activeTabId, setActiveTabId, closeTab } = useTabs();
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
         <div className="flex flex-1 items-center gap-2">
           <div className="flex-shrink-0 lg:hidden">
             <Button variant="ghost" size="icon" onClick={toggleSidebar}>
@@ -116,29 +111,14 @@ export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </div>
-          <TabBar 
-            openTabs={openTabs}
-            activeTabId={activeTabId}
-            onTabClick={(id) => {
-                const tab = openTabs.find(t => t.id === id);
-                if (tab && tab.href) {
-                    setActiveTabId(id);
-                    router.push(tab.href);
-                }
-            }}
-            onCloseTab={(tabId, e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              closeTab(tabId);
-            }}
-          />
+          {/* Search bar can be added here if needed */}
         </div>
 
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <DynamicIslandToaster />
         </div>
 
-        <div className={cn("flex flex-1 items-center justify-end gap-2")}>
+        <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <NotificationBell />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
             <Settings className="h-5 w-5" />
