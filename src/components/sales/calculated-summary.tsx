@@ -11,16 +11,21 @@ import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search } from "lucide-r
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
+import { Switch } from "../ui/switch";
+import { Label } from "../ui/label";
 
 interface CalculatedSummaryProps {
     customer: Customer;
     onSave: () => void;
-    onSaveAndPrint: () => void;
+    onSaveAndPrint: (docType: 'tax-invoice' | 'bill-of-supply' | 'challan') => void;
     onNew: () => void;
     isEditing: boolean;
-    onSearch: (term: string) => void;
-    onPrint: () => void;
-    selectedIdsCount: number;
+    onSearch?: (term: string) => void;
+    onPrint?: () => void;
+    selectedIdsCount?: number;
+    isCustomerForm?: boolean;
+    isBrokerageIncluded?: boolean;
+    onBrokerageToggle?: (checked: boolean) => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -42,23 +47,37 @@ const SummaryItem = ({ label, value, isHighlighted, className }: { label: string
 );
 
 
-export const CalculatedSummary = ({ customer, onSave, onNew, isEditing, onSearch, onPrint, selectedIdsCount }: CalculatedSummaryProps) => {
+export const CalculatedSummary = ({ 
+    customer, 
+    onSave, 
+    onSaveAndPrint, 
+    onNew, 
+    isEditing, 
+    onSearch, 
+    onPrint, 
+    selectedIdsCount,
+    isCustomerForm = false,
+    isBrokerageIncluded,
+    onBrokerageToggle
+}: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
-    const isPrintActionForSelected = selectedIdsCount > 0;
+    const isPrintActionForSelected = selectedIdsCount && selectedIdsCount > 0;
     
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
             <CardContent className="p-3 space-y-3">
-                <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
-                    <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />
+                 <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
+                    {!isCustomerForm && <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />}
                     <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
-                    <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />
+                    {!isCustomerForm && <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />}
                     <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
-                    <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />
-                    <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />
+                    {!isCustomerForm && <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />}
+                    {!isCustomerForm && <SummaryItem label="Karta" value={formatCurrency(customer.kartaAmount || 0)} />}
+                    {isCustomerForm && <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} />}
+                    {isCustomerForm && <SummaryItem label="CD" value={formatCurrency(customer.cd || 0)} />}
                     <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
-                    <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.netAmount) || 0)} isHighlighted />
+                    <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
                 </div>
                 
                 <Separator />
@@ -68,22 +87,45 @@ export const CalculatedSummary = ({ customer, onSave, onNew, isEditing, onSearch
                          <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
                             <Input
                                 placeholder="Search by SR No, Name, or Contact..."
-                                onChange={(e) => onSearch(e.target.value)}
+                                onChange={(e) => onSearch && onSearch(e.target.value)}
                                 className="h-8 pl-10 text-xs"
                             />
                         </InputWithIcon>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Button
-                            onClick={onPrint}
-                            size="icon"
-                            variant={isPrintActionForSelected ? "default" : "outline"}
-                            className="h-8 w-8 rounded-full"
-                            disabled={isLoading}
-                        >
-                            <Printer className="h-4 w-4" />
-                        </Button>
+                        {isCustomerForm && (
+                            <div className="flex items-center space-x-2">
+                                <Switch id="brokerage-toggle" checked={isBrokerageIncluded} onCheckedChange={onBrokerageToggle} />
+                                <Label htmlFor="brokerage-toggle" className="text-xs">Include Brokerage</Label>
+                            </div>
+                        )}
+
+                        {onPrint && (
+                             <Button
+                                onClick={onPrint}
+                                size="icon"
+                                variant={isPrintActionForSelected ? "default" : "outline"}
+                                className="h-8 w-8 rounded-full"
+                                disabled={isLoading}
+                            >
+                                <Printer className="h-4 w-4" />
+                            </Button>
+                        )}
+                        
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" className="h-8 rounded-md" disabled={isLoading}>
+                                    <Save className="mr-2 h-4 w-4" /> Save & Print <ChevronsUpDown className="ml-2 h-4 w-4"/>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('tax-invoice')}>Tax Invoice</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('bill-of-supply')}>Bill of Supply</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Challan</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading}>
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                         </Button>

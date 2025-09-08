@@ -184,13 +184,13 @@ export default function SupplierEntryClient() {
     newDueDate.setDate(newDueDate.getDate() + termDays);
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
+    const weight = grossWeight - teirWeight; // This is Final Weight
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     const kartaWeight = weight * (kartaPercentage / 100);
     const kartaAmount = kartaWeight * rate;
     const netWeight = weight - kartaWeight;
-    const amount = weight * rate; // Changed from netWeight to weight
+    const amount = weight * rate; // Corrected: Amount = Rate * Final Weight
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
@@ -537,4 +537,3 @@ export default function SupplierEntryClient() {
   );
 }
 
-    
