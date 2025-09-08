@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { Settings, UserCircle, Search, Menu, X, LogOut, Bell } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import TabBar from './tab-bar';
 import { MenuItem } from "@/hooks/use-tabs";
 import { cn } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
@@ -21,10 +20,6 @@ import { formatCurrency } from "@/lib/utils";
 import Link from 'next/link';
 
 interface HeaderProps {
-  openTabs: MenuItem[];
-  activeTabId: string;
-  onTabClick: (id: string) => void;
-  onCloseTab: (id: string, e: React.MouseEvent) => void;
   toggleSidebar: () => void;
   user: User | null;
   onSignOut: () => void;
@@ -101,16 +96,12 @@ const NotificationBell = () => {
     )
 }
 
-export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSidebar, user, onSignOut }: HeaderProps) {
+export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { toasts } = useToast();
-  const hasToasts = toasts.length > 0;
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-30 flex flex-col bg-card">
-      {/* Top bar for actions and search */}
-      <div className="relative flex h-10 items-center justify-between gap-4 bg-card px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
         {/* Left Section: Search and Mobile Menu */}
         <div className="flex flex-1 items-center gap-2">
           <div className="flex-shrink-0 lg:hidden">
@@ -183,17 +174,6 @@ export function Header({ openTabs, activeTabId, onTabClick, onCloseTab, toggleSi
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-
-      {/* Bottom bar for tabs */}
-      <div className="flex h-10 items-center px-4 sm:px-6 border-y border-border">
-        <TabBar
-          openTabs={openTabs}
-          activeTabId={activeTabId}
-          onTabClick={onTabClick}
-          onCloseTab={onCloseTab}
-        />
-      </div>
-    </header>
+      </header>
   );
 }
