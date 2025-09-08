@@ -40,18 +40,17 @@ export default function RootLayout({
 }>) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const pathname = usePathname();
   const router = useRouter();
   
   useEffect(() => {
     const auth = getFirebaseAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        setLoading(true);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         if (currentUser) {
             setUser(currentUser);
-            if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
+             if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
                  router.replace('/dashboard-overview');
             }
         } else {
@@ -60,7 +59,7 @@ export default function RootLayout({
                 router.replace('/login');
             }
         }
-        setLoading(false);
+        setAuthLoading(false);
     });
     return () => unsubscribe();
   }, [pathname, router]);
@@ -78,7 +77,7 @@ export default function RootLayout({
     }
   };
 
-  if (loading) {
+  if (authLoading) {
       return (
         <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
           <body className="font-body antialiased">
