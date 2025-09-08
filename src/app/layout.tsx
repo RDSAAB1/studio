@@ -32,10 +32,13 @@ const sourceCodePro = Source_Code_Pro({
 
 const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
 
-// --- Auth Protector Component ---
+// --- Auth Context and Provider ---
+const AuthContext = React.createContext<{ user: User | null; authLoading: boolean }>({
+  user: null,
+  authLoading: true,
+});
+
 function AuthProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -48,48 +51,25 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
-
-  if (authLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user && isProtected) {
-    router.replace('/login');
-    return (
-        <div className="flex h-screen w-screen items-center justify-center bg-background">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Redirecting to login...</p>
-        </div>
-    );
-  }
-
-  if (user && !isProtected) {
-    router.replace('/dashboard-overview');
-    return (
-        <div className="flex h-screen w-screen items-center justify-center bg-background">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Redirecting to dashboard...</p>
-        </div>
-    );
-  }
-
-  if (isProtected) {
-      return <MainLayout user={user}>{children}</MainLayout>;
-  }
-
-  return <>{children}</>;
+  return (
+    <AuthContext.Provider value={{ user, authLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-
 // --- Main App Layout ---
-function MainLayout({ children, user }: { children: ReactNode, user: User | null }) {
+function MainLayout({ children }: { children: ReactNode }) {
     const [isSidebarActive, setIsSidebarActive] = useState(false);
     const router = useRouter();
+    const { user, authLoading } = React.useContext(AuthContext);
+
+    useEffect(() => {
+        // Redirect to login if auth is done and there's no user.
+        if (!authLoading && !user) {
+            router.replace('/login');
+        }
+    }, [user, authLoading, router]);
 
     const toggleSidebar = () => {
         setIsSidebarActive(prev => !prev);
@@ -104,6 +84,16 @@ function MainLayout({ children, user }: { children: ReactNode, user: User | null
         }
     };
     
+    // While checking auth state, show a loader.
+    if (authLoading || !user) {
+        return (
+             <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
+    
+    // Once authenticated, show the main layout
     return (
         <div className={cn("wrapper", isSidebarActive && "active")}>
             <CustomSidebar isSidebarActive={isSidebarActive} />
@@ -129,10 +119,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
+
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+            {isProtected ? <MainLayout>{children}</MainLayout> : children}
+        </AuthProvider>
       </body>
     </html>
   );

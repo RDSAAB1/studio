@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Auth, User } from 'firebase/auth';
-import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle } from 'lucide-react';
@@ -16,15 +16,26 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const [authLoading, setAuthLoading] = useState(true);
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
     const [authError, setAuthError] = useState<string | null>(null);
 
     useEffect(() => {
-        setAuth(getFirebaseAuth());
+        const authInstance = getFirebaseAuth();
+        setAuth(authInstance);
         setGoogleProvider(getGoogleProvider());
-    }, []);
+        
+        const unsubscribe = onAuthStateChanged(authInstance, (user) => {
+            if (user) {
+                router.replace('/dashboard-overview');
+            } else {
+                setAuthLoading(false);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
 
     const handleSignIn = async () => {
         if (!auth || !googleProvider) {
@@ -36,17 +47,12 @@ export default function LoginPage() {
             return;
         }
 
-        setLoading(true);
+        setAuthLoading(true);
         setAuthError(null);
         try {
-            // Explicitly sign out to clear any lingering state before a new sign-in attempt.
-            // This can help resolve issues with stuck auth states.
             await signOut(auth);
-            
             await signInWithPopup(auth, googleProvider);
-            // On successful login, the onAuthStateChanged listener in MainLayout will handle redirection
-            router.push('/dashboard-overview');
-            
+            // Redirection is handled by the onAuthStateChanged listener
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred. Please try again.";
@@ -63,8 +69,7 @@ export default function LoginPage() {
                 description: errorMessage,
                 variant: "destructive"
             });
-        } finally {
-            setLoading(false);
+             setAuthLoading(false);
         }
     };
     
@@ -77,6 +82,14 @@ export default function LoginPage() {
             </div>
         </div>
     );
+    
+    if (authLoading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
     
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -104,11 +117,11 @@ export default function LoginPage() {
                                 </AlertDescription>
                             </Alert>
                         )}
-                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={loading || !auth}>
-                             {loading ? (
+                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={authLoading}>
+                             {authLoading ? (
                                 <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Signing in...
+                                Please wait...
                                 </>
                              ) : (
                                 <>
