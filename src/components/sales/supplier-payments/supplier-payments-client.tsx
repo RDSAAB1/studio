@@ -2,12 +2,12 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings } from '@/lib/firestore';
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
-import { collection, runTransaction, doc, getDocs, query, where } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc } from "firebase/firestore";
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Pen } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
@@ -29,6 +29,8 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 const suppliersCollection = collection(db, "suppliers");
+const transactionsCollection = collection(db, "transactions");
+
 
 type PaymentOption = {
   quantity: number;
@@ -45,9 +47,12 @@ type SortConfig = {
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -57,9 +62,12 @@ export default function SupplierPaymentsClient() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('CashInHand');
   
   const [supplierDetails, setSupplierDetails] = useState({ name: '', fatherName: '', address: '', contact: ''});
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
+  const [isPayeeEditing, setIsPayeeEditing] = useState(false);
+  
   const [sixRNo, setSixRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
@@ -150,6 +158,40 @@ export default function SupplierPaymentsClient() {
     return summary;
   }, [suppliers]);
   
+  const financialState = useMemo(() => {
+    const balances = new Map<string, number>();
+    bankAccounts.forEach(acc => balances.set(acc.id, 0));
+    balances.set('CashInHand', 0);
+
+    fundTransactions.forEach(t => {
+        if (t.type === 'CapitalInflow') {
+            if (balances.has(t.destination)) {
+                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+            }
+        } else if (t.type === 'CashTransfer') {
+             if (balances.has(t.source)) {
+                balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+            }
+            if (balances.has(t.destination)) {
+                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+            }
+        }
+    });
+    
+    transactions.forEach(t => {
+        const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+         if (balanceKey && balances.has(balanceKey)) {
+            if (t.transactionType === 'Income') {
+                balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+            } else if (t.transactionType === 'Expense') {
+                balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+            }
+        }
+    });
+    
+    return { balances };
+  }, [fundTransactions, transactions, bankAccounts]);
+
   const selectedEntries = useMemo(() => {
     return suppliers.filter(s => selectedEntryIds.has(s.id));
   }, [suppliers, selectedEntryIds]);
@@ -176,7 +218,16 @@ export default function SupplierPaymentsClient() {
   
   useEffect(() => {
     setIsClient(true);
+    const lastUsedAccount = localStorage.getItem('lastSelectedAccountId');
+    if (lastUsedAccount) {
+      setSelectedAccountId(lastUsedAccount);
+    }
   }, []);
+
+  const handleSetSelectedAccount = (accountId: string) => {
+    setSelectedAccountId(accountId);
+    localStorage.setItem('lastSelectedAccountId', accountId);
+  }
 
   useEffect(() => {
     if(!isClient) return;
@@ -184,7 +235,7 @@ export default function SupplierPaymentsClient() {
     let isSubscribed = true;
     setLoading(true);
 
-    const unsubscribeSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
+    const unsubSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
       if (isSubscribed) {
           setSuppliers(fetchedSuppliers);
           setLoading(false);
@@ -197,7 +248,7 @@ export default function SupplierPaymentsClient() {
         }
     });
 
-    const unsubscribePayments = getPaymentsRealtime((fetchedPayments) => {
+    const unsubPayments = getPaymentsRealtime((fetchedPayments) => {
       if(isSubscribed) {
         setPaymentHistory(fetchedPayments);
         if (!editingPayment) {
@@ -211,6 +262,10 @@ export default function SupplierPaymentsClient() {
             stableToast({ title: "Failed to load payment history.", variant: 'destructive' });
         }
     });
+    
+    const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
+    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
+    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
     
     const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
       if(isSubscribed) console.error("Error fetching banks:", error);
@@ -231,19 +286,16 @@ export default function SupplierPaymentsClient() {
 
     return () => {
       isSubscribed = false;
-      unsubscribeSuppliers();
-      unsubscribePayments();
+      unsubSuppliers();
+      unsubPayments();
+      unsubTransactions();
+      unsubFunds();
+      unsubBankAccounts();
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
   }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
   
-  useEffect(() => {
-    if (paymentType === 'Partial') {
-      setCdAt('paid_amount');
-    }
-  }, [paymentType]);
-
   useEffect(() => {
     autoSetCDToggle();
   }, [selectedEntryIds, autoSetCDToggle]);
@@ -260,27 +312,7 @@ export default function SupplierPaymentsClient() {
     let baseAmountForCd = 0;
     
     if (cdAt === 'paid_amount') {
-        if (paymentType === 'Partial') {
-            baseAmountForCd = paymentAmount;
-        } else {
-            let totalEligiblePaidAmount = 0;
-            const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-            const paymentsForSelectedEntries = paymentHistory.filter(p => 
-                p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
-            );
-
-            paymentsForSelectedEntries.forEach(p => {
-                if (!p.cdApplied) {
-                    p.paidFor?.forEach(pf => {
-                        const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
-                        if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
-                            totalEligiblePaidAmount += pf.amount;
-                        }
-                    });
-                }
-            });
-            baseAmountForCd = totalEligiblePaidAmount;
-        }
+        baseAmountForCd = paymentAmount;
     } else if (cdAt === 'unpaid_amount') {
         const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
         baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
@@ -386,149 +418,209 @@ export default function SupplierPaymentsClient() {
     setSelectedEntryIds(newSet);
   };
 
-    const processPayment = async () => {
-        if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
-            toast({ title: "No supplier selected", variant: 'destructive' });
-            return;
-        }
-        if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) {
-            toast({ title: "Please select entries to pay", variant: 'destructive' });
-            return;
-        }
+  const processPayment = async () => {
+    if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
+        toast({ title: "No supplier selected", variant: 'destructive' });
+        return;
+    }
+    if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) {
+        toast({ title: "Please select entries to pay", variant: 'destructive' });
+        return;
+    }
 
-        const finalPaymentAmount = rtgsAmount || paymentAmount;
-        const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
+    const finalPaymentAmount = rtgsAmount || paymentAmount;
+    
+    const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
+    const availableBalance = financialState.balances.get(accountIdForPayment) || 0;
+    
+    if (finalPaymentAmount > availableBalance) {
+        const accountName = bankAccounts.find(acc => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
+        toast({
+            title: "Insufficient Balance",
+            description: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.`,
+            variant: "destructive"
+        });
+        return;
+    }
+    
+    const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
 
-        if (totalPaidAmount <= 0) {
-            toast({ title: "Payment amount must be positive", variant: 'destructive' });
-            return;
-        }
-        if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalPaidAmount > totalOutstandingForSelected) {
-            toast({ title: "Partial payment cannot exceed outstanding", variant: 'destructive' });
-            return;
-        }
+    if (totalPaidAmount <= 0) {
+        toast({ title: "Payment amount must be positive", variant: 'destructive' });
+        return;
+    }
+    if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalPaidAmount > totalOutstandingForSelected) {
+        toast({ title: "Partial payment cannot exceed outstanding", variant: 'destructive' });
+        return;
+    }
 
-        try {
-            let finalPaymentData: Payment | null = null;
-            await runTransaction(db, async (transaction) => {
-                const tempEditingPayment = editingPayment;
-                let paidForDetails: PaidFor[] = [];
-                
-                const supplierDocRefsToRead = new Set<string>();
-
-                if (rtgsFor === 'Supplier') {
-                    if (tempEditingPayment) {
-                        for (const detail of tempEditingPayment.paidFor || []) {
-                            const supplier = suppliers.find(s => s.srNo === detail.srNo);
-                            if(supplier) supplierDocRefsToRead.add(supplier.id);
-                        }
-                    }
-                    for (const entryId of selectedEntryIds) {
-                        supplierDocRefsToRead.add(entryId);
-                    }
-                }
-                
-                const supplierDocs = new Map<string, any>();
-                for (const id of supplierDocRefsToRead) {
-                    const docRef = doc(db, "suppliers", id);
-                    const supplierDoc = await transaction.get(docRef);
-                    if (supplierDoc.exists()) {
-                        supplierDocs.set(id, supplierDoc.data());
-                    } else {
-                         throw new Error(`Supplier with ID ${id} not found.`);
-                    }
-                }
-                
-                if (rtgsFor === 'Supplier') {
-                    if (tempEditingPayment) {
-                        for (const detail of tempEditingPayment.paidFor || []) {
-                            const supplier = suppliers.find(s => s.srNo === detail.srNo);
-                            if (supplier && supplierDocs.has(supplier.id)) {
-                                const currentNetAmount = Number(supplierDocs.get(supplier.id).netAmount) || 0;
-                                const amountToRestore = detail.amount + (detail.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
-                                const supplierRef = doc(db, "suppliers", supplier.id);
-                                transaction.update(supplierRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
-                            }
-                        }
-                    }
-
-                    let amountToDistribute = Math.round(totalPaidAmount);
-                    const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                    
-                    for (const entryData of sortedEntries) {
-                        if (amountToDistribute <= 0) break;
-                        const supplierData = supplierDocs.get(entryData.id);
-                        let outstanding = Number(supplierData.netAmount);
-                        const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
-
-                        if (paymentForThisEntry > 0) {
-                             paidForDetails.push({ 
-                                srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
-                                supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
-                                supplierContact: entryData.contact,
-                            });
-                            
-                            const supplierRef = doc(db, "suppliers", entryData.id);
-                            transaction.update(supplierRef, { netAmount: outstanding - paymentForThisEntry });
-                            amountToDistribute -= paymentForThisEntry;
-                        }
-                    }
-                }
-                
-                const paymentData: Omit<Payment, 'id'> = {
-                    paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-                    rtgsSrNo: paymentMethod === 'RTGS' ? (tempEditingPayment ? tempEditingPayment.rtgsSrNo : rtgsSrNo) : undefined,
-                    customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
-                    date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
-                    cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
-                    receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
-                    paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
-                    sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
-                    parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
-                    supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
-                    supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
-                    bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-                    rtgsFor: rtgsFor,
-                };
-
+    try {
+        let finalPaymentData: Payment | null = null;
+        await runTransaction(db, async (transaction) => {
+            const tempEditingPayment = editingPayment;
+            
+            // --- READ PHASE ---
+            const supplierDocsToGet = new Set<string>();
+            const expenseDocsToDelete: any[] = [];
+            
+            // 1. Get supplier documents to read
+            if (rtgsFor === 'Supplier') {
+                selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
                 if (tempEditingPayment) {
-                    const paymentRef = doc(db, "payments", tempEditingPayment.id);
-                    transaction.update(paymentRef, paymentData);
-                    finalPaymentData = { id: tempEditingPayment.id, ...paymentData };
-                } else {
-                    const newPaymentRef = doc(collection(db, "payments"));
-                    transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
-                    finalPaymentData = { id: newPaymentRef.id, ...paymentData };
+                    tempEditingPayment.paidFor?.forEach(pf => {
+                        const supplier = suppliers.find(s => s.srNo === pf.srNo);
+                        if (supplier) supplierDocsToGet.add(supplier.id);
+                    });
                 }
-            });
-
-            toast({ title: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, variant: 'success' });
-            if (paymentMethod === 'RTGS' && finalPaymentData) {
-                setRtgsReceiptData(finalPaymentData);
             }
-            resetPaymentForm(rtgsFor === 'Outsider');
-        } catch (error) {
-            console.error("Error processing payment:", error);
-            toast({ title: "Transaction Failed", variant: "destructive" });
+
+            // 2. Get associated expense transaction to read (for deletion)
+            if (tempEditingPayment && tempEditingPayment.expenseTransactionId) {
+                const expenseDocRef = doc(transactionsCollection, tempEditingPayment.expenseTransactionId);
+                expenseDocsToDelete.push(expenseDocRef);
+            }
+            
+            // 3. Execute all reads
+            const supplierDocs = new Map<string, any>();
+            for (const id of supplierDocsToGet) {
+                const docRef = doc(db, "suppliers", id);
+                const supplierDoc = await transaction.get(docRef);
+                if (supplierDoc.exists()) {
+                    supplierDocs.set(id, supplierDoc.data());
+                } else {
+                    throw new Error(`Supplier with ID ${id} not found.`);
+                }
+            }
+            
+            // --- WRITE PHASE ---
+            
+            // 1. Delete old expense transaction if editing
+            expenseDocsToDelete.forEach(ref => transaction.delete(ref));
+
+            // 2. Revert previous payment amounts if editing
+            if (tempEditingPayment && rtgsFor === 'Supplier') {
+                 for (const detail of tempEditingPayment.paidFor || []) {
+                    const supplier = suppliers.find(s => s.srNo === detail.srNo);
+                    if (supplier && supplierDocs.has(supplier.id)) {
+                        const currentNetAmount = Number(supplierDocs.get(supplier.id).netAmount) || 0;
+                        const amountToRestore = detail.amount + (tempEditingPayment.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
+                        const supplierRef = doc(db, "suppliers", supplier.id);
+                        transaction.update(supplierRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
+                    }
+                }
+            }
+
+            // 3. Apply new payment amounts
+            let paidForDetails: PaidFor[] = [];
+            if (rtgsFor === 'Supplier') {
+                let amountToDistribute = Math.round(totalPaidAmount);
+                const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                
+                for (const entryData of sortedEntries) {
+                    if (amountToDistribute <= 0) break;
+                    
+                    const supplierData = supplierDocs.get(entryData.id);
+                    let outstanding = Number(supplierData.netAmount);
+                    const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
+
+                    if (paymentForThisEntry > 0) {
+                         paidForDetails.push({ 
+                            srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
+                            supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
+                            supplierContact: entryData.contact,
+                        });
+                        
+                        const supplierRef = doc(db, "suppliers", entryData.id);
+                        transaction.update(supplierRef, { netAmount: outstanding - paymentForThisEntry });
+                        amountToDistribute -= paymentForThisEntry;
+                    }
+                }
+            }
+            
+            // 4. Create new expense transaction and link it
+            const newTransactionRef = doc(collection(db, 'transactions'));
+            const expenseData: Partial<Transaction> = {
+                id: newTransactionRef.id,
+                date: new Date().toISOString().split('T')[0],
+                transactionType: 'Expense',
+                category: 'Supplier Payments',
+                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
+                amount: finalPaymentAmount,
+                payee: supplierDetails.name,
+                description: `Payment ${tempEditingPayment ? tempEditingPayment.paymentId : paymentId} to ${supplierDetails.name}`,
+                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
+                status: 'Paid',
+                isRecurring: false,
+            };
+            if (paymentMethod !== 'Cash') {
+                expenseData.bankAccountId = selectedAccountId;
+            }
+            transaction.set(newTransactionRef, expenseData);
+
+
+            // 5. Create or update the payment document
+            const paymentData: Omit<Payment, 'id'> = {
+                paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
+                rtgsSrNo: paymentMethod === 'RTGS' ? (tempEditingPayment && tempEditingPayment.rtgsSrNo ? tempEditingPayment.rtgsSrNo : rtgsSrNo) : undefined,
+                customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+                date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
+                cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
+                receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
+                paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
+                sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+                parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
+                supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
+                supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
+                bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
+                rtgsFor: rtgsFor,
+                expenseTransactionId: newTransactionRef.id, // Link to the new expense transaction
+            };
+            
+            if (paymentMethod !== 'RTGS') {
+                delete (paymentData as Partial<Payment>).rtgsSrNo;
+            }
+
+            if (tempEditingPayment) {
+                const paymentRef = doc(db, "payments", tempEditingPayment.id);
+                transaction.update(paymentRef, paymentData);
+                finalPaymentData = { id: tempEditingPayment.id, ...paymentData };
+            } else {
+                const newPaymentRef = doc(collection(db, "payments"));
+                transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
+                finalPaymentData = { id: newPaymentRef.id, ...paymentData };
+            }
+        });
+
+        toast({ title: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, variant: 'success' });
+        if (paymentMethod === 'RTGS' && finalPaymentData) {
+            setRtgsReceiptData(finalPaymentData);
         }
-    };
+        resetPaymentForm(rtgsFor === 'Outsider');
+    } catch (error) {
+        console.error("Error processing payment:", error);
+        toast({ title: "Transaction Failed", description: (error as Error).message, variant: "destructive" });
+    }
+};
 
     const handleEditPayment = async (paymentToEdit: Payment) => {
+        if (!paymentToEdit.id) return;
+        
+        // Fill the form first
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         
-        if (paymentToEdit.rtgsFor === 'Supplier') {
-          const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
-          const supplierDocs = await getDocs(q);
-          const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
-          
-          if (foundSrNos.size !== srNosInPayment.length) {
-              toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
-              return;
-          }
+        if (paymentToEdit.rtgsFor === 'Supplier' && srNosInPayment.length > 0) {
+            const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
+            const supplierDocs = await getDocs(q);
+            const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
+            
+            if (foundSrNos.size !== srNosInPayment.length) {
+                toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
+                return;
+            }
 
-          const newSelectedEntryIds = new Set<string>();
-          supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
-          setSelectedEntryIds(newSelectedEntryIds);
+            const newSelectedEntryIds = new Set<string>();
+            supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
+            setSelectedEntryIds(newSelectedEntryIds);
         } else {
             setSelectedEntryIds(new Set());
         }
@@ -560,56 +652,56 @@ export default function SupplierPaymentsClient() {
             bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
         });
         setActiveTab('processing');
-        toast({ title: `Now editing payment ${paymentToEdit.paymentId}.` });
+        
+        // Then, delete the payment to allow reprocessing
+        await handleDeletePayment(paymentToEdit.id, true); // Pass a flag to prevent toast
+        toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
     };
 
-    const handleDeletePayment = async (paymentIdToDelete: string) => {
+    const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
         const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-    
+
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
-                const supplierDocRefs = new Map<string, string>();
-                const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
-                if (srNos.length > 0) {
-                    const q = query(suppliersCollection, where('srNo', 'in', srNos));
-                    const supplierQuerySnapshot = await getDocs(q);
-                    supplierQuerySnapshot.forEach(doc => {
-                        supplierDocRefs.set(doc.data().srNo, doc.id);
-                    });
-                }
-    
-                const supplierDocsData = new Map<string, any>();
-                for (const [srNo, docId] of supplierDocRefs.entries()) {
-                    const docRef = doc(db, "suppliers", docId);
-                    const supplierDoc = await transaction.get(docRef);
-                    if (supplierDoc.exists()) {
-                        supplierDocsData.set(srNo, supplierDoc.data());
+                
+                // Revert supplier netAmount
+                if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
+                    const srNos = paymentToDelete.paidFor.map(pf => pf.srNo);
+                    if (srNos.length > 0) {
+                        const q = query(suppliersCollection, where('srNo', 'in', srNos));
+                        const supplierDocsSnapshot = await getDocs(q);
+                        const supplierDocsMap = new Map(supplierDocsSnapshot.docs.map(d => [d.id, d.data() as Customer]));
+                        
+                        supplierDocsSnapshot.forEach(docSnapshot => {
+                             const currentSupplier = docSnapshot.data() as Customer;
+                             const amountToRestore = paymentToDelete.amount + (paymentToDelete.cdAmount || 0);
+                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                             transaction.update(doc(db, "suppliers", docSnapshot.id), { netAmount: Math.round(newNetAmount) });
+                        });
                     }
                 }
-    
-                for (const detail of paymentToDelete.paidFor || []) {
-                    const supplierData = supplierDocsData.get(detail.srNo);
-                    if (supplierData) {
-                        const docId = supplierDocRefs.get(detail.srNo)!;
-                        const supplierDocRef = doc(db, "suppliers", docId);
-                        const currentNetAmount = Number(supplierData.netAmount) || 0;
-                        const amountToRestore = detail.amount;
-                        transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
-                    }
+                
+                // Delete the associated expense transaction, if it exists
+                if (paymentToDelete.expenseTransactionId) {
+                    const expenseDocRef = doc(transactionsCollection, paymentToDelete.expenseTransactionId);
+                    transaction.delete(expenseDocRef);
                 }
+                
+                // Delete the payment itself
                 transaction.delete(paymentRef);
             });
-    
-            toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
+            if (!isEditing) {
+                toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
+            }
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) {
             console.error("Error deleting payment:", error);
-            toast({ title: "Failed to delete payment.", variant: "destructive" });
+            toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
         }
     };
     
@@ -671,7 +763,8 @@ export default function SupplierPaymentsClient() {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setPaymentAmount(option.calculatedAmount);
+        setCdAt('full_amount');
+        setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
         setRtgsAmount(option.calculatedAmount);
@@ -788,8 +881,9 @@ export default function SupplierPaymentsClient() {
 
                 {(selectedCustomerKey || rtgsFor === 'Outsider') && (
                     <PaymentForm
-                        paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails}
-                        setSupplierDetails={setSupplierDetails} bankDetails={bankDetails} setBankDetails={setBankDetails}
+                        paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails} setSupplierDetails={setSupplierDetails}
+                        isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
+                        bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
@@ -813,6 +907,10 @@ export default function SupplierPaymentsClient() {
                         sortedPaymentOptions={sortedPaymentOptions}
                         roundFigureToggle={roundFigureToggle}
                         setRoundFigureToggle={setRoundFigureToggle}
+                        bankAccounts={bankAccounts}
+                        selectedAccountId={selectedAccountId}
+                        setSelectedAccountId={handleSetSelectedAccount}
+                        financialState={financialState}
                     />
                 )}
             </TabsContent>
@@ -880,3 +978,5 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    

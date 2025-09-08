@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen } from "lucide-react";
 import { format } from 'date-fns';
 import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,8 +24,9 @@ const cdOptions = [
 ];
 
 export const PaymentForm = ({
-    paymentMethod, rtgsFor, supplierDetails, setSupplierDetails, bankDetails,
-    setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
+    paymentMethod, rtgsFor, supplierDetails, setSupplierDetails,
+    isPayeeEditing, setIsPayeeEditing,
+    bankDetails, setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
     rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
     cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
     setSixRDate, parchiNo, setParchiNo, checkNo, setCheckNo,
@@ -57,12 +58,28 @@ export const PaymentForm = ({
     return (
         <>
             <Card className="p-2 mt-3">
-                <CardHeader className="p-1 pb-2"><CardTitle className="text-sm">Supplier/Payee Details</CardTitle></CardHeader>
-                <CardContent className="p-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-                    <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
-                    <div className="space-y-1"><Label className="text-xs">{rtgsFor === 'Outsider' ? 'Company Name' : "Father's Name"}</Label><Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} className="h-8 text-xs" /></div>
-                    <div className="space-y-1"><Label className="text-xs">Address</Label><Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} className="h-8 text-xs" /></div>
-                    <div className="space-y-1"><Label className="text-xs">Contact</Label><Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" disabled={rtgsFor === 'Supplier'}/></div>
+                <CardHeader className="p-1 pb-2 flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm">Supplier/Payee Details</CardTitle>
+                    {!isPayeeEditing && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsPayeeEditing(true)}><Pen className="h-4 w-4"/></Button>}
+                </CardHeader>
+                <CardContent className="p-1">
+                    {isPayeeEditing ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                            <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
+                            <div className="space-y-1"><Label className="text-xs">{rtgsFor === 'Outsider' ? 'Company Name' : "Father's Name"}</Label><Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} className="h-8 text-xs" /></div>
+                            <div className="space-y-1"><Label className="text-xs">Address</Label><Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} className="h-8 text-xs" /></div>
+                            <div className="space-y-1"><Label className="text-xs">Contact</Label><Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" disabled={rtgsFor === 'Supplier'}/></div>
+                            <div className="col-span-full flex justify-end">
+                                <Button size="sm" onClick={() => setIsPayeeEditing(false)} className="h-7 text-xs">Done</Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-xs grid grid-cols-2 md:grid-cols-4 gap-2 text-muted-foreground p-2 rounded-lg bg-background">
+                            <p><span className="font-semibold">Name:</span> {supplierDetails.name}</p>
+                            <p><span className="font-semibold">{rtgsFor === 'Outsider' ? 'Company:' : "Father's Name:"}</span> {supplierDetails.fatherName}</p>
+                            <p className="col-span-2"><span className="font-semibold">Address:</span> {supplierDetails.address}</p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -181,7 +198,10 @@ export const PaymentForm = ({
             {paymentMethod === 'RTGS' && (
                 <>
                      <Card className="p-2 mt-3">
-                        <CardHeader className="p-1 pb-2"><CardTitle className="text-sm">Bank Details</CardTitle></CardHeader>
+                        <CardHeader className="p-1 pb-2 flex flex-row items-center justify-between">
+                            <CardTitle className="text-sm">Bank Details</CardTitle>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsBankSettingsOpen(true)}><Settings className="h-4 w-4"/></Button>
+                        </CardHeader>
                         <CardContent className="p-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                                 <div className="space-y-1"><Label className="text-xs">Bank</Label>
                                     <Popover><PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">{bankDetails.bank || "Select bank"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
@@ -232,3 +252,5 @@ export const PaymentForm = ({
         </>
     );
 };
+
+    

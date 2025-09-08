@@ -82,76 +82,58 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
     const closingBalance = totalDebit - totalCredit;
 
-    const handlePrint = () => {
+     const handlePrint = () => {
         const node = statementRef.current;
         if (!node) return;
 
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
+        const newWindow = window.open('', '', 'height=800,width=1200');
+        if (newWindow) {
+            const document = newWindow.document;
+            document.write(`
+                <html>
+                    <head>
+                        <title>Print Statement</title>
+                        <style>
+                            /* Include basic styles for printing */
+                            body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; color: #000 !important; }
+                            table { width: 100%; border-collapse: collapse; }
+                            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+                            th { background-color: #f2f2f2; }
+                            .no-print { display: none; }
+                             @media print {
+                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                                .printable-area { background-color: #fff !important; color: #000 !important; }
+                                .printable-area * { color: #000 !important; border-color: #ccc !important; }
+                             }
+                        </style>
+                    </head>
+                    <body>
+                    </body>
+                </html>
+            `);
 
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) return;
-        
-        iframeDoc.open();
-        iframeDoc.write(`
-            <html>
-                <head>
-                    <title>Print Statement</title>
-                    <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-                        body { 
-                            font-family: 'Inter', sans-serif;
-                            margin: 0;
-                        }
-                        .summary-grid {
-                            display: grid;
-                            grid-template-columns: repeat(3, minmax(0, 1fr));
-                            gap: 1.5rem;
-                        }
-                        @media print {
-                            body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                            .no-print { display: none !important; }
-                        }
-                    </style>
-                </head>
-                <body>
-                </body>
-            </html>
-        `);
-        
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const style = iframeDoc.createElement('style');
-                style.textContent = Array.from(styleSheet.cssRules)
-                    .map(rule => rule.cssText)
-                    .join('');
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn('Could not copy stylesheet:', e);
-            }
-        });
+            // Use a more robust method to clone and append styles
+            Array.from(window.document.styleSheets).forEach(styleSheet => {
+                try {
+                    const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                    const styleElement = document.createElement('style');
+                    styleElement.appendChild(document.createTextNode(css));
+                    newWindow.document.head.appendChild(styleElement);
+                } catch (e) {
+                    console.warn('Could not copy stylesheet:', e);
+                }
+            });
 
-        const printableContent = node.cloneNode(true) as HTMLElement;
-        iframeDoc.body.appendChild(printableContent);
-        
-        const summaryGrid = iframeDoc.querySelector('.summary-grid-container');
-        if(summaryGrid) {
-            summaryGrid.className = 'summary-grid';
+            document.body.innerHTML = node.innerHTML;
+            
+            setTimeout(() => {
+                newWindow.focus();
+                newWindow.print();
+                newWindow.close();
+            }, 500);
         }
-
-        iframeDoc.close();
-
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500);
     };
-
+    
     return (
     <>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
@@ -521,3 +503,5 @@ export const SupplierProfileView = ({
         </div>
     );
 };
+
+    
