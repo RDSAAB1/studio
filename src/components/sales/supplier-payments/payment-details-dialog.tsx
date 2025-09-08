@@ -58,7 +58,7 @@ export const PaymentDetailsDialog = ({ payment, suppliers, onOpenChange, onShowE
                                     <TableCell>{supplier ? toTitleCase(supplier.name) : 'N/A'}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(pf.amount)}</TableCell>
                                     <TableCell className="text-center">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowEntryDetails(supplier)}>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { onOpenChange(false); onShowEntryDetails(supplier); }}>
                                             <Info className="h-4 w-4" />
                                         </Button>
                                     </TableCell>

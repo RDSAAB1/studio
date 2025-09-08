@@ -145,7 +145,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     return (
     <>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
-            <DialogTitle>Account Statement for {data.name}</DialogTitle>
+             <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
              A detailed summary and transaction history for {data.name}.
              </DialogDescription>
