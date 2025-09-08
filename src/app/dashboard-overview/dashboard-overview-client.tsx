@@ -109,13 +109,13 @@ export default function DashboardOverviewClient() {
             }
         });
 
-        const totalSupplierRawDues = suppliers.reduce((sum, s) => sum + (s.netAmount || 0), 0);
-        const totalCdFromSuppliers = payments.filter(p => p.customerId.startsWith('s')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        const totalSupplierDues = totalSupplierRawDues - totalCdFromSuppliers;
+        const totalSupplierRawDues = suppliers.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0);
+        const totalSupplierPayments = payments.filter(p => p.paymentId.startsWith('P')).reduce((sum, p) => sum + p.amount + (p.cdAmount || 0), 0);
+        const totalSupplierDues = totalSupplierRawDues - totalSupplierPayments;
 
-        const totalCustomerRawDues = customers.reduce((sum, c) => sum + Number(c.netAmount || 0), 0);
-        const totalCdToCustomers = payments.filter(p => p.customerId.startsWith('c')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
-        const totalCustomerDues = totalCustomerRawDues - totalCdToCustomers;
+        const totalCustomerRawDues = customers.reduce((sum, c) => sum + (c.originalNetAmount || 0), 0);
+        const totalCustomerPayments = payments.filter(p => p.paymentId.startsWith('CR')).reduce((sum,p) => sum + p.amount, 0);
+        const totalCustomerDues = totalCustomerRawDues - totalCustomerPayments;
         
         const loanLiabilities = loans.reduce((sum, loan) => {
             const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
@@ -135,7 +135,8 @@ export default function DashboardOverviewClient() {
         }, 0);
 
         const totalLiabilities = loanLiabilities + totalSupplierDues;
-        const totalCdReceived = payments.filter(p => p.customerId.startsWith('s')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        
+        const totalCdReceived = payments.filter(p => p.paymentId.startsWith('P')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalAssets = cashAndBankAssets + totalCustomerDues;
@@ -334,5 +335,7 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
+
+    
 
     
