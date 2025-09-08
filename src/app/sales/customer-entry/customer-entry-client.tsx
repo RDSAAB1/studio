@@ -605,11 +605,11 @@ export default function CustomerEntryClient() {
         onDelete={handleDelete} 
         onShowDetails={handleShowDetails}
         onPrint={handlePrint}
-        onPrintRow={(entry: Customer) => handlePrint([entry])}
         selectedIds={selectedCustomerIds}
         onSelectionChange={setSelectedCustomerIds}
         onSearch={setSearchTerm}
         entryType="Customer"
+        onPrintRow={(entry: Customer) => handlePrint([entry])}
       />
 
       <CustomerDetailsDialog

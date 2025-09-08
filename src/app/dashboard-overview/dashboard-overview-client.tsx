@@ -130,7 +130,7 @@ export default function DashboardOverviewClient() {
         }, 0);
 
         const totalLiabilities = loanLiabilities + totalSupplierDues;
-        const totalCdReceived = payments.reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        const totalCdReceived = payments.filter(p => p.customerId.startsWith('s')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalAssets = cashAndBankAssets + totalCustomerDues + totalCdReceived;
@@ -169,6 +169,7 @@ export default function DashboardOverviewClient() {
         const assetsBreakdown = [
             { name: 'Cash & Bank', value: financialState.cashAndBankAssets },
             { name: 'Receivables', value: financialState.totalCustomerDues },
+            { name: 'CD Received', value: financialState.totalCdReceived },
         ];
         
         const liabilitiesBreakdown = [
@@ -238,7 +239,7 @@ export default function DashboardOverviewClient() {
                 <Card>
                     <CardHeader><CardTitle className="text-base">Assets Breakdown</CardTitle></CardHeader>
                     <CardContent className="flex items-center justify-center">
-                        <DonutChart className="h-48" data={chartData.assetsBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['sky', 'blue']} />
+                        <DonutChart className="h-48" data={chartData.assetsBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['sky', 'blue', 'teal']} />
                     </CardContent>
                 </Card>
                 <Card>
