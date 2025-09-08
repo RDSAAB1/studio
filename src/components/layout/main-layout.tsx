@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, type ReactNode, useCallback } from "react";
+import React, { useState, useEffect, type ReactNode, useCallback, useRef } from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import CustomSidebar from "./custom-sidebar";
 import { cn } from "@/lib/utils";
@@ -27,19 +27,30 @@ const findTabForPath = (path: string): MenuItem | undefined => {
             if (subItem) return subItem;
         }
     }
+    // Return dashboard as a fallback if no other match is found.
     return allMenuItems.find(item => item.id === 'dashboard');
 };
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
-  const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string>('');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>('');
   
   const pathname = usePathname();
   const router = useRouter();
 
+  // Initialize tabs only once
+  useEffect(() => {
+      const dashboardTab = allMenuItems.find(item => item.id === 'dashboard');
+      if (dashboardTab) {
+          setOpenTabs([dashboardTab]);
+          setActiveTabId(dashboardTab.id);
+      }
+  }, []);
+  
   useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -68,18 +79,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [pathname, router]);
 
   useEffect(() => {
-    if (loading || UNPROTECTED_ROUTES.includes(pathname)) return;
+    if (loading || UNPROTECTED_ROUTES.includes(pathname) || !pathname) return;
 
     const currentTabInfo = findTabForPath(pathname);
     
     if (currentTabInfo) {
       setActiveTabId(currentTabInfo.id);
       
-      if (!openTabs.some(tab => tab.id === currentTabInfo.id)) {
-        setOpenTabs(prevTabs => [...prevTabs, currentTabInfo]);
-      }
+      setOpenTabs(prevTabs => {
+          if (!prevTabs.some(tab => tab.id === currentTabInfo.id)) {
+              return [...prevTabs, currentTabInfo];
+          }
+          return prevTabs;
+      });
     }
-  }, [pathname, loading, openTabs]);
+  }, [pathname, loading]);
 
 
   const handleTabClick = (tabId: string) => {
@@ -93,35 +107,31 @@ export default function MainLayout({ children }: MainLayoutProps) {
     e.stopPropagation();
     if (tabId === 'dashboard') return;
 
-    const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
-    const newTabs = openTabs.filter(tab => tab.id !== tabId);
+    setOpenTabs(prevTabs => {
+        const tabIndex = prevTabs.findIndex(tab => tab.id === tabId);
+        const newTabs = prevTabs.filter(tab => tab.id !== tabId);
 
-    if (activeTabId === tabId) {
-        const newActiveTab = newTabs[tabIndex] || newTabs[tabIndex - 1] || newTabs[0];
-        if (newActiveTab?.href) {
-            router.push(newActiveTab.href);
-        } else if (newTabs.length === 0) {
-            const dashboard = allMenuItems.find(item => item.id === 'dashboard');
-            if (dashboard) {
-                router.push(dashboard.href!);
-                setOpenTabs([dashboard]);
-                setActiveTabId(dashboard.id);
+        if (activeTabId === tabId) {
+            const newActiveTab = newTabs[tabIndex] || newTabs[tabIndex - 1] || newTabs[0];
+            if (newActiveTab?.href) {
+                router.push(newActiveTab.href);
+            } else if (newTabs.length === 0) {
+                const dashboard = allMenuItems.find(item => item.id === 'dashboard');
+                if (dashboard) {
+                    router.push(dashboard.href!);
+                    // Since this is an edge case (closing the last tab), we can directly set it.
+                    return [dashboard];
+                }
             }
         }
-    }
-    setOpenTabs(newTabs);
+        return newTabs;
+    });
   };
 
   const handleSidebarItemClick = (item: MenuItem) => {
-    if (item.href) {
-      if (!openTabs.some(tab => tab.id === item.id)) {
-        setOpenTabs([...openTabs, item]);
-      }
-      setActiveTabId(item.id);
-      // Let the <Link> component handle the navigation
-      if (window.innerWidth < 1024) {
-          setIsSidebarActive(false);
-      }
+    // Let the <Link> component in the sidebar handle the navigation
+    if (window.innerWidth < 1024) {
+        setIsSidebarActive(false);
     }
   };
   
@@ -179,9 +189,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
               user={user}
               onSignOut={handleSignOut}
             />
-            <div className="content">
+            <main className="content">
                  {children}
-            </div>
+            </main>
             {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
         </div>
     </div>

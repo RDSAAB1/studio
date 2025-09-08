@@ -20,7 +20,6 @@ interface TabProps {
 }
 
 export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose, isNextTabActive, isClosable }) => {
-  const router = useRouter();
 
   const cornerStyle = {
     '--corner-bg': 'hsl(var(--background))',
@@ -41,10 +40,10 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
     <div 
       className="relative flex-shrink min-w-0" 
       style={cornerStyle as React.CSSProperties}
+      onClick={onClick}
     >
       <Link 
         href={path} 
-        onClick={onClick}
         className={tabClasses}
       >
         <div className="flex items-center z-10 overflow-hidden min-w-0">
