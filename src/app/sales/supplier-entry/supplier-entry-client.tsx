@@ -353,10 +353,9 @@ export default function SupplierEntryClient() {
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            toast({ title: "Payments Deleted", description: "Associated payments removed." });
-            const savedEntry = await addSupplier(updatedEntry);
-            toast({ title: "Entry updated successfully.", variant: "success" });
-            if (callback) callback(savedEntry); else handleNew();
+            await addSupplier(updatedEntry);
+            toast({ title: "Entry updated and associated payments removed.", variant: "success" });
+            if (callback) callback(updatedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
@@ -537,4 +536,3 @@ export default function SupplierEntryClient() {
   );
 }
 
-    
