@@ -269,19 +269,19 @@ export default function SupplierProfilePage() {
     setIsClient(true);
     setLoading(true);
 
-    const unsubscribeSuppliers = onSnapshot(collection(db, "suppliers"), (snapshot) => {
+    const unsubscribeSuppliers = onSnapshot(collection(db, "customers"), (snapshot) => {
         const fetchedSuppliers: Supplier[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier));
         setSuppliers(fetchedSuppliers);
         setLoading(false);
     }, (error) => {
-        console.error("Failed to load suppliers from Firestore", error);
+        console.error("Failed to load customers from Firestore", error);
         setSuppliers([]);
         setLoading(false);
     });
 
     const unsubscribePayments = onSnapshot(collection(db, "payments"), (snapshot) => {
         const fetchedPayments: Payment[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-        setPaymentHistory(fetchedPayments);
+        setPaymentHistory(fetchedPayments.filter(p => !p.paymentId.startsWith('S')));
     }, (error) => {
         console.error("Failed to load payments from Firestore", error);
         setPaymentHistory([]);
@@ -317,7 +317,7 @@ export default function SupplierProfilePage() {
     suppliers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
-        data.totalAmount += s.amount || 0;
+        data.totalAmount += s.netAmount || 0;
         data.totalOriginalAmount += s.originalNetAmount || 0;
         data.totalGrossWeight! += s.grossWeight;
         data.totalTeirWeight! += s.teirWeight;
