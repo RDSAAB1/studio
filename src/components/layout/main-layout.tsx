@@ -93,7 +93,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
     const tab = openTabs.find(t => t.id === tabId);
     if (tab?.href) {
         setActiveTabId(tabId);
-        router.push(tab.href);
+        // We no longer use router.push to prevent state loss.
+        // The visibility of the page content will be handled by CSS.
     }
   };
 
@@ -193,7 +194,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onSignOut={handleSignOut}
             />
             <div className="content">
-                {children}
+                 <div style={{ display: pathname === '/dashboard-overview' ? 'block' : 'none' }}>
+                    {/* Render the children only if it's the active route */}
+                    {pathname === '/dashboard-overview' && children}
+                </div>
+                {openTabs.filter(tab => tab.id !== 'dashboard').map(tab => (
+                    <div key={tab.id} style={{ display: activeTabId === tab.id ? 'block' : 'none' }}>
+                        {activeTabId === tab.id && children}
+                    </div>
+                ))}
             </div>
             {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
         </div>

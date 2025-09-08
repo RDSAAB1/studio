@@ -39,7 +39,11 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
   return (
     <div 
       className="relative flex-shrink min-w-0" 
-      onClick={onClick}
+      onClick={(e) => {
+        e.preventDefault(); // Prevent default link behavior
+        onClick();
+        router.push(path, { scroll: false }); // Use router for navigation without full page reload
+      }}
       style={cornerStyle as React.CSSProperties}
     >
       <div className={tabClasses}>

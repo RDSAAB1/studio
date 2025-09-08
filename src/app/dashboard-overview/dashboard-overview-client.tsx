@@ -109,13 +109,8 @@ export default function DashboardOverviewClient() {
             }
         });
 
-        const totalSupplierRawDues = suppliers.reduce((sum, s) => sum + (s.originalNetAmount || 0), 0);
-        const totalSupplierPayments = payments.filter(p => p.paymentId.startsWith('P')).reduce((sum, p) => sum + p.amount + (p.cdAmount || 0), 0);
-        const totalSupplierDues = totalSupplierRawDues - totalSupplierPayments;
-
-        const totalCustomerRawDues = customers.reduce((sum, c) => sum + (c.originalNetAmount || 0), 0);
-        const totalCustomerPayments = payments.filter(p => p.paymentId.startsWith('CR')).reduce((sum,p) => sum + p.amount, 0);
-        const totalCustomerDues = totalCustomerRawDues - totalCustomerPayments;
+        const totalSupplierDues = suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
+        const totalCustomerDues = customers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0);
         
         const loanLiabilities = loans.reduce((sum, loan) => {
             const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
@@ -191,7 +186,7 @@ export default function DashboardOverviewClient() {
             .filter(c => (c.netAmount || 0) > 0)
             .sort((a,b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
             .slice(0, 5)
-            .map(c => ({ name: toTitleCase(c.name), "Amount": c.netAmount }));
+            .map(c => ({ name: toTitleCase(c.name), "Amount": Number(c.netAmount) }));
 
         return {
             timeSeriesData,
