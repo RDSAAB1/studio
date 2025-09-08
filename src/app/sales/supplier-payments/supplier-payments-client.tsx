@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -680,22 +679,22 @@ export default function SupplierPaymentsClient() {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
-    
+
         try {
             await runTransaction(db, async (transaction) => {
                 const paymentRef = doc(db, "payments", paymentIdToDelete);
-                
+
                 // --- READ PHASE ---
                 const supplierDocRefs = new Map<string, string>();
                 const srNos = (paymentToDelete.paidFor || []).map(pf => pf.srNo);
                 if (srNos.length > 0) {
                     const q = query(suppliersCollection, where('srNo', 'in', srNos));
-                    const supplierQuerySnapshot = await getDocs(q);
+                    const supplierDocs = await getDocs(q);
                     supplierQuerySnapshot.forEach(doc => {
                         supplierDocRefs.set(doc.data().srNo, doc.id);
                     });
                 }
-        
+                
                 const expenseQuery = query(transactionsCollection, where("description", "==", `Payment ${paymentToDelete.paymentId} to ${paymentToDelete.supplierName}`));
                 const expenseSnapshot = await getDocs(expenseQuery);
                 const expenseDocsToDelete = expenseSnapshot.docs.map(doc => doc.ref);
@@ -716,15 +715,29 @@ export default function SupplierPaymentsClient() {
                         const docId = supplierDocRefs.get(detail.srNo)!;
                         const supplierDocRef = doc(db, "suppliers", docId);
                         const currentNetAmount = Number(supplierData.netAmount) || 0;
-                        const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                        const amountToRestore = detail.amount;
                         transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
                     }
                 }
-    
+                
+                const totalReversalAmount = paymentToDelete.amount + (paymentToDelete.cdAmount || 0);
+
+                for (const detail of paymentToDelete.paidFor || []) {
+                    const supplierData = supplierDocsData.get(detail.srNo);
+                    if (supplierData) {
+                        const docId = supplierDocRefs.get(detail.srNo)!;
+                        const supplierDocRef = doc(db, "suppliers", docId);
+                        const currentNetAmount = Number(supplierData.netAmount) || 0;
+                        const amountToRestoreForThisEntry = (detail.amount / paymentToDelete.amount) * totalReversalAmount;
+                        transaction.update(supplierDocRef, { netAmount: Math.round(currentNetAmount + amountToRestoreForThisEntry) });
+                    }
+                }
+
+
                 expenseDocsToDelete.forEach(ref => transaction.delete(ref));
                 transaction.delete(paymentRef);
             });
-    
+
             toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) {
