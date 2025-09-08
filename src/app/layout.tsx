@@ -205,15 +205,14 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <TabProvider>
             <div className={cn("wrapper", isSidebarActive && "active")}>
-                <div onMouseEnter={() => setIsSidebarActive(true)} onMouseLeave={() => setIsSidebarActive(false)}>
-                    <CustomSidebar isSidebarActive={isSidebarActive} />
-                </div>
+                <CustomSidebar isSidebarActive={isSidebarActive} />
                 <div className="main_container">
                   <Header 
                       toggleSidebar={toggleSidebar}
                       user={user}
                       onSignOut={handleSignOut}
                   />
+                  <TabBar />
                   <main className="content">
                     {children}
                   </main>

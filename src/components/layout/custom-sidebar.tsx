@@ -19,6 +19,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
   useEffect(() => {
+    // Expand submenu if a child route is active
     for (const item of allMenuItems) {
       if (item.subMenus && item.subMenus.some(subItem => subItem.href === pathname)) {
         setOpenSubMenu(item.id);
@@ -26,12 +27,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
       }
     }
   }, [pathname]);
-
-  useEffect(() => {
-    if (!isSidebarActive) {
-      setOpenSubMenu(null);
-    }
-  }, [isSidebarActive]);
 
   const handleSubMenuToggle = (id: string) => {
     setOpenSubMenu(openSubMenu === id ? null : id);
@@ -78,7 +73,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
             <React.Fragment key={item.id}>
               {renderMenuItem(item)}
               {item.subMenus && (
-                <ul className={cn("submenu", openSubMenu === item.id && "open")}>
+                <ul className={cn("submenu", openSubMenu === item.id && isSidebarActive && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
                       <Link
