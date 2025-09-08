@@ -119,10 +119,10 @@ export default function RtgsReportClient() {
         let filtered = reportRows;
 
         if (searchSrNo) {
-            filtered = filtered.filter(row => row.srNo.toLowerCase() === searchSrNo.toLowerCase());
+            filtered = filtered.filter(row => row.srNo.toLowerCase().includes(searchSrNo.toLowerCase()));
         }
         if (searchCheckNo) {
-            filtered = filtered.filter(row => row.checkNo.toLowerCase() === searchCheckNo.toLowerCase());
+            filtered = filtered.filter(row => row.checkNo.toLowerCase().includes(searchCheckNo.toLowerCase()));
         }
         if (searchName) {
             filtered = filtered.filter(row => row.supplierName.toLowerCase() === searchName.toLowerCase());
@@ -409,9 +409,6 @@ export default function RtgsReportClient() {
                          <Button variant="outline" onClick={handleDownloadExcel}>
                             <Download className="mr-2 h-4 w-4" /> Download Excel
                         </Button>
-                        <Button variant="outline" onClick={handlePrint}>
-                            <Printer className="mr-2 h-4 w-4" /> Download in pdf
-                        </Button>
                         <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </DialogFooter>
                     <div className="p-4 overflow-auto flex-grow">
@@ -487,4 +484,5 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+
 
