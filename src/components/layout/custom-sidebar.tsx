@@ -10,10 +10,9 @@ import { cn } from '@/lib/utils';
 
 interface CustomSidebarProps {
   isSidebarActive: boolean;
-  onMenuItemClick: (item: MenuItemType) => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuItemClick }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
   const pathname = usePathname();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
@@ -39,10 +38,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
   const handleSubMenuToggle = (id: string) => {
     setOpenSubMenu(openSubMenu === id ? null : id);
   };
-  
-  const handleItemClick = (item: MenuItemType) => {
-    onMenuItemClick(item);
-  };
 
   const renderMenuItem = (item: MenuItemType) => {
     const isSubMenuActive = item.subMenus?.some(sub => sub.href === pathname) ?? false;
@@ -57,8 +52,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
             if (item.subMenus) {
               e.preventDefault(); 
               handleSubMenuToggle(item.id);
-            } else {
-              handleItemClick(item);
             }
           }}
         >
@@ -73,7 +66,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
   return (
     <aside className="side_bar">
       <div className="side_bar_top">
-         {/* The toggle arrow is removed as per user request for hover-based interaction */}
       </div>
       <div className="side_bar_bottom scrollbar-hide">
         <ul>
@@ -84,7 +76,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, onMenuIt
                 <ul className={cn("submenu", openSubMenu === item.id && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <Link href={subItem.href || '#'} onClick={() => handleItemClick(subItem)}>
+                      <Link href={subItem.href || '#'}>
                          {subItem.name}
                       </Link>
                     </li>

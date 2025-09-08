@@ -1,11 +1,17 @@
 
 "use client";
 
-// This page is now handled by the main layout, which includes an auth check.
-// If the user is logged in, they will be directed to the dashboard.
-// If not, they will be redirected to the login page.
-// No specific logic is needed here anymore.
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
-  return null;
+  const router = useRouter();
+
+  useEffect(() => {
+    // The auth check in RootLayout will handle the redirect.
+    // This page can be a fallback or loading indicator if needed.
+    router.replace('/dashboard-overview');
+  }, [router]);
+
+  return null; // or a loading spinner
 }

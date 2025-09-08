@@ -5,11 +5,8 @@ import { useState, useEffect } from "react";
 import { Settings, UserCircle, Search, Menu, X, LogOut, Bell } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import TabBar from "./tab-bar";
-import { MenuItem, allMenuItems } from "@/hooks/use-tabs";
 import { cn } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
-import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import type { User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
@@ -24,17 +21,12 @@ interface HeaderProps {
   toggleSidebar: () => void;
   user: User | null;
   onSignOut: () => void;
-  openTabs: MenuItem[];
-  activeTabId: string;
-  onTabClick: (id: string) => void;
-  onCloseTab: (id: string, e: React.MouseEvent) => void;
 }
 
 const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
-    const router = useRouter();
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
@@ -50,7 +42,7 @@ const NotificationBell = () => {
         setPendingNotifications(pending);
     }, [loans]);
 
-    const handleNotificationClick = (loan: Loan) => {
+    const handleNotificationClick = () => {
         setOpen(false); // Close the popover on click
     };
 
@@ -82,7 +74,7 @@ const NotificationBell = () => {
                                     description: `EMI for ${loan.loanName}`
                                 }).toString()}`} 
                                 className="block p-2 rounded-md hover:bg-accent active:bg-primary/20 cursor-pointer"
-                                onClick={() => handleNotificationClick(loan)}
+                                onClick={handleNotificationClick}
                              >
                                 <div>
                                     <p className="text-sm font-semibold">{loan.loanName}</p>
@@ -101,13 +93,12 @@ const NotificationBell = () => {
     )
 }
 
-export function Header({ toggleSidebar, user, onSignOut, openTabs, activeTabId, onTabClick, onCloseTab }: HeaderProps) {
+export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const router = useRouter();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
-        {/* Left Section: Search and Mobile Menu */}
         <div className="flex flex-1 items-center gap-2">
           <div className="flex-shrink-0 lg:hidden">
             <Button variant="ghost" size="icon" onClick={toggleSidebar}>
@@ -115,22 +106,12 @@ export function Header({ toggleSidebar, user, onSignOut, openTabs, activeTabId, 
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </div>
-          <div className="hidden lg:block">
-            <TabBar 
-                openTabs={openTabs}
-                activeTabId={activeTabId}
-                onTabClick={onTabClick}
-                onCloseTab={onCloseTab}
-            />
-          </div>
         </div>
 
-        {/* Center Section: Dynamic Island Toaster */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <DynamicIslandToaster />
         </div>
 
-        {/* Right Section: Actions */}
         <div className={cn("flex flex-1 items-center justify-end gap-2", isSearchOpen && "hidden")}>
           <NotificationBell />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
