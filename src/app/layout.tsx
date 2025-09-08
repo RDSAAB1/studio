@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, type ReactNode } from "react";
+import React, { useState, useEffect, type ReactNode, createContext, useContext, useCallback } from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
@@ -10,7 +10,6 @@ import { Header } from "@/components/layout/header";
 import { cn } from "@/lib/utils";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
 import { Loader2 } from "lucide-react";
 import { allMenuItems, type MenuItem } from '@/hooks/use-tabs';
 
@@ -34,7 +33,94 @@ const sourceCodePro = Source_Code_Pro({
 
 const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
 
+// --- Tab Context ---
+interface TabContextType {
+  openTabs: MenuItem[];
+  activeTabId: string;
+  openTab: (menuItem: MenuItem) => void;
+  closeTab: (tabId: string) => void;
+  setActiveTabId: (tabId: string) => void;
+}
 
+const TabContext = createContext<TabContextType | null>(null);
+
+export const useTabs = () => {
+  const context = useContext(TabContext);
+  if (!context) {
+    throw new Error('useTabs must be used within a TabProvider');
+  }
+  return context;
+};
+
+const TabProvider = ({ children }: { children: ReactNode }) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [openTabs, setOpenTabs] = useState<MenuItem[]>([allMenuItems[0]]); // Start with dashboard
+  const [activeTabId, setActiveTabId] = useState<string>(allMenuItems[0].id);
+  const [pages, setPages] = useState<{ [key: string]: ReactNode }>({ [allMenuItems[0].id]: children });
+
+  const openTab = useCallback((menuItem: MenuItem) => {
+    setOpenTabs(prevTabs => {
+      if (prevTabs.some(tab => tab.id === menuItem.id)) {
+        return prevTabs;
+      }
+      return [...prevTabs, menuItem];
+    });
+    setActiveTabId(menuItem.id);
+  }, []);
+
+  const closeTab = useCallback((tabId: string) => {
+    if (tabId === 'dashboard') return;
+
+    setOpenTabs(prevTabs => {
+      const tabIndex = prevTabs.findIndex(tab => tab.id === tabId);
+      if (tabIndex === -1) return prevTabs;
+
+      const newTabs = prevTabs.filter(tab => tab.id !== tabId);
+      
+      if (activeTabId === tabId) {
+        const nextTab = newTabs[tabIndex] || newTabs[tabIndex - 1] || newTabs[0];
+        if (nextTab && nextTab.href) {
+            setActiveTabId(nextTab.id);
+            router.push(nextTab.href);
+        }
+      }
+      return newTabs;
+    });
+     setPages(prevPages => {
+        const newPages = { ...prevPages };
+        delete newPages[tabId];
+        return newPages;
+    });
+  }, [activeTabId, router]);
+  
+  useEffect(() => {
+    const currentItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(i => i.href === pathname);
+    if (currentItem) {
+        if (!pages[currentItem.id]) {
+            setPages(prev => ({...prev, [currentItem.id]: children}));
+        }
+        openTab(currentItem);
+        setActiveTabId(currentItem.id);
+    }
+  }, [pathname, children, pages, openTab]);
+
+
+  const value = { openTabs, activeTabId, openTab, closeTab, setActiveTabId };
+
+  return (
+    <TabContext.Provider value={value}>
+        {Object.keys(pages).map(pageId => (
+            <div key={pageId} style={{ display: pageId === activeTabId ? 'block' : 'none' }}>
+                {pages[pageId]}
+            </div>
+        ))}
+    </TabContext.Provider>
+  );
+};
+
+
+// --- Root Layout ---
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -53,14 +139,7 @@ export default function RootLayout({
         setLoading(true);
         if (currentUser) {
             setUser(currentUser);
-            const companySettings = await getCompanySettings(currentUser.uid);
-            const rtgsSettings = await getRtgsSettings();
-
-            if (!companySettings || !companySettings.appPassword) {
-                if (pathname !== '/setup/connect-gmail') router.replace('/setup/connect-gmail');
-            } else if (!rtgsSettings) {
-                if (pathname !== '/setup/company-details') router.replace('/setup/company-details');
-            } else if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
+            if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
                  router.replace('/dashboard-overview');
             }
         } else {
@@ -78,8 +157,7 @@ export default function RootLayout({
 
   const handleSignOut = async () => {
     try {
-      const auth = getFirebaseAuth();
-      await signOut(auth);
+      await signOut(getFirebaseAuth());
       router.replace('/login');
     } catch (error) {
       console.error("Error signing out: ", error);
@@ -102,7 +180,7 @@ export default function RootLayout({
     return (
         <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
           <body className="font-body antialiased">
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
+             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           </body>
@@ -121,22 +199,24 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
-        <div className={cn("wrapper", isSidebarActive && "active")}>
-            <div onMouseEnter={() => setIsSidebarActive(true)} onMouseLeave={() => setIsSidebarActive(false)}>
-                <CustomSidebar isSidebarActive={isSidebarActive} />
+        <TabProvider>
+            <div className={cn("wrapper", isSidebarActive && "active")}>
+                <div onMouseEnter={() => setIsSidebarActive(true)} onMouseLeave={() => setIsSidebarActive(false)}>
+                    <CustomSidebar isSidebarActive={isSidebarActive} />
+                </div>
+                <div className="main_container">
+                     <Header 
+                        toggleSidebar={toggleSidebar}
+                        user={user}
+                        onSignOut={handleSignOut}
+                    />
+                    <main className="content">
+                        {children}
+                    </main>
+                    {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
+                </div>
             </div>
-            <div className="main_container">
-                <Header 
-                  toggleSidebar={toggleSidebar}
-                  user={user}
-                  onSignOut={handleSignOut}
-                />
-                <main className="content">
-                    {children}
-                </main>
-                {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
-            </div>
-        </div>
+        </TabProvider>
       </body>
     </html>
   );

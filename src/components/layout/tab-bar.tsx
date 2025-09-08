@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Tab } from './tab';
 import { MenuItem } from '@/hooks/use-tabs';
 
@@ -14,6 +14,8 @@ interface TabBarProps {
 }
 
 const TabBar: React.FC<TabBarProps> = ({ openTabs, activeTabId, onTabClick, onCloseTab }) => {
+  const router = useRouter();
+
   return (
     <div className="tab-bar-container flex-1 min-w-0">
       <div className="flex items-end">
@@ -27,9 +29,7 @@ const TabBar: React.FC<TabBarProps> = ({ openTabs, activeTabId, onTabClick, onCl
                 key={tab.id}
                 icon={iconElement}
                 title={tab.name}
-                path={tab.href || '#'}
                 isActive={isActive}
-                isNextTabActive={isNextTabActive}
                 onClick={() => onTabClick(tab.id)}
                 onClose={(e) => onCloseTab(tab.id, e)}
                 isClosable={tab.id !== 'dashboard'} // Dashboard is not closable

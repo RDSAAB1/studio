@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useTabs } from '@/app/layout'; // Changed import
 import { cn } from '@/lib/utils';
 
 interface CustomSidebarProps {
@@ -14,22 +14,20 @@ interface CustomSidebarProps {
 
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
   const pathname = usePathname();
+  const router = useRouter();
+  const { openTab, setActiveTabId } = useTabs();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
   useEffect(() => {
-    // Automatically find and open the submenu of the current active page
     for (const item of allMenuItems) {
-      if (item.subMenus) {
-        if (item.subMenus.some(subItem => subItem.href === pathname)) {
-          setOpenSubMenu(item.id);
-          break;
-        }
+      if (item.subMenus && item.subMenus.some(subItem => subItem.href === pathname)) {
+        setOpenSubMenu(item.id);
+        break;
       }
     }
   }, [pathname]);
 
   useEffect(() => {
-    // Close submenus when the sidebar collapses
     if (!isSidebarActive) {
       setOpenSubMenu(null);
     }
@@ -37,6 +35,16 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
 
   const handleSubMenuToggle = (id: string) => {
     setOpenSubMenu(openSubMenu === id ? null : id);
+  };
+  
+  const handleMenuItemClick = (item: MenuItemType) => {
+    if (item.href) {
+        openTab(item);
+        setActiveTabId(item.id);
+        router.push(item.href); // Still need to navigate
+    } else if (item.subMenus) {
+        handleSubMenuToggle(item.id);
+    }
   };
 
   const renderMenuItem = (item: MenuItemType) => {
@@ -46,18 +54,16 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
     return (
       <li className={cn((isActive || isSubMenuActive) && "active")}>
         {(isActive || isSubMenuActive) && <span className="top_curve"></span>}
-        <Link
+        <a
           href={item.href || '#'}
-          onClick={(e) => { 
-            if (item.subMenus) {
-              e.preventDefault(); 
-              handleSubMenuToggle(item.id);
-            }
+          onClick={(e) => {
+            e.preventDefault(); 
+            handleMenuItemClick(item);
           }}
         >
             <span className="icon">{React.createElement(item.icon)}</span>
             <span className="item">{item.name}</span>
-        </Link>
+        </a>
         {(isActive || isSubMenuActive) && <span className="bottom_curve"></span>}
       </li>
     );
@@ -76,9 +82,15 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
                 <ul className={cn("submenu", openSubMenu === item.id && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <Link href={subItem.href || '#'}>
+                      <a 
+                        href={subItem.href || '#'}
+                        onClick={(e) => {
+                           e.preventDefault();
+                           handleMenuItemClick(subItem);
+                        }}
+                      >
                          {subItem.name}
-                      </Link>
+                      </a>
                     </li>
                   ))}
                 </ul>

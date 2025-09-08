@@ -9,13 +9,15 @@ import { cn } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import type { User } from "firebase/auth";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import Link from 'next/link';
+import { useTabs } from "@/app/layout";
+import TabBar from "./tab-bar";
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -27,6 +29,8 @@ const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
+    const router = useRouter();
+    const { openTab } = useTabs();
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
@@ -42,8 +46,11 @@ const NotificationBell = () => {
         setPendingNotifications(pending);
     }, [loans]);
 
-    const handleNotificationClick = () => {
-        setOpen(false); // Close the popover on click
+    const handleNotificationClick = (e: React.MouseEvent, href: string) => {
+        e.preventDefault();
+        router.push(href, { scroll: false });
+        // The tab opening is now handled by the RootLayout's useEffect on pathname change
+        setOpen(false); 
     };
 
     return (
@@ -64,17 +71,19 @@ const NotificationBell = () => {
                 </div>
                 <div className="mt-2 space-y-2 max-h-72 overflow-y-auto">
                     {pendingNotifications.length > 0 ? (
-                        pendingNotifications.map(loan => (
-                             <Link 
+                        pendingNotifications.map(loan => {
+                             const href = `/expense-tracker?${new URLSearchParams({
+                                loanId: loan.id,
+                                amount: String(loan.emiAmount || 0),
+                                payee: loan.lenderName || loan.productName || 'Loan Payment',
+                                description: `EMI for ${loan.loanName}`
+                            }).toString()}`;
+                            return (
+                             <a 
                                 key={loan.id} 
-                                href={`/expense-tracker?${new URLSearchParams({
-                                    loanId: loan.id,
-                                    amount: String(loan.emiAmount || 0),
-                                    payee: loan.lenderName || loan.productName || 'Loan Payment',
-                                    description: `EMI for ${loan.loanName}`
-                                }).toString()}`} 
+                                href={href}
+                                onClick={(e) => handleNotificationClick(e, href)}
                                 className="block p-2 rounded-md hover:bg-accent active:bg-primary/20 cursor-pointer"
-                                onClick={handleNotificationClick}
                              >
                                 <div>
                                     <p className="text-sm font-semibold">{loan.loanName}</p>
@@ -82,8 +91,9 @@ const NotificationBell = () => {
                                         EMI of {formatCurrency(loan.emiAmount || 0)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
                                     </p>
                                 </div>
-                             </Link>
-                        ))
+                             </a>
+                            )
+                        })
                     ) : (
                         <p className="text-sm text-muted-foreground p-2 text-center">No new notifications.</p>
                     )}
@@ -94,8 +104,8 @@ const NotificationBell = () => {
 }
 
 export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const router = useRouter();
+  const { openTabs, activeTabId, setActiveTabId, closeTab } = useTabs();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6">
@@ -106,13 +116,29 @@ export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </div>
+          <TabBar 
+            openTabs={openTabs}
+            activeTabId={activeTabId}
+            onTabClick={(id) => {
+                const tab = openTabs.find(t => t.id === id);
+                if (tab && tab.href) {
+                    setActiveTabId(id);
+                    router.push(tab.href);
+                }
+            }}
+            onCloseTab={(tabId, e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              closeTab(tabId);
+            }}
+          />
         </div>
 
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <DynamicIslandToaster />
         </div>
 
-        <div className={cn("flex flex-1 items-center justify-end gap-2", isSearchOpen && "hidden")}>
+        <div className={cn("flex flex-1 items-center justify-end gap-2")}>
           <NotificationBell />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
             <Settings className="h-5 w-5" />

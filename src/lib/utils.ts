@@ -13,7 +13,7 @@ export function toTitleCase(str: string) {
   );
 }
 
-export function formatSrNo(num: number | string, prefix: 'S' | 'C' = 'S') {
+export function formatSrNo(num: number | string, prefix: 'S' | 'C' | 'R' = 'S') {
   return prefix + String(num).padStart(5, '0');
 }
 

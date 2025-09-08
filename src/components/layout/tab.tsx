@@ -2,8 +2,6 @@
 "use client";
 
 import React from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,15 +9,13 @@ import { Button } from '@/components/ui/button';
 interface TabProps {
   icon: React.ReactNode;
   title: string;
-  path: string;
   isActive: boolean;
   onClick: () => void;
   onClose: (e: React.MouseEvent) => void;
-  isNextTabActive: boolean;
   isClosable: boolean;
 }
 
-export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, onClose, isNextTabActive, isClosable }) => {
+export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
 
   const cornerStyle = {
     '--corner-bg': 'hsl(var(--background))',
@@ -34,18 +30,13 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
     }
   );
 
-  const showSeparator = !isActive && !isNextTabActive;
-
   return (
     <div 
       className="relative flex-shrink min-w-0" 
       style={cornerStyle as React.CSSProperties}
       onClick={onClick}
     >
-      <Link 
-        href={path} 
-        className={tabClasses}
-      >
+      <div className={tabClasses}>
         <div className="flex items-center z-10 overflow-hidden min-w-0">
           {icon}
           <span className="whitespace-nowrap ml-2 truncate">{title}</span>
@@ -67,7 +58,7 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
             <X className="h-3 w-3" />
             </Button>
         )}
-      </Link>
+      </div>
 
       {isActive && (
         <>
@@ -85,8 +76,6 @@ export const Tab: React.FC<TabProps> = ({ icon, title, path, isActive, onClick, 
           />
         </>
       )}
-      
-       {showSeparator && <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-px bg-primary-foreground/20 z-10" />}
     </div>
   );
 };
