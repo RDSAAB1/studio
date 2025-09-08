@@ -32,100 +32,107 @@ const sourceCodePro = Source_Code_Pro({
 
 const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
 
+// --- Auth Protector Component ---
+function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user && isProtected) {
+    router.replace('/login');
+    return (
+        <div className="flex h-screen w-screen items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Redirecting to login...</p>
+        </div>
+    );
+  }
+
+  if (user && !isProtected) {
+    router.replace('/dashboard-overview');
+    return (
+        <div className="flex h-screen w-screen items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Redirecting to dashboard...</p>
+        </div>
+    );
+  }
+
+  if (isProtected) {
+      return <MainLayout user={user}>{children}</MainLayout>;
+  }
+
+  return <>{children}</>;
+}
+
+
+// --- Main App Layout ---
+function MainLayout({ children, user }: { children: ReactNode, user: User | null }) {
+    const [isSidebarActive, setIsSidebarActive] = useState(false);
+    const router = useRouter();
+
+    const toggleSidebar = () => {
+        setIsSidebarActive(prev => !prev);
+    };
+
+    const handleSignOut = async () => {
+        try {
+            await signOut(getFirebaseAuth());
+            router.replace('/login');
+        } catch (error) {
+            console.error("Error signing out: ", error);
+        }
+    };
+    
+    return (
+        <div className={cn("wrapper", isSidebarActive && "active")}>
+            <CustomSidebar isSidebarActive={isSidebarActive} />
+            <div className="main_container">
+                <Header
+                    toggleSidebar={toggleSidebar}
+                    user={user}
+                    onSignOut={handleSignOut}
+                />
+                <main className="content">
+                    {children}
+                </main>
+                {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
+            </div>
+        </div>
+    )
+}
+
+
 // --- Root Layout ---
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [isSidebarActive, setIsSidebarActive] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  const pathname = usePathname();
-  const router = useRouter();
-  
-  useEffect(() => {
-    const auth = getFirebaseAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        if (currentUser) {
-            setUser(currentUser);
-             if (UNPROTECTED_ROUTES.includes(pathname) || pathname === '/') {
-                 router.replace('/dashboard-overview');
-            }
-        } else {
-            setUser(null);
-            if (!UNPROTECTED_ROUTES.includes(pathname)) {
-                router.replace('/login');
-            }
-        }
-        setAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, [pathname, router]);
-
-  const toggleSidebar = () => {
-    setIsSidebarActive(prev => !prev);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut(getFirebaseAuth());
-      router.replace('/login');
-    } catch (error) {
-      console.error("Error signing out: ", error);
-    }
-  };
-
-  if (authLoading) {
-      return (
-        <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
-          <body className="font-body antialiased">
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          </body>
-        </html>
-      );
-  }
-  
-  if (!user && !UNPROTECTED_ROUTES.includes(pathname)) {
-    return (
-        <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
-          <body className="font-body antialiased">
-             <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          </body>
-        </html>
-    );
-  }
-
-  if (UNPROTECTED_ROUTES.includes(pathname)) {
-    return (
-       <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
-          <body className="font-body antialiased">{children}</body>
-       </html>
-    );
-  }
-
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
-        <div className={cn("wrapper", isSidebarActive && "active")}>
-          <CustomSidebar isSidebarActive={isSidebarActive} />
-          <div className="main_container">
-            <Header 
-              toggleSidebar={toggleSidebar}
-              user={user}
-              onSignOut={handleSignOut}
-            />
-            <main className="content">
-              {children}
-            </main>
-            {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
-          </div>
-        </div>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
