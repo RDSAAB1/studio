@@ -125,7 +125,7 @@ export type FundTransaction = {
 export type PaidFor = {
     srNo: string;
     amount: number;
-    cdApplied: boolean;
+    cdApplied?: boolean; // Optional for CustomerPayment
     supplierName?: string;
     supplierSo?: string;
     supplierContact?: string;
@@ -167,6 +167,22 @@ export type Payment = {
     expenseTransactionId?: string; // ID of the corresponding expense transaction
 }
 
+// A simplified payment type for customers
+export type CustomerPayment = {
+    id: string;
+    paymentId: string; // e.g., CR00001
+    customerId: string;
+    date: string;
+    amount: number;
+    type: 'Full' | 'Partial' | string;
+    paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS';
+    notes?: string;
+    paidFor: PaidFor[]; // Details of which customer entries are being paid for
+    incomeTransactionId?: string; // Link to the corresponding income transaction
+    bankAccountId?: string; // Link to bank account if not cash
+}
+
+
 export type CustomerSummary = {
     name: string;
     contact: string;
@@ -201,7 +217,7 @@ export type CustomerSummary = {
     totalTransactions: number;
     totalOutstandingTransactions: number;
     allTransactions: Customer[];
-    allPayments: Payment[];
+    allPayments: (Payment | CustomerPayment)[];
     transactionsByVariety: { [key: string]: number };
 }
 

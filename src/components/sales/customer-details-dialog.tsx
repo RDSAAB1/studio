@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Customer, Payment } from "@/lib/definitions";
+import type { Customer, CustomerPayment, Payment } from "@/lib/definitions";
 import { format } from "date-fns";
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ interface CustomerDetailsDialogProps {
     customer: Customer | null;
     onOpenChange: (isOpen: boolean) => void;
     onPrint: (customer: Customer) => void;
-    paymentHistory?: Payment[];
+    paymentHistory?: CustomerPayment[];
 }
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -141,8 +141,6 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                                     <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                                     <TableHead className="p-2 text-xs">Date</TableHead>
                                                     <TableHead className="p-2 text-xs">Type</TableHead>
-                                                    <TableHead className="p-2 text-xs">CD Applied</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">CD Amount</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -154,8 +152,6 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.type}</TableCell>
-                                                            <TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell>
-                                                            <TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell>
                                                             <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
                                                         </TableRow>
                                                     );

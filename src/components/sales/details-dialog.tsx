@@ -54,9 +54,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
         <Dialog open={isOpen ?? !!customer} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl p-0">
                 <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
-                    <div>
-                        <DialogTitle className="text-base font-semibold">Details for SR No: {customer.srNo}</DialogTitle>
-                    </div>
+                    <div><DialogTitle className="text-base font-semibold">Details for SR No: {customer.srNo}</DialogTitle></div>
                     <div className="flex items-center gap-2">
                         {onPrint && (
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onPrint(customer)}>
@@ -107,10 +105,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                 <Card>
                                     <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0">
-                                        <Table className="text-xs"><TableBody>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{customer.netWeight.toFixed(2)} Qtl</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(customer.rate)}</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
+                                    <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.weight.toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(customer.rate)}</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(customer.amount)}</TableCell></TableRow>
                                             
                                             {customer.bagAmount != null && customer.bagAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({customer.bags} @ {formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount)}</td></tr>}
                                             
@@ -150,8 +145,6 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                                     <TableHead className="p-2 text-xs">Payment ID</TableHead>
                                                     <TableHead className="p-2 text-xs">Date</TableHead>
                                                     <TableHead className="p-2 text-xs">Type</TableHead>
-                                                    <TableHead className="p-2 text-xs">CD Applied</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">CD Amount</TableHead>
                                                     <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -163,8 +156,6 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                                             <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
                                                             <TableCell className="p-2">{payment.type}</TableCell>
-                                                            <TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell>
-                                                            <TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell>
                                                             <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
                                                         </TableRow>
                                                     );

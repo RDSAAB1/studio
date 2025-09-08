@@ -1,16 +1,17 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Customer, Payment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
+import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency } from "@/lib/utils";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getCustomersRealtime, updateCustomer, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -76,7 +77,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
 export default function CustomerEntryClient() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -153,7 +154,7 @@ export default function CustomerEntryClient() {
       setIsLoading(false);
     });
 
-    const unsubscribePayments = getPaymentsRealtime((data: Payment[]) => {
+    const unsubscribePayments = getCustomerPaymentsRealtime((data: CustomerPayment[]) => {
         setPaymentHistory(data);
     }, (error) => {
         console.error("Error fetching payments: ", error);
@@ -207,7 +208,7 @@ export default function CustomerEntryClient() {
     const netWeight = weight - totalBagWeightQuintals;
     
     const rate = values.rate || 0;
-    const amount = weight * rate; // Corrected calculation
+    const amount = weight * rate;
     
     const brokerageRate = Number(values.brokerage) || 0;
     const brokerageAmount = brokerageRate * weight;
@@ -338,13 +339,6 @@ export default function CustomerEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
-    if (contactValue.length > 0 && contactValue.length < 10) {
-      toast({
-        title: "Incomplete Contact Number",
-        variant: "destructive"
-      });
-      return;
-    }
     if (contactValue.length === 10) {
       const foundCustomer = customers.find(c => c.contact === contactValue);
       if (foundCustomer && foundCustomer.id !== currentCustomer.id) {
@@ -352,7 +346,7 @@ export default function CustomerEntryClient() {
         form.setValue('companyName', foundCustomer.companyName || '');
         form.setValue('address', foundCustomer.address);
         form.setValue('gstin', foundCustomer.gstin || '');
-        toast({ title: "Customer Found", description: `Details for ${toTitleCase(foundCustomer.name)} auto-filled.` });
+        toast({ title: "Customer Found: Details auto-filled." });
       }
     }
   }
@@ -380,17 +374,14 @@ export default function CustomerEntryClient() {
     }
     try {
       await deleteCustomer(id);
-      await deletePaymentsForSrNo(currentCustomer.srNo);
+      await deleteCustomerPaymentsForSrNo(currentCustomer.srNo);
       toast({ title: "Entry and payments deleted.", variant: "success" });
       if (currentCustomer.id === id) {
         handleNew();
       }
     } catch (error) {
       console.error("Error deleting customer and payments: ", error);
-      toast({
-        title: "Failed to delete entry.",
-        variant: "destructive",
-      });
+      toast({ title: "Failed to delete entry.", variant: "destructive" });
     }
   };
 
@@ -459,7 +450,7 @@ export default function CustomerEntryClient() {
         }
         
         if (deletePayments) {
-            await deletePaymentsForSrNo(dataToSave.srNo!);
+            await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
             const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
             await addCustomer(entryWithRestoredAmount as Customer);
             toast({ title: "Entry updated and payments deleted", variant: "success" });

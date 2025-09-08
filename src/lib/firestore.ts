@@ -20,11 +20,12 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment } from "@/lib/definitions";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
 const paymentsCollection = collection(db, "payments");
+const customerPaymentsCollection = collection(db, "customer_payments");
 const transactionsCollection = collection(db, "transactions");
 const fundTransactionsCollection = collection(db, "fund_transactions");
 const banksCollection = collection(db, "banks");
@@ -344,7 +345,7 @@ export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onE
   }, onError);
 }
 
-export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
+export async function deleteSupplierPaymentsForSrNo(srNo: string): Promise<void> {
   if (!srNo) {
     console.error("SR No. is required to delete payments.");
     return;
@@ -376,6 +377,23 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
     await batch.commit();
   }
 }
+
+export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
+  if (!srNo) {
+    console.error("SR No. is required to delete customer payments.");
+    return;
+  }
+  const q = query(customerPaymentsCollection, where("paidFor", "array-contains", { srNo }));
+  const paymentsSnapshot = await getDocs(q);
+  
+  const batch = writeBatch(db);
+  paymentsSnapshot.forEach(doc => {
+      batch.delete(doc.ref);
+  });
+
+  await batch.commit();
+}
+
 
 // --- General Transaction Functions ---
 
@@ -532,4 +550,15 @@ export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<v
 export async function deleteLoan(id: string): Promise<void> {
     const loanRef = doc(db, "loans", id);
     await deleteDoc(loanRef);
+}
+
+
+// --- Customer Payment Functions ---
+
+export function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
+  const q = query(customerPaymentsCollection, orderBy("date", "desc"));
+  return onSnapshot(q, (snapshot) => {
+    const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
+    callback(payments);
+  }, onError);
 }
