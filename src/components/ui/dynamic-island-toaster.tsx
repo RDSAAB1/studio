@@ -3,10 +3,23 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 export function DynamicIslandToaster() {
   const { toasts } = useToast();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // This will only run on the client side, after the component has mounted
+    setIsClient(true);
+  }, []);
+  
+  if (!isClient) {
+    // On the server or during the initial client render, render nothing
+    // to avoid the hydration mismatch.
+    return null;
+  }
+
   const hasToasts = toasts.length > 0;
   const toast = toasts[0]; // Always work with the first toast
 
