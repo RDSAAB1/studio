@@ -127,16 +127,47 @@ export default function DailySupplierReportClient() {
              printStyles.textContent = `
                 @media print {
                     @page { size: landscape; margin: 0mm; }
-                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding: 0 !important; margin: 0 !important; }
-                    .printable-area { background-color: #fff !important; color: #000 !important; }
-                    .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                    .printable-area .card { border: 1px solid #000 !important; }
-                    .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
-                    .print-header { margin-bottom: 0.5rem; text-align: center; }
-                    .print-header h2 { font-size: 1rem; font-weight: bold; }
-                    .print-header p { font-size: 0.75rem; }
-                    .no-print { display: none !important; }
-                    .print-no-border { border: none !important; }
+                    body { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                        padding: 0 !important; 
+                        margin: 0 !important; 
+                        background-color: #fff !important; 
+                    }
+                    .printable-area { 
+                        background-color: #fff !important; 
+                        color: #000 !important; 
+                    }
+                    .printable-area * { 
+                        color: #000 !important; 
+                        border-color: #ccc !important;
+                        background-color: transparent !important;
+                    }
+                    .printable-area .card { 
+                        border: 1px solid #000 !important; 
+                    }
+                    .print-summary-container { 
+                        display: flex !important; 
+                        flex-direction: row !important; 
+                        gap: 0.5rem !important; 
+                    }
+                    .print-header { 
+                        margin-bottom: 0.5rem; 
+                        text-align: center; 
+                    }
+                    .print-header h2 { 
+                        font-size: 1rem; 
+                        font-weight: bold; 
+                    }
+                    .print-header p { 
+                        font-size: 0.75rem; 
+                    }
+                    .no-print { 
+                        display: none !important; 
+                    }
+                    .print-no-border { 
+                        border: none !important; 
+                    }
                 }
             `;
             newWindow.document.head.appendChild(printStyles);
@@ -276,4 +307,5 @@ export default function DailySupplierReportClient() {
     );
 
     
+
 
