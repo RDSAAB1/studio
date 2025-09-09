@@ -175,9 +175,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 </div>
             </div>
 
-            {/* Summary Section */}
+             {/* Summary Section */}
             <div className="summary-grid-container grid grid-cols-3 gap-x-4 mb-6">
-                 <Card className="bg-white border-gray-200">
+                <Card className="bg-white border-gray-200">
                     <CardHeader className="p-2 pb-1">
                         <h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3>
                     </CardHeader>
@@ -538,4 +538,3 @@ export default function SupplierProfilePage() {
   );
 }
 
-    
