@@ -22,10 +22,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="main_container">
                 <Header toggleSidebar={toggleSidebar} onSignOut={logout} />
                 <main className="content">{children}</main>
-                {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && (
-                    <div className="shadow" onClick={toggleSidebar}></div>
-                )}
             </div>
+            {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && (
+                <div className="shadow" onClick={toggleSidebar}></div>
+            )}
             <DynamicIslandToaster />
         </div>
     )

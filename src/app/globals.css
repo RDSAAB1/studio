@@ -48,11 +48,15 @@ body {
     background: hsl(var(--background));
     height: 100vh;
     border-radius: 15px;
-    display: flex;
+    display: block; /* Changed from flex */
     position: relative;
+    overflow-x: hidden; /* Prevent horizontal scroll on wrapper */
 }
 
 .side_bar{
+    position: fixed; /* Make sidebar fixed */
+    top: 0;
+    left: 0;
     width: 80px; /* Start with collapsed sidebar width */
     height: 100%;
     background: hsl(var(--card));
@@ -61,10 +65,10 @@ body {
     border-bottom-left-radius: 15px;
     padding: 20px;
     padding-right: 0;
-    transition: all 0.3s ease;
+    transition: width 0.3s ease; /* Transition only width */
     display: flex;
     flex-direction: column;
-    flex-shrink: 0; /* Prevent sidebar from shrinking */
+    z-index: 50;
 }
 .wrapper.active .side_bar {
     width: 250px;
@@ -252,12 +256,17 @@ body {
 }
 
 .main_container{
-    flex-grow: 1;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    min-width: 0; /* Fix for flexbox overflow */
-    overflow: hidden;
+    margin-left: 80px; /* Same as collapsed sidebar width */
+    transition: margin-left 0.3s ease; /* Transition margin */
 }
+
+.wrapper.active .main_container {
+    margin-left: 250px; /* Same as expanded sidebar width */
+}
+
 
 .main_container > .content {
     padding: 30px;
@@ -292,12 +301,7 @@ body {
 
 @media screen and (max-width: 1023px) {
     .wrapper .side_bar{
-        position: absolute;
-        top: 0;
         left: -250px;
-        height: 100%;
-        z-index: 50;
-        width: 250px;
     }
     .wrapper.active .side_bar{
         left: 0;
@@ -315,6 +319,9 @@ body {
     .main_container{
         width: 100%;
         margin-left: 0;
+    }
+    .wrapper.active .main_container {
+        margin-left: 0; /* No margin change needed on mobile when sidebar is overlay */
     }
 }
 
