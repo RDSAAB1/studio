@@ -35,7 +35,7 @@ interface AuthContextType {
   authLoading: boolean;
   isAuthenticated: boolean;
   isBypassed: boolean;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 const AuthContext = React.createContext<AuthContextType | null>(null);
 
@@ -51,7 +51,6 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isBypassed, setIsBypassed] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     const bypassState = sessionStorage.getItem('bypass') === 'true';
@@ -65,12 +64,11 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const logout = () => {
+  const logout = async () => {
     const auth = getFirebaseAuth();
-    signOut(auth).finally(() => {
-        sessionStorage.removeItem('bypass');
-        window.location.href = '/login';
-    });
+    await signOut(auth);
+    sessionStorage.removeItem('bypass');
+    // The redirect will be handled by the LayoutController
   };
 
   const isAuthenticated = !!user || isBypassed;
@@ -85,6 +83,18 @@ function AuthProvider({ children }: { children: ReactNode }) {
 function LayoutController({ children }: { children: ReactNode }) {
     const { isAuthenticated, authLoading } = useAuth();
     const pathname = usePathname();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!authLoading) {
+            if (!isAuthenticated && pathname !== '/login') {
+                router.replace('/login');
+            } else if (isAuthenticated && pathname === '/login') {
+                router.replace('/dashboard-overview');
+            }
+        }
+    }, [isAuthenticated, authLoading, pathname, router]);
+
 
     if (authLoading) {
         return (
@@ -95,31 +105,12 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
     
     if (!isAuthenticated) {
-        if (pathname === '/login') {
-            return <LoginPage />;
-        }
-        // Redirect to login if not authenticated and not on login page
-        if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-        }
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
+        // Only render LoginPage if not authenticated.
+        // This prevents AppLayout from ever rendering on the login page.
+        return <LoginPage />;
     }
 
-    if (pathname === '/login') {
-         if (typeof window !== 'undefined') {
-            window.location.href = '/';
-        }
-         return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
+    // If authenticated, render the main app layout.
     return <AppLayout>{children}</AppLayout>;
 }
 

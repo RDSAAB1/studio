@@ -47,6 +47,7 @@ export default function LoginPage() {
         setAuthError(null);
         try {
             await signInWithPopup(auth, googleProvider);
+            // Let the LayoutController handle the redirect after auth state changes.
             window.location.href = '/dashboard-overview';
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
@@ -77,6 +78,7 @@ export default function LoginPage() {
                 variant: "success",
             });
             sessionStorage.setItem('bypass', 'true');
+            // Let the LayoutController handle the redirect after state changes.
             window.location.href = '/dashboard-overview';
         } else {
             toast({

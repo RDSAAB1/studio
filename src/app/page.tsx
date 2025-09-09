@@ -1,25 +1,11 @@
 
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { useAuth } from './layout';
 
 export default function Home() {
-  const router = useRouter();
-  const { isAuthenticated, authLoading } = useAuth();
-
-  useEffect(() => {
-    if (!authLoading) {
-      if (isAuthenticated) {
-        router.replace('/dashboard-overview');
-      } else {
-        router.replace('/login');
-      }
-    }
-  }, [isAuthenticated, authLoading, router]);
-
+  // The redirection logic is now handled entirely by the LayoutController in layout.tsx.
+  // This page just shows a loading indicator while the auth state is being checked.
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
