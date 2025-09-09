@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Scale, Weight, Calculator, Percent, Server, Milestone, FileText, Users, Download, Printer, ChevronsUpDown, Check } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Scale, Weight, Calculator, Percent, Server, Milestone, FileText, Users, Download, Printer, ChevronsUpDown, Check, Calendar as CalendarIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -21,9 +21,11 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { SupplierProfileView } from "./supplier-profile-view";
+import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
+import { Calendar } from '@/components/ui/calendar';
+
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -79,7 +81,6 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                     <head>
                         <title>Print Statement</title>
                         <style>
-                            /* Include basic styles for printing */
                             body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; }
                             table { width: 100%; border-collapse: collapse; }
                             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
@@ -89,16 +90,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                                 body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                                 .printable-area { background-color: #fff !important; color: #000 !important; }
                                 .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                                .summary-grid-container {
-                                    display: flex !important;
-                                    flex-wrap: nowrap !important;
-                                }
-                                .summary-grid-container > div {
-                                    flex: 1;
-                                }
-                                .print-table tbody tr {
-                                    background-color: transparent !important;
-                                }
+                                .summary-grid-container { display: flex !important; flex-wrap: nowrap !important; }
+                                .summary-grid-container > div { flex: 1; }
+                                .print-table tbody tr { background-color: transparent !important; }
                              }
                         </style>
                     </head>
@@ -133,22 +127,25 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     return (
     <>
         <style>
-            {`
-              @media print {
-                .summary-grid-container {
-                  display: flex !important;
-                  flex-wrap: nowrap !important;
-                  gap: 1rem !important;
-                }
-                .summary-grid-container > div {
-                  flex: 1;
-                  padding: 8px;
-                }
-                .print-table th, .print-table td {
-                    padding: 4px 6px;
-                }
-              }
-            `}
+        {`
+            @media print {
+            .summary-grid-container {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                gap: 1rem !important;
+            }
+            .summary-grid-container > div {
+                flex: 1;
+                padding: 8px;
+            }
+            .print-table tbody tr {
+                background-color: transparent !important;
+            }
+            .print-table th, .print-table td {
+                padding: 4px 6px;
+            }
+            }
+        `}
         </style>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
              <DialogTitle>Account Statement for {data.name}</DialogTitle>
@@ -179,11 +176,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             </div>
 
             {/* Summary Section */}
-            <div className="summary-grid-container grid grid-cols-3 gap-x-4 mb-6">
-                <Card className="bg-white border-gray-200">
-                    <CardHeader className="p-2 pb-1">
-                        <h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3>
-                    </CardHeader>
+            <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-4 mb-6">
+                 <Card className="bg-white border-gray-200">
+                    <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3></CardHeader>
                     <CardContent className="p-2 pt-1 text-xs space-y-0.5">
                         <div className="flex justify-between"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
                         <div className="flex justify-between"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
@@ -192,7 +187,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1"><span>Net Wt</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                     </CardContent>
                 </Card>
-                <Card className="bg-white border-gray-200">
+                 <Card className="bg-white border-gray-200">
                     <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Deductions</h3></CardHeader>
                      <CardContent className="p-2 pt-1 text-xs space-y-0.5">
                         <div className="flex justify-between"><span className="text-gray-600">Total Amount</span><span className="font-semibold text-black">{`${formatCurrency(data.totalAmount || 0)}`}</span></div>
@@ -284,6 +279,9 @@ export default function SupplierProfilePage() {
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+
 
   useEffect(() => {
     setIsClient(true);
@@ -312,11 +310,43 @@ export default function SupplierProfilePage() {
         unsubscribePayments(); 
     };
   }, []);
+  
+  const filteredData = useMemo(() => {
+    let filteredSuppliers = suppliers;
+    let filteredPayments = paymentHistory;
+
+    if (startDate || endDate) {
+        const start = startDate ? new Date(startDate) : null;
+        if(start) start.setHours(0,0,0,0);
+
+        const end = endDate ? new Date(endDate) : null;
+        if(end) end.setHours(23,59,59,999);
+
+        filteredSuppliers = suppliers.filter(s => {
+            const sDate = new Date(s.date);
+            if (start && end) return sDate >= start && sDate <= end;
+            if (start) return sDate >= start;
+            if (end) return sDate <= end;
+            return true;
+        });
+
+        filteredPayments = paymentHistory.filter(p => {
+            const pDate = new Date(p.date);
+            if (start && end) return pDate >= start && pDate <= end;
+            if (start) return pDate >= start;
+            if (end) return pDate <= end;
+            return true;
+        });
+    }
+
+    return { filteredSuppliers, filteredPayments };
+  }, [suppliers, paymentHistory, startDate, endDate]);
 
   const supplierSummaryMap = useMemo(() => {
+    const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    suppliers.forEach(s => {
+    filteredSuppliers.forEach(s => {
         if (s.customerId && !summary.has(s.customerId)) {
             summary.set(s.customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -334,7 +364,7 @@ export default function SupplierProfilePage() {
 
     let supplierRateSum: { [key: string]: { rate: number, karta: number, laboury: number, count: number } } = {};
 
-    suppliers.forEach(s => {
+    filteredSuppliers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
         data.totalAmount += s.amount || 0;
@@ -363,7 +393,7 @@ export default function SupplierProfilePage() {
         data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
     });
 
-    paymentHistory.forEach(p => {
+    filteredPayments.forEach(p => {
         if (p.customerId && summary.has(p.customerId)) {
             const data = summary.get(p.customerId)!;
             data.totalPaid += p.amount;
@@ -406,17 +436,17 @@ export default function SupplierProfilePage() {
         name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: suppliers, 
-        allPayments: paymentHistory, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
+        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
+        allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
     });
     
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
-    millSummary.totalTransactions = suppliers.length;
-    millSummary.totalOutstandingTransactions = suppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
+    millSummary.totalTransactions = filteredSuppliers.length;
+    millSummary.totalOutstandingTransactions = filteredSuppliers.filter(c => parseFloat(String(c.netAmount)) >= 1).length;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
-    const totalRateData = suppliers.reduce((acc, s) => {
+    const totalRateData = filteredSuppliers.reduce((acc, s) => {
         if(s.rate > 0) {
             acc.karta += s.kartaPercentage;
             acc.laboury += s.labouryRate;
@@ -428,7 +458,7 @@ export default function SupplierProfilePage() {
         millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
         millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
     }
-    millSummary.transactionsByVariety = suppliers.reduce((acc, s) => {
+    millSummary.transactionsByVariety = filteredSuppliers.reduce((acc, s) => {
         const variety = toTitleCase(s.variety) || 'Unknown';
         acc[variety] = (acc[variety] || 0) + 1;
         return acc;
@@ -439,7 +469,7 @@ export default function SupplierProfilePage() {
     summary.forEach((value, key) => finalSummaryMap.set(key, value));
 
     return finalSummaryMap;
-  }, [suppliers, paymentHistory]);
+  }, [filteredData]);
 
   const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
   
@@ -459,14 +489,32 @@ export default function SupplierProfilePage() {
                 <Users className="h-5 w-5 text-primary" />
                 <h3 className="text-base font-semibold">Select Profile</h3>
             </div>
-            <div className="w-full sm:w-auto sm:min-w-64">
-                 <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                </Popover>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                </Popover>
+                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                     <PopoverTrigger asChild>
                         <Button
                         variant="outline"
                         role="combobox"
                         aria-expanded={openCombobox}
-                        className="w-full justify-between h-9 text-sm font-normal"
+                        className="w-full sm:w-[300px] justify-between h-9 text-sm font-normal"
                         >
                         {selectedSupplierKey
                             ? toTitleCase(supplierSummaryMap.get(selectedSupplierKey)?.name || '')
