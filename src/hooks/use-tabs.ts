@@ -56,9 +56,9 @@ export const allMenuItems: MenuItem[] = [
     name: "Supplier",
     icon: Truck,
     subMenus: [
-      { id: "supplier-entry", name: "Supplier Entry", icon: ChevronRight },
-      { id: "supplier-payments", name: "Supplier Payments", icon: ChevronRight },
-      { id: "supplier-profile", name: "Supplier Profile", icon: ChevronRight },
+      { id: "supplier-entry", name: "Supplier Entry", icon: UserPlus },
+      { id: "supplier-payments", name: "Supplier Payments", icon: Wallet },
+      { id: "supplier-profile", name: "Supplier Profile", icon: UserCircle },
     ],
   },
     {
@@ -66,9 +66,9 @@ export const allMenuItems: MenuItem[] = [
     name: "Customer",
     icon: Users,
     subMenus: [
-      { id: "customer-entry", name: "Customer Entry", icon: ChevronRight },
-      { id: "customer-payments", name: "Customer Payments", icon: ChevronRight },
-      { id: "customer-profile", name: "Customer Profile", icon: ChevronRight },
+      { id: "customer-entry", name: "Customer Entry", icon: UserPlus },
+      { id: "customer-payments", name: "Customer Payments", icon: Wallet },
+      { id: "customer-profile", name: "Customer Profile", icon: UserCircle },
     ],
   },
   {
@@ -86,7 +86,7 @@ export const allMenuItems: MenuItem[] = [
     name: "Reports",
     icon: FileText,
     subMenus: [
-        { id: "rtgs-report", name: "RTGS Report", icon: ChevronRight },
+        { id: "rtgs-report", name: "RTGS Report", icon: FileText },
     ]
   },
   {
@@ -94,9 +94,9 @@ export const allMenuItems: MenuItem[] = [
     name: "HR Management",
     icon: Users2,
     subMenus: [
-      { id: "employee-db", name: "Employee Database", icon: ChevronRight },
-      { id: "payroll", name: "Payroll Management", icon: ChevronRight },
-      { id: "attendance", name: "Attendance Tracking", icon: ChevronRight },
+      { id: "employee-db", name: "Employee Database", icon: Database },
+      { id: "payroll", name: "Payroll Management", icon: Calculator },
+      { id: "attendance", name: "Attendance Tracking", icon: CalendarCheck },
     ],
   },
   {
@@ -104,8 +104,8 @@ export const allMenuItems: MenuItem[] = [
     name: "Inventory",
     icon: PackageIcon,
     subMenus: [
-      { id: "inventory-mgmt", name: "Inventory", icon: ChevronRight },
-      { id: "purchase-orders", name: "Purchase Orders", icon: ChevronRight },
+      { id: "inventory-mgmt", name: "Inventory", icon: Boxes },
+      { id: "purchase-orders", name: "Purchase Orders", icon: ShoppingCart },
     ],
   },
   {
@@ -113,7 +113,7 @@ export const allMenuItems: MenuItem[] = [
     name: "Projects",
     icon: Briefcase,
     subMenus: [
-        { id: "project-dashboard", name: "Dashboard", icon: ChevronRight },
+        { id: "project-dashboard", name: "Dashboard", icon: LayoutDashboard },
         { id: "project-management", name: "Management", icon: List },
         { id: "tasks", name: "Tasks", icon: ClipboardCheck },
         { id: "collaboration", name: "Collaboration", icon: Users },
