@@ -18,7 +18,7 @@ import { Separator } from '@/components/ui/separator';
 
 
 const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { label: string; value: string; isHighlighted?: boolean }[]; icon: React.ReactNode }) => (
-    <Card className="flex-1 bg-card/60 border print:border print:shadow-none">
+    <Card className="flex-1 bg-card/60 border border-primary/30 shadow-md print:border print:shadow-none">
         <CardHeader className="p-2 flex flex-row items-center space-x-2">
              <div className="bg-primary/10 text-primary p-1.5 rounded-md">{icon}</div>
              <CardTitle className="text-sm font-semibold">{title}</CardTitle>
@@ -275,4 +275,3 @@ export default function DailySupplierReportClient() {
     );
 
     
-
