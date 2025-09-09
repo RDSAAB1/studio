@@ -7,14 +7,14 @@ import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Header } from './header';
 
 interface CustomSidebarProps {
   children: ReactNode;
   onSignOut: () => void;
+  onTabSelect: (menuItem: MenuItemType) => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTabSelect }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const location = useLocation();
@@ -39,7 +39,8 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
     setOpenSubMenu(prev => (prev === id ? null : id));
   };
   
-  const handleLinkClick = (id: string) => {
+  const handleLinkClick = (menuItem: MenuItemType) => {
+    onTabSelect(menuItem);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsSidebarActive(false);
     }
@@ -68,10 +69,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
     return (
       <li className={cn(isActive && "active")}>
         {isActive && <span className="top_curve"></span>}
-        <Link to={`/${item.id}`} className="w-full block" onClick={() => handleLinkClick(item.id)}>
+        <button onClick={() => handleLinkClick(item)} className="w-full">
           <span className="icon">{React.createElement(item.icon)}</span>
           <span className="item">{item.name}</span>
-        </Link>
+        </button>
         {isActive && <span className="bottom_curve"></span>}
       </li>
     );
@@ -82,10 +83,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
         <aside className="side_bar">
         <div className="side_bar_top">
             <div className="logo_wrap">
-            <Link to="/dashboard-overview" className='flex items-center gap-2'>
+             <button onClick={() => onTabSelect(allMenuItems.find(i => i.id === 'dashboard')!)} className='flex items-center gap-2'>
                     <span className="icon"><Sparkles/></span>
                     <span className="text">BizSuite</span>
-            </Link>
+            </button>
             </div>
             <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">
                 <Menu className="h-5 w-5" />
@@ -101,9 +102,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
                     <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
                     {item.subMenus.map(subItem => (
                         <li key={subItem.id} className={cn(`/${subItem.id}` === activePath && "active")}>
-                        <Link to={`/${subItem.id}`} className="w-full text-left" onClick={() => handleLinkClick(subItem.id)}>
+                        <button onClick={() => handleLinkClick(subItem)} className="w-full text-left">
                             {subItem.name}
-                        </Link>
+                        </button>
                         </li>
                     ))}
                     </ul>
@@ -114,10 +115,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
         </div>
         </aside>
         <div className="main_container">
-            <Header toggleSidebar={toggleSidebar} onSignOut={onSignOut} />
-            <div className="content">
-                {children}
-            </div>
+            {children}
         </div>
         {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && (
             <div className="shadow" onClick={toggleSidebar}></div>

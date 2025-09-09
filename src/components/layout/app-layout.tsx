@@ -5,7 +5,7 @@ import React, { useState, useEffect, type ReactNode } from "react";
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { Loader2 } from 'lucide-react';
+import { Loader2, LayoutDashboard } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
 import LoginPage from "@/app/login/page";
@@ -31,6 +31,8 @@ import CollaborationPage from "@/app/projects/collaboration/page";
 import DataCapturePage from "@/app/data-capture/page";
 import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
+import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
+
 
 const pageComponents: { [key: string]: React.FC<any> } = {
     "/": DashboardOverviewPage,
@@ -119,7 +121,43 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 const AppContent = () => {
     const { isAuthenticated, authLoading, logout } = useAuth();
-    const location = useLocation();
+    const navigate = useNavigate();
+
+    const dashboardTab: MenuItem = { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard };
+    const [openTabs, setOpenTabs] = useState<MenuItem[]>([dashboardTab]);
+    const [activeTabId, setActiveTabId] = useState<string>('dashboard');
+    
+    const handleTabSelect = (tabId: string) => {
+        setActiveTabId(tabId);
+        navigate(`/${tabId}`);
+    };
+
+    const handleTabClose = (tabIdToClose: string) => {
+        if (tabIdToClose === 'dashboard') return;
+
+        const tabIndex = openTabs.findIndex(tab => tab.id === tabIdToClose);
+        const newTabs = openTabs.filter(tab => tab.id !== tabIdToClose);
+        
+        setOpenTabs(newTabs);
+
+        if (activeTabId === tabIdToClose) {
+            const newActiveTab = newTabs[tabIndex - 1] || newTabs[0];
+            if (newActiveTab) {
+                setActiveTabId(newActiveTab.id);
+                navigate(`/${newActiveTab.id}`);
+            }
+        }
+    };
+    
+    const handleOpenTab = (menuItem: MenuItem) => {
+        const isAlreadyOpen = openTabs.some(tab => tab.id === menuItem.id);
+        if (!isAlreadyOpen) {
+            setOpenTabs(prev => [...prev, menuItem]);
+        }
+        setActiveTabId(menuItem.id);
+        navigate(`/${menuItem.id}`);
+    };
+
 
     if (authLoading) {
         return (
@@ -133,16 +171,18 @@ const AppContent = () => {
        return <LoginPage />;
     }
     
-    const activePath = location.pathname;
-
     return (
-       <CustomSidebar onSignOut={logout}>
-          <div className="relative w-full h-full">
-            {Object.entries(pageComponents).map(([path, PageComponent]) => (
-                <div key={path} style={{ display: activePath === path || (activePath === '/' && path === '/dashboard-overview') ? 'block' : 'none' }}>
-                    <PageComponent />
-                </div>
-            ))}
+       <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab}>
+          <Header openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
+          <div className="content">
+            {openTabs.map(tab => {
+                const PageComponent = pageComponents[`/${tab.id}`];
+                return (
+                    <div key={tab.id} style={{ display: tab.id === activeTabId ? 'block' : 'none' }}>
+                        {PageComponent && <PageComponent />}
+                    </div>
+                )
+            })}
           </div>
        </CustomSidebar>
     );

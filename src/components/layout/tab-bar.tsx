@@ -21,11 +21,8 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
                 icon={iconElement}
                 title={tab.name}
                 isActive={isActive}
-                href={tab.href || '#'}
                 onClick={() => {
-                   if(tab.href){
-                     setActiveTabId(tab.id);
-                   }
+                   setActiveTabId(tab.id);
                 }}
                 onClose={(e: React.MouseEvent) => {
                   e.stopPropagation();
