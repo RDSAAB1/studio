@@ -18,7 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     
     return (
         <div className={cn("wrapper", isSidebarActive && "active")}>
-            <CustomSidebar isSidebarActive={isSidebarActive} />
+            <CustomSidebar isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar} />
             <div className="main_container">
                 <Header toggleSidebar={toggleSidebar} onSignOut={logout} />
                 <main className="content">{children}</main>

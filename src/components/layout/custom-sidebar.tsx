@@ -6,13 +6,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Menu } from 'lucide-react';
+import { Button } from '../ui/button';
 
 interface CustomSidebarProps {
   isSidebarActive: boolean;
+  toggleSidebar: () => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSidebar }) => {
   const pathname = usePathname();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
@@ -58,19 +60,23 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive }) => {
     <aside className="side_bar">
       <div className="side_bar_top">
         <div className="logo_wrap">
-           <Link href="/">
+           <Link href="/" className='flex items-center gap-2'>
                 <span className="icon"><Sparkles/></span>
                 <span className="text">BizSuite</span>
            </Link>
         </div>
+         <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">Pin/Unpin Menu</span>
+        </Button>
       </div>
       <div className="side_bar_bottom scrollbar-hide">
         <ul>
           {allMenuItems.map(item => (
             <React.Fragment key={item.id}>
               {renderMenuItem(item)}
-              {item.subMenus && isSidebarActive && (
-                <ul className={cn("submenu", openSubMenu === item.id && "open")}>
+              {item.subMenus && (isSidebarActive || openSubMenu === item.id) && (
+                <ul className={cn("submenu", (openSubMenu === item.id || isSidebarActive) && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
                       <Link href={subItem.href || '#'}>
