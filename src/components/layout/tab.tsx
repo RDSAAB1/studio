@@ -18,7 +18,7 @@ interface TabProps {
 export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
   
   const tabClasses = cn(
-    "relative flex items-center justify-between cursor-pointer group text-sm h-[36px] px-3 max-w-[200px] min-w-[100px] flex-1 transition-all duration-200",
+    "relative flex items-center justify-between cursor-pointer group text-sm h-[32px] px-3 max-w-[200px] min-w-[100px] flex-1 transition-all duration-200",
     {
       'bg-background text-primary-foreground font-medium z-10 rounded-t-md border-x border-t border-border': isActive,
       'bg-card text-muted-foreground hover:bg-accent/80 rounded-t-md border-b border-border': !isActive,
