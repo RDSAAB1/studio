@@ -47,30 +47,31 @@ body {
 .wrapper{
     background: hsl(var(--background));
     height: 100vh;
-    border-radius: 15px;
-    display: block; /* Changed from flex */
     position: relative;
-    overflow-x: hidden; /* Prevent horizontal scroll on wrapper */
+    display: flex;
 }
 
 .side_bar{
-    position: fixed; /* Make sidebar fixed */
+    position: fixed;
     top: 0;
     left: 0;
-    width: 80px; /* Start with collapsed sidebar width */
+    width: 80px; /* Collapsed width */
     height: 100%;
     background: hsl(var(--card));
     border-right: 1px solid hsl(var(--border));
-    border-top-left-radius: 15px;
-    border-bottom-left-radius: 15px;
     padding: 20px;
     padding-right: 0;
-    transition: width 0.3s ease; /* Transition only width */
+    transition: width 0.3s ease;
     display: flex;
     flex-direction: column;
     z-index: 50;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
-.wrapper.active .side_bar {
+
+/* Expanded state when wrapper is active (pinned) or sidebar is hovered */
+.wrapper.active .side_bar,
+.wrapper:not(.active) .side_bar:hover {
     width: 250px;
 }
 
@@ -116,9 +117,16 @@ body {
 .logo_wrap a .icon{
     margin-right: 10px;
 }
-.wrapper:not(.active) .logo_wrap span.text {
+
+/* Hide text when not hovered and not active */
+.wrapper:not(.active) .side_bar:not(:hover) .logo_wrap span.text {
   display: none;
 }
+.wrapper.active .side_bar .logo_wrap span.text,
+.wrapper .side_bar:hover .logo_wrap span.text {
+  display: inline;
+}
+
 
 .side_bar_bottom{
     flex-grow: 1;
@@ -145,6 +153,7 @@ body {
     color: hsl(var(--accent));
 }
 
+
 .side_bar_bottom ul li a .icon{
     margin-right: 10px;
     font-size: 18px;
@@ -152,14 +161,22 @@ body {
     color: hsl(var(--primary-foreground));
     transition: color 0.2s ease;
 }
-.wrapper:not(.active) .side_bar_bottom ul li a .icon {
+
+/* Adjust icon margin when collapsed and not hovered */
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li a .icon {
     margin-right: 0;
 }
-.wrapper:not(.active) .side_bar_bottom ul li a {
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li a {
     justify-content: center;
 }
-.wrapper:not(.active) .side_bar_bottom .item {
+
+/* Hide text when collapsed and not hovered */
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom .item {
   display: none;
+}
+.wrapper.active .side_bar .side_bar_bottom .item,
+.wrapper .side_bar:hover .side_bar_bottom .item {
+  display: inline;
 }
 
 
@@ -183,12 +200,17 @@ body {
     height: 20px;
     background: hsl(var(--background));
 }
+
 .wrapper.active .side_bar_bottom ul li.active .top_curve,
-.wrapper.active .side_bar_bottom ul li.active .bottom_curve {
+.wrapper.active .side_bar_bottom ul li.active .bottom_curve,
+.wrapper .side_bar:hover .side_bar_bottom ul li.active .top_curve,
+.wrapper .side_bar:hover .side_bar_bottom ul li.active .bottom_curve {
     /* Only show curves when expanded */
 }
-.wrapper:not(.active) .side_bar_bottom ul li.active .top_curve,
-.wrapper:not(.active) .side_bar_bottom ul li.active .bottom_curve {
+
+/* Hide curves when collapsed and not hovered */
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li.active .top_curve,
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li.active .bottom_curve {
     display: none;
 }
 
@@ -230,7 +252,9 @@ body {
   overflow: hidden;
   transition: max-height 0.3s ease-in-out;
 }
-.wrapper:not(.active) .submenu {
+
+/* Hide submenu when collapsed and not hovered */
+.wrapper:not(.active) .side_bar:not(:hover) .submenu {
   display: none;
 }
 
@@ -259,12 +283,14 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
-    margin-left: 80px; /* Same as collapsed sidebar width */
-    transition: margin-left 0.3s ease; /* Transition margin */
+    flex-grow: 1;
+    min-width: 0; /* Prevents content from overflowing container */
+    margin-left: 80px; /* Collapsed sidebar width */
+    transition: margin-left 0.3s ease;
 }
 
 .wrapper.active .main_container {
-    margin-left: 250px; /* Same as expanded sidebar width */
+    margin-left: 250px; /* Expanded sidebar width */
 }
 
 
@@ -300,15 +326,20 @@ body {
 }
 
 @media screen and (max-width: 1023px) {
-    .wrapper .side_bar{
+    .wrapper .side_bar,
+    .wrapper.active .side_bar,
+    .wrapper:not(.active) .side_bar:hover {
         left: -250px;
+        width: 250px; /* Full width on mobile */
     }
+    
     .wrapper.active .side_bar{
         left: 0;
     }
+    
     .wrapper.active .shadow{
         display: block;
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
@@ -316,12 +347,14 @@ body {
         background: rgba(0,0,0,0.5);
         z-index: 40;
     }
+    
     .main_container{
         width: 100%;
         margin-left: 0;
     }
+    
     .wrapper.active .main_container {
-        margin-left: 0; /* No margin change needed on mobile when sidebar is overlay */
+        margin-left: 0;
     }
 }
 
