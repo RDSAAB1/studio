@@ -50,7 +50,6 @@ body {
     border-radius: 15px;
     display: flex;
     position: relative;
-    overflow: hidden;
 }
 
 .side_bar{
