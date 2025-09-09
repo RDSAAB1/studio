@@ -35,7 +35,6 @@ interface AuthContextType {
   authLoading: boolean;
   isAuthenticated: boolean;
   isBypassed: boolean;
-  login: () => void;
   logout: () => void;
 }
 const AuthContext = React.createContext<AuthContextType | null>(null);
@@ -52,6 +51,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isBypassed, setIsBypassed] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const bypassState = sessionStorage.getItem('bypass') === 'true';
@@ -65,10 +65,6 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const login = () => {
-    // This is a placeholder; actual login is handled by Firebase/bypass logic
-  };
-
   const logout = () => {
     const auth = getFirebaseAuth();
     signOut(auth).finally(() => {
@@ -80,22 +76,16 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = !!user || isBypassed;
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, isAuthenticated, isBypassed, login, logout }}>
+    <AuthContext.Provider value={{ user, authLoading, isAuthenticated, isBypassed, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-const AuthGuard = ({ children }: { children: React.ReactNode }) => {
+function LayoutController({ children }: { children: ReactNode }) {
     const { isAuthenticated, authLoading } = useAuth();
-    const router = useRouter();
+    const pathname = usePathname();
 
-    useEffect(() => {
-        if (!authLoading && !isAuthenticated) {
-            router.replace('/login');
-        }
-    }, [isAuthenticated, authLoading, router]);
-    
     if (authLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -103,13 +93,36 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
             </div>
         );
     }
-
+    
     if (!isAuthenticated) {
-        return <LoginPage />;
+        if (pathname === '/login') {
+            return <LoginPage />;
+        }
+        // Redirect to login if not authenticated and not on login page
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (pathname === '/login') {
+         if (typeof window !== 'undefined') {
+            window.location.href = '/';
+        }
+         return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
     }
 
     return <AppLayout>{children}</AppLayout>;
-};
+}
+
 
 // --- Root Layout ---
 export default function RootLayout({
@@ -120,13 +133,13 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
-      <body>
-        <AuthProvider>
-            <AuthGuard>
-                {children}
-            </AuthGuard>
-        </AuthProvider>
-      </body>
+        <body className="font-body antialiased">
+            <AuthProvider>
+                <LayoutController>
+                    {children}
+                </LayoutController>
+            </AuthProvider>
+        </body>
     </html>
   );
 }
