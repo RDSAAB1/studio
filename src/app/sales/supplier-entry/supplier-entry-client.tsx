@@ -10,7 +10,7 @@ import { formatSrNo, toTitleCase, formatCurrency } from "@/lib/utils";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteSupplierPaymentsForSrNo } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -184,15 +184,13 @@ export default function SupplierEntryClient() {
     newDueDate.setDate(newDueDate.getDate() + termDays);
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight; // This is Final Weight
-    const rate = values.rate || 0;
-    const amount = weight * rate; // Corrected calculation
-    
+    const weight = grossWeight - teirWeight;
     const kartaPercentage = values.kartaPercentage || 0;
+    const rate = values.rate || 0;
     const kartaWeight = weight * (kartaPercentage / 100);
     const kartaAmount = kartaWeight * rate;
     const netWeight = weight - kartaWeight;
-    
+    const amount = netWeight * rate;
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
@@ -323,7 +321,7 @@ export default function SupplierEntryClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteSupplier(id);
-      await deleteSupplierPaymentsForSrNo(currentSupplier.srNo);
+      await deletePaymentsForSrNo(currentSupplier.srNo);
       toast({ title: "Entry and payments deleted.", variant: "success" });
       if (currentSupplier.id === id) {
         handleNew();
@@ -353,7 +351,7 @@ export default function SupplierEntryClient() {
         }
 
         if (deletePayments) {
-            await deleteSupplierPaymentsForSrNo(completeEntry.srNo);
+            await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
             const savedEntry = await addSupplier(updatedEntry);
             toast({ title: "Entry updated and payments deleted.", variant: "success" });

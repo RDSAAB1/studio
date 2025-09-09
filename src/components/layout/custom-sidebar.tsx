@@ -5,8 +5,9 @@ import React, { useState, useEffect, type ReactNode } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
-import { Sparkles, Menu, ChevronDown } from 'lucide-react';
+import { Sparkles, Menu } from 'lucide-react';
 import { Button } from '../ui/button';
+import { getRtgsSettings } from '@/lib/firestore'; // Import the settings function
 
 interface CustomSidebarProps {
   children: ReactNode;
@@ -18,8 +19,20 @@ interface CustomSidebarProps {
 
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTabSelect, isSidebarActive, toggleSidebar }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('BizSuite'); // Default name
   const location = useLocation();
   const activePath = location.pathname;
+
+  useEffect(() => {
+    // Fetch company name from settings
+    const fetchCompanyName = async () => {
+      const settings = await getRtgsSettings();
+      if (settings && settings.companyName) {
+        setCompanyName(settings.companyName);
+      }
+    };
+    fetchCompanyName();
+  }, []);
 
   useEffect(() => {
     for (const item of allMenuItems) {
@@ -79,7 +92,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
             <div className="logo_wrap">
              <button onClick={() => onTabSelect(allMenuItems.find(i => i.id === 'dashboard-overview')!)} className='flex items-center gap-2'>
                     <span className="icon"><Sparkles/></span>
-                    <span className="text">BizSuite</span>
+                    <span className="text">{companyName}</span>
             </button>
             </div>
             <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">

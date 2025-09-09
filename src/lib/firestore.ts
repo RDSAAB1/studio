@@ -108,7 +108,7 @@ export async function deleteCompanySettings(userId: string): Promise<void> {
 }
 
 
-export async function getRtgsSettings(): Promise<RtgsSettings | null> {
+export async function getRtgsSettings(): Promise<RtgsSettings> {
     const docRef = doc(settingsCollection, "rtgs");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -118,7 +118,18 @@ export async function getRtgsSettings(): Promise<RtgsSettings | null> {
         }
         return data;
     }
-    return null;
+    return {
+        companyName: "BizSuite DataFlow",
+        companyAddress1: "123 Business Rd",
+        companyAddress2: "Suite 100, BizCity",
+        bankName: "Default Bank",
+        ifscCode: "DFLT0000001",
+        branchName: "Main Branch",
+        accountNo: "000000000000",
+        contactNo: "9876543210",
+        gmail: "contact@bizsuite.com",
+        type: "SB"
+    };
 }
 
 export async function updateRtgsSettings(settings: Partial<RtgsSettings>): Promise<void> {
@@ -345,7 +356,7 @@ export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onE
   }, onError);
 }
 
-export async function deleteSupplierPaymentsForSrNo(srNo: string): Promise<void> {
+export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   if (!srNo) {
     console.error("SR No. is required to delete payments.");
     return;
@@ -561,4 +572,21 @@ export function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment
     const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
     callback(payments);
   }, onError);
+}
+
+export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'>): Promise<CustomerPayment> {
+    const docRef = await addDoc(customerPaymentsCollection, paymentData);
+    const newPayment = { ...paymentData, id: docRef.id };
+    await updateDoc(docRef, { id: docRef.id });
+    return newPayment;
+}
+
+export async function deletePayment(id: string): Promise<void> {
+    const docRef = doc(db, "payments", id);
+    await deleteDoc(docRef);
+}
+
+export async function deleteCustomerPayment(id: string): Promise<void> {
+    const docRef = doc(db, "customer_payments", id);
+    await deleteDoc(docRef);
 }
