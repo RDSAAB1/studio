@@ -87,6 +87,7 @@ export const allMenuItems: MenuItem[] = [
     icon: FileText,
     subMenus: [
         { id: "rtgs-report", name: "RTGS Report", icon: FileText },
+        { id: "daily-supplier-report", name: "Daily Supplier Report", icon: FileText },
     ]
   },
   {
