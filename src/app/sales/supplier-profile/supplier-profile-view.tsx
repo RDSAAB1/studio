@@ -206,7 +206,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Financial</h3>
                             <table className="w-full"><tbody>
                                 <tr><td className="py-0.5 text-muted-foreground">Original Purchases</td><td className="py-0.5 text-right font-semibold">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                                <tr className="border-t"><td className="py-0.5 text-muted-foreground">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
+                                <tr className="border-t"><td className="py-0.5 text-muted-foreground">Total Received</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
                                 <tr><td className="py-0.5 text-muted-foreground">Total CD Granted</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
                                 <tr className="font-bold text-destructive border-t"><td className="py-1">Outstanding Balance</td><td className="py-1 text-right">{`${formatCurrency(data.totalOutstanding)}`}</td></tr>
                             </tbody></table>
@@ -292,7 +292,7 @@ export const SupplierProfileView = ({
     const financialPieChartData = useMemo(() => {
         if (!selectedSupplierData) return [];
         return [
-          { name: 'Total Paid', value: selectedSupplierData.totalPaid + selectedSupplierData.totalCdAmount! },
+          { name: 'Total Received', value: selectedSupplierData.totalPaid + selectedSupplierData.totalCdAmount! },
           { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
         ];
       }, [selectedSupplierData]);
@@ -381,9 +381,9 @@ export const SupplierProfileView = ({
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Original Amount <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/kg)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Total Received</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
