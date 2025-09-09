@@ -1,21 +1,24 @@
+
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Header } from './header';
 
 interface CustomSidebarProps {
-  isSidebarActive: boolean;
-  toggleSidebar: () => void;
+  children: ReactNode;
+  onSignOut: () => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSidebar }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) => {
   const pathname = usePathname();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
+  const [isSidebarActive, setIsSidebarActive] = useState(false);
 
   useEffect(() => {
     // Find the active menu item and expand its parent submenu
@@ -26,9 +29,14 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
       }
     }
   }, [pathname]);
+  
+  const toggleSidebar = () => {
+    setIsSidebarActive(prev => !prev);
+  };
 
   const handleSubMenuToggle = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
+    e.stopPropagation();
     setOpenSubMenu(prev => (prev === id ? null : id));
   };
   
@@ -46,16 +54,11 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
       return (
         <li className={cn(isSubMenuActive && "active")}>
           {isSubMenuActive && <span className="top_curve"></span>}
-           <button
-                onClick={(e) => handleSubMenuToggle(e, item.id)}
-                className="w-full"
-            >
-                <span className="flex items-center justify-between">
-                    <span className="flex items-center">
-                        <span className="icon">{React.createElement(item.icon)}</span>
-                        <span className="item">{item.name}</span>
-                    </span>
-                    <ChevronDown className={cn("h-4 w-4 mr-5 transition-transform item", openSubMenu === item.id && "rotate-180")} />
+           <button onClick={(e) => handleSubMenuToggle(e, item.id)} className="w-full">
+                <span className="icon">{React.createElement(item.icon)}</span>
+                <span className="item flex justify-between w-full">
+                    {item.name}
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", openSubMenu === item.id && "rotate-180")} />
                 </span>
             </button>
           {isSubMenuActive && <span className="bottom_curve"></span>}
@@ -66,10 +69,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
     return (
       <li className={cn(isActive && "active")}>
         {isActive && <span className="top_curve"></span>}
-        <Link
-          href={item.href || '#'}
-          onClick={handleLinkClick}
-        >
+        <Link href={item.href || '#'} onClick={handleLinkClick}>
           <span className="icon">{React.createElement(item.icon)}</span>
           <span className="item">{item.name}</span>
         </Link>
@@ -79,40 +79,51 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
   };
 
   return (
-    <aside className="side_bar">
-      <div className="side_bar_top">
-        <div className="logo_wrap">
-           <Link href="/" className='flex items-center gap-2'>
-                <span className="icon"><Sparkles/></span>
-                <span className="text">BizSuite</span>
-           </Link>
+    <div className={cn("wrapper", isSidebarActive && "active")}>
+        <aside className="side_bar">
+        <div className="side_bar_top">
+            <div className="logo_wrap">
+            <Link href="/" className='flex items-center gap-2'>
+                    <span className="icon"><Sparkles/></span>
+                    <span className="text">BizSuite</span>
+            </Link>
+            </div>
+            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Pin/Unpin Menu</span>
+            </Button>
         </div>
-         <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Pin/Unpin Menu</span>
-        </Button>
-      </div>
-      <div className="side_bar_bottom scrollbar-hide">
-        <ul>
-          {allMenuItems.map(item => (
-            <React.Fragment key={item.id}>
-              {renderMenuItem(item)}
-              {item.subMenus && (
-                <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
-                  {item.subMenus.map(subItem => (
-                    <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <Link href={subItem.href || '#'} onClick={handleLinkClick}>
-                         {subItem.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </React.Fragment>
-          ))}
-        </ul>
-      </div>
-    </aside>
+        <div className="side_bar_bottom scrollbar-hide">
+            <ul>
+            {allMenuItems.map(item => (
+                <React.Fragment key={item.id}>
+                {renderMenuItem(item)}
+                {item.subMenus && (
+                    <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
+                    {item.subMenus.map(subItem => (
+                        <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
+                        <Link href={subItem.href || '#'} onClick={handleLinkClick}>
+                            {subItem.name}
+                        </Link>
+                        </li>
+                    ))}
+                    </ul>
+                )}
+                </React.Fragment>
+            ))}
+            </ul>
+        </div>
+        </aside>
+        <div className="main_container">
+            <Header toggleSidebar={toggleSidebar} onSignOut={onSignOut} />
+            <div className="content">
+                {children}
+            </div>
+        </div>
+        {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && (
+            <div className="shadow" onClick={toggleSidebar}></div>
+        )}
+    </div>
   );
 };
 

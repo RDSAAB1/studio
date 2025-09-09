@@ -113,10 +113,6 @@ export function Header({ toggleSidebar, onSignOut }: HeaderProps) {
           </div>
         </div>
 
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <DynamicIslandToaster />
-        </div>
-
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <NotificationBell />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>

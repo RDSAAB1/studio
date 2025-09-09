@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
@@ -69,11 +70,6 @@ function LayoutController({ children }: { children: ReactNode }) {
     const { isAuthenticated, authLoading, logout } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
-    const [isSidebarActive, setIsSidebarActive] = useState(false);
-
-    const toggleSidebar = () => {
-        setIsSidebarActive(prev => !prev);
-    };
 
     useEffect(() => {
         if (!authLoading) {
@@ -109,16 +105,13 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
 
     return (
-        <div className={cn("wrapper", isSidebarActive && "active")}>
-            <CustomSidebar isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar} />
-            <div className="main_container">
-                <Header toggleSidebar={toggleSidebar} onSignOut={logout} />
-                <main className="content">{children}</main>
-            </div>
-            {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && (
-                <div className="shadow" onClick={toggleSidebar}></div>
-            )}
-            <DynamicIslandToaster />
+        <div className="flex min-h-screen">
+           <CustomSidebar onSignOut={logout}>
+                <main className="flex-1 p-4 sm:p-6 lg:p-8">
+                    {children}
+                </main>
+           </CustomSidebar>
+           <DynamicIslandToaster />
         </div>
     )
 }
