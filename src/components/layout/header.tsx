@@ -26,6 +26,7 @@ const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
+    const router = useRouter();
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
@@ -41,8 +42,14 @@ const NotificationBell = () => {
         setPendingNotifications(pending);
     }, [loans]);
 
-    const handleNotificationClick = () => {
+    const handleNotificationClick = (e: React.MouseEvent, href: string) => {
+        e.preventDefault();
         setOpen(false); 
+        // We are in a full SPA, so we need to use the router to navigate
+        // to the correct page and pass the query params.
+        // The AppLayout will handle the tab switching based on the 'tab' query param.
+        const url = new URL(href, window.location.origin);
+        router.push(url.toString());
     };
 
     return (
@@ -64,7 +71,7 @@ const NotificationBell = () => {
                 <div className="mt-2 space-y-2 max-h-72 overflow-y-auto">
                     {pendingNotifications.length > 0 ? (
                         pendingNotifications.map(loan => {
-                             const href = `/expense-tracker?${new URLSearchParams({
+                             const href = `/?tab=income-expense&${new URLSearchParams({
                                 loanId: loan.id,
                                 amount: String(loan.emiAmount || 0),
                                 payee: loan.lenderName || loan.productName || 'Loan Payment',
@@ -74,7 +81,7 @@ const NotificationBell = () => {
                              <a
                                 key={loan.id} 
                                 href={href}
-                                onClick={handleNotificationClick}
+                                onClick={(e) => handleNotificationClick(e, href)}
                                 className="block p-2 rounded-md hover:bg-accent active:bg-primary/20 cursor-pointer"
                              >
                                 <div>
@@ -113,7 +120,7 @@ export function Header({ toggleSidebar, onSignOut }: HeaderProps) {
 
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <NotificationBell />
-          <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
+          <Button variant="ghost" size="icon" onClick={() => router.push('/?tab=settings')}>
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
           </Button>

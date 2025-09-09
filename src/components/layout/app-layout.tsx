@@ -127,8 +127,11 @@ function LayoutController({ children }: { children: ReactNode }) {
     const pathname = usePathname();
 
     useEffect(() => {
-        // This effect can be used to sync the tab state with the URL if needed in the future
-        // For now, it respects the SPA behavior by not relying on the URL path
+        const queryParams = new URLSearchParams(window.location.search);
+        const tab = queryParams.get('tab');
+        if (tab && pageComponents[tab]) {
+            setActiveTabId(tab);
+        }
     }, [pathname]);
 
     if (authLoading) {
@@ -140,21 +143,7 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
     
     if (!isAuthenticated) {
-        // If not authenticated, and not on the login page, redirect.
-        // This check is a safeguard. The main logic is now handled here instead of page-level.
-        if (pathname !== '/login') {
-           // router.replace('/login'); // This might be too aggressive in a pure SPA model
-           return <LoginPage />;
-        }
-        return <LoginPage />;
-    }
-    
-    // If authenticated, but somehow on the login page, redirect to dashboard.
-    if (isAuthenticated && pathname === '/login') {
-       // router.replace('/dashboard-overview'); // In SPA model, just change the state
-       if (activeTabId !== 'dashboard') {
-          setActiveTabId('dashboard');
-       }
+       return <LoginPage />;
     }
     
     return (
