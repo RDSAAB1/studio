@@ -23,7 +23,7 @@ const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { lab
              <div className="bg-primary/10 text-primary p-1.5 rounded-md">{icon}</div>
              <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         </CardHeader>
-        <CardContent className="p-2 pt-0">
+        <CardContent className="p-2 pt-1">
              <div className="space-y-1">
                 {data.map((item, index) => (
                     <div key={index} className="flex justify-between items-baseline text-xs">
@@ -282,7 +282,7 @@ export default function DailySupplierReportClient() {
                                             <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.kartaAmount)}</td>
                                             <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.labouryAmount)}</td>
                                             <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.kanta)}</td>
-                                            <td className="border border-gray-300 p-1 text-right font-bold text-base">{formatCurrency(Number(s.netAmount))}</td>
+                                            <td className="border border-gray-300 p-1 text-right font-bold text-sm">{formatCurrency(Number(s.netAmount))}</td>
                                         </tr>
                                     ))}
                                     {Array.from({ length: Math.max(0, 15 - filteredSuppliers.length) }).map((_, i) => (
