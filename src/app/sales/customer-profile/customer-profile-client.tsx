@@ -90,6 +90,11 @@ export default function CustomerProfilePage() {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
         data.totalOriginalAmount += s.originalNetAmount || 0;
+        data.totalGrossWeight! += s.grossWeight || 0;
+        data.totalTeirWeight! += s.teirWeight || 0;
+        data.totalFinalWeight! += s.weight || 0;
+        data.totalNetWeight! += s.netWeight || 0;
+        data.totalTransactions! += 1;
         data.allTransactions!.push(s);
     });
 
@@ -102,25 +107,36 @@ export default function CustomerProfilePage() {
     });
 
     summary.forEach((data, key) => {
-        data.totalAmount = data.totalOriginalAmount; // Total transactions is the sum of net payable
+        data.totalAmount = data.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
+        data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
+        data.outstandingEntryIds = data.allTransactions!.filter(t => (t.netAmount || 0) > 0).map(t => t.id);
+        data.totalOutstandingTransactions = data.outstandingEntryIds.length;
     });
 
     const millSummary: CustomerSummary = Array.from(summary.values()).reduce((acc, s) => {
         acc.totalOriginalAmount += s.totalOriginalAmount;
         acc.totalPaid += s.totalPaid;
-        // Aggregate other fields if necessary for mill overview
+        acc.totalGrossWeight! += s.totalGrossWeight!;
+        acc.totalTeirWeight! += s.totalTeirWeight!;
+        acc.totalFinalWeight! += s.totalFinalWeight!;
+        acc.totalNetWeight! += s.totalNetWeight!;
+        acc.totalTransactions! += s.totalTransactions!;
+        acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
+        acc.allTransactions = [...(acc.allTransactions || []), ...(s.allTransactions || [])];
+        acc.allPayments = [...(acc.allPayments || []), ...(s.allPayments || [])];
         return acc;
     }, {
         name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: customers, 
-        allPayments: paymentHistory, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
+        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: [], 
+        allPayments: [], transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
     });
     
-    millSummary.totalAmount = millSummary.totalOriginalAmount;
+    millSummary.totalAmount = millSummary.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
+    millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
 
     const finalSummaryMap = new Map<string, CustomerSummary>();
     finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
