@@ -19,7 +19,7 @@ import { useAuth } from '../layout';
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const { user, authLoading, isBypassed } = useAuth(); // Use the context
+    const { user, authLoading, isBypassed } = useAuth();
     
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
@@ -35,7 +35,6 @@ export default function LoginPage() {
     }, []);
 
     useEffect(() => {
-        // If the user is already logged in or bypassed, redirect them to the dashboard.
         if (!authLoading && (user || isBypassed)) {
             router.replace('/dashboard-overview');
         }
@@ -55,7 +54,7 @@ export default function LoginPage() {
         setAuthError(null);
         try {
             await signInWithPopup(auth, googleProvider);
-            // The useEffect hook above will handle the redirect on successful login.
+            // The useEffect hook will handle the redirect on successful login.
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred. Please try again.";
@@ -85,7 +84,6 @@ export default function LoginPage() {
                 variant: "success",
             });
             sessionStorage.setItem('bypass', 'true');
-            // Force a reload to re-trigger the AuthProvider and AuthGuard logic
             window.location.href = '/dashboard-overview';
         } else {
             toast({
@@ -108,7 +106,6 @@ export default function LoginPage() {
         </div>
     );
     
-    // Show loading spinner while checking auth state, or if user is logged in (while redirecting)
     if (authLoading || user || isBypassed) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -117,7 +114,6 @@ export default function LoginPage() {
         );
     }
     
-    // Only show login page if not loading and no user/bypass
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
             <Card className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 overflow-hidden shadow-2xl">

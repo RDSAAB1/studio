@@ -10,7 +10,6 @@ import { Header } from "@/components/layout/header";
 import { cn } from "@/lib/utils";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { Loader2 } from "lucide-react";
 import { DynamicIslandToaster } from "@/components/ui/dynamic-island-toaster";
 
 const inter = Inter({
@@ -31,8 +30,6 @@ const sourceCodePro = Source_Code_Pro({
   variable: '--font-source-code-pro',
 });
 
-const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
-
 // --- Auth Context and Provider ---
 const AuthContext = React.createContext<{ user: User | null; authLoading: boolean; isBypassed: boolean; }>({
   user: null,
@@ -49,9 +46,11 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [isClient, setIsClient] = useState(false); 
 
   useEffect(() => {
-    setIsClient(true); 
-    const bypassState = sessionStorage.getItem('bypass') === 'true';
-    setIsBypassed(bypassState);
+    setIsClient(true);
+    if (typeof window !== 'undefined') {
+        const bypassState = sessionStorage.getItem('bypass') === 'true';
+        setIsBypassed(bypassState);
+    }
     
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -85,20 +84,21 @@ export default function RootLayout({
     const handleSignOut = async () => {
         try {
             await signOut(getFirebaseAuth());
-            sessionStorage.removeItem('bypass'); // Clear the bypass session on sign out
-            window.location.href = '/login'; // Force a full redirect to clear all state
+            sessionStorage.removeItem('bypass');
+            window.location.href = '/login';
         } catch (error) {
             console.error("Error signing out: ", error);
         }
     };
     
-    const isLayoutVisible = !UNPROTECTED_ROUTES.includes(pathname);
+    // Only show the main layout for non-auth pages
+    const showLayout = pathname !== '/login' && pathname !== '/setup/connect-gmail' && pathname !== '/setup/company-details';
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
         <AuthProvider>
-          {isLayoutVisible ? (
+          {showLayout ? (
             <div className={cn("wrapper", isSidebarActive && "active")}>
               <CustomSidebar isSidebarActive={isSidebarActive} />
               <div className="main_container">
