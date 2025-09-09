@@ -7,7 +7,7 @@ import { getSuppliersRealtime, getRtgsSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
-import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp } from 'lucide-react';
+import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -177,27 +177,31 @@ export default function DailySupplierReportClient() {
                             </div>
                         </div>
 
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 print:flex print-summary-container">
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 print:flex print-summary-container">
                             <SummaryCard title="Weight Summary" icon={<Weight size={14}/>}>
                                 <div className="space-y-1">
                                     <SummaryItem label="GROSS" value={summary.gross} />
                                     <SummaryItem label="TIER" value={summary.tier} />
-                                    <SummaryItem label="TOTAL" value={summary.total} />
+                                    <SummaryItem label="TOTAL" value={summary.total} className="font-bold text-primary" />
+                                </div>
+                            </SummaryCard>
+                            <SummaryCard title="Net Weight Summary" icon={<HandCoins size={14}/>}>
+                                <div className="space-y-1">
                                     <SummaryItem label="KARTA" value={summary.karta} />
                                     <SummaryItem label="NET" value={summary.net} className="font-bold text-primary" />
                                 </div>
                             </SummaryCard>
-                            <SummaryCard title="Deductions & Rate" icon={<TrendingUp size={14}/>}>
+                             <SummaryCard title="Rate & Amount" icon={<TrendingUp size={14}/>}>
                                 <div className="space-y-1">
                                     <SummaryItem label="RATE" value={summary.rate} isCurrency />
-                                    <SummaryItem label="LABOUR" value={summary.labour} isCurrency />
-                                    <SummaryItem label="KARTA" value={summary.kartaAmount} isCurrency />
-                                    <SummaryItem label="KANTA" value={summary.kanta} isCurrency />
+                                    <SummaryItem label="TOTAL AMOUNT" value={summary.amount} isCurrency className="font-bold text-primary"/>
                                 </div>
                             </SummaryCard>
                              <SummaryCard title="Financial Summary" icon={<CircleDollarSign size={14}/>}>
                                  <div className="space-y-1">
-                                    <SummaryItem label="TOTAL AMOUNT" value={summary.amount} isCurrency />
+                                    <SummaryItem label="KANTA" value={summary.kanta} isCurrency />
+                                    <SummaryItem label="KARTA" value={summary.kartaAmount} isCurrency />
+                                    <SummaryItem label="LABOUR" value={summary.labour} isCurrency />
                                     <SummaryItem label="NET PAYABLE" value={summary.netAmount} isCurrency className="font-bold text-primary" />
                                 </div>
                             </SummaryCard>
