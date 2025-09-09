@@ -101,10 +101,8 @@ export default function DailySupplierReportClient() {
                 @media print {
                     @page { size: landscape; margin: 10mm; }
                     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .printable-area { background-color: #fff !important; color: #000 !important; }
+                    .printable-area, .printable-area tr { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                    .print-bg-yellow { background-color: #FBBF24 !important; }
-                    .print-bg-gray { background-color: #F3F4F6 !important; }
                 }
             `;
             newWindow.document.head.appendChild(printStyles);
@@ -174,7 +172,7 @@ export default function DailySupplierReportClient() {
 
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm border-collapse border border-gray-400">
-                                <thead className="bg-amber-400 print-bg-yellow">
+                                <thead className="bg-amber-400">
                                     <tr>
                                         <th className="border border-gray-400 p-1 text-left">SR NO.</th>
                                         <th className="border border-gray-400 p-1 text-left">TRM</th>
@@ -197,7 +195,7 @@ export default function DailySupplierReportClient() {
                                 </thead>
                                 <tbody>
                                     {filteredSuppliers.map((s) => (
-                                        <tr key={s.id} className="bg-gray-200 print-bg-gray">
+                                        <tr key={s.id} className="bg-gray-200">
                                             <td className="border border-gray-400 p-1">{s.srNo}</td>
                                             <td className="border border-gray-400 p-1">{s.term}</td>
                                             <td className="border border-gray-400 p-1">{toTitleCase(s.name)}</td>
