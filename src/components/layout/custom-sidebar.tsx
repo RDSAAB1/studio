@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
-import { Sparkles, Menu } from 'lucide-react';
+import { Sparkles, Menu, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
 
 interface CustomSidebarProps {
@@ -28,7 +28,8 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
     }
   }, [pathname]);
 
-  const handleSubMenuToggle = (id: string) => {
+  const handleSubMenuToggle = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
     setOpenSubMenu(prev => (prev === id ? null : id));
   };
   
@@ -42,25 +43,37 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
     const isSubMenuActive = item.subMenus?.some(sub => sub.href === pathname) ?? false;
     const isActive = !item.subMenus && pathname === item.href;
 
+    if (item.subMenus) {
+      return (
+        <li className={cn(isSubMenuActive && "active")}>
+          {isSubMenuActive && <span className="top_curve"></span>}
+          <a
+            href="#"
+            onClick={(e) => handleSubMenuToggle(e, item.id)}
+            className="flex items-center justify-between w-full"
+          >
+            <div className="flex items-center">
+              <span className="icon">{React.createElement(item.icon)}</span>
+              <span className="item">{item.name}</span>
+            </div>
+            <ChevronDown className={cn("h-4 w-4 mr-5 transition-transform item", openSubMenu === item.id && "rotate-180")} />
+          </a>
+          {isSubMenuActive && <span className="bottom_curve"></span>}
+        </li>
+      );
+    }
+
     return (
-      <li className={cn((isActive || isSubMenuActive) && "active")}>
-        {(isActive || isSubMenuActive) && <span className="top_curve"></span>}
+      <li className={cn(isActive && "active")}>
+        {isActive && <span className="top_curve"></span>}
         <Link
           href={item.href || '#'}
-          onClick={(e) => {
-            if (item.href) {
-              handleLinkClick();
-            }
-            if (!item.href) {
-              e.preventDefault();
-              handleSubMenuToggle(item.id);
-            }
-          }}
+          onClick={handleLinkClick}
         >
           <span className="icon">{React.createElement(item.icon)}</span>
           <span className="item">{item.name}</span>
         </Link>
-        {(isActive || isSubMenuActive) && <span className="bottom_curve"></span>}
+        {isActive && <span className="bottom_curve"></span>}
       </li>
     );
   };
