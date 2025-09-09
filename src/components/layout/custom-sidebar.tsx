@@ -19,7 +19,7 @@ interface CustomSidebarProps {
 
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTabSelect, isSidebarActive, toggleSidebar }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState('BizSuite'); // Default name
+  const [companyName, setCompanyName] = useState('BizSuite DataFlow'); // Default name
   const location = useLocation();
   const activePath = location.pathname;
 
