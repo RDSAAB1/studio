@@ -176,41 +176,37 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             </div>
 
             {/* Summary Section */}
-            <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
-                <Card className="bg-white border-gray-200">
-                    <CardHeader className="p-4 pb-2"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3></CardHeader>
-                    <CardContent className="p-4 pt-2">
-                        <table className="w-full text-sm"><tbody>
-                            <tr><td className="py-0.5 text-gray-600">Gross Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</td></tr>
-                            <tr><td className="py-0.5 text-gray-600">Teir Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</td></tr>
-                            <tr className="font-bold border-t border-gray-200"><td className="py-1 text-black">Final Wt</td><td className="py-1 text-right font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</td></tr>
-                            <tr><td className="py-0.5 text-gray-600">Karta Wt</td><td className="py-0.5 text-right font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</td></tr>
-                            <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Net Wt</td><td className="py-1 text-right">{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</td></tr>
-                        </tbody></table>
+            <div className="summary-grid-container grid grid-cols-3 gap-x-4">
+                 <Card className="bg-white border-gray-200">
+                    <CardHeader className="p-2 pb-1">
+                        <h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3>
+                    </CardHeader>
+                    <CardContent className="p-2 pt-1 text-xs space-y-0.5">
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between items-baseline font-bold border-t border-gray-200 pt-1 mt-1"><span className="text-black">Final Wt</span><span className="font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Karta Wt</span><span className="font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between items-baseline font-bold text-primary border-t border-gray-200 pt-1 mt-1"><span>Net Wt</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                     </CardContent>
                 </Card>
                 <Card className="bg-white border-gray-200">
-                    <CardHeader className="p-4 pb-2"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Deductions</h3></CardHeader>
-                    <CardContent className="p-4 pt-2">
-                         <table className="w-full text-sm"><tbody>
-                            <tr><td className="py-0.5 text-gray-600">Total Amount</td><td className="py-0.5 text-right font-semibold text-black">{`${formatCurrency(data.totalAmount || 0)}`}</td></tr>
-                            <tr className="border-t border-gray-200"><td className="py-0.5 text-gray-600">Karta</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</td></tr>
-                            <tr><td className="py-0.5 text-gray-600">Laboury</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</td></tr>
-                            <tr><td className="py-0.5 text-gray-600">Kanta</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalKanta || 0)}`}</td></tr>
-                            <tr><td className="py-0.5 text-gray-600">Other</td><td className="py-0.5 text-right font-semibold text-black">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</td></tr>
-                            <tr className="font-bold text-primary border-t border-gray-200"><td className="py-1">Original Amount</td><td className="py-1 text-right">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                        </tbody></table>
+                    <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Deductions</h3></CardHeader>
+                    <CardContent className="p-2 pt-1 text-xs space-y-0.5">
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Total Amount</span><span className="font-semibold text-black">{`${formatCurrency(data.totalAmount || 0)}`}</span></div>
+                        <div className="flex justify-between items-baseline border-t border-gray-200 pt-1 mt-1"><span className="text-gray-600">Karta</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Laboury</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Kanta</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Other</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
+                        <div className="flex justify-between items-baseline font-bold text-primary border-t border-gray-200 pt-1 mt-1"><span>Original Amount</span><span>{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
                     </CardContent>
                 </Card>
                 <Card className="bg-white border-gray-200">
-                    <CardHeader className="p-4 pb-2"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Financial</h3></CardHeader>
-                    <CardContent className="p-4 pt-2">
-                         <table className="w-full text-sm"><tbody>
-                            <tr><td className="py-0.5 text-gray-600">Original Purchases</td><td className="py-0.5 text-right font-semibold text-black">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                            <tr className="border-t border-gray-200"><td className="py-0.5 text-gray-600">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
-                            <tr><td className="py-0.5 text-gray-600">Total CD Granted</td><td className="py-0.5 text-right font-semibold text-black">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
-                            <tr className="font-bold text-destructive border-t border-gray-200"><td className="py-1">Outstanding</td><td className="py-1 text-right">{`${formatCurrency(data.totalOutstanding)}`}</td></tr>
-                        </tbody></table>
+                    <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Financial</h3></CardHeader>
+                    <CardContent className="p-2 pt-1 text-xs space-y-0.5">
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Original Purchases</span><span className="font-semibold text-black">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                        <div className="flex justify-between items-baseline border-t border-gray-200 pt-1 mt-1"><span className="text-gray-600">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-gray-600">Total CD Granted</span><span className="font-semibold text-black">{`${formatCurrency(data.totalCdAmount || 0)}`}</span></div>
+                        <div className="flex justify-between items-baseline font-bold text-destructive border-t border-gray-200 pt-1 mt-1"><span>Outstanding</span><span>{`${formatCurrency(data.totalOutstanding)}`}</span></div>
                     </CardContent>
                 </Card>
             </div>
@@ -543,4 +539,3 @@ export default function SupplierProfilePage() {
   );
 }
 
-    
