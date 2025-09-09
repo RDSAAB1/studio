@@ -15,6 +15,7 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/layout/app-layout";
+import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 
 
 interface HeaderProps {
@@ -100,11 +101,18 @@ export function Header({ onSignOut }: HeaderProps) {
   const { user } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
+    <header className="sticky top-0 z-30 flex h-12 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
+        {/* Left Aligned Spacer */}
         <div className="flex flex-1 items-center gap-2">
           {/* Header content, if any, can go here. For now, it's a spacer. */}
         </div>
 
+        {/* Center Aligned Dynamic Island */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+             <DynamicIslandToaster />
+        </div>
+
+        {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <NotificationBell />
           <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>

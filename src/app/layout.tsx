@@ -16,9 +16,6 @@ export default function RootLayout({
         <ClientLayoutWrapper>
           {children}
         </ClientLayoutWrapper>
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100]">
-          <DynamicIslandToaster />
-        </div>
       </body>
     </html>
   );
