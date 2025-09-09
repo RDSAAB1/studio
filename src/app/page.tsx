@@ -8,17 +8,17 @@ import { useAuth } from './layout';
 
 export default function Home() {
   const router = useRouter();
-  const { user, authLoading, isBypassed } = useAuth();
+  const { isAuthenticated, authLoading } = useAuth();
 
   useEffect(() => {
     if (!authLoading) {
-      if (user || isBypassed) {
+      if (isAuthenticated) {
         router.replace('/dashboard-overview');
       } else {
         router.replace('/login');
       }
     }
-  }, [user, authLoading, isBypassed, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-background">

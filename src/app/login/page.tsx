@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { Auth, User } from 'firebase/auth';
+import type { Auth } from 'firebase/auth';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,12 +14,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '../layout';
 
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const { user, authLoading, isBypassed } = useAuth();
     
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
@@ -34,11 +32,6 @@ export default function LoginPage() {
         setGoogleProvider(getGoogleProvider());
     }, []);
 
-    useEffect(() => {
-        if (!authLoading && (user || isBypassed)) {
-            router.replace('/dashboard-overview');
-        }
-    }, [user, authLoading, isBypassed, router]);
 
     const handleSignIn = async () => {
         if (!auth || !googleProvider) {
@@ -54,7 +47,7 @@ export default function LoginPage() {
         setAuthError(null);
         try {
             await signInWithPopup(auth, googleProvider);
-            // The useEffect hook will handle the redirect on successful login.
+            window.location.href = '/dashboard-overview';
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred. Please try again.";
@@ -105,14 +98,6 @@ export default function LoginPage() {
             </div>
         </div>
     );
-    
-    if (authLoading || user || isBypassed) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
     
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">

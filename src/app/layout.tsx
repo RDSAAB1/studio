@@ -5,12 +5,11 @@ import React, { useState, useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
-import CustomSidebar from '@/components/layout/custom-sidebar';
-import { Header } from "@/components/layout/header";
-import { cn } from "@/lib/utils";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { DynamicIslandToaster } from "@/components/ui/dynamic-island-toaster";
+import { Loader2 } from 'lucide-react';
+import AppLayout from "@/components/layout/app-layout";
+import LoginPage from "./login/page";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,26 +30,32 @@ const sourceCodePro = Source_Code_Pro({
 });
 
 // --- Auth Context and Provider ---
-const AuthContext = React.createContext<{ user: User | null; authLoading: boolean; isBypassed: boolean; }>({
-  user: null,
-  authLoading: true,
-  isBypassed: false,
-});
+interface AuthContextType {
+  user: User | null;
+  authLoading: boolean;
+  isAuthenticated: boolean;
+  isBypassed: boolean;
+  login: () => void;
+  logout: () => void;
+}
+const AuthContext = React.createContext<AuthContextType | null>(null);
 
-export const useAuth = () => React.useContext(AuthContext);
+export const useAuth = () => {
+    const context = React.useContext(AuthContext);
+    if (!context) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
+};
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isBypassed, setIsBypassed] = useState(false);
-  const [isClient, setIsClient] = useState(false); 
 
   useEffect(() => {
-    setIsClient(true);
-    if (typeof window !== 'undefined') {
-        const bypassState = sessionStorage.getItem('bypass') === 'true';
-        setIsBypassed(bypassState);
-    }
+    const bypassState = sessionStorage.getItem('bypass') === 'true';
+    setIsBypassed(bypassState);
     
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -60,13 +65,46 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  const login = () => {
+    // This is a placeholder; actual login is handled by Firebase/bypass logic
+    // This function can be used to trigger re-renders if needed
+  };
+
+  const logout = () => {
+    const auth = getFirebaseAuth();
+    signOut(auth).finally(() => {
+        sessionStorage.removeItem('bypass');
+        window.location.href = '/login';
+    });
+  };
+
+  const isAuthenticated = !!user || isBypassed;
+
   return (
-    <AuthContext.Provider value={{ user, authLoading, isBypassed }}>
+    <AuthContext.Provider value={{ user, authLoading, isAuthenticated, isBypassed, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+const AuthGuard = ({ children }: { children: React.ReactNode }) => {
+    const { isAuthenticated, authLoading } = useAuth();
+    const router = useRouter();
+
+    if (authLoading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return <LoginPage />;
+    }
+
+    return <AppLayout>{children}</AppLayout>;
+};
 
 // --- Root Layout ---
 export default function RootLayout({
@@ -74,45 +112,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-    const pathname = usePathname();
-    const [isSidebarActive, setIsSidebarActive] = useState(false);
-
-    const toggleSidebar = () => {
-        setIsSidebarActive(prev => !prev);
-    };
-
-    const handleSignOut = async () => {
-        try {
-            await signOut(getFirebaseAuth());
-            sessionStorage.removeItem('bypass');
-            window.location.href = '/login';
-        } catch (error) {
-            console.error("Error signing out: ", error);
-        }
-    };
-    
-    // Only show the main layout for non-auth pages
-    const showLayout = pathname !== '/login' && pathname !== '/setup/connect-gmail' && pathname !== '/setup/company-details';
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
         <AuthProvider>
-          {showLayout ? (
-            <div className={cn("wrapper", isSidebarActive && "active")}>
-              <CustomSidebar isSidebarActive={isSidebarActive} />
-              <div className="main_container">
-                <Header toggleSidebar={toggleSidebar} onSignOut={handleSignOut} />
-                <main className="content">{children}</main>
-                {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && (
-                  <div className="shadow" onClick={toggleSidebar}></div>
-                )}
-              </div>
-               <DynamicIslandToaster />
-            </div>
-          ) : (
-            children
-          )}
+            <AuthGuard>
+                {children}
+            </AuthGuard>
         </AuthProvider>
       </body>
     </html>
