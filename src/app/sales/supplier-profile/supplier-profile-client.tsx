@@ -89,12 +89,6 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                                 body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                                 .printable-area { background-color: #fff !important; color: #000 !important; }
                                 .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                                .print-bg-gray-800 {
-                                    background-color: #f2f2f2 !important; /* Light gray for print */
-                                    color: #000 !important;
-                                    -webkit-print-color-adjust: exact;
-                                    print-color-adjust: exact;
-                                }
                              }
                         </style>
                     </head>
