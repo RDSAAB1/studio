@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
@@ -13,22 +12,23 @@ import { Header } from './header';
 interface CustomSidebarProps {
   children: ReactNode;
   onSignOut: () => void;
+  activeTabId: string;
+  onTabSelect: (tabId: string) => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) => {
-  const pathname = usePathname();
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, activeTabId, onTabSelect }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [isSidebarActive, setIsSidebarActive] = useState(false);
 
   useEffect(() => {
     // Find the active menu item and expand its parent submenu
     for (const item of allMenuItems) {
-      if (item.subMenus && item.subMenus.some(subItem => subItem.href === pathname)) {
+      if (item.subMenus && item.subMenus.some(subItem => subItem.id === activeTabId)) {
         setOpenSubMenu(item.id);
         return;
       }
     }
-  }, [pathname]);
+  }, [activeTabId]);
   
   const toggleSidebar = () => {
     setIsSidebarActive(prev => !prev);
@@ -40,15 +40,16 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
     setOpenSubMenu(prev => (prev === id ? null : id));
   };
   
-  const handleLinkClick = () => {
+  const handleLinkClick = (id: string) => {
+    onTabSelect(id);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsSidebarActive(false);
     }
   };
 
   const renderMenuItem = (item: MenuItemType) => {
-    const isSubMenuActive = item.subMenus?.some(sub => sub.href === pathname) ?? false;
-    const isActive = !item.subMenus && pathname === item.href;
+    const isSubMenuActive = item.subMenus?.some(sub => sub.id === activeTabId) ?? false;
+    const isActive = !item.subMenus && item.id === activeTabId;
 
     if (item.subMenus) {
       return (
@@ -69,10 +70,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
     return (
       <li className={cn(isActive && "active")}>
         {isActive && <span className="top_curve"></span>}
-        <Link href={item.href || '#'} onClick={handleLinkClick}>
+        <button className="w-full" onClick={() => handleLinkClick(item.id)}>
           <span className="icon">{React.createElement(item.icon)}</span>
           <span className="item">{item.name}</span>
-        </Link>
+        </button>
         {isActive && <span className="bottom_curve"></span>}
       </li>
     );
@@ -83,10 +84,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
         <aside className="side_bar">
         <div className="side_bar_top">
             <div className="logo_wrap">
-            <Link href="/" className='flex items-center gap-2'>
+            <button onClick={() => onTabSelect('dashboard')} className='flex items-center gap-2'>
                     <span className="icon"><Sparkles/></span>
                     <span className="text">BizSuite</span>
-            </Link>
+            </button>
             </div>
             <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">
                 <Menu className="h-5 w-5" />
@@ -101,10 +102,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
                 {item.subMenus && (
                     <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
                     {item.subMenus.map(subItem => (
-                        <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                        <Link href={subItem.href || '#'} onClick={handleLinkClick}>
+                        <li key={subItem.id} className={cn(activeTabId === subItem.id && "active")}>
+                        <button className="w-full text-left" onClick={() => handleLinkClick(subItem.id)}>
                             {subItem.name}
-                        </Link>
+                        </button>
                         </li>
                     ))}
                     </ul>
