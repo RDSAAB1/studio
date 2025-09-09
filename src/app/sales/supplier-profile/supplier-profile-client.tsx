@@ -21,7 +21,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { SupplierProfileView } from "./supplier-profile-view";
+import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
@@ -89,6 +89,12 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                                 body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                                 .printable-area { background-color: #fff !important; color: #000 !important; }
                                 .printable-area * { color: #000 !important; border-color: #ccc !important; }
+                                .print-bg-gray-800 {
+                                    background-color: #f2f2f2 !important; /* Light gray for print */
+                                    color: #000 !important;
+                                    -webkit-print-color-adjust: exact;
+                                    print-color-adjust: exact;
+                                }
                              }
                         </style>
                     </head>
@@ -130,6 +136,31 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
              </DialogDescription>
         </DialogHeader>
         <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
+             <style>
+                {`
+                @media print {
+                    body {
+                        background-color: #fff !important;
+                    }
+                    .printable-statement {
+                        background-color: #fff !important;
+                        color: #000 !important;
+                    }
+                    .printable-statement * {
+                        color: #000 !important;
+                        border-color: #ccc !important;
+                    }
+                    .text-primary, .text-destructive {
+                        color: #000 !important;
+                    }
+                    .bg-muted\\/50 {
+                        background-color: #f9fafb !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                }
+                `}
+            </style>
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
@@ -200,7 +231,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 <div className="overflow-x-auto border rounded-lg">
                     <Table className="print-table min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-gray-100">
+                            <TableRow className="bg-muted/50">
                                 <TableHead className="py-2 px-3">Date</TableHead>
                                 <TableHead className="py-2 px-3">Particulars</TableHead>
                                 <TableHead className="text-right py-2 px-3">Debit</TableHead>
@@ -224,7 +255,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             ))}
                         </TableBody>
                         <TableFooter>
-                            <TableRow className="bg-gray-100 font-bold">
+                            <TableRow className="bg-muted/50 font-bold">
                                 <TableCell colSpan={2} className="py-2 px-3">Closing Balance</TableCell>
                                 <TableCell className="text-right font-mono py-2 px-3">{formatCurrency(totalDebit)}</TableCell>
                                 <TableCell className="text-right font-mono py-2 px-3">{formatCurrency(totalCredit)}</TableCell>
@@ -520,3 +551,6 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
+
+
+    
