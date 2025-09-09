@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { Customer } from '@/lib/definitions';
-import { getSuppliersRealtime } from '@/lib/firestore';
+import type { Customer, RtgsSettings } from '@/lib/definitions';
+import { getSuppliersRealtime, getRtgsSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
@@ -39,6 +39,7 @@ const SummaryItem = ({ label, value, isCurrency = false, className }: { label: s
 export default function DailySupplierReportClient() {
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
+    const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [searchTerm, setSearchTerm] = useState('');
     const { toast } = useToast();
@@ -56,6 +57,13 @@ export default function DailySupplierReportClient() {
                 setLoading(false);
             }
         );
+        
+        const fetchSettings = async () => {
+            const fetchedSettings = await getRtgsSettings();
+            setSettings(fetchedSettings);
+        }
+        fetchSettings();
+
         return () => unsubscribe();
     }, [toast]);
 
@@ -117,11 +125,11 @@ export default function DailySupplierReportClient() {
                     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     .printable-area, .printable-area table, .printable-area tr, .printable-area td, .printable-area th, .printable-area div, .printable-area p { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                    .print-summary-container {
-                        display: flex !important;
-                        flex-direction: row !important;
-                        gap: 0.5rem !important;
-                    }
+                    .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
+                    .print-header { margin-bottom: 1rem; text-align: center; }
+                    .print-header h2 { font-size: 1.25rem; font-weight: bold; }
+                    .print-header p { font-size: 0.875rem; }
+                    .no-print { display: none !important; }
                 }
             `;
             newWindow.document.head.appendChild(printStyles);
@@ -146,6 +154,10 @@ export default function DailySupplierReportClient() {
     return (
         <div className="space-y-4">
              <div ref={printRef}>
+                 <div className="hidden print:block print-header">
+                    {settings && <h2>{toTitleCase(settings.companyName)} - Daily Supplier Report</h2>}
+                    <p>Date: {format(selectedDate, "dd-MMM-yyyy")}</p>
+                </div>
                 <Card>
                     <CardContent className="p-4 space-y-4">
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
@@ -160,7 +172,7 @@ export default function DailySupplierReportClient() {
                                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
                                 </Popover>
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-2 no-print">
                                 <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
                             </div>
                         </div>
