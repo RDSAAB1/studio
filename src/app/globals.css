@@ -141,6 +141,7 @@ body {
 .side_bar_bottom ul li button {
     display: flex;
     align-items: center;
+    justify-content: flex-start; /* Align items to the start */
     padding: 15px;
     color: hsl(var(--primary-foreground));
     margin-bottom: 5px;	
@@ -149,7 +150,7 @@ body {
 
 .side_bar_bottom ul li button:hover,
 .side_bar_bottom ul li button:hover .icon {
-    color: hsl(var(--accent));
+    color: hsl(var(--primary));
 }
 
 
@@ -263,20 +264,23 @@ body {
 }
 
 .submenu li button {
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding: 10px 15px; /* Consistent padding */
   font-size: 0.875rem; /* text-sm */
   color: hsl(var(--muted-foreground));
+  margin-bottom: 2px;
+  border-radius: 8px;
+  justify-content: flex-start; /* Align text to left */
 }
 
 .submenu li button:hover {
   color: hsl(var(--primary-foreground));
+  background: hsl(var(--accent) / 0.5);
 }
 
 .submenu li.active button {
   color: hsl(var(--primary));
-  font-weight: 500;
-  background: transparent !important; /* Override active background */
+  font-weight: 600;
+  background: transparent !important; /* Override active background from parent */
 }
 
 .main_container{
