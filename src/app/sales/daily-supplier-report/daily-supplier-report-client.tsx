@@ -126,9 +126,9 @@ export default function DailySupplierReportClient() {
                     .printable-area, .printable-area table, .printable-area tr, .printable-area td, .printable-area th, .printable-area div, .printable-area p { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
                     .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
-                    .print-header { margin-bottom: 1rem; text-align: center; }
-                    .print-header h2 { font-size: 1.25rem; font-weight: bold; }
-                    .print-header p { font-size: 0.875rem; }
+                    .print-header { margin-bottom: 0.5rem; text-align: center; }
+                    .print-header h2 { font-size: 1rem; font-weight: bold; }
+                    .print-header p { font-size: 0.75rem; }
                     .no-print { display: none !important; }
                 }
             `;
