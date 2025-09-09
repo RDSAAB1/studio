@@ -458,17 +458,15 @@ export default function SupplierPaymentsClient() {
         let finalPaymentData: Payment | null = null;
         
         await runTransaction(db, async (transaction) => {
-            const tempEditingPayment = editingPayment;
-            
             // --- READ PHASE ---
             const supplierDocsToGet = new Set<string>();
             
-            // 1. Get supplier documents to read for updates
+            // Get supplier documents to read for updates
             if (rtgsFor === 'Supplier') {
                 selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
             }
             
-            // 2. Execute all reads
+            // Execute all reads
             const supplierDocs = new Map<string, any>();
             for (const id of supplierDocsToGet) {
                 const docRef = doc(db, "suppliers", id);
@@ -482,7 +480,7 @@ export default function SupplierPaymentsClient() {
             
             // --- WRITE PHASE ---
             
-            // 1. Apply new payment amounts to supplier entries
+            // Apply new payment amounts to supplier entries
             let paidForDetails: PaidFor[] = [];
             if (rtgsFor === 'Supplier') {
                 let amountToDistribute = Math.round(totalPaidAmount);
@@ -509,7 +507,7 @@ export default function SupplierPaymentsClient() {
                 }
             }
             
-            // 2. Create new expense transaction
+            // Create new expense transaction
             const newTransactionRef = doc(collection(db, 'transactions'));
             const expenseData: Partial<Transaction> = {
                 id: newTransactionRef.id,
@@ -529,8 +527,8 @@ export default function SupplierPaymentsClient() {
             }
             transaction.set(newTransactionRef, expenseData);
 
-            // 3. Create the new payment document
-            const paymentDataBase: Omit<Payment, 'id' | 'rtgsSrNo'> & { rtgsSrNo?: string } = {
+            // Create the new payment document
+            const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: paymentId,
                 customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                 date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
@@ -548,6 +546,10 @@ export default function SupplierPaymentsClient() {
             
             if (paymentMethod === 'RTGS') {
                 paymentDataBase.rtgsSrNo = rtgsSrNo;
+            }
+            
+            if (paymentMethod !== 'RTGS') {
+                delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
             }
 
             const newPaymentRef = doc(collection(db, "payments"));
@@ -644,7 +646,7 @@ export default function SupplierPaymentsClient() {
                         if (!supplierDocsSnapshot.empty) {
                             const customerDoc = supplierDocsSnapshot.docs[0];
                             const currentSupplier = customerDoc.data() as Customer;
-                            const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                            const amountToRestore = detail.amount;
                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                             transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
                         }
@@ -943,7 +945,5 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
 
     
