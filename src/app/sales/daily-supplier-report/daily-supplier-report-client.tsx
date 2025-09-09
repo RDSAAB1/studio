@@ -169,9 +169,11 @@ export default function DailySupplierReportClient() {
                                 <thead>
                                     <tr className="bg-amber-400 text-black">
                                         <th className="border border-gray-400 p-1 text-left">Info</th>
-                                        <th className="border border-gray-400 p-1 text-left">Supplier</th>
+                                        <th className="border border-gray-400 p-1 text-left">Supplier Info</th>
                                         <th className="border border-gray-400 p-1 text-left">Weight Details</th>
-                                        <th className="border border-gray-400 p-1 text-left">Financials</th>
+                                        <th className="border border-gray-400 p-1 text-left">Amount</th>
+                                        <th className="border border-gray-400 p-1 text-left">Deductions</th>
+                                        <th className="border border-gray-400 p-1 text-right">Net Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -180,37 +182,34 @@ export default function DailySupplierReportClient() {
                                             <td className="border border-gray-400 p-1 align-top">
                                                 <div className="font-bold">{s.srNo}</div>
                                                 <div className="text-xs">{format(new Date(s.date), "dd-MMM-yy")}</div>
-                                                <div className="text-xs">Term: {s.term}</div>
+                                                <div className="text-xs">Vehicle: {s.vehicleNo.toUpperCase()}</div>
                                             </td>
                                             <td className="border border-gray-400 p-1 align-top">
                                                 <div className="font-bold">{toTitleCase(s.name)}</div>
                                                 <div className="text-xs">S/O: {toTitleCase(s.so)}</div>
-                                                <div className="text-xs">Addr: {toTitleCase(s.address)}</div>
                                                 <div className="text-xs">Mob: {s.contact}</div>
                                             </td>
                                             <td className="border border-gray-400 p-1 align-top">
-                                                <div className="grid grid-cols-2 gap-x-2">
-                                                    <div className="text-xs">Gross:</div><div className="text-xs text-right font-semibold">{s.grossWeight.toFixed(2)}</div>
-                                                    <div className="text-xs">Teir:</div><div className="text-xs text-right font-semibold">{s.teirWeight.toFixed(2)}</div>
-                                                    <div className="text-xs font-bold">Total:</div><div className="text-xs text-right font-bold">{s.weight.toFixed(2)}</div>
-                                                    <div className="text-xs">Karta:</div><div className="text-xs text-right font-semibold">{s.kartaWeight.toFixed(2)}</div>
-                                                    <div className="text-xs font-bold">Net:</div><div className="text-xs text-right font-bold">{s.netWeight.toFixed(2)}</div>
-                                                </div>
+                                                <div className="text-xs">G: {s.grossWeight.toFixed(2)} | T: {s.teirWeight.toFixed(2)}</div>
+                                                <div className="text-xs">Final: <span className="font-bold">{s.weight.toFixed(2)}</span></div>
+                                                <div className="text-xs">Net: <span className="font-bold text-blue-600">{s.netWeight.toFixed(2)}</span></div>
                                             </td>
                                             <td className="border border-gray-400 p-1 align-top">
-                                                <div className="grid grid-cols-2 gap-x-2">
-                                                    <div className="text-xs">Rate:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.rate)}</div>
-                                                    <div className="text-xs">Amount:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.amount)}</div>
-                                                    <div className="text-xs">Karta Amt:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.kartaAmount)}</div>
-                                                    <div className="text-xs">Laboury:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.labouryAmount)}</div>
-                                                    <div className="text-xs">Kanta:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.kanta)}</div>
-                                                    <div className="text-xs font-bold">Net Amt:</div><div className="text-xs text-right font-bold">{formatCurrency(Number(s.netAmount))}</div>
-                                                </div>
+                                                <div className="text-xs">Rate: <span className="font-semibold">{formatCurrency(s.rate)}</span></div>
+                                                <div className="text-xs">Amt: <span className="font-semibold">{formatCurrency(s.amount)}</span></div>
                                             </td>
+                                            <td className="border border-gray-400 p-1 align-top">
+                                                <div className="text-xs">Karta: {formatCurrency(s.kartaAmount)}</div>
+                                                <div className="text-xs">Labour: {formatCurrency(s.labouryAmount)}</div>
+                                                <div className="text-xs">Kanta: {formatCurrency(s.kanta)}</div>
+                                            </td>
+                                            <td className="border border-gray-400 p-1 align-top text-right font-bold text-base">{formatCurrency(Number(s.netAmount))}</td>
                                         </tr>
                                     ))}
                                     {Array.from({ length: Math.max(0, 15 - filteredSuppliers.length) }).map((_, i) => (
-                                        <tr key={`empty-${i}`} className="h-7">
+                                        <tr key={`empty-${i}`} className="h-10">
+                                            <td className="border border-gray-400 p-1"></td>
+                                            <td className="border border-gray-400 p-1"></td>
                                             <td className="border border-gray-400 p-1"></td>
                                             <td className="border border-gray-400 p-1"></td>
                                             <td className="border border-gray-400 p-1"></td>
