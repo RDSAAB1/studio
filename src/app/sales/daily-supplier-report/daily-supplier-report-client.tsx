@@ -148,7 +148,7 @@ export default function DailySupplierReportClient() {
                             </div>
                         </div>
 
-                         <div className="p-2 border rounded-lg bg-amber-400 text-black">
+                         <div className="p-2 border rounded-lg bg-white text-black">
                             <h3 className="text-center font-bold text-sm mb-2">TODAY TOTAL SUMMARY</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-1 text-xs">
                                 <SummaryItem label="GROSS" value={summary.gross.toFixed(2)} />
