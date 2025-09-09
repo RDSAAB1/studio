@@ -16,7 +16,7 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import Link from 'next/link';
-import { useAuth } from "@/app/layout";
+import { useAuth } from "@/components/layout/app-layout";
 
 
 interface HeaderProps {
