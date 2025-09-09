@@ -18,9 +18,9 @@ import { Separator } from '@/components/ui/separator';
 
 
 const SummaryCard = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-    <Card className="flex-1 bg-white border">
+    <Card className="flex-1 bg-card/60">
         <CardHeader className="p-2 pb-1">
-            <CardTitle className="text-xs font-semibold text-gray-700 flex items-center gap-2">{icon}{title}</CardTitle>
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">{icon}{title}</CardTitle>
         </CardHeader>
         <CardContent className="p-2">
             {children}
@@ -30,8 +30,8 @@ const SummaryCard = ({ title, icon, children }: { title: string; icon: React.Rea
 
 const SummaryItem = ({ label, value, isCurrency = false, className }: { label: string; value: string | number; isCurrency?: boolean; className?: string }) => (
     <div className={cn("flex justify-between items-baseline", className)}>
-        <p className="text-xs text-gray-600">{label}:</p>
-        <p className="text-xs font-bold">{isCurrency ? formatCurrency(Number(value)) : Number(value).toFixed(2)}</p>
+        <p className="text-xs text-muted-foreground">{label}:</p>
+        <p className="text-sm font-bold">{isCurrency ? formatCurrency(Number(value)) : Number(value).toFixed(2)}</p>
     </div>
 );
 
