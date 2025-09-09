@@ -31,6 +31,12 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
   const handleSubMenuToggle = (id: string) => {
     setOpenSubMenu(prev => (prev === id ? null : id));
   };
+  
+  const handleLinkClick = () => {
+    if (window.innerWidth < 1024) {
+      toggleSidebar();
+    }
+  };
 
   const renderMenuItem = (item: MenuItemType) => {
     const isSubMenuActive = item.subMenus?.some(sub => sub.href === pathname) ?? false;
@@ -42,6 +48,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
         <Link
           href={item.href || '#'}
           onClick={(e) => {
+            if (item.href) {
+              handleLinkClick();
+            }
             if (!item.href) {
               e.preventDefault();
               handleSubMenuToggle(item.id);
@@ -79,7 +88,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
                 <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
-                      <Link href={subItem.href || '#'}>
+                      <Link href={subItem.href || '#'} onClick={handleLinkClick}>
                          {subItem.name}
                       </Link>
                     </li>
