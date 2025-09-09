@@ -121,7 +121,7 @@ export default function DailySupplierReportClient() {
              const printStyles = newWindow.document.createElement('style');
              printStyles.textContent = `
                 @media print {
-                    @page { size: landscape; margin: 10mm; }
+                    @page { size: landscape; margin: 5mm; }
                     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     .printable-area, .printable-area table, .printable-area tr, .printable-area td, .printable-area th, .printable-area div, .printable-area p { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
