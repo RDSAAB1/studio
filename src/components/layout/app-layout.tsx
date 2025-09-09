@@ -2,10 +2,10 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { Loader2, LayoutDashboard } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
 import LoginPage from "@/app/login/page";
@@ -32,11 +32,10 @@ import DataCapturePage from "@/app/data-capture/page";
 import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
-
+import TabBar from './tab-bar';
 
 const pageComponents: { [key: string]: React.FC<any> } = {
     "/": DashboardOverviewPage,
-    "/dashboard": DashboardOverviewPage,
     "/dashboard-overview": DashboardOverviewPage,
     "/supplier-entry": SupplierEntryPage,
     "/supplier-payments": SupplierPaymentsPage,
@@ -78,6 +77,14 @@ export const useAuth = () => {
     }
     return context;
 };
+
+const router = createMemoryRouter([
+    ...allMenuItems.flatMap(item => 
+        item.subMenus 
+        ? item.subMenus.map(sub => ({ path: `/${sub.id}`, Component: pageComponents[`/${sub.id}`] }))
+        : [{ path: `/${item.id}`, Component: pageComponents[`/${item.id}`] }]
+    )
+], { initialEntries: ['/dashboard-overview'] });
 
 const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -121,11 +128,16 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 const AppContent = () => {
     const { isAuthenticated, authLoading, logout } = useAuth();
+    const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
+    const [activeTabId, setActiveTabId] = useState<string>('dashboard-overview');
     const navigate = useNavigate();
 
-    const dashboardTab: MenuItem = { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard };
-    const [openTabs, setOpenTabs] = useState<MenuItem[]>([dashboardTab]);
-    const [activeTabId, setActiveTabId] = useState<string>('dashboard');
+    useEffect(() => {
+      const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
+      if (dashboardTab) {
+          setOpenTabs([dashboardTab]);
+      }
+    }, []);
     
     const handleTabSelect = (tabId: string) => {
         setActiveTabId(tabId);
@@ -133,7 +145,7 @@ const AppContent = () => {
     };
 
     const handleTabClose = (tabIdToClose: string) => {
-        if (tabIdToClose === 'dashboard') return;
+        if (tabIdToClose === 'dashboard-overview') return;
 
         const tabIndex = openTabs.findIndex(tab => tab.id === tabIdToClose);
         const newTabs = openTabs.filter(tab => tab.id !== tabIdToClose);
@@ -173,7 +185,8 @@ const AppContent = () => {
     
     return (
        <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab}>
-          <Header openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
+          <Header onSignOut={logout} />
+          <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
           <div className="content">
             {openTabs.map(tab => {
                 const PageComponent = pageComponents[`/${tab.id}`];
@@ -191,16 +204,14 @@ const AppContent = () => {
 
 const RoutedApp = () => {
     return (
-        <MemoryRouter>
-            <AppContent />
-        </MemoryRouter>
+        <RouterProvider router={router} />
     );
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <AuthProvider>
-            <RoutedApp />
+            <RouterProvider router={createMemoryRouter([{ path: "*", Component: AppContent }])}/>
         </AuthProvider>
     );
 }

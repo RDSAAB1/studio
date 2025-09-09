@@ -19,14 +19,14 @@ export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClos
 
   const cornerStyle = {
     '--corner-bg': 'hsl(var(--background))',
-    '--tab-bar-bg': 'hsl(var(--card))',
+    '--tab-bar-bg': 'hsl(var(--card))', // Assuming the tab bar bg is card
   };
   
   const tabClasses = cn(
-    "relative flex items-center justify-between cursor-pointer group text-sm h-[40px] px-3 max-w-[200px] min-w-[100px] flex-1 transition-all duration-200",
+    "relative flex items-center justify-between cursor-pointer group text-sm h-[36px] px-3 max-w-[200px] min-w-[100px] flex-1 transition-all duration-200",
     {
-      'bg-background text-foreground z-10 rounded-t-lg': isActive,
-      'bg-card text-card-foreground hover:bg-accent/50': !isActive,
+      'bg-background text-primary-foreground font-medium z-10 rounded-t-md border-x border-t border-border': isActive,
+      'bg-muted text-muted-foreground hover:bg-accent/80 rounded-t-md': !isActive,
     }
   );
 
@@ -34,8 +34,9 @@ export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClos
     <div 
       className="relative flex-shrink min-w-0" 
       style={cornerStyle as React.CSSProperties}
+      onClick={onClick}
     >
-      <button className={tabClasses} onClick={onClick}>
+      <div className={tabClasses}>
           <div className="flex items-center z-10 overflow-hidden min-w-0">
           {icon}
           <span className="whitespace-nowrap ml-2 truncate">{title}</span>
@@ -48,16 +49,12 @@ export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClos
                   "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
                   isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
               )}
-              onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onClose(e);
-              }}
+              onClick={onClose}
               >
               <X className="h-3 w-3" />
               </Button>
           )}
-      </button>
+      </div>
 
       {isActive && (
         <>

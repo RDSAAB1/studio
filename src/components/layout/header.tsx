@@ -15,16 +15,10 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/layout/app-layout";
-import TabBar from './tab-bar';
 
 
 interface HeaderProps {
-  toggleSidebar?: () => void;
   onSignOut: () => void;
-  openTabs: any[];
-  activeTabId: string;
-  setActiveTabId: (id: string) => void;
-  closeTab: (id: string) => void;
 }
 
 const NotificationBell = () => {
@@ -101,22 +95,14 @@ const NotificationBell = () => {
     )
 }
 
-export function Header({ toggleSidebar, onSignOut, openTabs, activeTabId, setActiveTabId, closeTab }: HeaderProps) {
+export function Header({ onSignOut }: HeaderProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
         <div className="flex flex-1 items-center gap-2">
-          {toggleSidebar && (
-            <div className="lg:hidden">
-              <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-            </div>
-          )}
-          <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={setActiveTabId} closeTab={closeTab} />
+          {/* Header content, if any, can go here. For now, it's a spacer. */}
         </div>
 
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>

@@ -3,6 +3,7 @@
 import ClientLayoutWrapper from '@/components/client-layout-wrapper';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { DynamicIslandToaster } from '@/components/ui/dynamic-island-toaster';
 
 export default function RootLayout({
   children,
@@ -15,7 +16,9 @@ export default function RootLayout({
         <ClientLayoutWrapper>
           {children}
         </ClientLayoutWrapper>
-        <Toaster />
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100]">
+          <DynamicIslandToaster />
+        </div>
       </body>
     </html>
   );
