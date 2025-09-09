@@ -16,11 +16,11 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import Link from 'next/link';
+import { useAuth } from "@/app/layout";
 
 
 interface HeaderProps {
   toggleSidebar: () => void;
-  user: User | null;
   onSignOut: () => void;
 }
 
@@ -100,8 +100,9 @@ const NotificationBell = () => {
     )
 }
 
-export function Header({ toggleSidebar, user, onSignOut }: HeaderProps) {
+export function Header({ toggleSidebar, onSignOut }: HeaderProps) {
   const router = useRouter();
+  const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">

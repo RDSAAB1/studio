@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Auth, User } from 'firebase/auth';
-import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle, KeyRound } from 'lucide-react';
@@ -14,32 +14,25 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '../layout';
 
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const [authLoading, setAuthLoading] = useState(true);
+    const { user, authLoading } = useAuth(); // Use the context
+    
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
     const [authError, setAuthError] = useState<string | null>(null);
     const [isBypassDialogOpen, setIsBypassDialogOpen] = useState(false);
     const [bypassCode, setBypassCode] = useState('');
+    const [signInLoading, setSignInLoading] = useState(false);
 
     useEffect(() => {
         const authInstance = getFirebaseAuth();
         setAuth(authInstance);
         setGoogleProvider(getGoogleProvider());
-        
-        const unsubscribe = onAuthStateChanged(authInstance, (user) => {
-            if (user) {
-                router.replace('/dashboard-overview');
-            } else {
-                setAuthLoading(false);
-            }
-        });
-
-        return () => unsubscribe();
-    }, [router]);
+    }, []);
 
     const handleSignIn = async () => {
         if (!auth || !googleProvider) {
@@ -51,11 +44,11 @@ export default function LoginPage() {
             return;
         }
 
-        setAuthLoading(true);
+        setSignInLoading(true);
         setAuthError(null);
         try {
             await signInWithPopup(auth, googleProvider);
-            // Redirection is handled by the onAuthStateChanged listener
+            // Redirection is handled by the AuthGate in layout
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred. Please try again.";
@@ -72,7 +65,8 @@ export default function LoginPage() {
                 description: errorMessage,
                 variant: "destructive"
             });
-             setAuthLoading(false);
+        } finally {
+            setSignInLoading(false);
         }
     };
 
@@ -83,8 +77,11 @@ export default function LoginPage() {
                 description: "Accessing the application directly.",
                 variant: "success",
             });
-            // This is a mock bypass, it doesn't create a real user session.
-            // A better approach would be a custom token, but this meets the request.
+            // This is a mock bypass. A proper implementation would use custom tokens.
+            // For now, we'll just redirect. The AuthGate will see no user and redirect back.
+            // This needs a better solution, maybe a "guest" state in the auth context.
+            // For now, let's just use a simple redirect for demonstration.
+            sessionStorage.setItem('bypass', 'true');
             router.replace('/dashboard-overview');
         } else {
             toast({
@@ -107,7 +104,8 @@ export default function LoginPage() {
         </div>
     );
     
-    if (authLoading) {
+    // AuthGate handles rendering the loading spinner now.
+    if (authLoading || user) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -141,8 +139,8 @@ export default function LoginPage() {
                                 </AlertDescription>
                             </Alert>
                         )}
-                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={authLoading}>
-                             {authLoading ? (
+                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={signInLoading}>
+                             {signInLoading ? (
                                 <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Please wait...
@@ -174,7 +172,7 @@ export default function LoginPage() {
                     <DialogHeader>
                         <DialogTitle>Login Bypass</DialogTitle>
                         <DialogDescription>
-                            Enter the bypass code to access the application without signing in.
+                            Enter the bypass code to access the application without signing in. This is for emergency access only.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">

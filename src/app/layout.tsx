@@ -38,6 +38,8 @@ const AuthContext = React.createContext<{ user: User | null; authLoading: boolea
   authLoading: true,
 });
 
+export const useAuth = () => React.useContext(AuthContext);
+
 function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -58,62 +60,43 @@ function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// --- Main App Layout ---
-function MainLayout({ children }: { children: ReactNode }) {
-    const [isSidebarActive, setIsSidebarActive] = useState(false);
+// --- Auth Gate (Handles redirection) ---
+function AuthGate({ children }: { children: ReactNode }) {
+    const { user, authLoading } = useAuth();
     const router = useRouter();
-    const { user, authLoading } = React.useContext(AuthContext);
+    const pathname = usePathname();
+    const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
 
     useEffect(() => {
-        if (!authLoading && !user) {
-            router.replace('/login');
+        if (!authLoading) {
+            if (!user && isProtected) {
+                router.replace('/login');
+            }
+            if (user && !isProtected) {
+                router.replace('/dashboard-overview');
+            }
         }
-    }, [user, authLoading, router]);
+    }, [user, authLoading, isProtected, router, pathname]);
 
-    const toggleSidebar = () => {
-        setIsSidebarActive(prev => !prev);
-    };
-
-    const handleSignOut = async () => {
-        try {
-            await signOut(getFirebaseAuth());
-            // The onAuthStateChanged listener in AuthProvider will handle the redirect.
-        } catch (error) {
-            console.error("Error signing out: ", error);
-        }
-    };
-    
-    // While checking auth state, show a loader.
     if (authLoading) {
-        return (
+         return (
              <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         )
     }
-    
-    // If auth is done and there's no user, return null to let the redirect happen.
-    if (!user) {
+
+    if (!user && isProtected) {
+        // Render nothing, redirection is in progress
         return null;
     }
     
-    // Once authenticated, show the main layout
-    return (
-        <div className={cn("wrapper", isSidebarActive && "active")}>
-            <CustomSidebar isSidebarActive={isSidebarActive} />
-            <div className="main_container">
-                <Header
-                    toggleSidebar={toggleSidebar}
-                    user={user}
-                    onSignOut={handleSignOut}
-                />
-                <main className="content">
-                    {children}
-                </main>
-                {isSidebarActive && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
-            </div>
-        </div>
-    )
+    if (user && !isProtected) {
+        // Render nothing, redirection is in progress
+        return null;
+    }
+
+    return <>{children}</>;
 }
 
 
@@ -123,14 +106,46 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
-  const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
+    const pathname = usePathname();
+    const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
+    const [isSidebarActive, setIsSidebarActive] = useState(false);
 
+    const toggleSidebar = () => {
+        setIsSidebarActive(prev => !prev);
+    };
+
+    const handleSignOut = async () => {
+        try {
+            await signOut(getFirebaseAuth());
+            // AuthProvider will handle state change and AuthGate will redirect
+        } catch (error) {
+            console.error("Error signing out: ", error);
+        }
+    };
+    
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
         <AuthProvider>
-            {isProtected ? <MainLayout>{children}</MainLayout> : children}
+            <AuthGate>
+                {isProtected ? (
+                     <div className={cn("wrapper", isSidebarActive && "active")}>
+                        <CustomSidebar isSidebarActive={isSidebarActive} />
+                        <div className="main_container">
+                            <Header
+                                toggleSidebar={toggleSidebar}
+                                onSignOut={handleSignOut}
+                            />
+                            <main className="content">
+                                {children}
+                            </main>
+                            {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
+                        </div>
+                    </div>
+                ) : (
+                    children
+                )}
+            </AuthGate>
         </AuthProvider>
       </body>
     </html>
