@@ -241,58 +241,52 @@ export default function DailySupplierReportClient() {
                         
 
                         <div className="overflow-x-auto">
-                           <table className="w-full text-xs border-collapse border border-gray-300">
+                            <table className="w-full text-xs border-collapse border border-gray-300">
                                 <thead>
-                                    <tr className="bg-gray-100 text-black font-semibold text-[10px] uppercase">
-                                        <th className="border border-gray-300 p-1 text-left">SR/Date/Term</th>
-                                        <th className="border border-gray-300 p-1 text-left">Supplier/SO/Contact</th>
-                                        <th className="border border-gray-300 p-1 text-left">Address/Vehicle</th>
-                                        <th className="border border-gray-300 p-1 text-center">Gross/Teir</th>
-                                        <th className="border border-gray-300 p-1 text-center">Final/Net Wt.</th>
-                                        <th className="border border-gray-300 p-1 text-center">Rate/Amount</th>
-                                        <th className="border border-gray-300 p-1 text-center">Deductions</th>
-                                        <th className="border border-gray-300 p-1 text-right">Net Amount</th>
+                                    <tr className="bg-gray-100 text-black font-semibold text-[10px] uppercase whitespace-nowrap">
+                                        <th className="border border-gray-300 p-1 text-left">SR</th>
+                                        <th className="border border-gray-300 p-1 text-left">Date</th>
+                                        <th className="border border-gray-300 p-1 text-left">Term</th>
+                                        <th className="border border-gray-300 p-1 text-left">Name</th>
+                                        <th className="border border-gray-300 p-1 text-left">S/O</th>
+                                        <th className="border border-gray-300 p-1 text-left">Vehicle</th>
+                                        <th className="border border-gray-300 p-1 text-right">Gross</th>
+                                        <th className="border border-gray-300 p-1 text-right">Teir</th>
+                                        <th className="border border-gray-300 p-1 text-right">Final</th>
+                                        <th className="border border-gray-300 p-1 text-right">Karta</th>
+                                        <th className="border border-gray-300 p-1 text-right">Net</th>
+                                        <th className="border border-gray-300 p-1 text-right">Rate</th>
+                                        <th className="border border-gray-300 p-1 text-right">Amount</th>
+                                        <th className="border border-gray-300 p-1 text-right">Karta Amt</th>
+                                        <th className="border border-gray-300 p-1 text-right">Laboury</th>
+                                        <th className="border border-gray-300 p-1 text-right">Kanta</th>
+                                        <th className="border border-gray-300 p-1 text-right">Net Payable</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredSuppliers.map((s) => (
-                                        <tr key={s.id} className="bg-white hover:bg-gray-50">
-                                            <td className="border border-gray-300 p-1 align-top">
-                                                <div className="font-bold">{s.srNo}</div>
-                                                <div className="text-gray-600">{format(new Date(s.date), "dd-MMM-yy")}</div>
-                                                <div className="text-gray-600">Term: {s.term}</div>
-                                            </td>
-                                            <td className="border border-gray-300 p-1 align-top">
-                                                <div className="font-bold">{toTitleCase(s.name)}</div>
-                                                <div className="text-gray-600">S/O: {toTitleCase(s.so)}</div>
-                                                <div className="text-gray-600">{s.contact}</div>
-                                            </td>
-                                             <td className="border border-gray-300 p-1 align-top">
-                                                <div className="font-semibold">{toTitleCase(s.address)}</div>
-                                                <div className="text-gray-600">{s.vehicleNo.toUpperCase()}</div>
-                                            </td>
-                                            <td className="border border-gray-300 p-1 align-top text-center">
-                                                <div>{s.grossWeight.toFixed(2)}</div>
-                                                <div className="text-gray-600">{s.teirWeight.toFixed(2)}</div>
-                                            </td>
-                                             <td className="border border-gray-300 p-1 align-top text-center">
-                                                <div className="font-semibold">{s.weight.toFixed(2)}</div>
-                                                <div className="text-blue-600 font-bold">{s.netWeight.toFixed(2)}</div>
-                                            </td>
-                                            <td className="border border-gray-300 p-1 align-top text-center">
-                                                <div className="font-semibold">{formatCurrency(s.rate)}</div>
-                                                <div className="text-gray-600">{formatCurrency(s.amount)}</div>
-                                            </td>
-                                            <td className="border border-gray-300 p-1 align-top text-center">
-                                                <div className="text-red-600">Karta: {formatCurrency(s.kartaAmount)}</div>
-                                                <div className="text-red-600">Labour: {formatCurrency(s.labouryAmount)}</div>
-                                                <div className="text-red-600">Kanta: {formatCurrency(s.kanta)}</div>
-                                            </td>
-                                            <td className="border border-gray-300 p-1 align-top text-right font-bold text-base">{formatCurrency(Number(s.netAmount))}</td>
+                                        <tr key={s.id} className="bg-white hover:bg-gray-50 whitespace-nowrap">
+                                            <td className="border border-gray-300 p-1 font-bold">{s.srNo}</td>
+                                            <td className="border border-gray-300 p-1">{format(new Date(s.date), "dd-MMM")}</td>
+                                            <td className="border border-gray-300 p-1 text-center">{s.term}</td>
+                                            <td className="border border-gray-300 p-1">{toTitleCase(s.name)}</td>
+                                            <td className="border border-gray-300 p-1">{toTitleCase(s.so)}</td>
+                                            <td className="border border-gray-300 p-1">{s.vehicleNo.toUpperCase()}</td>
+                                            <td className="border border-gray-300 p-1 text-right">{s.grossWeight.toFixed(2)}</td>
+                                            <td className="border border-gray-300 p-1 text-right">{s.teirWeight.toFixed(2)}</td>
+                                            <td className="border border-gray-300 p-1 text-right font-semibold">{s.weight.toFixed(2)}</td>
+                                            <td className="border border-gray-300 p-1 text-right">{s.kartaWeight.toFixed(2)}</td>
+                                            <td className="border border-gray-300 p-1 text-right font-bold text-blue-600">{s.netWeight.toFixed(2)}</td>
+                                            <td className="border border-gray-300 p-1 text-right">{formatCurrency(s.rate)}</td>
+                                            <td className="border border-gray-300 p-1 text-right">{formatCurrency(s.amount)}</td>
+                                            <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.kartaAmount)}</td>
+                                            <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.labouryAmount)}</td>
+                                            <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.kanta)}</td>
+                                            <td className="border border-gray-300 p-1 text-right font-bold text-base">{formatCurrency(Number(s.netAmount))}</td>
                                         </tr>
                                     ))}
                                     {Array.from({ length: Math.max(0, 15 - filteredSuppliers.length) }).map((_, i) => (
-                                        <tr key={`empty-${i}`} className="h-10"><td className="border border-gray-300" colSpan={8}></td></tr>
+                                        <tr key={`empty-${i}`} className="h-[29px]"><td className="border border-gray-300" colSpan={17}></td></tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -305,7 +299,4 @@ export default function DailySupplierReportClient() {
              </div>
         </div>
     );
-
-    
-
-
+}
