@@ -35,7 +35,6 @@ import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import TabBar from './tab-bar';
 
 const pageComponents: { [key: string]: React.FC<any> } = {
-    "/": DashboardOverviewPage,
     "/dashboard-overview": DashboardOverviewPage,
     "/supplier-entry": SupplierEntryPage,
     "/supplier-payments": SupplierPaymentsPage,
@@ -77,14 +76,6 @@ export const useAuth = () => {
     }
     return context;
 };
-
-const router = createMemoryRouter([
-    ...allMenuItems.flatMap(item => 
-        item.subMenus 
-        ? item.subMenus.map(sub => ({ path: `/${sub.id}`, Component: pageComponents[`/${sub.id}`] }))
-        : [{ path: `/${item.id}`, Component: pageComponents[`/${item.id}`] }]
-    )
-], { initialEntries: ['/dashboard-overview'] });
 
 const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -131,6 +122,7 @@ const AppContent = () => {
     const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
     const [activeTabId, setActiveTabId] = useState<string>('dashboard-overview');
     const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
       const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
@@ -138,6 +130,13 @@ const AppContent = () => {
           setOpenTabs([dashboardTab]);
       }
     }, []);
+
+    useEffect(() => {
+        const currentPathId = location.pathname.substring(1);
+        if (currentPathId && currentPathId !== activeTabId) {
+            setActiveTabId(currentPathId);
+        }
+    }, [location.pathname, activeTabId]);
     
     const handleTabSelect = (tabId: string) => {
         setActiveTabId(tabId);
@@ -185,8 +184,8 @@ const AppContent = () => {
     
     return (
        <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab}>
-          <Header onSignOut={logout} />
           <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
+          <Header onSignOut={logout} />
           <div className="content">
             {openTabs.map(tab => {
                 const PageComponent = pageComponents[`/${tab.id}`];
@@ -202,16 +201,14 @@ const AppContent = () => {
 };
 
 
-const RoutedApp = () => {
-    return (
-        <RouterProvider router={router} />
-    );
-}
+const router = createMemoryRouter([
+    { path: "*", Component: AppContent }
+]);
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <AuthProvider>
-            <RouterProvider router={createMemoryRouter([{ path: "*", Component: AppContent }])}/>
+            <RouterProvider router={router}/>
         </AuthProvider>
     );
 }

@@ -9,7 +9,7 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
   if (!openTabs) return null;
 
   return (
-    <div className="h-10 bg-background border-b border-border flex items-end overflow-x-auto scrollbar-hide">
+    <div className="h-10 bg-card border-b border-border flex items-end overflow-x-auto scrollbar-hide">
       <div className="flex items-end pl-2">
         {openTabs.map((tab: any) => {
             const isActive = tab.id === activeTabId;

@@ -16,24 +16,18 @@ interface TabProps {
 }
 
 export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
-
-  const cornerStyle = {
-    '--corner-bg': 'hsl(var(--background))',
-    '--tab-bar-bg': 'hsl(var(--card))', // Assuming the tab bar bg is card
-  };
   
   const tabClasses = cn(
     "relative flex items-center justify-between cursor-pointer group text-sm h-[36px] px-3 max-w-[200px] min-w-[100px] flex-1 transition-all duration-200",
     {
       'bg-background text-primary-foreground font-medium z-10 rounded-t-md border-x border-t border-border': isActive,
-      'bg-muted text-muted-foreground hover:bg-accent/80 rounded-t-md': !isActive,
+      'bg-card text-muted-foreground hover:bg-accent/80 rounded-t-md': !isActive,
     }
   );
 
   return (
     <div 
-      className="relative flex-shrink min-w-0" 
-      style={cornerStyle as React.CSSProperties}
+      className="relative flex-shrink-0"
       onClick={onClick}
     >
       <div className={tabClasses}>
@@ -56,22 +50,11 @@ export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClos
           )}
       </div>
 
-      {isActive && (
-        <>
-          <div 
-            className="absolute bottom-0 left-[-16px] w-4 h-4 z-20" 
-            style={{ 
-              background: 'radial-gradient(circle at 0 0, transparent 0, transparent 15px, var(--corner-bg) 15.5px)',
-            }}
-          />
-          <div 
-            className="absolute bottom-0 right-[-16px] w-4 h-4 z-20" 
-            style={{ 
-              background: 'radial-gradient(circle at 100% 0, transparent 0, transparent 15px, var(--corner-bg) 15.5px)',
-            }}
-          />
-        </>
-      )}
+       {isActive && (
+        <div 
+            className="absolute bottom-[-1px] left-0 right-0 h-[1px] bg-background z-20"
+        />
+       )}
     </div>
   );
 };

@@ -47,7 +47,7 @@ export type MenuItem = {
 
 export const allMenuItems: MenuItem[] = [
   {
-    id: "dashboard",
+    id: "dashboard-overview",
     name: "Dashboard",
     icon: LayoutDashboard,
   },
