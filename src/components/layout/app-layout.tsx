@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from 'lucide-react';
@@ -123,6 +123,13 @@ const TabContent = ({ activeTabId }: { activeTabId: string }) => {
 function LayoutController({ children }: { children: ReactNode }) {
     const { isAuthenticated, authLoading, logout } = useAuth();
     const [activeTabId, setActiveTabId] = useState<string>('dashboard');
+    const router = useRouter();
+    const pathname = usePathname();
+
+    useEffect(() => {
+        // This effect can be used to sync the tab state with the URL if needed in the future
+        // For now, it respects the SPA behavior by not relying on the URL path
+    }, [pathname]);
 
     if (authLoading) {
         return (
@@ -133,7 +140,21 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
     
     if (!isAuthenticated) {
+        // If not authenticated, and not on the login page, redirect.
+        // This check is a safeguard. The main logic is now handled here instead of page-level.
+        if (pathname !== '/login') {
+           // router.replace('/login'); // This might be too aggressive in a pure SPA model
+           return <LoginPage />;
+        }
         return <LoginPage />;
+    }
+    
+    // If authenticated, but somehow on the login page, redirect to dashboard.
+    if (isAuthenticated && pathname === '/login') {
+       // router.replace('/dashboard-overview'); // In SPA model, just change the state
+       if (activeTabId !== 'dashboard') {
+          setActiveTabId('dashboard');
+       }
     }
     
     return (

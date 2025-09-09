@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu, ChevronDown } from 'lucide-react';
