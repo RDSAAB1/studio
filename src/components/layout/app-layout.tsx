@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { createMemoryRouter, RouterProvider, useLocation, useNavigate, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from 'lucide-react';
@@ -34,6 +34,7 @@ import SettingsPage from "@/app/settings/page";
 
 const pageRoutes = [
     { path: "/", element: <DashboardOverviewPage /> },
+    { path: "/dashboard", element: <DashboardOverviewPage /> },
     { path: "/dashboard-overview", element: <DashboardOverviewPage /> },
     { path: "/supplier-entry", element: <SupplierEntryPage /> },
     { path: "/supplier-payments", element: <SupplierPaymentsPage /> },
@@ -58,8 +59,6 @@ const pageRoutes = [
     { path: "/settings", element: <SettingsPage /> },
     { path: "*", element: <DashboardOverviewPage /> }
 ];
-
-const router = createMemoryRouter(pageRoutes);
 
 interface AuthContextType {
   user: User | null;
@@ -134,34 +133,23 @@ const AppContent = () => {
     }
     
     return (
-        <RouterProvider router={router} />
+       <CustomSidebar onSignOut={logout}>
+          <Routes>
+              {pageRoutes.map((route) => (
+                  <Route key={route.path} path={route.path} element={route.element} />
+              ))}
+          </Routes>
+       </CustomSidebar>
     );
 };
-
-const AppLayoutStructure = () => {
-    const { logout } = useAuth();
-    const location = useLocation();
-
-    return (
-        <div className="flex min-h-screen">
-            <CustomSidebar onSignOut={logout}>
-                <main className="flex-1 p-4 sm:p-6 lg:p-8">
-                    <Routes location={location}>
-                        {pageRoutes.map((route) => (
-                            <Route key={route.path} path={route.path} element={route.element} />
-                        ))}
-                    </Routes>
-                </main>
-            </CustomSidebar>
-        </div>
-    )
-}
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <AuthProvider>
-            <AppContent />
+            <MemoryRouter>
+              <AppContent />
+            </MemoryRouter>
         </AuthProvider>
     );
 }

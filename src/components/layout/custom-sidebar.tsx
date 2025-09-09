@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu, ChevronDown } from 'lucide-react';
@@ -17,7 +17,6 @@ interface CustomSidebarProps {
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [isSidebarActive, setIsSidebarActive] = useState(false);
-  const navigate = useNavigate();
   const location = useLocation();
   const activePath = location.pathname;
 
@@ -41,7 +40,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
   };
   
   const handleLinkClick = (id: string) => {
-    navigate(`/${id}`);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsSidebarActive(false);
     }
@@ -70,10 +68,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
     return (
       <li className={cn(isActive && "active")}>
         {isActive && <span className="top_curve"></span>}
-        <button className="w-full" onClick={() => handleLinkClick(item.id)}>
+        <Link to={`/${item.id}`} className="w-full block" onClick={() => handleLinkClick(item.id)}>
           <span className="icon">{React.createElement(item.icon)}</span>
           <span className="item">{item.name}</span>
-        </button>
+        </Link>
         {isActive && <span className="bottom_curve"></span>}
       </li>
     );
@@ -84,10 +82,10 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
         <aside className="side_bar">
         <div className="side_bar_top">
             <div className="logo_wrap">
-            <button onClick={() => navigate('/dashboard-overview')} className='flex items-center gap-2'>
+            <Link to="/dashboard-overview" className='flex items-center gap-2'>
                     <span className="icon"><Sparkles/></span>
                     <span className="text">BizSuite</span>
-            </button>
+            </Link>
             </div>
             <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">
                 <Menu className="h-5 w-5" />
@@ -103,9 +101,9 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
                     <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
                     {item.subMenus.map(subItem => (
                         <li key={subItem.id} className={cn(`/${subItem.id}` === activePath && "active")}>
-                        <button className="w-full text-left" onClick={() => handleLinkClick(subItem.id)}>
+                        <Link to={`/${subItem.id}`} className="w-full text-left" onClick={() => handleLinkClick(subItem.id)}>
                             {subItem.name}
-                        </button>
+                        </Link>
                         </li>
                     ))}
                     </ul>
