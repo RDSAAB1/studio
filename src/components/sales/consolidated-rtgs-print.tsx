@@ -156,8 +156,9 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         // This is a more robust way to copy styles
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
+                const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 const style = iframeDoc.createElement('style');
-                style.textContent = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                style.textContent = css;
                 iframeDoc.head.appendChild(style);
             } catch (e) {
                 console.warn('Could not copy stylesheet:', e);
@@ -180,6 +181,12 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     background-color: #fff !important; 
                     color: #000 !important; 
                     border-color: #ccc !important; 
+                }
+                .print-table tbody tr, .print-table tbody td {
+                    color: #000 !important;
+                }
+                thead tr {
+                    background-color: #e5e7eb !important;
                 }
             }
         `;
