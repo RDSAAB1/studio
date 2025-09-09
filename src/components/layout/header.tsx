@@ -28,7 +28,6 @@ const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
-    const router = useRouter();
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
@@ -44,9 +43,7 @@ const NotificationBell = () => {
         setPendingNotifications(pending);
     }, [loans]);
 
-    const handleNotificationClick = (e: React.MouseEvent, href: string) => {
-        e.preventDefault();
-        router.push(href, { scroll: false });
+    const handleNotificationClick = () => {
         setOpen(false); 
     };
 
@@ -79,7 +76,7 @@ const NotificationBell = () => {
                              <Link
                                 key={loan.id} 
                                 href={href}
-                                onClick={(e) => handleNotificationClick(e, href)}
+                                onClick={handleNotificationClick}
                                 className="block p-2 rounded-md hover:bg-accent active:bg-primary/20 cursor-pointer"
                              >
                                 <div>
