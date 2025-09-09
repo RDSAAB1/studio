@@ -117,6 +117,11 @@ export default function DailySupplierReportClient() {
                     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     .printable-area, .printable-area table, .printable-area tr, .printable-area td, .printable-area th, .printable-area div, .printable-area p { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
+                    .print-summary-container {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        gap: 0.5rem !important;
+                    }
                 }
             `;
             newWindow.document.head.appendChild(printStyles);
@@ -160,7 +165,7 @@ export default function DailySupplierReportClient() {
                             </div>
                         </div>
 
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 print:flex print-summary-container">
                             <SummaryCard title="Weight Summary" icon={<Weight size={14}/>}>
                                 <div className="space-y-1">
                                     <SummaryItem label="GROSS" value={summary.gross} />
