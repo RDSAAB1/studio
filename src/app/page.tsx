@@ -11,6 +11,8 @@ export default function Home() {
   const { user, authLoading } = useAuth();
 
   useEffect(() => {
+    // AuthGate in layout.tsx will handle the redirection logic.
+    // This page just shows a loading spinner until the auth state is resolved.
     if (!authLoading) {
       if (user) {
         router.replace('/dashboard-overview');

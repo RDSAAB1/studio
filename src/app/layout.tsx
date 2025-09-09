@@ -65,18 +65,19 @@ function AuthGate({ children }: { children: ReactNode }) {
     const { user, authLoading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
+    const isProtectedRoute = !UNPROTECTED_ROUTES.includes(pathname);
 
     useEffect(() => {
         if (!authLoading) {
-            if (!user && isProtected) {
+            if (!user && isProtectedRoute) {
                 router.replace('/login');
             }
-            if (user && !isProtected) {
-                router.replace('/dashboard-overview');
-            }
+            // This case should be handled by the login page itself to avoid loops
+            // if (user && !isProtectedRoute) {
+            //     router.replace('/dashboard-overview');
+            // }
         }
-    }, [user, authLoading, isProtected, router, pathname]);
+    }, [user, authLoading, isProtectedRoute, router, pathname]);
 
     if (authLoading) {
          return (
@@ -86,14 +87,13 @@ function AuthGate({ children }: { children: ReactNode }) {
         )
     }
 
-    if (!user && isProtected) {
-        // Render nothing, redirection is in progress
-        return null;
-    }
-    
-    if (user && !isProtected) {
-        // Render nothing, redirection is in progress
-        return null;
+    if (!user && isProtectedRoute) {
+        // Render loading while redirecting
+        return (
+             <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
     }
 
     return <>{children}</>;

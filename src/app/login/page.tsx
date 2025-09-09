@@ -34,6 +34,13 @@ export default function LoginPage() {
         setGoogleProvider(getGoogleProvider());
     }, []);
 
+    useEffect(() => {
+        // If the user is already logged in, redirect them to the dashboard.
+        if (!authLoading && user) {
+            router.replace('/dashboard-overview');
+        }
+    }, [user, authLoading, router]);
+
     const handleSignIn = async () => {
         if (!auth || !googleProvider) {
             toast({
@@ -48,7 +55,7 @@ export default function LoginPage() {
         setAuthError(null);
         try {
             await signInWithPopup(auth, googleProvider);
-            // Redirection is handled by the AuthGate in layout
+            // The useEffect hook above will handle the redirect on successful login.
         } catch (error: any) {
             console.error("Error signing in with Google: ", error);
             let errorMessage = "An unknown error occurred. Please try again.";
@@ -78,10 +85,11 @@ export default function LoginPage() {
                 variant: "success",
             });
             // This is a mock bypass. A proper implementation would use custom tokens.
-            // For now, we'll just redirect. The AuthGate will see no user and redirect back.
-            // This needs a better solution, maybe a "guest" state in the auth context.
             // For now, let's just use a simple redirect for demonstration.
-            sessionStorage.setItem('bypass', 'true');
+            sessionStorage.setItem('bypass', 'true'); // We'll use this as a simple flag
+             // We can't set the user object, so we redirect and let the AuthGate handle it.
+             // But for a true bypass, we need to skip the AuthGate check.
+             // A better approach is needed here, but for now, this will just redirect.
             router.replace('/dashboard-overview');
         } else {
             toast({
