@@ -67,7 +67,7 @@ body {
     overflow-x: hidden;
 }
 
-/* Expanded state when wrapper is active (pinned) or sidebar is hovered */
+/* Expanded state when wrapper is active (pinned) */
 .wrapper.active .side_bar {
     width: 250px;
 }
