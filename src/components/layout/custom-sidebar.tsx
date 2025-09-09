@@ -55,7 +55,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
                 <span className="icon">{React.createElement(item.icon)}</span>
                 <span className="item flex justify-between w-full">
                     {item.name}
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", openSubMenu === item.id && "rotate-180")} />
                 </span>
             </button>
           {isSubMenuActive && <span className="bottom_curve"></span>}
