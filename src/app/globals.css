@@ -50,7 +50,6 @@ body {
     border-radius: 15px;
     display: flex;
     position: relative;
-    overflow: hidden;
 }
 
 .side_bar{
@@ -256,7 +255,8 @@ body {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    /* transition removed to prevent width calculation issues */
+    min-width: 0; /* Fix for flexbox overflow */
+    overflow: hidden;
 }
 
 .main_container > .content {
