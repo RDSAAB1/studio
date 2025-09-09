@@ -47,16 +47,18 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
       return (
         <li className={cn(isSubMenuActive && "active")}>
           {isSubMenuActive && <span className="top_curve"></span>}
-          <button
-            onClick={(e) => handleSubMenuToggle(e, item.id)}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center p-4">
-              <span className="icon">{React.createElement(item.icon)}</span>
-              <span className="item">{item.name}</span>
-            </div>
-            <ChevronDown className={cn("h-4 w-4 mr-5 transition-transform item", openSubMenu === item.id && "rotate-180")} />
-          </button>
+           <button
+                onClick={(e) => handleSubMenuToggle(e, item.id)}
+                className="w-full"
+            >
+                <span className="flex items-center justify-between">
+                    <span className="flex items-center">
+                        <span className="icon">{React.createElement(item.icon)}</span>
+                        <span className="item">{item.name}</span>
+                    </span>
+                    <ChevronDown className={cn("h-4 w-4 mr-5 transition-transform item", openSubMenu === item.id && "rotate-180")} />
+                </span>
+            </button>
           {isSubMenuActive && <span className="bottom_curve"></span>}
         </li>
       );

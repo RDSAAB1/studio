@@ -138,7 +138,8 @@ body {
     position: relative;
 }
 
-.side_bar_bottom ul li a{
+.side_bar_bottom ul li a,
+.side_bar_bottom ul li button {
     display: flex;
     align-items: center;
     padding: 15px;
@@ -148,12 +149,15 @@ body {
 }
 
 .side_bar_bottom ul li a:hover,
-.side_bar_bottom ul li a:hover .icon {
+.side_bar_bottom ul li button:hover,
+.side_bar_bottom ul li a:hover .icon,
+.side_bar_bottom ul li button:hover .icon {
     color: hsl(var(--accent));
 }
 
 
-.side_bar_bottom ul li a .icon{
+.side_bar_bottom ul li a .icon,
+.side_bar_bottom ul li button .icon {
     margin-right: 15px;
     font-size: 18px;
     height: 18px;
@@ -163,10 +167,12 @@ body {
 }
 
 /* Adjust icon margin when collapsed and not hovered */
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li a .icon {
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li a .icon,
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button .icon {
     margin-right: 0;
 }
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li a {
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li a,
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button {
     justify-content: center;
     padding: 15px 0;
 }
@@ -181,14 +187,16 @@ body {
 }
 
 
-.side_bar_bottom ul li.active a{
+.side_bar_bottom ul li.active a,
+.side_bar_bottom ul li.active button {
     background: hsl(var(--background));
     color: hsl(var(--primary));
     font-weight: 600;
     border-top-left-radius: 25px;
     border-bottom-left-radius: 25px;
 }
-.side_bar_bottom ul li.active a .icon {
+.side_bar_bottom ul li.active a .icon,
+.side_bar_bottom ul li.active button .icon {
   color: hsl(var(--primary));
 }
 
