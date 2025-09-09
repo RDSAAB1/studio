@@ -101,7 +101,7 @@ export function Header({ onSignOut }: HeaderProps) {
   const { user } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
+    <header className="sticky top-0 z-30 flex h-10 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
         {/* Left Aligned Spacer */}
         <div className="flex flex-1 items-center gap-2">
           {/* Header content, if any, can go here. For now, it's a spacer. */}
