@@ -296,6 +296,10 @@ body {
     transition: margin-left 0.3s ease;
 }
 
+.side_bar:hover ~ .main_container {
+    margin-left: 250px; /* Adjust for expanded sidebar on hover */
+}
+
 .wrapper.active .main_container {
     margin-left: 250px; /* Expanded sidebar width */
 }
@@ -361,6 +365,10 @@ body {
     
     .wrapper.active .main_container {
         margin-left: 0;
+    }
+    
+    .side_bar:hover ~ .main_container {
+        margin-left: 0; /* No margin change on hover for mobile */
     }
 }
 
