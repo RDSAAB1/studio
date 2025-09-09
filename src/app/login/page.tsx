@@ -5,13 +5,15 @@ import { useState, useEffect } from 'react';
 import type { Auth, User } from 'firebase/auth';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
     const { toast } = useToast();
@@ -20,6 +22,8 @@ export default function LoginPage() {
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
     const [authError, setAuthError] = useState<string | null>(null);
+    const [isBypassDialogOpen, setIsBypassDialogOpen] = useState(false);
+    const [bypassCode, setBypassCode] = useState('');
 
     useEffect(() => {
         const authInstance = getFirebaseAuth();
@@ -50,7 +54,6 @@ export default function LoginPage() {
         setAuthLoading(true);
         setAuthError(null);
         try {
-            await signOut(auth);
             await signInWithPopup(auth, googleProvider);
             // Redirection is handled by the onAuthStateChanged listener
         } catch (error: any) {
@@ -71,6 +74,27 @@ export default function LoginPage() {
             });
              setAuthLoading(false);
         }
+    };
+
+    const handleBypass = () => {
+        if (bypassCode === '7880') {
+            toast({
+                title: "Bypass Successful",
+                description: "Accessing the application directly.",
+                variant: "success",
+            });
+            // This is a mock bypass, it doesn't create a real user session.
+            // A better approach would be a custom token, but this meets the request.
+            router.replace('/dashboard-overview');
+        } else {
+            toast({
+                title: "Invalid Code",
+                description: "The bypass code is incorrect.",
+                variant: "destructive",
+            });
+        }
+        setIsBypassDialogOpen(false);
+        setBypassCode('');
     };
     
     const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) => (
@@ -102,7 +126,7 @@ export default function LoginPage() {
                         </div>
                         <CardDescription>Your all-in-one business management solution. Sign in to continue.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-0">
+                    <CardContent className="p-0 space-y-4">
                          <div className="space-y-6 mb-8">
                              <FeatureCard icon={<Users className="h-5 w-5"/>} title="Unified Management" description="Handle suppliers, customers, and finances all in one place." />
                              <FeatureCard icon={<BarChart3 className="h-5 w-5"/>} title="Insightful Reports" description="Generate RTGS, sales, and financial reports with a single click." />
@@ -131,6 +155,12 @@ export default function LoginPage() {
                              )}
                         </Button>
                     </CardContent>
+                     <CardFooter className="p-0 pt-4">
+                        <Button variant="link" className="text-muted-foreground" onClick={() => setIsBypassDialogOpen(true)}>
+                            <KeyRound className="mr-2 h-4 w-4"/>
+                            Bypass Login
+                        </Button>
+                    </CardFooter>
                 </div>
                  <div className="hidden md:block bg-muted/40 p-8">
                     <div className="flex flex-col justify-center h-full">
@@ -138,6 +168,33 @@ export default function LoginPage() {
                     </div>
                 </div>
             </Card>
+
+             <Dialog open={isBypassDialogOpen} onOpenChange={setIsBypassDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Login Bypass</DialogTitle>
+                        <DialogDescription>
+                            Enter the bypass code to access the application without signing in.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="bypass-code">Bypass Code</Label>
+                            <Input
+                                id="bypass-code"
+                                type="password"
+                                value={bypassCode}
+                                onChange={(e) => setBypassCode(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleBypass()}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsBypassDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleBypass}>Enter</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

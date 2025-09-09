@@ -65,7 +65,6 @@ function MainLayout({ children }: { children: ReactNode }) {
     const { user, authLoading } = React.useContext(AuthContext);
 
     useEffect(() => {
-        // Redirect to login if auth is done and there's no user.
         if (!authLoading && !user) {
             router.replace('/login');
         }
@@ -78,19 +77,24 @@ function MainLayout({ children }: { children: ReactNode }) {
     const handleSignOut = async () => {
         try {
             await signOut(getFirebaseAuth());
-            router.replace('/login');
+            // The onAuthStateChanged listener in AuthProvider will handle the redirect.
         } catch (error) {
             console.error("Error signing out: ", error);
         }
     };
     
     // While checking auth state, show a loader.
-    if (authLoading || !user) {
+    if (authLoading) {
         return (
              <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         )
+    }
+    
+    // If auth is done and there's no user, return null to let the redirect happen.
+    if (!user) {
+        return null;
     }
     
     // Once authenticated, show the main layout
