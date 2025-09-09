@@ -285,9 +285,6 @@ export default function DailySupplierReportClient() {
                                             <td className="border border-gray-300 p-1 text-right font-bold text-sm">{formatCurrency(Number(s.netAmount))}</td>
                                         </tr>
                                     ))}
-                                    {Array.from({ length: Math.max(0, 15 - filteredSuppliers.length) }).map((_, i) => (
-                                        <tr key={`empty-${i}`} className="h-[29px]"><td className="border border-gray-300" colSpan={17}></td></tr>
-                                    ))}
                                 </tbody>
                             </table>
                         </div>
