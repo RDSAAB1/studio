@@ -160,7 +160,7 @@ export default function DailySupplierReportClient() {
                 </div>
                 <Card>
                     <CardContent className="p-4 space-y-4">
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center no-print">
                             <div className="flex items-center gap-4 col-span-1">
                                 <Popover>
                                     <PopoverTrigger asChild>
@@ -172,7 +172,7 @@ export default function DailySupplierReportClient() {
                                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
                                 </Popover>
                             </div>
-                            <div className="md:col-span-2 no-print">
+                            <div className="md:col-span-2">
                                 <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
                             </div>
                         </div>
