@@ -246,7 +246,7 @@ export const PaymentForm = ({
                     <div className="flex-grow"></div>
                     <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
                     <Button onClick={processPayment} size="sm" className="h-8 text-xs">
-                        {editingPayment ? 'Save Payment' : 'Finalize Payment'}
+                       Finalize Payment
                     </Button>
                 </CardContent>
                 </Card>
@@ -254,3 +254,5 @@ export const PaymentForm = ({
         </>
     );
 };
+
+    
