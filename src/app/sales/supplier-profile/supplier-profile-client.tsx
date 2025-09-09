@@ -63,103 +63,19 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     const totalDebit = transactions.reduce((sum, item) => sum + item.debit, 0);
     const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
     const closingBalance = totalDebit - totalCredit;
-
-     const handlePrint = () => {
-        const node = statementRef.current;
-        if (!node) {
-            toast({ title: 'Error', description: 'Could not find printable content.', variant: 'destructive'});
-            return;
-        }
-
-        const newWindow = window.open('', '', 'height=800,width=1200');
-        if (newWindow) {
-            const document = newWindow.document;
-            document.write(`
-                <html>
-                    <head>
-                        <title>Print Statement</title>
-                        <style>
-                            /* Include basic styles for printing */
-                            body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; }
-                            table { width: 100%; border-collapse: collapse; }
-                            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            .no-print { display: none; }
-                             @media print {
-                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                .printable-area { background-color: #fff !important; color: #000 !important; }
-                                .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                                .print-bg-gray-800 {
-                                    background-color: #f2f2f2 !important; /* Light gray for print */
-                                    color: #000 !important;
-                                    -webkit-print-color-adjust: exact;
-                                    print-color-adjust: exact;
-                                }
-                             }
-                        </style>
-                    </head>
-                    <body>
-                    </body>
-                </html>
-            `);
-
-            // Use a more robust method to clone and append styles
-            Array.from(window.document.styleSheets).forEach(styleSheet => {
-                try {
-                    const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                    const styleElement = document.createElement('style');
-                    styleElement.appendChild(document.createTextNode(css));
-                    newWindow.document.head.appendChild(styleElement);
-                } catch (e) {
-                    console.warn('Could not copy stylesheet:', e);
-                }
-            });
-
-            document.body.innerHTML = node.innerHTML;
-            
-            setTimeout(() => {
-                newWindow.focus();
-                newWindow.print();
-                newWindow.close();
-            }, 500);
-        } else {
-            toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
-        }
-    };
     
     return (
     <>
-        <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
-             <DialogTitle>Account Statement for {data.name}</DialogTitle>
-             <DialogDescription className="sr-only">
-             A detailed summary and transaction history for {data.name}.
-             </DialogDescription>
-        </DialogHeader>
         <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
             <style>
                 {`
                 @media print {
-                    body {
-                        background-color: #fff !important;
+                    .summary-grid-container {
+                        display: flex !important;
+                        flex-wrap: nowrap !important;
                     }
-                    .printable-statement {
-                        background-color: #fff !important;
-                        color: #000 !important;
-                    }
-                    .printable-statement * {
-                        color: #000 !important;
-                        border-color: #ccc !important;
-                    }
-                    .text-primary, .text-destructive, .text-green-600 {
-                        color: #000 !important;
-                    }
-                    .bg-muted\\/50 {
-                        background-color: #f9fafb !important;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
-                    .text-gray-600, .text-muted-foreground {
-                        color: #555 !important;
+                    .summary-grid-container > div {
+                        flex: 1;
                     }
                 }
                 `}
@@ -277,12 +193,6 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                     </div>
             </div>
         </div>
-        <DialogFooter className="p-4 border-t no-print">
-            <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
-            <div className="flex-grow" />
-            <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
-            <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
-        </DialogFooter>
     </>
     );
 };
@@ -295,7 +205,6 @@ export default function SupplierProfilePage() {
 
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
-  const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
 
@@ -526,16 +435,12 @@ export default function SupplierProfilePage() {
         isMillSelected={selectedSupplierKey === MILL_OVERVIEW_KEY}
         onShowDetails={setDetailsCustomer}
         onShowPaymentDetails={setSelectedPaymentForDetails}
-        onGenerateStatement={() => setIsStatementOpen(true)}
+        onGenerateStatement={() => window.print()}
       />
-
-      <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-        <DialogContent className="max-w-5xl p-0 printable-statement-container">
-            <ScrollArea className="max-h-[90vh] printable-statement-scroll-area">
-                <StatementPreview data={selectedSupplierData} />
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      
+      <div className="print-only hidden">
+          <StatementPreview data={selectedSupplierData} />
+      </div>
       
       <DetailsDialog 
           isOpen={!!detailsCustomer}
