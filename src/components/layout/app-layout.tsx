@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { MemoryRouter, useLocation, useNavigate, Routes, Route } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from 'lucide-react';
@@ -32,33 +32,35 @@ import DataCapturePage from "@/app/data-capture/page";
 import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
 
-const pageComponents: { [key: string]: React.FC<any> } = {
-    "/dashboard-overview": DashboardOverviewPage,
-    "/supplier-entry": SupplierEntryPage,
-    "/supplier-payments": SupplierPaymentsPage,
-    "/supplier-profile": SupplierProfilePage,
-    "/customer-entry": CustomerEntryPage,
-    "/customer-payments": CustomerPaymentsPage,
-    "/customer-profile": CustomerProfilePage,
-    "/cash-bank": CashBankPage,
-    "/income-expense": ExpenseTrackerPage,
-    "/rtgs-report": RtgsReportPage,
-    "/employee-db": EmployeeDatabasePage,
-    "/payroll": PayrollManagementPage,
-    "/attendance": AttendanceTrackingPage,
-    "/inventory-mgmt": InventoryManagementPage,
-    "/purchase-orders": PurchaseOrdersPage,
-    "/project-dashboard": ProjectDashboardPage,
-    "/project-management": ProjectManagementPage,
-    "/tasks": TasksPage,
-    "/collaboration": CollaborationPage,
-    "/data-capture": DataCapturePage,
-    "/printer-settings": PrinterSettingsPage,
-    "/settings": SettingsPage,
-};
+const pageRoutes = [
+    { path: "/", element: <DashboardOverviewPage /> },
+    { path: "/dashboard-overview", element: <DashboardOverviewPage /> },
+    { path: "/supplier-entry", element: <SupplierEntryPage /> },
+    { path: "/supplier-payments", element: <SupplierPaymentsPage /> },
+    { path: "/supplier-profile", element: <SupplierProfilePage /> },
+    { path: "/customer-entry", element: <CustomerEntryPage /> },
+    { path: "/customer-payments", element: <CustomerPaymentsPage /> },
+    { path: "/customer-profile", element: <CustomerProfilePage /> },
+    { path: "/cash-bank", element: <CashBankPage /> },
+    { path: "/income-expense", element: <ExpenseTrackerPage /> },
+    { path: "/rtgs-report", element: <RtgsReportPage /> },
+    { path: "/employee-db", element: <EmployeeDatabasePage /> },
+    { path: "/payroll", element: <PayrollManagementPage /> },
+    { path: "/attendance", element: <AttendanceTrackingPage /> },
+    { path: "/inventory-mgmt", element: <InventoryManagementPage /> },
+    { path: "/purchase-orders", element: <PurchaseOrdersPage /> },
+    { path: "/project-dashboard", element: <ProjectDashboardPage /> },
+    { path: "/project-management", element: <ProjectManagementPage /> },
+    { path: "/tasks", element: <TasksPage /> },
+    { path: "/collaboration", element: <CollaborationPage /> },
+    { path: "/data-capture", element: <DataCapturePage /> },
+    { path: "/printer-settings", element: <PrinterSettingsPage /> },
+    { path: "/settings", element: <SettingsPage /> },
+    { path: "*", element: <DashboardOverviewPage /> }
+];
 
+const router = createMemoryRouter(pageRoutes);
 
-// --- Auth Context and Provider ---
 interface AuthContextType {
   user: User | null;
   authLoading: boolean;
@@ -80,8 +82,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [isBypassed, setIsBypassed] = useState(false);
-    const navigate = useNavigate();
-
+    
     useEffect(() => {
         const auth = getFirebaseAuth();
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -103,7 +104,8 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (typeof window !== 'undefined') {
             sessionStorage.removeItem('bypass');
         }
-        navigate('/login');
+        // Let the router handle the redirect
+        router.navigate('/login');
     };
 
     const isAuthenticated = !!user || isBypassed;
@@ -113,11 +115,10 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
             {children}
         </AuthContext.Provider>
     );
-}
+};
 
 const AppContent = () => {
     const { isAuthenticated, authLoading, logout } = useAuth();
-    const location = useLocation();
 
     if (authLoading) {
         return (
@@ -135,24 +136,17 @@ const AppContent = () => {
         <div className="flex min-h-screen">
            <CustomSidebar onSignOut={logout}>
                 <main className="flex-1 p-4 sm:p-6 lg:p-8">
-                    <Routes>
-                        {Object.entries(pageComponents).map(([path, Component]) => (
-                            <Route key={path} path={path} element={<Component />} />
-                        ))}
-                         <Route path="*" element={<DashboardOverviewPage />} />
-                    </Routes>
+                    <RouterProvider router={router} />
                 </main>
            </CustomSidebar>
         </div>
-    )
-}
+    );
+};
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
-        <MemoryRouter>
-            <AuthProvider>
-                <AppContent />
-            </AuthProvider>
-        </MemoryRouter>
+        <AuthProvider>
+            <AppContent />
+        </AuthProvider>
     );
 }

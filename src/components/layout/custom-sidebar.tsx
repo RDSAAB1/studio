@@ -84,7 +84,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
         <aside className="side_bar">
         <div className="side_bar_top">
             <div className="logo_wrap">
-            <button onClick={() => handleLinkClick('dashboard')} className='flex items-center gap-2'>
+            <button onClick={() => navigate('/dashboard-overview')} className='flex items-center gap-2'>
                     <span className="icon"><Sparkles/></span>
                     <span className="text">BizSuite</span>
             </button>
