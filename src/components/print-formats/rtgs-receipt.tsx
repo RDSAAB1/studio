@@ -92,7 +92,7 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
 
                         {/* Information Table */}
                          <table className="w-full text-left mb-4 print-table text-base">
-                            <thead className="print-bg-orange">
+                            <thead>
                                 <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
                                     <th className="p-2 font-semibold w-[20%]">Payee Name</th>
                                     <th className="p-2 font-semibold w-[20%]">Bank Name</th>

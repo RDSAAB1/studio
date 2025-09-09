@@ -154,7 +154,6 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 body {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
-                    font-size: 12px;
                 }
                 .page-break-after { page-break-after: always !important; }
                 .printable-area { background-color: #fff !important; color: #000 !important; }
@@ -185,14 +184,14 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
-                <div ref={printRef} className="printable-area">
+                <div ref={printRef} className="printable-area bg-white text-black">
                     {paymentChunks.map((chunk, pageIndex) => {
                         const isLastPage = pageIndex === paymentChunks.length - 1;
                         const pageTotal = chunk.reduce((sum, p) => sum + p.amount, 0);
                         cumulativeTotal += pageTotal;
 
                         return (
-                            <div key={pageIndex} className={`p-4 bg-white text-black font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${!isLastPage ? 'page-break-after' : ''}`}>
+                            <div key={pageIndex} className={`p-4 font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${!isLastPage ? 'page-break-after' : ''}`}>
                                 <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
                                 
                                 <div className="flex-grow overflow-x-auto">
