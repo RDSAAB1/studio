@@ -130,6 +130,20 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     
     return (
     <>
+         <style>
+            {`
+              @media print {
+                .summary-grid-container {
+                  display: flex !important;
+                  flex-wrap: nowrap !important;
+                  gap: 1rem !important;
+                }
+                .summary-grid-container > div {
+                  flex: 1;
+                }
+              }
+            `}
+          </style>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
              <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
