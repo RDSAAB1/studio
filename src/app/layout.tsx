@@ -108,11 +108,11 @@ export default function RootLayout({
                   <div className="shadow" onClick={toggleSidebar}></div>
                 )}
               </div>
+               <DynamicIslandToaster />
             </div>
           ) : (
             children
           )}
-          <DynamicIslandToaster />
         </AuthProvider>
       </body>
     </html>
