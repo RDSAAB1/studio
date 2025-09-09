@@ -190,7 +190,7 @@ export default function SupplierEntryClient() {
     const kartaWeight = weight * (kartaPercentage / 100);
     const kartaAmount = kartaWeight * rate;
     const netWeight = weight - kartaWeight;
-    const amount = netWeight * rate;
+    const amount = weight * rate;
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
