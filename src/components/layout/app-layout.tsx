@@ -2,16 +2,13 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
-import { DynamicIslandToaster } from "@/components/ui/dynamic-island-toaster";
 import LoginPage from "@/app/login/page";
-import { allMenuItems } from "@/hooks/use-tabs";
-
 import DashboardOverviewPage from "@/app/dashboard-overview/page";
 import SupplierEntryPage from "@/app/sales/supplier-entry/page";
 import SupplierPaymentsPage from "@/app/sales/supplier-payments/page";
@@ -34,7 +31,6 @@ import CollaborationPage from "@/app/projects/collaboration/page";
 import DataCapturePage from "@/app/data-capture/page";
 import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
-
 
 const pageComponents: { [key: string]: React.FC<any> } = {
     "dashboard": DashboardOverviewPage,
@@ -80,6 +76,45 @@ export const useAuth = () => {
     return context;
 };
 
+const AuthProvider = ({ children }: { children: ReactNode }) => {
+    const [user, setUser] = useState<User | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [isBypassed, setIsBypassed] = useState(false);
+    const router = useRouter();
+
+    useEffect(() => {
+        const auth = getFirebaseAuth();
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setAuthLoading(false);
+        });
+
+        if (typeof window !== 'undefined') {
+            const bypass = sessionStorage.getItem('bypass') === 'true';
+            setIsBypassed(bypass);
+        }
+
+        return () => unsubscribe();
+    }, []);
+
+    const logout = async () => {
+        const auth = getFirebaseAuth();
+        await signOut(auth);
+        if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('bypass');
+        }
+        router.push('/login');
+    };
+
+    const isAuthenticated = !!user || isBypassed;
+    
+    return (
+        <AuthContext.Provider value={{ user, authLoading, isAuthenticated, isBypassed, logout }}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
+
 const TabContent = ({ activeTabId }: { activeTabId: string }) => {
     const PageComponent = pageComponents[activeTabId];
     return PageComponent ? <PageComponent /> : <div>Page not found</div>;
@@ -87,18 +122,7 @@ const TabContent = ({ activeTabId }: { activeTabId: string }) => {
 
 function LayoutController({ children }: { children: ReactNode }) {
     const { isAuthenticated, authLoading, logout } = useAuth();
-    const pathname = usePathname();
-    const router = useRouter();
     const [activeTabId, setActiveTabId] = useState<string>('dashboard');
-
-    useEffect(() => {
-        if (!authLoading) {
-            const isSetupPage = pathname.startsWith('/setup');
-            if (!isAuthenticated && !isSetupPage && pathname !== '/login') {
-                router.replace('/login');
-            }
-        }
-    }, [isAuthenticated, authLoading, pathname, router]);
 
     if (authLoading) {
         return (
@@ -109,21 +133,9 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
     
     if (!isAuthenticated) {
-        if (pathname.startsWith('/setup')) {
-            return <>{children}</>;
-        }
         return <LoginPage />;
     }
-
-    if (pathname === '/login') {
-        router.replace('/dashboard-overview'); // Still good to have a default redirect
-        return ( 
-             <div className="flex h-screen w-screen items-center justify-center bg-background">
-                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-             </div>
-        );
-    }
-
+    
     return (
         <div className="flex min-h-screen">
            <CustomSidebar onSignOut={logout} activeTabId={activeTabId} onTabSelect={setActiveTabId}>
@@ -131,7 +143,6 @@ function LayoutController({ children }: { children: ReactNode }) {
                     <TabContent activeTabId={activeTabId} />
                 </main>
            </CustomSidebar>
-           <DynamicIslandToaster />
         </div>
     )
 }

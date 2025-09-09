@@ -6,7 +6,6 @@ import { Settings, UserCircle, Search, Menu, X, LogOut, Bell } from "lucide-reac
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
-import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import type { User } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -15,7 +14,6 @@ import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
-import Link from 'next/link';
 import { useAuth } from "@/components/layout/app-layout";
 
 
@@ -73,7 +71,7 @@ const NotificationBell = () => {
                                 description: `EMI for ${loan.loanName}`
                             }).toString()}`;
                             return (
-                             <Link
+                             <a
                                 key={loan.id} 
                                 href={href}
                                 onClick={handleNotificationClick}
@@ -85,7 +83,7 @@ const NotificationBell = () => {
                                         EMI of {formatCurrency(loan.emiAmount || 0)} was due on {format(new Date(loan.nextEmiDueDate!), "dd-MMM-yy")}
                                     </p>
                                 </div>
-                             </Link>
+                             </a>
                             )
                         })
                     ) : (
