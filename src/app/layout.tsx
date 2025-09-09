@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
-import { Toaster } from "@/components/ui/toast"
 import { DynamicIslandToaster } from "@/components/ui/dynamic-island-toaster";
 
 const inter = Inter({
@@ -35,9 +34,10 @@ const sourceCodePro = Source_Code_Pro({
 const UNPROTECTED_ROUTES = ['/login', '/setup/connect-gmail', '/setup/company-details'];
 
 // --- Auth Context and Provider ---
-const AuthContext = React.createContext<{ user: User | null; authLoading: boolean }>({
+const AuthContext = React.createContext<{ user: User | null; authLoading: boolean; isBypassed: boolean; }>({
   user: null,
   authLoading: true,
+  isBypassed: false,
 });
 
 export const useAuth = () => React.useContext(AuthContext);
@@ -45,8 +45,15 @@ export const useAuth = () => React.useContext(AuthContext);
 function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isBypassed, setIsBypassed] = useState(false);
 
   useEffect(() => {
+    // Check for bypass state on client side
+    if (typeof window !== 'undefined') {
+        const bypassState = sessionStorage.getItem('bypass') === 'true';
+        setIsBypassed(bypassState);
+    }
+    
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -56,11 +63,39 @@ function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, authLoading }}>
+    <AuthContext.Provider value={{ user, authLoading, isBypassed }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
+const AuthGuard = ({ children }: { children: ReactNode }) => {
+    const { user, authLoading, isBypassed } = useAuth();
+    const router = useRouter();
+    const pathname = usePathname();
+    const isProtectedRoute = !UNPROTECTED_ROUTES.includes(pathname);
+
+    useEffect(() => {
+        if (!authLoading && !user && !isBypassed && isProtectedRoute) {
+            router.replace('/login');
+        }
+    }, [user, authLoading, isBypassed, isProtectedRoute, router, pathname]);
+
+    if (authLoading && isProtectedRoute) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    if (!user && !isBypassed && isProtectedRoute) {
+        return null; // Don't render anything while redirecting
+    }
+
+    return <>{children}</>;
+};
+
 
 // --- Root Layout ---
 export default function RootLayout({
@@ -69,9 +104,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
     const pathname = usePathname();
-    const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
     const [isSidebarActive, setIsSidebarActive] = useState(false);
-    const router = useRouter();
 
     const toggleSidebar = () => {
         setIsSidebarActive(prev => !prev);
@@ -81,7 +114,7 @@ export default function RootLayout({
         try {
             await signOut(getFirebaseAuth());
             sessionStorage.removeItem('bypass'); // Clear the bypass session on sign out
-            router.push('/login');
+            window.location.href = '/login'; // Force a full redirect to clear all state
         } catch (error) {
             console.error("Error signing out: ", error);
         }
@@ -91,24 +124,26 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
         <AuthProvider>
-            {isProtected ? (
-                 <div className={cn("wrapper", isSidebarActive && "active")}>
-                    <CustomSidebar isSidebarActive={isSidebarActive} />
-                    <div className="main_container">
-                        <Header
-                            toggleSidebar={toggleSidebar}
-                            onSignOut={handleSignOut}
-                        />
-                        <main className="content">
-                            {children}
-                        </main>
-                        {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
+            <AuthGuard>
+                {!UNPROTECTED_ROUTES.includes(pathname) ? (
+                     <div className={cn("wrapper", isSidebarActive && "active")}>
+                        <CustomSidebar isSidebarActive={isSidebarActive} />
+                        <div className="main_container">
+                            <Header
+                                toggleSidebar={toggleSidebar}
+                                onSignOut={handleSignOut}
+                            />
+                            <main className="content">
+                                {children}
+                            </main>
+                            {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
+                        </div>
                     </div>
-                </div>
-            ) : (
-                children
-            )}
-             <DynamicIslandToaster />
+                ) : (
+                    children
+                )}
+                 <DynamicIslandToaster />
+            </AuthGuard>
         </AuthProvider>
       </body>
     </html>

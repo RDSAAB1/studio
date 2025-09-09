@@ -19,7 +19,7 @@ import { useAuth } from '../layout';
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const { user, authLoading } = useAuth(); // Use the context
+    const { user, authLoading, isBypassed } = useAuth(); // Use the context
     
     const [auth, setAuth] = useState<Auth | null>(null);
     const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
@@ -35,11 +35,11 @@ export default function LoginPage() {
     }, []);
 
     useEffect(() => {
-        // If the user is already logged in, redirect them to the dashboard.
-        if (!authLoading && user) {
+        // If the user is already logged in or bypassed, redirect them to the dashboard.
+        if (!authLoading && (user || isBypassed)) {
             router.replace('/dashboard-overview');
         }
-    }, [user, authLoading, router]);
+    }, [user, authLoading, isBypassed, router]);
 
     const handleSignIn = async () => {
         if (!auth || !googleProvider) {
@@ -84,10 +84,9 @@ export default function LoginPage() {
                 description: "Accessing the application directly.",
                 variant: "success",
             });
-            // This is a mock bypass. A proper implementation would use custom tokens.
-            // For now, let's just use a simple redirect for demonstration.
             sessionStorage.setItem('bypass', 'true');
-            router.replace('/dashboard-overview');
+            // Force a reload to re-trigger the AuthProvider and AuthGuard logic
+            window.location.href = '/dashboard-overview';
         } else {
             toast({
                 title: "Invalid Code",
@@ -109,7 +108,8 @@ export default function LoginPage() {
         </div>
     );
     
-    if (authLoading || (!authLoading && user)) {
+    // Show loading spinner while checking auth state, or if user is logged in (while redirecting)
+    if (authLoading || user || isBypassed) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -117,6 +117,7 @@ export default function LoginPage() {
         );
     }
     
+    // Only show login page if not loading and no user/bypass
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
             <Card className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 overflow-hidden shadow-2xl">
