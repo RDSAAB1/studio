@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Auth, User } from 'firebase/auth';
-import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle, KeyRound } from 'lucide-react';
@@ -86,10 +86,7 @@ export default function LoginPage() {
             });
             // This is a mock bypass. A proper implementation would use custom tokens.
             // For now, let's just use a simple redirect for demonstration.
-            sessionStorage.setItem('bypass', 'true'); // We'll use this as a simple flag
-             // We can't set the user object, so we redirect and let the AuthGate handle it.
-             // But for a true bypass, we need to skip the AuthGate check.
-             // A better approach is needed here, but for now, this will just redirect.
+            sessionStorage.setItem('bypass', 'true');
             router.replace('/dashboard-overview');
         } else {
             toast({
@@ -112,8 +109,7 @@ export default function LoginPage() {
         </div>
     );
     
-    // AuthGate handles rendering the loading spinner now.
-    if (authLoading || user) {
+    if (authLoading || (!authLoading && user)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import CustomSidebar from '@/components/layout/custom-sidebar';
@@ -60,46 +60,6 @@ function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// --- Auth Gate (Handles redirection) ---
-function AuthGate({ children }: { children: ReactNode }) {
-    const { user, authLoading } = useAuth();
-    const router = useRouter();
-    const pathname = usePathname();
-    const isProtectedRoute = !UNPROTECTED_ROUTES.includes(pathname);
-
-    useEffect(() => {
-        if (!authLoading) {
-            if (!user && isProtectedRoute) {
-                router.replace('/login');
-            }
-            // This case should be handled by the login page itself to avoid loops
-            // if (user && !isProtectedRoute) {
-            //     router.replace('/dashboard-overview');
-            // }
-        }
-    }, [user, authLoading, isProtectedRoute, router, pathname]);
-
-    if (authLoading) {
-         return (
-             <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        )
-    }
-
-    if (!user && isProtectedRoute) {
-        // Render loading while redirecting
-        return (
-             <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    return <>{children}</>;
-}
-
-
 // --- Root Layout ---
 export default function RootLayout({
   children,
@@ -117,7 +77,7 @@ export default function RootLayout({
     const handleSignOut = async () => {
         try {
             await signOut(getFirebaseAuth());
-            // AuthProvider will handle state change and AuthGate will redirect
+            // The redirection will be handled by the page logic now.
         } catch (error) {
             console.error("Error signing out: ", error);
         }
@@ -127,25 +87,23 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
         <AuthProvider>
-            <AuthGate>
-                {isProtected ? (
-                     <div className={cn("wrapper", isSidebarActive && "active")}>
-                        <CustomSidebar isSidebarActive={isSidebarActive} />
-                        <div className="main_container">
-                            <Header
-                                toggleSidebar={toggleSidebar}
-                                onSignOut={handleSignOut}
-                            />
-                            <main className="content">
-                                {children}
-                            </main>
-                            {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
-                        </div>
+            {isProtected ? (
+                 <div className={cn("wrapper", isSidebarActive && "active")}>
+                    <CustomSidebar isSidebarActive={isSidebarActive} />
+                    <div className="main_container">
+                        <Header
+                            toggleSidebar={toggleSidebar}
+                            onSignOut={handleSignOut}
+                        />
+                        <main className="content">
+                            {children}
+                        </main>
+                        {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
                     </div>
-                ) : (
-                    children
-                )}
-            </AuthGate>
+                </div>
+            ) : (
+                children
+            )}
         </AuthProvider>
       </body>
     </html>
