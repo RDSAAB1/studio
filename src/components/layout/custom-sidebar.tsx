@@ -75,8 +75,8 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ isSidebarActive, toggleSi
           {allMenuItems.map(item => (
             <React.Fragment key={item.id}>
               {renderMenuItem(item)}
-              {item.subMenus && (isSidebarActive || openSubMenu === item.id) && (
-                <ul className={cn("submenu", (openSubMenu === item.id || isSidebarActive) && "open")}>
+              {item.subMenus && (
+                <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
                   {item.subMenus.map(subItem => (
                     <li key={subItem.id} className={cn(pathname === subItem.href && "active")}>
                       <Link href={subItem.href || '#'}>

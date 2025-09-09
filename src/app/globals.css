@@ -45,8 +45,6 @@ body {
 }
 
 .wrapper{
-    background: hsl(var(--background));
-    min-height: 100vh;
     position: relative;
     display: flex;
 }
@@ -254,6 +252,10 @@ body {
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease-in-out;
+  /* Hide submenu when sidebar is collapsed and not hovered */
+  .wrapper:not(.active) .side_bar:not(:hover) & {
+    display: none;
+  }
 }
 
 .submenu.open {
