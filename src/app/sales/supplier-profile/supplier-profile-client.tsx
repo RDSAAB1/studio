@@ -33,7 +33,38 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
     if (!data) return null;
 
-    const handlePrint = () => {
+    const transactions = useMemo(() => {
+        const allTransactions = data.allTransactions || [];
+        const allPayments = data.allPayments || [];
+        
+        const mappedTransactions = allTransactions.map(t => ({
+            date: t.date,
+            particulars: `Purchase (SR# ${t.srNo})`,
+            debit: t.originalNetAmount || 0,
+            credit: 0,
+        }));
+        
+        const mappedPayments = allPayments.map(p => ({
+            date: p.date,
+            particulars: `Payment (ID# ${p.paymentId})`,
+            debit: 0,
+            credit: p.amount + (p.cdAmount || 0),
+        }));
+
+        const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        let runningBalance = 0;
+        return combined.map(item => {
+            runningBalance += item.debit - item.credit;
+            return { ...item, balance: runningBalance };
+        });
+    }, [data]);
+
+    const totalDebit = transactions.reduce((sum, item) => sum + item.debit, 0);
+    const totalCredit = transactions.reduce((sum, item) => sum + item.credit, 0);
+    const closingBalance = totalDebit - totalCredit;
+
+     const handlePrint = () => {
         const node = statementRef.current;
         if (!node) {
             toast({ title: 'Error', description: 'Could not find printable content.', variant: 'destructive'});
@@ -48,7 +79,8 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                     <head>
                         <title>Print Statement</title>
                         <style>
-                             body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; }
+                            /* Include basic styles for printing */
+                            body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; }
                             table { width: 100%; border-collapse: collapse; }
                             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
                             th { background-color: #f2f2f2; }
@@ -97,7 +129,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     
     return (
     <>
-         <style>
+        <style>
             {`
               @media print {
                 .summary-grid-container {
@@ -107,118 +139,134 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 }
                 .summary-grid-container > div {
                   flex: 1;
-                  border: 1px solid #ccc;
                   padding: 8px;
-                  border-radius: 8px;
                 }
                 .print-table th, .print-table td {
                     padding: 4px 6px;
                 }
               }
             `}
-          </style>
+        </style>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
              <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">A detailed summary and transaction history for {data.name}.</DialogDescription>
         </DialogHeader>
         <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
             {/* Header */}
-            <div className="flex justify-between items-start pb-4 border-b mb-4">
-                <div className="w-1/2">
-                    <h2 className="text-xl font-bold">BizSuite DataFlow</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b border-gray-300 mb-4">
+                <div className="mb-4 sm:mb-0">
+                    <h2 className="text-xl font-bold text-black">BizSuite DataFlow</h2>
+                    <p className="text-xs text-gray-600">{toTitleCase(data.name)}</p>
+                    <p className="text-xs text-gray-600">{toTitleCase(data.address || '')}</p>
+                    <p className="text-xs text-gray-600">{data.contact}</p>
                 </div>
-                <div className="text-right">
-                    <h1 className="text-2xl font-bold text-primary">STATEMENT</h1>
-                    <p className="text-xs">Date: {format(new Date(), 'dd-MMM-yyyy')}</p>
+                <div className="text-left sm:text-right w-full sm:w-auto">
+                        <h1 className="text-2xl font-bold text-black">Statement of Account</h1>
+                        <div className="mt-2 text-sm w-full sm:w-80 border-t border-gray-300 pt-1">
+                        <div className="flex justify-between">
+                            <span className="font-semibold text-black">Statement Date:</span>
+                            <span className="text-black">{format(new Date(), 'dd-MMM-yyyy')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="font-semibold text-black">Closing Balance:</span>
+                            <span className="font-bold text-black">{formatCurrency(data.totalOutstanding)}</span>
+                        </div>
+                        </div>
                 </div>
             </div>
 
-            {/* Consignee Details */}
-            <div className="border border-gray-200 p-3 rounded-lg mb-4">
-                <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Supplier Details</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                    <p><strong>Name:</strong> {toTitleCase(data.name)}</p>
-                    <p><strong>Contact:</strong> {data.contact}</p>
-                    <p className="col-span-2"><strong>Address:</strong> {toTitleCase(data.address || '')}</p>
-                </div>
-            </div>
+            {/* Summary Section */}
+             <Card className="mb-6 bg-white border-gray-200">
+                <CardContent className="p-4">
+                    <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Operational</h3>
+                             <div className="space-y-1">
+                                <div className="flex justify-between"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                                <div className="flex justify-between font-bold border-t border-gray-200 pt-1 mt-1"><span className="text-black">Final Wt</span><span className="text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-600">Karta Wt</span><span className="font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                                <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1 mt-1"><span className="text-primary">Net Wt</span><span className="text-primary">{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                            </div>
+                        </div>
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Deductions</h3>
+                            <div className="space-y-1">
+                                <div className="flex justify-between"><span className="text-gray-600">Total Amount</span><span className="font-semibold text-black">{`${formatCurrency(data.totalAmount || 0)}`}</span></div>
+                                <div className="flex justify-between pt-1 mt-1 border-t border-gray-200"><span className="text-gray-600">Karta</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-600">Laboury</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-600">Kanta</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalKanta || 0)}`}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-600">Other</span><span className="font-semibold text-black">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</span></div>
+                                <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1 mt-1"><span className="text-primary">Original Amount</span><span className="text-primary">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                            </div>
+                        </div>
+                        <div className="text-sm">
+                            <h3 className="font-semibold text-black mb-2 text-base border-b border-gray-300 pb-1">Financial</h3>
+                            <div className="space-y-1">
+                                <div className="flex justify-between"><span className="text-gray-600">Original Purchases</span><span className="font-semibold text-black">{formatCurrency(data.totalOriginalAmount || 0)}</span></div>
+                                <div className="flex justify-between pt-1 mt-1 border-t border-gray-200"><span className="text-gray-600">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-600">Total CD Granted</span><span className="font-semibold text-black">{`${formatCurrency(data.totalCdAmount || 0)}`}</span></div>
+                                <div className="flex justify-between font-bold text-destructive border-t border-gray-200 pt-1 mt-1"><span className="text-destructive">Outstanding</span><span className="text-destructive">{`${formatCurrency(data.totalOutstanding)}`}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Transaction Table */}
             <div>
-                <h2 className="text-lg font-semibold border-b pb-1 mb-2">TRANSACTIONS</h2>
-                <div className="overflow-x-auto border rounded-lg">
-                    <Table className="print-table min-w-full text-xs">
+                <h2 className="text-lg font-semibold border-b border-gray-300 pb-1 mb-2 text-black">TRANSACTIONS</h2>
+                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                    <Table className="print-table min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-muted/50">
-                                <TableHead className="py-2 px-3">SR No.</TableHead>
-                                <TableHead className="py-2 px-3">Date</TableHead>
-                                <TableHead className="py-2 px-3">Variety</TableHead>
-                                <TableHead className="py-2 px-3 text-right">Net Wt. (Qtl)</TableHead>
-                                <TableHead className="py-2 px-3 text-right">Net Amount</TableHead>
+                            <TableRow className="bg-gray-100">
+                                <TableHead className="py-2 px-3 text-black">Date</TableHead>
+                                <TableHead className="py-2 px-3 text-black">Particulars</TableHead>
+                                <TableHead className="text-right py-2 px-3 text-black">Debit</TableHead>
+                                <TableHead className="text-right py-2 px-3 text-black">Credit</TableHead>
+                                <TableHead className="text-right py-2 px-3 text-black">Balance</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {(data.allTransactions || []).map((item, index) => (
-                                <TableRow key={index} className="[&_td]:py-1 [&_td]:px-3">
-                                    <TableCell>{item.srNo}</TableCell>
-                                    <TableCell>{format(new Date(item.date), "dd-MMM-yy")}</TableCell>
-                                    <TableCell>{toTitleCase(item.variety)}</TableCell>
-                                    <TableCell className="text-right font-mono">{(item.netWeight || 0).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-mono">{formatCurrency(item.originalNetAmount || 0)}</TableCell>
+                            <TableRow>
+                                <TableCell colSpan={4} className="font-semibold py-2 px-3 text-black">Opening Balance</TableCell>
+                                <TableCell className="text-right font-semibold font-mono py-2 px-3 text-black">{formatCurrency(0)}</TableCell>
+                            </TableRow>
+                            {transactions.map((item, index) => (
+                                <TableRow key={index} className="[&_td]:py-2 [&_td]:px-3">
+                                    <TableCell className="text-black">{format(new Date(item.date), "dd-MMM-yy")}</TableCell>
+                                    <TableCell className="text-black">{item.particulars}</TableCell>
+                                    <TableCell className="text-right font-mono text-black">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono text-black">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono text-black">{formatCurrency(item.balance)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
+                        <TableFooter>
+                            <TableRow className="bg-gray-100 font-bold">
+                                <TableCell colSpan={2} className="py-2 px-3 text-black">Closing Balance</TableCell>
+                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(totalDebit)}</TableCell>
+                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(totalCredit)}</TableCell>
+                                <TableCell className="text-right font-mono py-2 px-3 text-black">{formatCurrency(closingBalance)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
                     </Table>
                 </div>
             </div>
 
-             {/* Summary Section */}
-            <div className="mt-4 summary-grid-container grid grid-cols-3 gap-4">
-                <div className="border rounded-lg p-3">
-                    <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Operational</h3>
-                    <table className="w-full text-xs"><tbody>
-                        <tr><td className="py-0.5 text-gray-600">Gross Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</td></tr>
-                        <tr><td className="py-0.5 text-gray-600">Teir Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</td></tr>
-                        <tr className="font-bold border-t"><td className="py-1">Final Wt</td><td className="py-1 text-right font-semibold">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</td></tr>
-                        <tr><td className="py-0.5 text-gray-600">Karta Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</td></tr>
-                        <tr className="font-bold text-primary border-t"><td className="py-1">Net Wt</td><td className="py-1 text-right">{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</td></tr>
-                    </tbody></table>
-                </div>
-                <div className="border rounded-lg p-3">
-                    <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Deductions</h3>
-                    <table className="w-full text-xs"><tbody>
-                        <tr><td className="py-0.5 text-gray-600">Total Amount</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalAmount || 0)}`}</td></tr>
-                        <tr className="border-t"><td className="py-0.5 text-gray-600">Karta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</td></tr>
-                        <tr><td className="py-0.5 text-gray-600">Laboury</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</td></tr>
-                        <tr><td className="py-0.5 text-gray-600">Kanta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKanta || 0)}`}</td></tr>
-                        <tr><td className="py-0.5 text-gray-600">Other</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</td></tr>
-                        <tr className="font-bold text-primary border-t"><td className="py-1">Original Amount</td><td className="py-1 text-right">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                    </tbody></table>
-                </div>
-                <div className="border rounded-lg p-3">
-                    <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Financial</h3>
-                    <table className="w-full text-xs"><tbody>
-                        <tr><td className="py-0.5 text-gray-600">Original Purchases</td><td className="py-0.5 text-right font-semibold">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                        <tr className="border-t"><td className="py-0.5 text-gray-600">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
-                        <tr><td className="py-0.5 text-gray-600">Total CD Granted</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
-                        <tr className="font-bold text-destructive border-t"><td className="py-1">Outstanding Balance</td><td className="py-1 text-right">{`${formatCurrency(data.totalOutstanding)}`}</td></tr>
-                    </tbody></table>
-                </div>
-            </div>
-
-             {/* Footer */}
-            <div className="border-t border-gray-300 pt-8 mt-8 flex justify-end">
-                <div className="w-2/5 text-center">
-                    <div className="h-16"></div>
-                    <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-2">
-                        <p className="font-bold text-sm">Authorised Signatory</p>
+             {/* Reminder Section */}
+            <div className="mt-6">
+                    <h2 className="text-lg font-semibold border-b border-gray-300 pb-1 mb-2 text-black">REMINDER</h2>
+                    <div className="border border-gray-200 rounded-lg p-4 min-h-[80px] text-sm text-gray-600">
+                    Payment is due by the date specified.
                     </div>
-                </div>
             </div>
         </div>
         <DialogFooter className="p-4 border-t no-print">
             <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
-            <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
+            <div className="flex-grow" />
+            <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
+            <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
         </DialogFooter>
     </>
     );
