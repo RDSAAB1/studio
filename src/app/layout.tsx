@@ -46,13 +46,13 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isBypassed, setIsBypassed] = useState(false);
+  const [isClient, setIsClient] = useState(false); // New state to track client-side mount
 
   useEffect(() => {
-    // Check for bypass state on client side
-    if (typeof window !== 'undefined') {
-        const bypassState = sessionStorage.getItem('bypass') === 'true';
-        setIsBypassed(bypassState);
-    }
+    // This effect runs only once on the client after mount
+    setIsClient(true); 
+    const bypassState = sessionStorage.getItem('bypass') === 'true';
+    setIsBypassed(bypassState);
     
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -62,9 +62,10 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  // Provide isClient to the context
   return (
     <AuthContext.Provider value={{ user, authLoading, isBypassed }}>
-      {children}
+      {isClient ? children : null}
     </AuthContext.Provider>
   );
 }
@@ -76,11 +77,13 @@ const AuthGuard = ({ children }: { children: ReactNode }) => {
     const isProtectedRoute = !UNPROTECTED_ROUTES.includes(pathname);
 
     useEffect(() => {
+        // Only run redirection logic if auth is no longer loading
         if (!authLoading && !user && !isBypassed && isProtectedRoute) {
             router.replace('/login');
         }
     }, [user, authLoading, isBypassed, isProtectedRoute, router, pathname]);
-
+    
+    // While auth is loading, show a spinner on protected routes to prevent content flash
     if (authLoading && isProtectedRoute) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -89,8 +92,9 @@ const AuthGuard = ({ children }: { children: ReactNode }) => {
         );
     }
     
+    // If on a protected route without user/bypass, render nothing while redirecting
     if (!user && !isBypassed && isProtectedRoute) {
-        return null; // Don't render anything while redirecting
+        return null; 
     }
 
     return <>{children}</>;
