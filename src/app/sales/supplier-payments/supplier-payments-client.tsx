@@ -7,7 +7,7 @@ import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
-import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc } from "firebase/firestore";
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -457,33 +457,11 @@ export default function SupplierPaymentsClient() {
     try {
         let finalPaymentData: Payment | null = null;
         await runTransaction(db, async (transaction) => {
-            const tempEditingPayment = editingPayment;
             
             // --- READ PHASE ---
             const supplierDocsToGet = new Set<string>();
-            const expenseDocsToDelete: any[] = [];
+            selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
             
-            // 1. Get supplier documents to read
-            if (rtgsFor === 'Supplier') {
-                selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
-                if (tempEditingPayment) {
-                    tempEditingPayment.paidFor?.forEach(pf => {
-                        const supplier = suppliers.find(s => s.srNo === pf.srNo);
-                        if (supplier) supplierDocsToGet.add(supplier.id);
-                    });
-                }
-            }
-
-            // 2. Get associated expense transaction to read (for deletion)
-            if (tempEditingPayment && tempEditingPayment.expenseTransactionId) {
-                const expenseDocRef = doc(transactionsCollection, tempEditingPayment.expenseTransactionId);
-                const expenseDoc = await transaction.get(expenseDocRef);
-                 if (expenseDoc.exists()) {
-                    expenseDocsToDelete.push(expenseDocRef);
-                }
-            }
-            
-            // 3. Execute all reads
             const supplierDocs = new Map<string, any>();
             for (const id of supplierDocsToGet) {
                 const docRef = doc(db, "suppliers", id);
@@ -491,30 +469,13 @@ export default function SupplierPaymentsClient() {
                 if (supplierDoc.exists()) {
                     supplierDocs.set(id, supplierDoc.data());
                 } else {
-                    // This can happen if an entry was deleted between selection and payment
-                    console.warn(`Supplier with ID ${id} not found during transaction.`);
+                    throw new Error(`Supplier with ID ${id} not found.`);
                 }
             }
             
             // --- WRITE PHASE ---
             
-            // 1. Delete old expense transaction if editing
-            expenseDocsToDelete.forEach(ref => transaction.delete(ref));
-
-            // 2. Revert previous payment amounts if editing
-            if (tempEditingPayment && rtgsFor === 'Supplier') {
-                 for (const detail of tempEditingPayment.paidFor || []) {
-                    const supplier = suppliers.find(s => s.srNo === detail.srNo);
-                    if (supplier && supplierDocs.has(supplier.id)) {
-                        const currentNetAmount = Number(supplierDocs.get(supplier.id).netAmount) || 0;
-                        const amountToRestore = detail.amount + (tempEditingPayment.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
-                        const supplierRef = doc(db, "suppliers", supplier.id);
-                        transaction.update(supplierRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
-                    }
-                }
-            }
-
-            // 3. Apply new payment amounts
+            // Apply new payment amounts
             let paidForDetails: PaidFor[] = [];
             if (rtgsFor === 'Supplier') {
                 let amountToDistribute = Math.round(totalPaidAmount);
@@ -525,8 +486,6 @@ export default function SupplierPaymentsClient() {
                     if (amountToDistribute <= 0) break;
                     
                     const supplierData = supplierDocs.get(entryData.id);
-                    if (!supplierData) continue; // Skip if doc was not found in read phase
-
                     let outstanding = Number(supplierData.netAmount);
                     const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
@@ -544,7 +503,7 @@ export default function SupplierPaymentsClient() {
                 }
             }
             
-            // 4. Create new expense transaction and link it
+            // Create new expense transaction and link it
             const newTransactionRef = doc(collection(db, 'transactions'));
             const expenseData: Partial<Transaction> = {
                 id: newTransactionRef.id,
@@ -554,7 +513,7 @@ export default function SupplierPaymentsClient() {
                 subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
                 amount: finalPaymentAmount,
                 payee: supplierDetails.name,
-                description: `Payment ${tempEditingPayment ? tempEditingPayment.paymentId : paymentId} to ${supplierDetails.name}`,
+                description: `Payment ${editingPayment ? editingPayment.paymentId : paymentId} to ${supplierDetails.name}`,
                 paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
                 status: 'Paid',
                 isRecurring: false,
@@ -565,10 +524,10 @@ export default function SupplierPaymentsClient() {
             transaction.set(newTransactionRef, expenseData);
 
 
-            // 5. Create or update the payment document
+            // Create the payment document
             const paymentData: Omit<Payment, 'id'> = {
-                paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-                rtgsSrNo: paymentMethod === 'RTGS' ? (tempEditingPayment && tempEditingPayment.rtgsSrNo ? tempEditingPayment.rtgsSrNo : rtgsSrNo) : undefined,
+                paymentId: editingPayment ? editingPayment.paymentId : paymentId,
+                rtgsSrNo: paymentMethod === 'RTGS' ? (editingPayment && editingPayment.rtgsSrNo ? editingPayment.rtgsSrNo : rtgsSrNo) : undefined,
                 customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                 date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                 cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
@@ -580,25 +539,19 @@ export default function SupplierPaymentsClient() {
                 supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
                 bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
                 rtgsFor: rtgsFor,
-                expenseTransactionId: newTransactionRef.id,
+                expenseTransactionId: newTransactionRef.id, // Link to the new expense transaction
             };
             
             if (paymentMethod !== 'RTGS') {
                 delete (paymentData as Partial<Payment>).rtgsSrNo;
             }
 
-            if (tempEditingPayment) {
-                const paymentRef = doc(db, "payments", tempEditingPayment.id);
-                transaction.update(paymentRef, paymentData);
-                finalPaymentData = { id: tempEditingPayment.id, ...paymentData };
-            } else {
-                const newPaymentRef = doc(collection(db, "payments"));
-                transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
-                finalPaymentData = { id: newPaymentRef.id, ...paymentData };
-            }
+            const newPaymentRef = doc(collection(db, "payments"));
+            transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
+            finalPaymentData = { id: newPaymentRef.id, ...paymentData };
         });
 
-        toast({ title: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, variant: 'success' });
+        toast({ title: `Payment processed successfully.`, variant: 'success' });
         if (paymentMethod === 'RTGS' && finalPaymentData) {
             setRtgsReceiptData(finalPaymentData);
         }
@@ -612,6 +565,8 @@ export default function SupplierPaymentsClient() {
     const handleEditPayment = async (paymentToEdit: Payment) => {
         if (!paymentToEdit.id) return;
         
+        await handleDeletePayment(paymentToEdit.id, true);
+
         setActiveTab('processing');
         setEditingPayment(paymentToEdit);
         setPaymentId(paymentToEdit.paymentId);
@@ -695,10 +650,7 @@ export default function SupplierPaymentsClient() {
                 // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(transactionsCollection, paymentToDelete.expenseTransactionId);
-                    const expenseDoc = await transaction.get(expenseDocRef);
-                    if (expenseDoc.exists()) {
-                        transaction.delete(expenseDocRef);
-                    }
+                    transaction.delete(expenseDocRef);
                 }
                 
                 // Delete the payment itself
