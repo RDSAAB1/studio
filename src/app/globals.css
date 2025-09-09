@@ -68,8 +68,7 @@ body {
 }
 
 /* Expanded state when wrapper is active (pinned) or sidebar is hovered */
-.wrapper.active .side_bar,
-.wrapper .side_bar:hover {
+.wrapper.active .side_bar {
     width: 250px;
 }
 
@@ -117,12 +116,11 @@ body {
     flex-shrink: 0;
 }
 
-/* Hide text when not hovered and not active */
-.wrapper:not(.active) .side_bar:not(:hover) .logo_wrap span.text {
+/* Hide text when not active */
+.wrapper:not(.active) .side_bar .logo_wrap span.text {
   display: none;
 }
-.wrapper.active .side_bar .logo_wrap span.text,
-.wrapper .side_bar:hover .logo_wrap span.text {
+.wrapper.active .side_bar .logo_wrap span.text {
   display: inline;
 }
 
@@ -163,21 +161,20 @@ body {
     transition: color 0.2s ease;
 }
 
-/* Adjust icon margin when collapsed and not hovered */
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button .icon {
+/* Adjust icon margin when collapsed */
+.wrapper:not(.active) .side_bar .side_bar_bottom ul li button .icon {
     margin-right: 0;
 }
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button {
+.wrapper:not(.active) .side_bar .side_bar_bottom ul li button {
     justify-content: center;
     padding: 15px 0;
 }
 
-/* Hide text when collapsed and not hovered */
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom .item {
+/* Hide text when collapsed */
+.wrapper:not(.active) .side_bar .side_bar_bottom .item {
   display: none;
 }
-.wrapper.active .side_bar .side_bar_bottom .item,
-.wrapper .side_bar:hover .side_bar_bottom .item {
+.wrapper.active .side_bar .side_bar_bottom .item {
   display: inline;
 }
 
@@ -204,15 +201,13 @@ body {
 }
 
 .wrapper.active .side_bar_bottom ul li.active .top_curve,
-.wrapper.active .side_bar_bottom ul li.active .bottom_curve,
-.wrapper .side_bar:hover .side_bar_bottom ul li.active .top_curve,
-.wrapper .side_bar:hover .side_bar_bottom ul li.active .bottom_curve {
+.wrapper.active .side_bar_bottom ul li.active .bottom_curve {
     /* Only show curves when expanded */
 }
 
-/* Hide curves when collapsed and not hovered */
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li.active .top_curve,
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li.active .bottom_curve {
+/* Hide curves when collapsed */
+.wrapper:not(.active) .side_bar .side_bar_bottom ul li.active .top_curve,
+.wrapper:not(.active) .side_bar .side_bar_bottom ul li.active .bottom_curve {
     display: none;
 }
 
@@ -253,8 +248,8 @@ body {
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease-in-out;
-  /* Hide submenu when sidebar is collapsed and not hovered */
-  .wrapper:not(.active) .side_bar:not(:hover) & {
+  /* Hide submenu when sidebar is collapsed */
+  .wrapper:not(.active) .side_bar & {
     display: none;
   }
 }
@@ -331,8 +326,7 @@ body {
 
 @media screen and (max-width: 1023px) {
     .wrapper .side_bar,
-    .wrapper.active .side_bar,
-    .wrapper:not(.active) .side_bar:hover {
+    .wrapper.active .side_bar {
         left: -250px;
         width: 250px; /* Full width on mobile */
     }
