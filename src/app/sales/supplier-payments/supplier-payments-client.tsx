@@ -7,7 +7,7 @@ import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
-import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -477,7 +477,10 @@ export default function SupplierPaymentsClient() {
             // 2. Get associated expense transaction to read (for deletion)
             if (tempEditingPayment && tempEditingPayment.expenseTransactionId) {
                 const expenseDocRef = doc(transactionsCollection, tempEditingPayment.expenseTransactionId);
-                expenseDocsToDelete.push(expenseDocRef);
+                const expenseDoc = await transaction.get(expenseDocRef);
+                 if (expenseDoc.exists()) {
+                    expenseDocsToDelete.push(expenseDocRef);
+                }
             }
             
             // 3. Execute all reads
@@ -488,7 +491,8 @@ export default function SupplierPaymentsClient() {
                 if (supplierDoc.exists()) {
                     supplierDocs.set(id, supplierDoc.data());
                 } else {
-                    throw new Error(`Supplier with ID ${id} not found.`);
+                    // This can happen if an entry was deleted between selection and payment
+                    console.warn(`Supplier with ID ${id} not found during transaction.`);
                 }
             }
             
@@ -514,12 +518,15 @@ export default function SupplierPaymentsClient() {
             let paidForDetails: PaidFor[] = [];
             if (rtgsFor === 'Supplier') {
                 let amountToDistribute = Math.round(totalPaidAmount);
-                const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                const sortedEntries = Array.from(selectedEntryIds).map(id => suppliers.find(s => s.id === id)).filter(Boolean) as Customer[];
+                sortedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 
                 for (const entryData of sortedEntries) {
                     if (amountToDistribute <= 0) break;
                     
                     const supplierData = supplierDocs.get(entryData.id);
+                    if (!supplierData) continue; // Skip if doc was not found in read phase
+
                     let outstanding = Number(supplierData.netAmount);
                     const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
@@ -573,7 +580,7 @@ export default function SupplierPaymentsClient() {
                 supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
                 bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
                 rtgsFor: rtgsFor,
-                expenseTransactionId: newTransactionRef.id, // Link to the new expense transaction
+                expenseTransactionId: newTransactionRef.id,
             };
             
             if (paymentMethod !== 'RTGS') {
@@ -605,33 +612,14 @@ export default function SupplierPaymentsClient() {
     const handleEditPayment = async (paymentToEdit: Payment) => {
         if (!paymentToEdit.id) return;
         
-        // Fill the form first
-        const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-        
-        if (paymentToEdit.rtgsFor === 'Supplier' && srNosInPayment.length > 0) {
-          const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
-          const supplierDocs = await getDocs(q);
-          const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
-          
-          if (foundSrNos.size !== srNosInPayment.length) {
-              toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
-              return;
-          }
-
-          const newSelectedEntryIds = new Set<string>();
-          supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
-          setSelectedEntryIds(newSelectedEntryIds);
-        } else {
-            setSelectedEntryIds(new Set());
-        }
-
-        setSelectedCustomerKey(paymentToEdit.customerId);
+        setActiveTab('processing');
         setEditingPayment(paymentToEdit);
         setPaymentId(paymentToEdit.paymentId);
         setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
         setPaymentAmount(paymentToEdit.amount);
         setPaymentType(paymentToEdit.type);
         setPaymentMethod(paymentToEdit.receiptType);
+        setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
@@ -651,10 +639,30 @@ export default function SupplierPaymentsClient() {
             acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
             bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
         });
-        setActiveTab('processing');
         
-        // Then, delete the payment to allow reprocessing
-        await handleDeletePayment(paymentToEdit.id, true); // Pass a flag to prevent toast
+        if (paymentToEdit.rtgsFor === 'Supplier') {
+            setSelectedCustomerKey(paymentToEdit.customerId);
+            const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
+            if (srNosInPayment.length > 0) {
+              const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
+              const supplierDocs = await getDocs(q);
+              const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
+              if (foundSrNos.size !== srNosInPayment.length) {
+                  toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
+                  setEditingPayment(null); // Reset editing state
+                  return;
+              }
+              const newSelectedEntryIds = new Set<string>();
+              supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
+              setSelectedEntryIds(newSelectedEntryIds);
+            } else {
+                setSelectedEntryIds(new Set());
+            }
+        } else {
+            setSelectedCustomerKey(null);
+            setSelectedEntryIds(new Set());
+        }
+
         toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
     };
 
@@ -671,25 +679,26 @@ export default function SupplierPaymentsClient() {
                 
                 // Revert supplier netAmount
                 if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
-                    const srNos = paymentToDelete.paidFor.map(pf => pf.srNo);
-                    if (srNos.length > 0) {
-                        const q = query(suppliersCollection, where('srNo', 'in', srNos));
+                    for (const detail of paymentToDelete.paidFor) {
+                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
                         const supplierDocsSnapshot = await getDocs(q);
-                        const supplierDocsMap = new Map(supplierDocsSnapshot.docs.map(d => [d.id, d.data() as Customer]));
-                        
-                        supplierDocsSnapshot.forEach(docSnapshot => {
-                             const currentSupplier = docSnapshot.data() as Customer;
-                             const amountToRestore = paymentToDelete.amount + (paymentToDelete.cdAmount || 0);
-                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                             transaction.update(doc(db, "suppliers", docSnapshot.id), { netAmount: Math.round(newNetAmount) });
-                        });
+                        if (!supplierDocsSnapshot.empty) {
+                            const customerDoc = supplierDocsSnapshot.docs[0];
+                            const currentSupplier = customerDoc.data() as Customer;
+                            const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        }
                     }
                 }
                 
                 // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(transactionsCollection, paymentToDelete.expenseTransactionId);
-                    transaction.delete(expenseDocRef);
+                    const expenseDoc = await transaction.get(expenseDocRef);
+                    if (expenseDoc.exists()) {
+                        transaction.delete(expenseDocRef);
+                    }
                 }
                 
                 // Delete the payment itself
@@ -978,3 +987,7 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
+
+    
