@@ -101,7 +101,7 @@ export default function DailySupplierReportClient() {
                 @media print {
                     @page { size: landscape; margin: 10mm; }
                     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .printable-area, .printable-area tr { background-color: #fff !important; color: #000 !important; }
+                    .printable-area, .printable-area tr, .printable-area table, .printable-area td, .printable-area th { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
                 }
             `;
@@ -174,6 +174,11 @@ export default function DailySupplierReportClient() {
                             <table className="w-full text-sm border-collapse border border-gray-400">
                                 <thead className="bg-amber-400">
                                     <tr>
+                                        <th className="border border-gray-400 p-1 text-center" colSpan={6}>Supplier Details</th>
+                                        <th className="border border-gray-400 p-1 text-center" colSpan={5}>Weight Details (in Qtl)</th>
+                                        <th className="border border-gray-400 p-1 text-center" colSpan={6}>Financial Details</th>
+                                    </tr>
+                                    <tr>
                                         <th className="border border-gray-400 p-1 text-left">SR NO.</th>
                                         <th className="border border-gray-400 p-1 text-left">TRM</th>
                                         <th className="border border-gray-400 p-1 text-left">NAME</th>
@@ -184,12 +189,12 @@ export default function DailySupplierReportClient() {
                                         <th className="border border-gray-400 p-1 text-right">TEIR</th>
                                         <th className="border border-gray-400 p-1 text-right">TOTAL</th>
                                         <th className="border border-gray-400 p-1 text-right">KARTA</th>
-                                        <th className="border border-gray-400 p-1 text-right">KARTA AMT</th>
                                         <th className="border border-gray-400 p-1 text-right">NET</th>
                                         <th className="border border-gray-400 p-1 text-right">RATE</th>
+                                        <th className="border border-gray-400 p-1 text-right">AMOUNT</th>
+                                        <th className="border border-gray-400 p-1 text-right">KARTA AMT</th>
                                         <th className="border border-gray-400 p-1 text-right">LABOURY</th>
                                         <th className="border border-gray-400 p-1 text-right">KANTA</th>
-                                        <th className="border border-gray-400 p-1 text-right">AMOUNT</th>
                                         <th className="border border-gray-400 p-1 text-right">NET AMT</th>
                                     </tr>
                                 </thead>
@@ -206,12 +211,12 @@ export default function DailySupplierReportClient() {
                                             <td className="border border-gray-400 p-1 text-right">{s.teirWeight.toFixed(2)}</td>
                                             <td className="border border-gray-400 p-1 text-right">{s.weight.toFixed(2)}</td>
                                             <td className="border border-gray-400 p-1 text-right">{s.kartaWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.kartaAmount)}</td>
                                             <td className="border border-gray-400 p-1 text-right">{s.netWeight.toFixed(2)}</td>
                                             <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.rate)}</td>
+                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.amount)}</td>
+                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.kartaAmount)}</td>
                                             <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.labouryAmount)}</td>
                                             <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.kanta)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.amount)}</td>
                                             <td className="border border-gray-400 p-1 text-right font-bold">{formatCurrency(Number(s.netAmount))}</td>
                                         </tr>
                                     ))}
