@@ -3,17 +3,15 @@
 
 import React from 'react';
 import { Tab } from './tab';
-import { useRouter } from 'next/navigation';
 
 const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab }) => {
-  const router = useRouter();
 
   if (!openTabs) return null;
 
   return (
     <div className="tab-bar-container flex-1 min-w-0">
       <div className="flex items-end">
-        {openTabs.map((tab: any, index: number) => {
+        {openTabs.map((tab: any) => {
             const isActive = tab.id === activeTabId;
             const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
 
@@ -23,13 +21,13 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
                 icon={iconElement}
                 title={tab.name}
                 isActive={isActive}
+                href={tab.href || '#'}
                 onClick={() => {
                    if(tab.href){
                      setActiveTabId(tab.id);
-                     router.push(tab.href);
                    }
                 }}
-                onClose={(e) => {
+                onClose={(e: React.MouseEvent) => {
                   e.stopPropagation();
                   e.preventDefault();
                   closeTab(tab.id);

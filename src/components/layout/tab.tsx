@@ -2,6 +2,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,12 +11,13 @@ interface TabProps {
   icon: React.ReactNode;
   title: string;
   isActive: boolean;
+  href: string;
   onClick: () => void;
   onClose: (e: React.MouseEvent) => void;
   isClosable: boolean;
 }
 
-export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClose, isClosable }) => {
+export const Tab: React.FC<TabProps> = ({ icon, title, isActive, href, onClick, onClose, isClosable }) => {
 
   const cornerStyle = {
     '--corner-bg': 'hsl(var(--background))',
@@ -34,31 +36,32 @@ export const Tab: React.FC<TabProps> = ({ icon, title, isActive, onClick, onClos
     <div 
       className="relative flex-shrink min-w-0" 
       style={cornerStyle as React.CSSProperties}
-      onClick={onClick}
     >
-      <div className={tabClasses}>
-        <div className="flex items-center z-10 overflow-hidden min-w-0">
-          {icon}
-          <span className="whitespace-nowrap ml-2 truncate">{title}</span>
-        </div>
-        {isClosable && (
-            <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-                "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
-                isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
+      <Link href={href} passHref legacyBehavior>
+        <a className={tabClasses} onClick={onClick}>
+            <div className="flex items-center z-10 overflow-hidden min-w-0">
+            {icon}
+            <span className="whitespace-nowrap ml-2 truncate">{title}</span>
+            </div>
+            {isClosable && (
+                <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                    "h-5 w-5 ml-2 rounded-full shrink-0 z-20 transition-colors duration-200",
+                    isActive ? "hover:bg-foreground/20 text-foreground" : "hover:bg-primary-foreground/20 text-primary-foreground"
+                )}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onClose(e);
+                }}
+                >
+                <X className="h-3 w-3" />
+                </Button>
             )}
-            onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onClose(e);
-            }}
-            >
-            <X className="h-3 w-3" />
-            </Button>
-        )}
-      </div>
+        </a>
+      </Link>
 
       {isActive && (
         <>
