@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from 'lucide-react';
@@ -32,33 +32,33 @@ import DataCapturePage from "@/app/data-capture/page";
 import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
 
-const pageRoutes = [
-    { path: "/", element: <DashboardOverviewPage /> },
-    { path: "/dashboard", element: <DashboardOverviewPage /> },
-    { path: "/dashboard-overview", element: <DashboardOverviewPage /> },
-    { path: "/supplier-entry", element: <SupplierEntryPage /> },
-    { path: "/supplier-payments", element: <SupplierPaymentsPage /> },
-    { path: "/supplier-profile", element: <SupplierProfilePage /> },
-    { path: "/customer-entry", element: <CustomerEntryPage /> },
-    { path: "/customer-payments", element: <CustomerPaymentsPage /> },
-    { path: "/customer-profile", element: <CustomerProfilePage /> },
-    { path: "/cash-bank", element: <CashBankPage /> },
-    { path: "/income-expense", element: <ExpenseTrackerPage /> },
-    { path: "/rtgs-report", element: <RtgsReportPage /> },
-    { path: "/employee-db", element: <EmployeeDatabasePage /> },
-    { path: "/payroll", element: <PayrollManagementPage /> },
-    { path: "/attendance", element: <AttendanceTrackingPage /> },
-    { path: "/inventory-mgmt", element: <InventoryManagementPage /> },
-    { path: "/purchase-orders", element: <PurchaseOrdersPage /> },
-    { path: "/project-dashboard", element: <ProjectDashboardPage /> },
-    { path: "/project-management", element: <ProjectManagementPage /> },
-    { path: "/tasks", element: <TasksPage /> },
-    { path: "/collaboration", element: <CollaborationPage /> },
-    { path: "/data-capture", element: <DataCapturePage /> },
-    { path: "/printer-settings", element: <PrinterSettingsPage /> },
-    { path: "/settings", element: <SettingsPage /> },
-    { path: "*", element: <DashboardOverviewPage /> }
-];
+const pageComponents: { [key: string]: React.FC<any> } = {
+    "/": DashboardOverviewPage,
+    "/dashboard": DashboardOverviewPage,
+    "/dashboard-overview": DashboardOverviewPage,
+    "/supplier-entry": SupplierEntryPage,
+    "/supplier-payments": SupplierPaymentsPage,
+    "/supplier-profile": SupplierProfilePage,
+    "/customer-entry": CustomerEntryPage,
+    "/customer-payments": CustomerPaymentsPage,
+    "/customer-profile": CustomerProfilePage,
+    "/cash-bank": CashBankPage,
+    "/income-expense": ExpenseTrackerPage,
+    "/rtgs-report": RtgsReportPage,
+    "/employee-db": EmployeeDatabasePage,
+    "/payroll": PayrollManagementPage,
+    "/attendance": AttendanceTrackingPage,
+    "/inventory-mgmt": InventoryManagementPage,
+    "/purchase-orders": PurchaseOrdersPage,
+    "/project-dashboard": ProjectDashboardPage,
+    "/project-management": ProjectManagementPage,
+    "/tasks": TasksPage,
+    "/collaboration": CollaborationPage,
+    "/data-capture": DataCapturePage,
+    "/printer-settings": PrinterSettingsPage,
+    "/settings": SettingsPage,
+};
+
 
 interface AuthContextType {
   user: User | null;
@@ -119,6 +119,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 const AppContent = () => {
     const { isAuthenticated, authLoading, logout } = useAuth();
+    const location = useLocation();
 
     if (authLoading) {
         return (
@@ -132,24 +133,34 @@ const AppContent = () => {
        return <LoginPage />;
     }
     
+    const activePath = location.pathname;
+
     return (
        <CustomSidebar onSignOut={logout}>
-          <Routes>
-              {pageRoutes.map((route) => (
-                  <Route key={route.path} path={route.path} element={route.element} />
-              ))}
-          </Routes>
+          <div className="relative w-full h-full">
+            {Object.entries(pageComponents).map(([path, PageComponent]) => (
+                <div key={path} style={{ display: activePath === path || (activePath === '/' && path === '/dashboard-overview') ? 'block' : 'none' }}>
+                    <PageComponent />
+                </div>
+            ))}
+          </div>
        </CustomSidebar>
     );
 };
 
 
+const RoutedApp = () => {
+    return (
+        <MemoryRouter>
+            <AppContent />
+        </MemoryRouter>
+    );
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <AuthProvider>
-            <MemoryRouter>
-              <AppContent />
-            </MemoryRouter>
+            <RoutedApp />
         </AuthProvider>
     );
 }
