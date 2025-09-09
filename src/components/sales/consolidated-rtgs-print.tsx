@@ -38,7 +38,17 @@ interface ConsolidatedRtgsPrintFormatProps {
 }
 
 const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameCheckNo }: { settings: RtgsSettings, firstDate: string, firstCheckNo: string, isSameDate: boolean, isSameCheckNo: boolean }) => (
-    <div className="flex-grow-0">
+    <div className="flex-grow-0 printable-area">
+        <style>
+            {`
+            @media print {
+                .printable-area, .printable-area * {
+                    background-color: #fff !important;
+                    color: #000 !important;
+                }
+            }
+            `}
+        </style>
         <div className="flex justify-between items-start mb-4">
             <div className="w-1/2">
                 <h2 className="font-bold text-3xl mb-1">{settings.companyName}</h2>
@@ -73,7 +83,17 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
 );
 
 const ReportFooter = ({ settings }: { settings: RtgsSettings }) => (
-    <div className="flex-grow-0 pt-4 mt-auto">
+    <div className="flex-grow-0 pt-4 mt-auto printable-area">
+        <style>
+            {`
+            @media print {
+                .printable-area, .printable-area * {
+                    background-color: #fff !important;
+                    color: #000 !important;
+                }
+            }
+            `}
+        </style>
         <div className="border-t border-gray-300 pt-2">
             <div className="flex justify-between items-end">
                 <div className="w-3/5">
@@ -156,8 +176,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     print-color-adjust: exact !important;
                 }
                 .page-break-after { page-break-after: always !important; }
-                .printable-area { background-color: #fff !important; color: #000 !important; }
-                .printable-area * { color: #000 !important; border-color: #ccc !important; }
+                .printable-area, .printable-area * { background-color: #fff !important; color: #000 !important; border-color: #ccc !important; }
                 .bg-gray-800, .print-bg-gray-800 { background-color: #f2f2f2 !important; }
                 .bg-gray-800 th, .bg-gray-800 td, .print-bg-gray-800 th, .print-bg-gray-800 td { color: #000 !important; }
             }
@@ -184,7 +203,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
-                <div ref={printRef} className="printable-area bg-white text-black">
+                <div ref={printRef} className="bg-white text-black">
                     {paymentChunks.map((chunk, pageIndex) => {
                         const isLastPage = pageIndex === paymentChunks.length - 1;
                         const pageTotal = chunk.reduce((sum, p) => sum + p.amount, 0);
