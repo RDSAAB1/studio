@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { useLocation, useNavigate, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate, Routes, Route } from 'react-router-dom';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from 'lucide-react';
@@ -33,7 +33,7 @@ import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
 
 const pageComponents: { [key: string]: React.FC<any> } = {
-    "/dashboard": DashboardOverviewPage,
+    "/dashboard-overview": DashboardOverviewPage,
     "/supplier-entry": SupplierEntryPage,
     "/supplier-payments": SupplierPaymentsPage,
     "/supplier-profile": SupplierProfilePage,
@@ -149,8 +149,10 @@ const AppContent = () => {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
-        <AuthProvider>
-            <AppContent />
-        </AuthProvider>
+        <MemoryRouter>
+            <AuthProvider>
+                <AppContent />
+            </AuthProvider>
+        </MemoryRouter>
     );
 }

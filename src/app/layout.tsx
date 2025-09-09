@@ -1,7 +1,6 @@
 
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
-import { MemoryRouter } from 'react-router-dom';
 import AppLayout from '@/components/layout/app-layout';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -37,10 +36,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
-        <MemoryRouter>
-            <AppLayout>{children}</AppLayout>
-            <Toaster />
-        </MemoryRouter>
+        <AppLayout>{children}</AppLayout>
+        <Toaster />
       </body>
     </html>
   );
