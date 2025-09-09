@@ -67,7 +67,6 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = () => {
     // This is a placeholder; actual login is handled by Firebase/bypass logic
-    // This function can be used to trigger re-renders if needed
   };
 
   const logout = () => {
@@ -91,6 +90,12 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated, authLoading } = useAuth();
     const router = useRouter();
 
+    useEffect(() => {
+        if (!authLoading && !isAuthenticated) {
+            router.replace('/login');
+        }
+    }, [isAuthenticated, authLoading, router]);
+    
     if (authLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -115,7 +120,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
-      <body className="font-body antialiased">
+      <body>
         <AuthProvider>
             <AuthGuard>
                 {children}
