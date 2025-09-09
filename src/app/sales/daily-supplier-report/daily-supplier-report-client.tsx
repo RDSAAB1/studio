@@ -154,6 +154,7 @@ export default function DailySupplierReportClient() {
                     .print-header { 
                         margin-bottom: 0.5rem; 
                         text-align: center; 
+                        background-color: #f2f2f2 !important;
                     }
                     .print-header h2 { 
                         font-size: 1rem; 
