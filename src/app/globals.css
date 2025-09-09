@@ -390,12 +390,3 @@ body {
 .tab-bar-container::-webkit-scrollbar {
   display: none;
 }
-
-@media print {
-  body > div:not(.print-only) {
-    display: none;
-  }
-  .print-only {
-    display: block !important;
-  }
-}
