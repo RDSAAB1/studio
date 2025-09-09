@@ -16,11 +16,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
 const SummaryItem = ({ label, value, isCurrency = false, className }: { label: string; value: string | number; isCurrency?: boolean; className?: string }) => (
-    <div className={cn("flex justify-between items-baseline", className)}>
+    <div className={cn("flex flex-col items-center p-1", className)}>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className="text-sm font-bold text-right">{isCurrency ? formatCurrency(Number(value)) : Number(value).toFixed(2)}</p>
+        <p className="text-sm font-bold">{isCurrency ? formatCurrency(Number(value)) : Number(value).toFixed(2)}</p>
     </div>
 );
+
 
 export default function DailySupplierReportClient() {
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -101,7 +102,7 @@ export default function DailySupplierReportClient() {
                 @media print {
                     @page { size: landscape; margin: 10mm; }
                     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .printable-area, .printable-area tr, .printable-area table, .printable-area td, .printable-area th { background-color: #fff !important; color: #000 !important; }
+                    .printable-area, .printable-area table, .printable-area tr, .printable-area td, .printable-area th { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
                 }
             `;
@@ -148,81 +149,72 @@ export default function DailySupplierReportClient() {
 
                          <div className="p-2 border rounded-lg bg-white text-black">
                             <h3 className="text-center font-bold text-sm mb-2">TODAY TOTAL SUMMARY</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-1 text-xs">
-                                <SummaryItem label="GROSS" value={summary.gross.toFixed(2)} />
-                                <SummaryItem label="TIER" value={summary.tier.toFixed(2)} />
-
-                                <SummaryItem label="TOTAL" value={summary.total.toFixed(2)} />
-                                <SummaryItem label="KARTA" value={summary.karta.toFixed(2)} />
-
-                                <SummaryItem label="NET" value={summary.net.toFixed(2)} />
-                                <SummaryItem label="LABOUR" value={formatCurrency(summary.labour)} />
-
-                                <SummaryItem label="RATE" value={formatCurrency(summary.rate)} />
-                                <SummaryItem label="KARTA" value={formatCurrency(summary.kartaAmount)} />
-
-                                <SummaryItem label="KANTA" value={formatCurrency(summary.kanta)} />
-                                <SummaryItem label="AMOUNT" value={formatCurrency(summary.amount)} />
-                                
-                                <div className="sm:col-span-2 md:col-span-4 lg:col-span-6 border-t border-black mt-1 pt-1">
-                                   <SummaryItem label="NET AMT" value={formatCurrency(summary.netAmount)} className="text-base" />
-                                </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-x-2 gap-y-1">
+                                <SummaryItem label="GROSS" value={summary.gross} />
+                                <SummaryItem label="TIER" value={summary.tier} />
+                                <SummaryItem label="TOTAL" value={summary.total} />
+                                <SummaryItem label="KARTA" value={summary.karta} />
+                                <SummaryItem label="NET" value={summary.net} />
+                                <SummaryItem label="LABOUR" value={summary.labour} isCurrency />
+                                <SummaryItem label="RATE" value={summary.rate} isCurrency />
+                                <SummaryItem label="KARTA" value={summary.kartaAmount} isCurrency />
+                                <SummaryItem label="KANTA" value={summary.kanta} isCurrency />
+                                <SummaryItem label="AMOUNT" value={summary.amount} isCurrency />
+                                <SummaryItem label="NET AMT" value={summary.netAmount} isCurrency className="text-base" />
                             </div>
                         </div>
 
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm border-collapse border border-gray-400">
-                                <thead className="bg-amber-400">
-                                    <tr>
-                                        <th className="border border-gray-400 p-1 text-center" colSpan={6}>Supplier Details</th>
-                                        <th className="border border-gray-400 p-1 text-center" colSpan={5}>Weight Details (in Qtl)</th>
-                                        <th className="border border-gray-400 p-1 text-center" colSpan={6}>Financial Details</th>
-                                    </tr>
-                                    <tr>
-                                        <th className="border border-gray-400 p-1 text-left">SR NO.</th>
-                                        <th className="border border-gray-400 p-1 text-left">TRM</th>
-                                        <th className="border border-gray-400 p-1 text-left">NAME</th>
-                                        <th className="border border-gray-400 p-1 text-left">S/O</th>
-                                        <th className="border border-gray-400 p-1 text-left">ADDRESS</th>
-                                        <th className="border border-gray-400 p-1 text-left">CONTACT</th>
-                                        <th className="border border-gray-400 p-1 text-right">GROSS</th>
-                                        <th className="border border-gray-400 p-1 text-right">TEIR</th>
-                                        <th className="border border-gray-400 p-1 text-right">TOTAL</th>
-                                        <th className="border border-gray-400 p-1 text-right">KARTA</th>
-                                        <th className="border border-gray-400 p-1 text-right">NET</th>
-                                        <th className="border border-gray-400 p-1 text-right">RATE</th>
-                                        <th className="border border-gray-400 p-1 text-right">AMOUNT</th>
-                                        <th className="border border-gray-400 p-1 text-right">KARTA AMT</th>
-                                        <th className="border border-gray-400 p-1 text-right">LABOURY</th>
-                                        <th className="border border-gray-400 p-1 text-right">KANTA</th>
-                                        <th className="border border-gray-400 p-1 text-right">NET AMT</th>
+                                <thead>
+                                    <tr className="bg-amber-400 text-black">
+                                        <th className="border border-gray-400 p-1 text-left">Info</th>
+                                        <th className="border border-gray-400 p-1 text-left">Supplier</th>
+                                        <th className="border border-gray-400 p-1 text-left">Weight Details</th>
+                                        <th className="border border-gray-400 p-1 text-left">Financials</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredSuppliers.map((s) => (
                                         <tr key={s.id} className="bg-gray-200">
-                                            <td className="border border-gray-400 p-1">{s.srNo}</td>
-                                            <td className="border border-gray-400 p-1">{s.term}</td>
-                                            <td className="border border-gray-400 p-1">{toTitleCase(s.name)}</td>
-                                            <td className="border border-gray-400 p-1">{toTitleCase(s.so)}</td>
-                                            <td className="border border-gray-400 p-1">{toTitleCase(s.address)}</td>
-                                            <td className="border border-gray-400 p-1">{s.contact}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{s.grossWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{s.teirWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{s.weight.toFixed(2)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{s.kartaWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{s.netWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.rate)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.amount)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.kartaAmount)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.labouryAmount)}</td>
-                                            <td className="border border-gray-400 p-1 text-right">{formatCurrency(s.kanta)}</td>
-                                            <td className="border border-gray-400 p-1 text-right font-bold">{formatCurrency(Number(s.netAmount))}</td>
+                                            <td className="border border-gray-400 p-1 align-top">
+                                                <div className="font-bold">{s.srNo}</div>
+                                                <div className="text-xs">{format(new Date(s.date), "dd-MMM-yy")}</div>
+                                                <div className="text-xs">Term: {s.term}</div>
+                                            </td>
+                                            <td className="border border-gray-400 p-1 align-top">
+                                                <div className="font-bold">{toTitleCase(s.name)}</div>
+                                                <div className="text-xs">S/O: {toTitleCase(s.so)}</div>
+                                                <div className="text-xs">Addr: {toTitleCase(s.address)}</div>
+                                                <div className="text-xs">Mob: {s.contact}</div>
+                                            </td>
+                                            <td className="border border-gray-400 p-1 align-top">
+                                                <div className="grid grid-cols-2 gap-x-2">
+                                                    <div className="text-xs">Gross:</div><div className="text-xs text-right font-semibold">{s.grossWeight.toFixed(2)}</div>
+                                                    <div className="text-xs">Teir:</div><div className="text-xs text-right font-semibold">{s.teirWeight.toFixed(2)}</div>
+                                                    <div className="text-xs font-bold">Total:</div><div className="text-xs text-right font-bold">{s.weight.toFixed(2)}</div>
+                                                    <div className="text-xs">Karta:</div><div className="text-xs text-right font-semibold">{s.kartaWeight.toFixed(2)}</div>
+                                                    <div className="text-xs font-bold">Net:</div><div className="text-xs text-right font-bold">{s.netWeight.toFixed(2)}</div>
+                                                </div>
+                                            </td>
+                                            <td className="border border-gray-400 p-1 align-top">
+                                                <div className="grid grid-cols-2 gap-x-2">
+                                                    <div className="text-xs">Rate:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.rate)}</div>
+                                                    <div className="text-xs">Amount:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.amount)}</div>
+                                                    <div className="text-xs">Karta Amt:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.kartaAmount)}</div>
+                                                    <div className="text-xs">Laboury:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.labouryAmount)}</div>
+                                                    <div className="text-xs">Kanta:</div><div className="text-xs text-right font-semibold">{formatCurrency(s.kanta)}</div>
+                                                    <div className="text-xs font-bold">Net Amt:</div><div className="text-xs text-right font-bold">{formatCurrency(Number(s.netAmount))}</div>
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                     {Array.from({ length: Math.max(0, 15 - filteredSuppliers.length) }).map((_, i) => (
                                         <tr key={`empty-${i}`} className="h-7">
-                                            {Array.from({ length: 17 }).map((_, j) => <td key={j} className="border border-gray-400 p-1"></td>)}
+                                            <td className="border border-gray-400 p-1"></td>
+                                            <td className="border border-gray-400 p-1"></td>
+                                            <td className="border border-gray-400 p-1"></td>
+                                            <td className="border border-gray-400 p-1"></td>
                                         </tr>
                                     ))}
                                 </tbody>
