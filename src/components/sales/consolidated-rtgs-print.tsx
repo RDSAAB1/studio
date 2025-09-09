@@ -177,6 +177,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 }
                 .page-break-after { page-break-after: always !important; }
                 .printable-area, .printable-area * { background-color: #fff !important; color: #000 !important; border-color: #ccc !important; }
+                .printable-area tbody tr, .printable-area tbody td { color: #000 !important; }
                 thead tr {
                     background-color: #f2f2f2 !important;
                     color: #000 !important;
