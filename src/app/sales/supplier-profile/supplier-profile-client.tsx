@@ -96,6 +96,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                                 .summary-grid-container > div {
                                     flex: 1;
                                 }
+                                .print-table tbody tr {
+                                    background-color: transparent !important;
+                                }
                              }
                         </style>
                     </head>
@@ -175,7 +178,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 </div>
             </div>
 
-             {/* Summary Section */}
+            {/* Summary Section */}
             <div className="summary-grid-container grid grid-cols-3 gap-x-4 mb-6">
                 <Card className="bg-white border-gray-200">
                     <CardHeader className="p-2 pb-1">
@@ -537,4 +540,3 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
-
