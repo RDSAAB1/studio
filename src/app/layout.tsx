@@ -92,13 +92,13 @@ export default function RootLayout({
         }
     };
     
-    const showLayout = !UNPROTECTED_ROUTES.includes(pathname);
+    const isLayoutVisible = !UNPROTECTED_ROUTES.includes(pathname);
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
         <AuthProvider>
-          {showLayout ? (
+          {isLayoutVisible ? (
             <div className={cn("wrapper", isSidebarActive && "active")}>
               <CustomSidebar isSidebarActive={isSidebarActive} />
               <div className="main_container">
