@@ -17,22 +17,13 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
 
-const SummaryCard = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-    <Card className="flex-1 bg-card/60">
-        <CardHeader className="p-2 pb-1">
-            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-2">{icon}{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-2">
-            {children}
+const SummaryCard = ({ title, value, isCurrency = false, className }: { title: string; value: string | number; isCurrency?: boolean; className?: string }) => (
+    <Card className={cn("flex-1 bg-card/60 print:border-none print:shadow-none", className)}>
+        <CardContent className="p-2 text-center">
+            <p className="text-xs text-muted-foreground uppercase">{title}</p>
+            <p className="text-base font-bold">{isCurrency ? formatCurrency(Number(value)) : Number(value).toFixed(2)}</p>
         </CardContent>
     </Card>
-);
-
-const SummaryItem = ({ label, value, isCurrency = false, className }: { label: string; value: string | number; isCurrency?: boolean; className?: string }) => (
-    <div className={cn("flex justify-between items-baseline", className)}>
-        <p className="text-xs text-muted-foreground">{label}:</p>
-        <p className="text-sm font-bold">{isCurrency ? formatCurrency(Number(value)) : Number(value).toFixed(2)}</p>
-    </div>
 );
 
 
@@ -161,51 +152,26 @@ export default function DailySupplierReportClient() {
                 </div>
                 <Card className="print-no-border">
                     <CardContent className="p-4 space-y-4">
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center no-print">
-                            <div className="flex items-center gap-4 col-span-1">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full sm:w-[280px] justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
-                                </Popover>
-                            </div>
-                            <div className="md:col-span-2">
-                                <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
-                            </div>
+                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center no-print">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className={cn("w-full sm:w-[280px] justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
+                            </Popover>
+                             <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
                         </div>
 
-                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 print:flex print-summary-container">
-                            <SummaryCard title="Weight Summary" icon={<Weight size={14}/>}>
-                                <div className="space-y-1">
-                                    <SummaryItem label="GROSS" value={summary.gross} />
-                                    <SummaryItem label="TIER" value={summary.tier} />
-                                    <SummaryItem label="TOTAL" value={summary.total} className="font-bold text-primary" />
-                                </div>
-                            </SummaryCard>
-                            <SummaryCard title="Net Weight Summary" icon={<HandCoins size={14}/>}>
-                                <div className="space-y-1">
-                                    <SummaryItem label="KARTA" value={summary.karta} />
-                                    <SummaryItem label="NET" value={summary.net} className="font-bold text-primary" />
-                                </div>
-                            </SummaryCard>
-                             <SummaryCard title="Rate & Amount" icon={<TrendingUp size={14}/>}>
-                                <div className="space-y-1">
-                                    <SummaryItem label="RATE" value={summary.rate} isCurrency />
-                                    <SummaryItem label="TOTAL AMOUNT" value={summary.amount} isCurrency className="font-bold text-primary"/>
-                                </div>
-                            </SummaryCard>
-                             <SummaryCard title="Financial Summary" icon={<CircleDollarSign size={14}/>}>
-                                 <div className="space-y-1">
-                                    <SummaryItem label="KANTA" value={summary.kanta} isCurrency />
-                                    <SummaryItem label="KARTA" value={summary.kartaAmount} isCurrency />
-                                    <SummaryItem label="LABOUR" value={summary.labour} isCurrency />
-                                    <SummaryItem label="NET PAYABLE" value={summary.netAmount} isCurrency className="font-bold text-primary" />
-                                </div>
-                            </SummaryCard>
+                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 print:flex print-summary-container">
+                            <SummaryCard title="Gross Weight" value={summary.gross} />
+                            <SummaryCard title="Tier Weight" value={summary.tier} />
+                            <SummaryCard title="Final Weight" value={summary.total} className="font-bold text-primary" />
+                            <SummaryCard title="Net Weight" value={summary.net} className="font-bold text-primary"/>
+                            <SummaryCard title="Total Amount" value={summary.amount} isCurrency />
+                            <SummaryCard title="Net Payable" value={summary.netAmount} isCurrency className="font-bold text-primary" />
                         </div>
                         
 
