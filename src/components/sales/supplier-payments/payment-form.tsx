@@ -245,7 +245,9 @@ export const PaymentForm = ({
                     <div className="flex items-center gap-2 border-l pl-2 ml-2"><span className="text-sm font-medium text-muted-foreground">Total Reduction:</span><span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span></div>
                     <div className="flex-grow"></div>
                     <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
-                    <Button onClick={processPayment} size="sm" className="h-8 text-xs">{editingPayment ? 'Update Payment' : 'Finalize Payment'}</Button>
+                    <Button onClick={processPayment} size="sm" className="h-8 text-xs">
+                        {editingPayment ? 'Save Payment' : 'Finalize Payment'}
+                    </Button>
                 </CardContent>
                 </Card>
             </CardFooter>
