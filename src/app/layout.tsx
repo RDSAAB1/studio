@@ -46,10 +46,9 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isBypassed, setIsBypassed] = useState(false);
-  const [isClient, setIsClient] = useState(false); // New state to track client-side mount
+  const [isClient, setIsClient] = useState(false); 
 
   useEffect(() => {
-    // This effect runs only once on the client after mount
     setIsClient(true); 
     const bypassState = sessionStorage.getItem('bypass') === 'true';
     setIsBypassed(bypassState);
@@ -62,43 +61,12 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Provide isClient to the context
   return (
     <AuthContext.Provider value={{ user, authLoading, isBypassed }}>
-      {isClient ? children : null}
+      {children}
     </AuthContext.Provider>
   );
 }
-
-const AuthGuard = ({ children }: { children: ReactNode }) => {
-    const { user, authLoading, isBypassed } = useAuth();
-    const router = useRouter();
-    const pathname = usePathname();
-    const isProtectedRoute = !UNPROTECTED_ROUTES.includes(pathname);
-
-    useEffect(() => {
-        // Only run redirection logic if auth is no longer loading
-        if (!authLoading && !user && !isBypassed && isProtectedRoute) {
-            router.replace('/login');
-        }
-    }, [user, authLoading, isBypassed, isProtectedRoute, router, pathname]);
-    
-    // While auth is loading, show a spinner on protected routes to prevent content flash
-    if (authLoading && isProtectedRoute) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-    
-    // If on a protected route without user/bypass, render nothing while redirecting
-    if (!user && !isBypassed && isProtectedRoute) {
-        return null; 
-    }
-
-    return <>{children}</>;
-};
 
 
 // --- Root Layout ---
@@ -124,30 +92,27 @@ export default function RootLayout({
         }
     };
     
+    const showLayout = !UNPROTECTED_ROUTES.includes(pathname);
+
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
       <body className="font-body antialiased">
         <AuthProvider>
-            <AuthGuard>
-                {!UNPROTECTED_ROUTES.includes(pathname) ? (
-                     <div className={cn("wrapper", isSidebarActive && "active")}>
-                        <CustomSidebar isSidebarActive={isSidebarActive} />
-                        <div className="main_container">
-                            <Header
-                                toggleSidebar={toggleSidebar}
-                                onSignOut={handleSignOut}
-                            />
-                            <main className="content">
-                                {children}
-                            </main>
-                            {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && <div className="shadow" onClick={toggleSidebar}></div>}
-                        </div>
-                    </div>
-                ) : (
-                    children
+          {showLayout ? (
+            <div className={cn("wrapper", isSidebarActive && "active")}>
+              <CustomSidebar isSidebarActive={isSidebarActive} />
+              <div className="main_container">
+                <Header toggleSidebar={toggleSidebar} onSignOut={handleSignOut} />
+                <main className="content">{children}</main>
+                {isSidebarActive && typeof window !== 'undefined' && window.innerWidth < 1024 && (
+                  <div className="shadow" onClick={toggleSidebar}></div>
                 )}
-                 <DynamicIslandToaster />
-            </AuthGuard>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
+          <DynamicIslandToaster />
         </AuthProvider>
       </body>
     </html>
