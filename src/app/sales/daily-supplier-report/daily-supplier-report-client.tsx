@@ -156,12 +156,8 @@ export default function DailySupplierReportClient() {
                         text-align: center; 
                         background-color: #f2f2f2 !important;
                     }
-                    .print-header h2 { 
-                        font-size: 1rem; 
-                        font-weight: bold; 
-                    }
-                    .print-header p { 
-                        font-size: 0.75rem; 
+                    thead tr {
+                        background-color: #e5e7eb !important;
                     }
                     .no-print { 
                         display: none !important; 
