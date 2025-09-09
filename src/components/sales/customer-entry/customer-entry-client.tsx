@@ -207,7 +207,7 @@ export default function CustomerEntryClient() {
     const netWeight = weight - totalBagWeightQuintals;
     
     const rate = values.rate || 0;
-    const amount = netWeight * rate;
+    const amount = weight * rate;
     
     const brokerageRate = Number(values.brokerage) || 0;
     const brokerageAmount = brokerageRate * weight;
@@ -590,6 +590,7 @@ export default function CustomerEntryClient() {
         onSelectionChange={setSelectedCustomerIds}
         onSearch={setSearchTerm}
         entryType="Customer"
+        onPrintRow={(entry: Customer) => handlePrint([entry])}
       />
 
       <CustomerDetailsDialog
