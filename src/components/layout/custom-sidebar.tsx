@@ -95,10 +95,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
                     <span className="text">{companyName}</span>
             </button>
             </div>
-            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden lg:flex side_bar_menu">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Pin/Unpin Menu</span>
-            </Button>
         </div>
         <div className="side_bar_bottom scrollbar-hide">
             <ul>
