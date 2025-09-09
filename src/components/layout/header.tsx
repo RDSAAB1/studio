@@ -20,6 +20,7 @@ import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 
 interface HeaderProps {
   onSignOut: () => void;
+  toggleSidebar: () => void;
 }
 
 const NotificationBell = () => {
@@ -96,15 +97,18 @@ const NotificationBell = () => {
     )
 }
 
-export function Header({ onSignOut }: HeaderProps) {
+export function Header({ onSignOut, toggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 flex h-10 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
-        {/* Left Aligned Spacer */}
+        {/* Left Aligned Items */}
         <div className="flex flex-1 items-center gap-2">
-          {/* Header content, if any, can go here. For now, it's a spacer. */}
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleSidebar}>
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle Sidebar</span>
+            </Button>
         </div>
 
         {/* Center Aligned Dynamic Island */}

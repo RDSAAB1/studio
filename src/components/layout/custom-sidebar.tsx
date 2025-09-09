@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu, ChevronDown } from 'lucide-react';
@@ -12,11 +12,12 @@ interface CustomSidebarProps {
   children: ReactNode;
   onSignOut: () => void;
   onTabSelect: (menuItem: MenuItemType) => void;
+  isSidebarActive: boolean;
+  toggleSidebar: () => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTabSelect }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTabSelect, isSidebarActive, toggleSidebar }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
-  const [isSidebarActive, setIsSidebarActive] = useState(false);
   const location = useLocation();
   const activePath = location.pathname;
 
@@ -29,10 +30,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
     }
   }, [activePath]);
   
-  const toggleSidebar = () => {
-    setIsSidebarActive(prev => !prev);
-  };
-
   const handleSubMenuToggle = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -42,7 +39,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
   const handleLinkClick = (menuItem: MenuItemType) => {
     onTabSelect(menuItem);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      setIsSidebarActive(false);
+      toggleSidebar();
     }
   };
 
@@ -83,7 +80,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
         <aside className="side_bar">
         <div className="side_bar_top">
             <div className="logo_wrap">
-             <button onClick={() => onTabSelect(allMenuItems.find(i => i.id === 'dashboard')!)} className='flex items-center gap-2'>
+             <button onClick={() => onTabSelect(allMenuItems.find(i => i.id === 'dashboard-overview')!)} className='flex items-center gap-2'>
                     <span className="icon"><Sparkles/></span>
                     <span className="text">BizSuite</span>
             </button>

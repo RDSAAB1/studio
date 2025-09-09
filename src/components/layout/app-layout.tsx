@@ -121,6 +121,7 @@ const AppContent = () => {
     const { isAuthenticated, authLoading, logout } = useAuth();
     const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
     const [activeTabId, setActiveTabId] = useState<string>('dashboard-overview');
+    const [isSidebarActive, setIsSidebarActive] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -169,6 +170,9 @@ const AppContent = () => {
         navigate(`/${menuItem.id}`);
     };
 
+    const toggleSidebar = () => {
+        setIsSidebarActive(prev => !prev);
+    };
 
     if (authLoading) {
         return (
@@ -183,20 +187,22 @@ const AppContent = () => {
     }
     
     return (
-       <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab}>
-          <div className="sticky top-0 z-30 flex-shrink-0">
-            <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
-            <Header onSignOut={logout} />
-          </div>
-          <div className="content">
-            {openTabs.map(tab => {
-                const PageComponent = pageComponents[`/${tab.id}`];
-                return (
-                    <div key={tab.id} style={{ display: tab.id === activeTabId ? 'block' : 'none' }}>
-                        {PageComponent && <PageComponent />}
-                    </div>
-                )
-            })}
+       <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
+          <div className="flex flex-col flex-grow">
+              <div className="sticky top-0 z-30 flex-shrink-0">
+                <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
+                <Header onSignOut={logout} toggleSidebar={toggleSidebar} />
+              </div>
+              <div className="content">
+                {openTabs.map(tab => {
+                    const PageComponent = pageComponents[`/${tab.id}`];
+                    return (
+                        <div key={tab.id} style={{ display: tab.id === activeTabId ? 'block' : 'none' }}>
+                            {PageComponent && <PageComponent />}
+                        </div>
+                    )
+                })}
+              </div>
           </div>
        </CustomSidebar>
     );
