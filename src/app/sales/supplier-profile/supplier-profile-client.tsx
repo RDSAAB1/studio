@@ -21,7 +21,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
+import { SupplierProfileView } from "./supplier-profile-view";
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
@@ -136,7 +136,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
              </DialogDescription>
         </DialogHeader>
         <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
-             <style>
+            <style>
                 {`
                 @media print {
                     body {
@@ -150,13 +150,16 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         color: #000 !important;
                         border-color: #ccc !important;
                     }
-                    .text-primary, .text-destructive {
+                    .text-primary, .text-destructive, .text-green-600 {
                         color: #000 !important;
                     }
                     .bg-muted\\/50 {
                         background-color: #f9fafb !important;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
+                    }
+                    .text-gray-600, .text-muted-foreground {
+                        color: #555 !important;
                     }
                 }
                 `}
@@ -185,7 +188,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             </div>
 
             {/* Summary Section */}
-             <Card className="mb-6">
+             <Card className="mb-6 bg-white shadow-none border">
                 <CardContent className="p-4">
                     <div className="summary-grid-container grid grid-cols-1 md:grid-cols-3 gap-x-6">
                         {/* Operational Summary */}
@@ -551,6 +554,3 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
-
-
-    
