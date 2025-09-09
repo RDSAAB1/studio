@@ -59,7 +59,7 @@ body {
     border-right: 1px solid hsl(var(--border));
     padding: 20px;
     padding-right: 0;
-    transition: width 0.3s ease;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
     z-index: 50;
@@ -293,7 +293,7 @@ body {
     flex-grow: 1;
     min-width: 0; /* Prevents content from overflowing container */
     margin-left: 80px; /* Collapsed sidebar width */
-    transition: margin-left 0.3s ease;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .side_bar:hover ~ .main_container {
