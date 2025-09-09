@@ -53,7 +53,6 @@ function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
         sessionStorage.removeItem('bypass');
     }
-    // The redirect will now be handled by the LayoutController component
     router.push('/login'); 
   };
 
@@ -94,7 +93,6 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
     
     if (!isAuthenticated) {
-        // Allow access to setup pages even if not authenticated
         if (pathname.startsWith('/setup')) {
             return <>{children}</>;
         }
@@ -102,16 +100,14 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
 
     if (pathname === '/login') {
-        // If user is authenticated but on login page, redirect to dashboard
         router.replace('/dashboard-overview');
-        return ( // Return loader while redirecting
+        return ( 
              <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
+                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
         );
     }
 
-    // If authenticated, render the main app layout.
     return (
         <div className={cn("wrapper", isSidebarActive && "active")}>
             <CustomSidebar isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar} />
@@ -127,7 +123,6 @@ function LayoutController({ children }: { children: ReactNode }) {
     )
 }
 
-// --- Main AppLayout Component ---
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <AuthProvider>
