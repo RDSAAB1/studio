@@ -19,6 +19,7 @@ import CustomerProfilePage from "@/app/sales/customer-profile/page";
 import CashBankPage from "@/app/cash-bank/page";
 import ExpenseTrackerPage from "@/app/expense-tracker/page";
 import RtgsReportPage from "@/app/sales/rtgs-report/page";
+import DailySupplierReportPage from "@/app/sales/daily-supplier-report/page";
 import EmployeeDatabasePage from "@/app/hr/employee-database/page";
 import PayrollManagementPage from "@/app/hr/payroll-management/page";
 import AttendanceTrackingPage from "@/app/hr/attendance-tracking/page";
@@ -45,6 +46,7 @@ const pageComponents: { [key: string]: React.FC<any> } = {
     "/cash-bank": CashBankPage,
     "/income-expense": ExpenseTrackerPage,
     "/rtgs-report": RtgsReportPage,
+    "/daily-supplier-report": DailySupplierReportPage,
     "/employee-db": EmployeeDatabasePage,
     "/payroll": PayrollManagementPage,
     "/attendance": AttendanceTrackingPage,
