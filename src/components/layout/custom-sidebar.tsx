@@ -54,7 +54,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) =>
       return (
         <li className={cn(isSubMenuActive && "active")}>
           {isSubMenuActive && <span className="top_curve"></span>}
-           <button onClick={(e) => handleSubMenuToggle(e, item.id)}>
+           <button onClick={(e) => handleSubMenuToggle(e, item.id)} className="w-full">
                 <span className="icon">{React.createElement(item.icon)}</span>
                 <span className="item flex justify-between w-full">
                     {item.name}
