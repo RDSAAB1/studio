@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu, ChevronDown } from 'lucide-react';
@@ -11,23 +12,23 @@ import { Header } from './header';
 interface CustomSidebarProps {
   children: ReactNode;
   onSignOut: () => void;
-  activeTabId: string;
-  onTabSelect: (tabId: string) => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, activeTabId, onTabSelect }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [isSidebarActive, setIsSidebarActive] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const activePath = location.pathname;
 
   useEffect(() => {
-    // Find the active menu item and expand its parent submenu
     for (const item of allMenuItems) {
-      if (item.subMenus && item.subMenus.some(subItem => subItem.id === activeTabId)) {
+      if (item.subMenus && item.subMenus.some(subItem => `/${subItem.id}` === activePath)) {
         setOpenSubMenu(item.id);
         return;
       }
     }
-  }, [activeTabId]);
+  }, [activePath]);
   
   const toggleSidebar = () => {
     setIsSidebarActive(prev => !prev);
@@ -40,15 +41,15 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, acti
   };
   
   const handleLinkClick = (id: string) => {
-    onTabSelect(id);
+    navigate(`/${id}`);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsSidebarActive(false);
     }
   };
 
   const renderMenuItem = (item: MenuItemType) => {
-    const isSubMenuActive = item.subMenus?.some(sub => sub.id === activeTabId) ?? false;
-    const isActive = !item.subMenus && item.id === activeTabId;
+    const isSubMenuActive = item.subMenus?.some(sub => `/${sub.id}` === activePath) ?? false;
+    const isActive = !item.subMenus && `/${item.id}` === activePath;
 
     if (item.subMenus) {
       return (
@@ -83,7 +84,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, acti
         <aside className="side_bar">
         <div className="side_bar_top">
             <div className="logo_wrap">
-            <button onClick={() => onTabSelect('dashboard')} className='flex items-center gap-2'>
+            <button onClick={() => handleLinkClick('dashboard')} className='flex items-center gap-2'>
                     <span className="icon"><Sparkles/></span>
                     <span className="text">BizSuite</span>
             </button>
@@ -101,7 +102,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, acti
                 {item.subMenus && (
                     <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
                     {item.subMenus.map(subItem => (
-                        <li key={subItem.id} className={cn(activeTabId === subItem.id && "active")}>
+                        <li key={subItem.id} className={cn(`/${subItem.id}` === activePath && "active")}>
                         <button className="w-full text-left" onClick={() => handleLinkClick(subItem.id)}>
                             {subItem.name}
                         </button>

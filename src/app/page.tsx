@@ -1,11 +1,12 @@
 
 "use client";
-import DashboardOverviewPage from "./dashboard-overview/page";
+import AppLayout from '@/components/layout/app-layout';
 
 export default function Home() {
-  // The redirection and auth logic is now handled entirely by the AppLayout component.
-  // This page simply renders the main dashboard content.
+  // This component now only renders the layout, which handles everything.
   return (
-    <DashboardOverviewPage />
+    <AppLayout>
+        {/* Children are now handled inside AppLayout with Routes */}
+    </AppLayout>
   );
 }
