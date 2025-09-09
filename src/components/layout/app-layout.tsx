@@ -79,7 +79,8 @@ function LayoutController({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         if (!authLoading) {
-            if (!isAuthenticated && pathname !== '/login') {
+            const isSetupPage = pathname.startsWith('/setup');
+            if (!isAuthenticated && !isSetupPage && pathname !== '/login') {
                 router.replace('/login');
             }
         }
@@ -94,7 +95,21 @@ function LayoutController({ children }: { children: ReactNode }) {
     }
     
     if (!isAuthenticated) {
+        // Allow access to setup pages even if not authenticated
+        if (pathname.startsWith('/setup')) {
+            return <>{children}</>;
+        }
         return <LoginPage />;
+    }
+
+    if (pathname === '/login') {
+        // If user is authenticated but on login page, redirect to dashboard
+        router.replace('/dashboard-overview');
+        return ( // Return loader while redirecting
+             <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
     }
 
     // If authenticated, render the main app layout.
@@ -123,4 +138,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </AuthProvider>
     );
 }
-
