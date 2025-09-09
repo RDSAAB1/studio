@@ -159,8 +159,8 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 .page-break-after { page-break-after: always !important; }
                 .printable-area { background-color: #fff !important; color: #000 !important; }
                 .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                .bg-gray-800 { background-color: #f2f2f2 !important; }
-                .bg-gray-800 th, .bg-gray-800 td { color: #000 !important; }
+                .bg-gray-800, .print-bg-gray-800 { background-color: #f2f2f2 !important; }
+                .bg-gray-800 th, .bg-gray-800 td, .print-bg-gray-800 th, .print-bg-gray-800 td { color: #000 !important; }
             }
         `;
         iframeDoc.head.appendChild(printStyles);

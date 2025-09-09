@@ -96,6 +96,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     }
                     .print-bg-gray-800 {
                         background-color: #f2f2f2 !important; /* Light gray for print */
+                        color: #000 !important;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
                     }

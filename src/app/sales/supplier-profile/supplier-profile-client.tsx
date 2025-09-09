@@ -129,14 +129,14 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
              A detailed summary and transaction history for {data.name}.
              </DialogDescription>
         </DialogHeader>
-        <div ref={statementRef} className="printable-statement bg-background p-4 sm:p-6 font-sans text-foreground">
+        <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b mb-4">
                 <div className="mb-4 sm:mb-0">
                     <h2 className="text-xl font-bold">BizSuite DataFlow</h2>
-                    <p className="text-xs text-muted-foreground">{toTitleCase(data.name)}</p>
-                    <p className="text-xs text-muted-foreground">{toTitleCase(data.address || '')}</p>
-                    <p className="text-xs text-muted-foreground">{data.contact}</p>
+                    <p className="text-xs text-gray-600">{toTitleCase(data.name)}</p>
+                    <p className="text-xs text-gray-600">{toTitleCase(data.address || '')}</p>
+                    <p className="text-xs text-gray-600">{data.contact}</p>
                 </div>
                 <div className="text-left sm:text-right w-full sm:w-auto">
                         <h1 className="text-2xl font-bold text-primary">Statement of Account</h1>
@@ -161,10 +161,10 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         <div className="text-sm">
                             <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Operational</h3>
                              <table className="w-full"><tbody>
-                                <tr><td className="py-0.5 text-muted-foreground">Gross Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</td></tr>
-                                <tr><td className="py-0.5 text-muted-foreground">Teir Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Gross Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Teir Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</td></tr>
                                 <tr className="font-bold border-t"><td className="py-1">Final Wt</td><td className="py-1 text-right font-semibold">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</td></tr>
-                                <tr><td className="py-0.5 text-muted-foreground">Karta Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Karta Wt</td><td className="py-0.5 text-right font-semibold">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</td></tr>
                                 <tr className="font-bold text-primary border-t"><td className="py-1">Net Wt</td><td className="py-1 text-right">{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</td></tr>
                             </tbody></table>
                         </div>
@@ -172,11 +172,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         <div className="text-sm">
                             <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Deductions</h3>
                             <table className="w-full"><tbody>
-                                <tr><td className="py-0.5 text-muted-foreground">Total Amount</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalAmount || 0)}`}</td></tr>
-                                <tr className="border-t"><td className="py-0.5 text-muted-foreground">Karta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-muted-foreground">Laboury</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-muted-foreground">Kanta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKanta || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-muted-foreground">Other</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Total Amount</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalAmount || 0)}`}</td></tr>
+                                <tr className="border-t"><td className="py-0.5 text-gray-600">Karta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKartaAmount || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Laboury</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalLabouryAmount || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Kanta</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalKanta || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Other</td><td className="py-0.5 text-right font-semibold">{`- ${formatCurrency(data.totalOtherCharges || 0)}`}</td></tr>
                                 <tr className="font-bold text-primary border-t"><td className="py-1">Original Amount</td><td className="py-1 text-right">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
                             </tbody></table>
                         </div>
@@ -184,9 +184,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                         <div className="text-sm">
                             <h3 className="font-semibold text-primary mb-2 text-base border-b pb-1">Financial</h3>
                             <table className="w-full"><tbody>
-                                <tr><td className="py-0.5 text-muted-foreground">Original Purchases</td><td className="py-0.5 text-right font-semibold">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
-                                <tr className="border-t"><td className="py-0.5 text-muted-foreground">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
-                                <tr><td className="py-0.5 text-muted-foreground">Total CD Granted</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Original Purchases</td><td className="py-0.5 text-right font-semibold">{formatCurrency(data.totalOriginalAmount || 0)}</td></tr>
+                                <tr className="border-t"><td className="py-0.5 text-gray-600">Total Paid</td><td className="py-0.5 text-right font-semibold text-green-600">{`${formatCurrency(data.totalPaid || 0)}`}</td></tr>
+                                <tr><td className="py-0.5 text-gray-600">Total CD Granted</td><td className="py-0.5 text-right font-semibold">{`${formatCurrency(data.totalCdAmount || 0)}`}</td></tr>
                                 <tr className="font-bold text-destructive border-t"><td className="py-1">Outstanding Balance</td><td className="py-1 text-right">{`${formatCurrency(data.totalOutstanding)}`}</td></tr>
                             </tbody></table>
                         </div>
@@ -200,7 +200,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                 <div className="overflow-x-auto border rounded-lg">
                     <Table className="print-table min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-muted/50">
+                            <TableRow className="bg-gray-100">
                                 <TableHead className="py-2 px-3">Date</TableHead>
                                 <TableHead className="py-2 px-3">Particulars</TableHead>
                                 <TableHead className="text-right py-2 px-3">Debit</TableHead>
@@ -224,7 +224,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                             ))}
                         </TableBody>
                         <TableFooter>
-                            <TableRow className="bg-muted/50 font-bold">
+                            <TableRow className="bg-gray-100 font-bold">
                                 <TableCell colSpan={2} className="py-2 px-3">Closing Balance</TableCell>
                                 <TableCell className="text-right font-mono py-2 px-3">{formatCurrency(totalDebit)}</TableCell>
                                 <TableCell className="text-right font-mono py-2 px-3">{formatCurrency(totalCredit)}</TableCell>
@@ -238,7 +238,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
              {/* Reminder Section */}
             <div className="mt-6">
                     <h2 className="text-lg font-semibold border-b pb-1 mb-2">REMINDER</h2>
-                    <div className="border rounded-lg p-4 min-h-[80px] text-sm text-muted-foreground">
+                    <div className="border rounded-lg p-4 min-h-[80px] text-sm text-gray-600">
                     Payment is due by the date specified.
                     </div>
             </div>

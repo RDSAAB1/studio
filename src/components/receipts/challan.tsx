@@ -31,6 +31,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings }) => {
                     }
                     .print-bg-gray-800 {
                         background-color: #f2f2f2 !important; /* Light gray for print */
+                        color: #000 !important;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
                     }
