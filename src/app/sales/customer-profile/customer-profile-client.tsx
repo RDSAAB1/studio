@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Scale, Weight, Calculator, Percent, Server, Milestone, FileText, Users, Download, Printer, ChevronsUpDown, Check } from "lucide-react";
+import { Home, Phone, User, Banknote, Landmark, Hash, UserCircle, Briefcase, Building, Info, Scale, Weight, Calculator, Percent, Server, Milestone, FileText, Users, Download, Printer, ChevronsUpDown, Check, Calendar as CalendarIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
+import { Calendar } from '@/components/ui/calendar';
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -273,6 +274,9 @@ export default function CustomerProfilePage() {
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+
 
   useEffect(() => {
     setIsClient(true);
@@ -302,10 +306,42 @@ export default function CustomerProfilePage() {
     };
   }, []);
 
+  const filteredData = useMemo(() => {
+    let filteredCustomers = customers;
+    let filteredPayments = paymentHistory;
+
+    if (startDate || endDate) {
+        const start = startDate ? new Date(startDate) : null;
+        if(start) start.setHours(0,0,0,0);
+
+        const end = endDate ? new Date(endDate) : null;
+        if(end) end.setHours(23,59,59,999);
+
+        filteredCustomers = customers.filter(c => {
+            const cDate = new Date(c.date);
+            if (start && end) return cDate >= start && cDate <= end;
+            if (start) return cDate >= start;
+            if (end) return cDate <= end;
+            return true;
+        });
+
+        filteredPayments = paymentHistory.filter(p => {
+            const pDate = new Date(p.date);
+            if (start && end) return pDate >= start && pDate <= end;
+            if (start) return pDate >= start;
+            if (end) return pDate <= end;
+            return true;
+        });
+    }
+
+    return { filteredCustomers, filteredPayments };
+  }, [customers, paymentHistory, startDate, endDate]);
+
   const customerSummaryMap = useMemo(() => {
+    const { filteredCustomers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    customers.forEach(s => {
+    filteredCustomers.forEach(s => {
         if (s.customerId && !summary.has(s.customerId)) {
             summary.set(s.customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -321,7 +357,7 @@ export default function CustomerProfilePage() {
         }
     });
 
-    customers.forEach(s => {
+    filteredCustomers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
         data.totalOriginalAmount += s.originalNetAmount || 0;
@@ -335,7 +371,7 @@ export default function CustomerProfilePage() {
         data.allTransactions!.push(s);
     });
 
-    paymentHistory.forEach(p => {
+    filteredPayments.forEach(p => {
         if (p.customerId && summary.has(p.customerId)) {
             const data = summary.get(p.customerId)!;
             data.totalPaid += p.amount;
@@ -379,7 +415,7 @@ export default function CustomerProfilePage() {
     summary.forEach((value, key) => finalSummaryMap.set(key, value));
 
     return finalSummaryMap;
-  }, [customers, paymentHistory]);
+  }, [filteredData]);
 
   const selectedCustomerData = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
   
@@ -399,14 +435,32 @@ export default function CustomerProfilePage() {
                 <Users className="h-5 w-5 text-primary" />
                 <h3 className="text-base font-semibold">Select Profile</h3>
             </div>
-            <div className="w-full sm:w-auto sm:min-w-64">
-                 <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !startDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus /></PopoverContent>
+                </Popover>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                </Popover>
+                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                     <PopoverTrigger asChild>
                         <Button
                         variant="outline"
                         role="combobox"
                         aria-expanded={openCombobox}
-                        className="w-full justify-between h-9 text-sm font-normal"
+                        className="w-full sm:w-[300px] justify-between h-9 text-sm font-normal"
                         >
                         {selectedCustomerKey
                             ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '')
@@ -480,3 +534,4 @@ export default function CustomerProfilePage() {
     </div>
   );
 }
+
