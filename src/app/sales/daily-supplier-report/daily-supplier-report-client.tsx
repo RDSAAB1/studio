@@ -7,7 +7,7 @@ import { getSuppliersRealtime, getRtgsSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
-import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins } from 'lucide-react';
+import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins, Scale, Percent } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,11 +17,21 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
 
-const SummaryCard = ({ title, value, isCurrency = false, className }: { title: string; value: string | number; isCurrency?: boolean; className?: string }) => (
-    <Card className={cn("flex-1 bg-card/60 print:border-none print:shadow-none", className)}>
-        <CardContent className="p-2 text-center">
-            <p className="text-xs text-muted-foreground uppercase">{title}</p>
-            <p className="text-base font-bold">{isCurrency ? formatCurrency(Number(value)) : Number(value).toFixed(2)}</p>
+const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { label: string; value: string; isHighlighted?: boolean }[]; icon: React.ReactNode }) => (
+    <Card className="flex-1 bg-card/60 print:border print:shadow-none">
+        <CardHeader className="p-2 flex flex-row items-center space-x-2">
+             <div className="bg-primary/10 text-primary p-1.5 rounded-md">{icon}</div>
+             <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-2 pt-0">
+             <div className="space-y-1">
+                {data.map((item, index) => (
+                    <div key={index} className="flex justify-between items-baseline text-xs">
+                        <p className="text-muted-foreground">{item.label}</p>
+                        <p className={cn("font-mono font-semibold", item.isHighlighted && "text-primary font-bold text-sm")}>{item.value}</p>
+                    </div>
+                ))}
+            </div>
         </CardContent>
     </Card>
 );
@@ -68,7 +78,7 @@ export default function DailySupplierReportClient() {
     }, [suppliers, selectedDate, searchTerm]);
 
     const summary = useMemo(() => {
-        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, rate: 0 };
+        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, rate: 0, kartaPercentage: 0 };
         const newSummary = filteredSuppliers.reduce((acc, s) => {
             acc.gross += s.grossWeight;
             acc.tier += s.teirWeight;
@@ -80,11 +90,15 @@ export default function DailySupplierReportClient() {
             acc.kanta += s.kanta;
             acc.amount += s.amount;
             acc.netAmount += Number(s.netAmount);
+            acc.kartaPercentage += s.kartaPercentage;
             return acc;
         }, initialSummary);
 
         if (newSummary.total > 0) {
             newSummary.rate = newSummary.amount / newSummary.total;
+        }
+        if (filteredSuppliers.length > 0) {
+            newSummary.kartaPercentage = newSummary.kartaPercentage / filteredSuppliers.length;
         }
 
         return newSummary;
@@ -114,7 +128,7 @@ export default function DailySupplierReportClient() {
                 @media print {
                     @page { size: landscape; margin: 0mm; }
                     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding: 0 !important; margin: 0 !important; }
-                    .printable-area, .printable-area table, .printable-area tr, .printable-area td, .printable-area th, .printable-area div, .printable-area p { background-color: #fff !important; color: #000 !important; }
+                    .printable-area, .printable-area table, .printable-area tr, .printable-area td, .printable-area th, .printable-area div, .printable-area p, .printable-area .card { background-color: #fff !important; color: #000 !important; }
                     .printable-area * { color: #000 !important; border-color: #ccc !important; }
                     .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
                     .print-header { margin-bottom: 0.5rem; text-align: center; }
@@ -166,12 +180,31 @@ export default function DailySupplierReportClient() {
                         </div>
 
                          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 print:flex print-summary-container">
-                            <SummaryCard title="Gross Weight" value={summary.gross} />
-                            <SummaryCard title="Tier Weight" value={summary.tier} />
-                            <SummaryCard title="Final Weight" value={summary.total} className="font-bold text-primary" />
-                            <SummaryCard title="Net Weight" value={summary.net} className="font-bold text-primary"/>
-                            <SummaryCard title="Total Amount" value={summary.amount} isCurrency />
-                            <SummaryCard title="Net Payable" value={summary.netAmount} isCurrency className="font-bold text-primary" />
+                           <CategorySummaryCard title="Gross & Tier" icon={<Weight size={16}/>} data={[
+                                { label: 'Gross', value: `${summary.gross.toFixed(2)}` },
+                                { label: 'Tier', value: `${summary.tier.toFixed(2)}` },
+                           ]}/>
+                           <CategorySummaryCard title="Final & Net Wt." icon={<Scale size={16}/>} data={[
+                                { label: 'Final Wt.', value: `${summary.total.toFixed(2)}`, isHighlighted: true },
+                                { label: 'Karta Wt.', value: `-${summary.karta.toFixed(2)}` },
+                                { label: 'Net Wt.', value: `${summary.net.toFixed(2)}`, isHighlighted: true },
+                           ]}/>
+                           <CategorySummaryCard title="Rate & Amount" icon={<TrendingUp size={16}/>} data={[
+                                { label: 'Avg Rate', value: formatCurrency(summary.rate) },
+                                { label: 'Total Amt', value: formatCurrency(summary.amount), isHighlighted: true },
+                           ]}/>
+                           <CategorySummaryCard title="Karta Deduction" icon={<Percent size={16}/>} data={[
+                                { label: 'Avg %', value: `${summary.kartaPercentage.toFixed(2)}%` },
+                                { label: 'Total Amt', value: formatCurrency(summary.kartaAmount) },
+                           ]}/>
+                             <CategorySummaryCard title="Other Deductions" icon={<HandCoins size={16}/>} data={[
+                                { label: 'Labour Amt', value: formatCurrency(summary.labour) },
+                                { label: 'Kanta Amt', value: formatCurrency(summary.kanta) },
+                           ]}/>
+                           <CategorySummaryCard title="Financial Summary" icon={<CircleDollarSign size={16}/>} data={[
+                                { label: 'Total Amt', value: formatCurrency(summary.amount) },
+                                { label: 'Net Payable', value: formatCurrency(summary.netAmount), isHighlighted: true },
+                           ]}/>
                         </div>
                         
 
@@ -242,3 +275,4 @@ export default function DailySupplierReportClient() {
     );
 
     
+
