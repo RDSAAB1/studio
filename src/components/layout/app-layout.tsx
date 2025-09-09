@@ -184,8 +184,10 @@ const AppContent = () => {
     
     return (
        <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab}>
-          <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
-          <Header onSignOut={logout} />
+          <div className="sticky top-0 z-30 flex-shrink-0">
+            <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
+            <Header onSignOut={logout} />
+          </div>
           <div className="content">
             {openTabs.map(tab => {
                 const PageComponent = pageComponents[`/${tab.id}`];

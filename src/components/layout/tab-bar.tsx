@@ -9,8 +9,8 @@ const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab
   if (!openTabs) return null;
 
   return (
-    <div className="h-10 bg-card border-b border-border flex items-end overflow-x-auto scrollbar-hide">
-      <div className="flex items-end pl-2">
+    <div className="tab-bar-container h-10 bg-card border-b border-border flex items-end">
+      <div className="flex items-end pl-2 overflow-x-auto scrollbar-hide">
         {openTabs.map((tab: any) => {
             const isActive = tab.id === activeTabId;
             const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
