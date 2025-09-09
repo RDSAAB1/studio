@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import CustomSidebar from '@/components/layout/custom-sidebar';
@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
+import { Toaster } from "@/components/ui/toast"
+import { DynamicIslandToaster } from "@/components/ui/dynamic-island-toaster";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -69,6 +71,7 @@ export default function RootLayout({
     const pathname = usePathname();
     const isProtected = !UNPROTECTED_ROUTES.includes(pathname);
     const [isSidebarActive, setIsSidebarActive] = useState(false);
+    const router = useRouter();
 
     const toggleSidebar = () => {
         setIsSidebarActive(prev => !prev);
@@ -77,7 +80,8 @@ export default function RootLayout({
     const handleSignOut = async () => {
         try {
             await signOut(getFirebaseAuth());
-            // The redirection will be handled by the page logic now.
+            sessionStorage.removeItem('bypass'); // Clear the bypass session on sign out
+            router.push('/login');
         } catch (error) {
             console.error("Error signing out: ", error);
         }
@@ -104,6 +108,7 @@ export default function RootLayout({
             ) : (
                 children
             )}
+             <DynamicIslandToaster />
         </AuthProvider>
       </body>
     </html>
