@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider, useLocation, useNavigate, Routes, Route } from 'react-router-dom';
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { Loader2 } from 'lucide-react';
@@ -93,6 +93,9 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (typeof window !== 'undefined') {
             const bypass = sessionStorage.getItem('bypass') === 'true';
             setIsBypassed(bypass);
+            if (bypass) {
+                setAuthLoading(false);
+            }
         }
 
         return () => unsubscribe();
@@ -104,8 +107,6 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (typeof window !== 'undefined') {
             sessionStorage.removeItem('bypass');
         }
-        // Let the router handle the redirect
-        router.navigate('/login');
     };
 
     const isAuthenticated = !!user || isBypassed;
@@ -133,15 +134,29 @@ const AppContent = () => {
     }
     
     return (
-        <div className="flex min-h-screen">
-           <CustomSidebar onSignOut={logout}>
-                <main className="flex-1 p-4 sm:p-6 lg:p-8">
-                    <RouterProvider router={router} />
-                </main>
-           </CustomSidebar>
-        </div>
+        <RouterProvider router={router} />
     );
 };
+
+const AppLayoutStructure = () => {
+    const { logout } = useAuth();
+    const location = useLocation();
+
+    return (
+        <div className="flex min-h-screen">
+            <CustomSidebar onSignOut={logout}>
+                <main className="flex-1 p-4 sm:p-6 lg:p-8">
+                    <Routes location={location}>
+                        {pageRoutes.map((route) => (
+                            <Route key={route.path} path={route.path} element={route.element} />
+                        ))}
+                    </Routes>
+                </main>
+            </CustomSidebar>
+        </div>
+    )
+}
+
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
