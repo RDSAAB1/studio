@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
+import type { Customer, Payment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData, CustomerPayment } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency } from "@/lib/utils";
 
 import { useToast } from "@/hooks/use-toast";
@@ -363,6 +364,20 @@ export default function CustomerEntryClient() {
         e.preventDefault();
         formElements[currentElementIndex + 1].focus();
       }
+    } else if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        form.handleSubmit(() => onSubmit())();
+    } else if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        handleSaveAndPrint('tax-invoice'); // Or your default print action
+    } else if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        handleNew();
+    } else if (e.ctrlKey && e.key === 'd') {
+        e.preventDefault();
+        if(isEditing && currentCustomer.id) {
+            handleDelete(currentCustomer.id);
+        }
     }
   };
 
@@ -452,17 +467,17 @@ export default function CustomerEntryClient() {
             await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
             const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
             await addCustomer(entryWithRestoredAmount as Customer);
-            toast({ title: "Entry updated and payments deleted", variant: "success" });
+            toast({ title: "Entry updated, payments deleted.", variant: "success" });
             if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
         } else {
             const entryToSave = { ...dataToSave, id: dataToSave.srNo };
             await addCustomer(entryToSave as Customer);
-            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully`, variant: "success" });
+            toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
             if (callback) callback(entryToSave as Customer); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
-        toast({ title: "Failed to save entry", variant: "destructive" });
+        toast({ title: "Failed to save entry.", variant: "destructive" });
     }
   };
 
@@ -488,10 +503,7 @@ export default function CustomerEntryClient() {
         handleNew();
       });
     } else {
-      toast({
-        title: "Invalid Form: Please check for errors",
-        variant: "destructive"
-      });
+      toast({ title: "Invalid Form", description: "Please check for errors.", variant: "destructive" });
     }
   };
   
@@ -501,10 +513,7 @@ export default function CustomerEntryClient() {
 
   const handlePrint = (entriesToPrint: Customer[]) => {
     if (!entriesToPrint || entriesToPrint.length === 0) {
-        toast({
-            title: "No entries selected to print",
-            variant: "destructive",
-        });
+        toast({ title: "No entries selected to print.", variant: "destructive" });
         return;
     }
 
@@ -516,10 +525,7 @@ export default function CustomerEntryClient() {
         const allSameCustomer = entriesToPrint.every(e => e.customerId === firstCustomerId);
 
         if (!allSameCustomer) {
-            toast({
-                title: "Consolidated receipts are for a single customer",
-                variant: "destructive",
-            });
+            toast({ title: "Consolidated receipts are for a single customer.", variant: "destructive" });
             return;
         }
         

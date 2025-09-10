@@ -74,31 +74,35 @@ export type Customer = {
 };
 
 export type Transaction = {
-    id: string;
-    date: string;
-    transactionType: 'Income' | 'Expense';
-    category: string;
-    subCategory: string;
-    amount: number;
-    payee: string;
-    description?: string;
-    paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS';
-    status: 'Paid' | 'Pending' | 'Cancelled';
-    invoiceNumber?: string;
-    taxAmount?: number;
-    expenseType?: 'Personal' | 'Business';
-    isRecurring: boolean;
-    recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    nextDueDate?: string;
-    mill?: string;
-    expenseNature?: 'Permanent' | 'Seasonal';
-    isCalculated?: boolean;
-    quantity?: number;
-    rate?: number;
-    projectId?: string; // Link to a project
-    loanId?: string; // Link to a loan
-    bankAccountId?: string;
+  id: string;
+  date: string;
+  transactionType: 'Income' | 'Expense';
+  category: string;
+  subCategory: string;
+  amount: number;
+  payee: string;
+  description?: string;
+  paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS';
+  status: 'Paid' | 'Pending' | 'Cancelled';
+  invoiceNumber?: string;
+  taxAmount?: number;
+  expenseType?: 'Personal' | 'Business';
+  isRecurring: boolean;
+  recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  nextDueDate?: string;
+  mill?: string;
+  expenseNature?: 'Permanent' | 'Seasonal';
+  isCalculated?: boolean;
+  quantity?: number;
+  rate?: number;
+  projectId?: string; // Link to a project
+  loanId?: string; // Link to a loan
+  bankAccountId?: string;
 };
+
+export type Income = Omit<Transaction, 'transactionType'> & { transactionType: 'Income' };
+export type Expense = Omit<Transaction, 'transactionType'> & { transactionType: 'Expense' };
+
 
 export type IncomeCategory = {
     id: string;
@@ -135,18 +139,21 @@ export type PaidFor = {
     bankIfsc?: string;
 }
 
+// Keeping a single Payment type for now
 export type Payment = {
     id: string;
-    paymentId: string;
-    customerId: string;
+    paymentId: string; // Pxxxxx or CRxxxxx
+    customerId: string; // Can be supplier or customer ID
     date: string;
     amount: number;
-    cdAmount: number;
-    cdApplied: boolean;
-    type: string;
-    receiptType: string;
-    notes: string;
+    cdAmount?: number;
+    cdApplied?: boolean;
+    type: string; // 'Full', 'Partial'
+    receiptType: string; // 'Cash', 'Online', 'RTGS'
+    notes?: string;
     paidFor?: PaidFor[];
+
+    // RTGS specific fields
     sixRNo?: string;
     sixRDate?: string;
     parchiNo?: string;
@@ -163,25 +170,14 @@ export type Payment = {
     bankAcNo?: string;
     bankIfsc?: string;
     rtgsFor?: 'Supplier' | 'Outsider';
-    rtgsSrNo?: string; // New field for RTGS serial number
-    expenseTransactionId?: string; // ID of the corresponding expense transaction
+    rtgsSrNo?: string; 
+    expenseTransactionId?: string;
+    incomeTransactionId?: string;
+    bankAccountId?: string; 
 }
 
-// A simplified payment type for customers
-export type CustomerPayment = {
-    id: string;
-    paymentId: string; // e.g., CR00001
-    customerId: string;
-    date: string;
-    amount: number;
-    type: 'Full' | 'Partial' | string;
-    paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS';
-    notes?: string;
-    paidFor: PaidFor[]; // Details of which customer entries are being paid for
-    incomeTransactionId?: string; // Link to the corresponding income transaction
-    bankAccountId?: string; // Link to bank account if not cash
-}
 
+export type CustomerPayment = Payment;
 
 export type CustomerSummary = {
     name: string;
@@ -197,7 +193,7 @@ export type CustomerSummary = {
     totalPaid: number;
     totalOutstanding: number;
     totalDeductions: number;
-    paymentHistory: Payment[];
+    paymentHistory: (Payment | CustomerPayment)[];
     outstandingEntryIds: string[];
     // New fields for Mill Overview
     totalGrossWeight: number;
@@ -414,3 +410,12 @@ export type Loan = {
     depositTo: 'BankAccount' | 'CashInHand' | 'CashAtHome' | string;
     nextEmiDueDate?: string;
 }
+
+export type SerialNumberFormat = {
+    prefix: string;
+    padding: number;
+};
+
+export type FormatSettings = {
+    [key: string]: SerialNumberFormat;
+};

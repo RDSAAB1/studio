@@ -35,6 +35,13 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
   }, []);
 
   useEffect(() => {
+    // This effect ensures that the submenu closes when the sidebar itself is collapsed or on mobile when it closes.
+    if (!isSidebarActive) {
+      setOpenSubMenu(null);
+    }
+  }, [isSidebarActive]);
+
+  useEffect(() => {
     for (const item of allMenuItems) {
       if (item.subMenus && item.subMenus.some(subItem => `/${subItem.id}` === activePath)) {
         setOpenSubMenu(item.id);

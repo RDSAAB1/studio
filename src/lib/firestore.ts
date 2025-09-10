@@ -356,6 +356,14 @@ export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onE
   }, onError);
 }
 
+export async function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
+  const q = query(customerPaymentsCollection, orderBy("date", "desc"));
+  return onSnapshot(q, (snapshot) => {
+    const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
+    callback(payments);
+  }, onError);
+}
+
 export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   if (!srNo) {
     console.error("SR No. is required to delete payments.");
@@ -434,10 +442,9 @@ export function getFundTransactionsRealtime(callback: (transactions: FundTransac
   }, onError);
 }
 
-export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'date'>): Promise<FundTransaction> {
-  const finalData = { ...transactionData, date: new Date().toISOString() };
-  const docRef = await addDoc(fundTransactionsCollection, finalData);
-  return { id: docRef.id, ...finalData };
+export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id'>): Promise<FundTransaction> {
+  const docRef = await addDoc(fundTransactionsCollection, transactionData);
+  return { id: docRef.id, ...transactionData };
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
@@ -566,7 +573,7 @@ export async function deleteLoan(id: string): Promise<void> {
 
 // --- Customer Payment Functions ---
 
-export function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
+export function getCustomerPayments(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
   const q = query(customerPaymentsCollection, orderBy("date", "desc"));
   return onSnapshot(q, (snapshot) => {
     const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
@@ -575,10 +582,9 @@ export function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment
 }
 
 export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'>): Promise<CustomerPayment> {
-    const docRef = await addDoc(customerPaymentsCollection, paymentData);
-    const newPayment = { ...paymentData, id: docRef.id };
-    await updateDoc(docRef, { id: docRef.id });
-    return newPayment;
+    const docRef = doc(db, 'customer_payments', paymentData.paymentId);
+    await setDoc(docRef, { ...paymentData, id: docRef.id });
+    return { ...paymentData, id: docRef.id };
 }
 
 export async function deletePayment(id: string): Promise<void> {
@@ -589,4 +595,52 @@ export async function deletePayment(id: string): Promise<void> {
 export async function deleteCustomerPayment(id: string): Promise<void> {
     const docRef = doc(db, "customer_payments", id);
     await deleteDoc(docRef);
+}
+
+
+// --- Income and Expense specific functions ---
+export function getIncomeRealtime(callback: (income: Income[]) => void, onError: (error: Error) => void): () => void {
+    const q = query(transactionsCollection, where("transactionType", "==", "Income"), orderBy("date", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const incomeList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+        callback(incomeList);
+    }, onError);
+}
+
+export function getExpensesRealtime(callback: (expenses: Expense[]) => void, onError: (error: Error) => void): () => void {
+    const q = query(transactionsCollection, where("transactionType", "==", "Expense"), orderBy("date", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const expenseList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+        callback(expenseList);
+    }, onError);
+}
+
+export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
+    const docRef = await addDoc(transactionsCollection, incomeData);
+    await updateDoc(docRef, { id: docRef.id });
+    return { id: docRef.id, ...incomeData };
+}
+
+export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
+    const docRef = await addDoc(transactionsCollection, expenseData);
+    await updateDoc(docRef, { id: docRef.id });
+    return { id: docRef.id, ...expenseData };
+}
+
+export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
+    const docRef = doc(transactionsCollection, id);
+    await updateDoc(docRef, incomeData);
+}
+
+export async function updateExpense(id: string, expenseData: Partial<Omit<Expense, 'id'>>): Promise<void> {
+    const docRef = doc(transactionsCollection, id);
+    await updateDoc(docRef, expenseData);
+}
+
+export async function deleteIncome(id: string): Promise<void> {
+    await deleteDoc(doc(transactionsCollection, id));
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+    await deleteDoc(doc(transactionsCollection, id));
 }

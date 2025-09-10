@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount } from "@/lib/definitions";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getTransactionsRealtime, getLoansRealtime, updateLoan, getBankAccountsRealtime } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getLoansRealtime, updateLoan, getBankAccountsRealtime, addIncome, addExpense, getIncomeRealtime, getExpensesRealtime, deleteIncome, deleteExpense, updateIncome, updateExpense } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
@@ -34,8 +34,8 @@ import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wall
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format, addMonths } from "date-fns"
 
-// Zod Schema
-const transactionSchema = z.object({
+// Zod Schema for form validation
+const transactionFormSchema = z.object({
   id: z.string().optional(),
   date: z.date(),
   transactionType: z.enum(["Income", "Expense"]),
@@ -62,10 +62,12 @@ const transactionSchema = z.object({
   loanId: z.string().optional(),
 });
 
-type TransactionFormValues = z.infer<typeof transactionSchema>;
-type TransactionFormData = Omit<TransactionFormValues, 'date' | 'nextDueDate'> & { date: string, nextDueDate?: string }; // For Firestore compatibility
+type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 
-const getInitialFormState = (): Omit<Transaction, 'id' | 'date' | 'nextDueDate'> & { date: Date, nextDueDate?: Date } => {
+// This combines both income and expense for the list display
+type DisplayTransaction = (Income | Expense) & { id: string };
+
+const getInitialFormState = (): TransactionFormValues => {
   const staticDate = new Date();
   staticDate.setHours(0, 0, 0, 0);
 
@@ -84,14 +86,10 @@ const getInitialFormState = (): Omit<Transaction, 'id' | 'date' | 'nextDueDate'>
     expenseType: 'Business',
     isRecurring: false,
     recurringFrequency: 'monthly',
-    nextDueDate: undefined,
-    mill: '',
-    expenseNature: 'Permanent',
     isCalculated: false,
     quantity: 0,
     rate: 0,
-    projectId: '',
-    loanId: '',
+    projectId: 'none',
   };
 };
 
@@ -126,12 +124,13 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 export default function IncomeExpenseClient() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [income, setIncome] = useState<Income[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("form");
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -144,26 +143,38 @@ export default function IncomeExpenseClient() {
   const [isRecurring, setIsRecurring] = useState(false);
 
   const form = useForm<TransactionFormValues>({
-    resolver: zodResolver(transactionSchema),
+    resolver: zodResolver(transactionFormSchema),
     defaultValues: getInitialFormState(),
   });
 
-  const selectedTransactionType = form.watch('transactionType');
-  const selectedPaymentMethod = form.watch('paymentMethod');
-  const selectedExpenseNature = form.watch('expenseNature');
-  const selectedCategory = form.watch('category');
-  const selectedSubCategory = form.watch('subCategory');
-  const quantity = form.watch('quantity');
-  const rate = form.watch('rate');
+  const allTransactions: DisplayTransaction[] = useMemo(() => [...income, ...expenses], [income, expenses]);
+
+  const {
+    watch,
+    control,
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = form;
+  
+  const selectedTransactionType = watch('transactionType');
+  const selectedPaymentMethod = watch('paymentMethod');
+  const selectedExpenseNature = watch('expenseNature');
+  const selectedCategory = watch('category');
+  const selectedSubCategory = watch('subCategory');
+  const quantity = watch('quantity');
+  const rate = watch('rate');
 
   const handleNew = useCallback(() => {
     setIsEditing(null); 
-    form.reset(getInitialFormState());
+    reset(getInitialFormState());
     setIsAdvanced(false);
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-  }, [form]);
+  }, [reset]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -173,15 +184,14 @@ export default function IncomeExpenseClient() {
 
       const loan = loans.find(l => l.id === loanId);
       if (loan) {
-        form.setValue('transactionType', 'Expense');
-        form.setValue('amount', Number(searchParams.get('amount') || 0));
-        form.setValue('payee', toTitleCase(searchParams.get('payee') || ''));
-        form.setValue('description', searchParams.get('description') || '');
-        // Set nature first to trigger category update
-        form.setValue('expenseNature', 'Permanent'); 
+        setValue('transactionType', 'Expense');
+        setValue('amount', Number(searchParams.get('amount') || 0));
+        setValue('payee', toTitleCase(searchParams.get('payee') || ''));
+        setValue('description', searchParams.get('description') || '');
+        setValue('expenseNature', 'Permanent'); 
       }
     }
-  }, [searchParams, loans, form, handleNew]);
+  }, [searchParams, loans, setValue, handleNew]);
 
   const availableCategories = useMemo(() => {
     if (selectedTransactionType === 'Income') {
@@ -194,44 +204,38 @@ export default function IncomeExpenseClient() {
   }, [selectedTransactionType, selectedExpenseNature, incomeCategories, expenseCategories]);
   
   useEffect(() => {
-      // This effect runs when availableCategories changes.
-      // If we came from a notification, it sets the category and subCategory.
       const loanId = searchParams.get('loanId');
       if (loanId && availableCategories.some(c => c.name === 'Interest & Loan Payments')) {
           const loan = loans.find(l => l.id === loanId);
           if (loan) {
-              form.setValue('category', 'Interest & Loan Payments');
-              // A timeout helps ensure the sub-category list is populated before setting its value
+              setValue('category', 'Interest & Loan Payments');
               setTimeout(() => {
-                  form.setValue('subCategory', loan.loanName);
+                  setValue('subCategory', loan.loanName);
               }, 50);
           }
       }
-  }, [availableCategories, searchParams, loans, form]);
+  }, [availableCategories, searchParams, loans, setValue]);
 
   
   useEffect(() => {
     if (selectedCategory === 'Interest & Loan Payments' && selectedSubCategory) {
         const matchingLoans = loans.filter(l => l.loanName === selectedSubCategory);
         if (matchingLoans.length > 0) {
-              // If there are multiple loans with the same name, we can't definitively pick one here.
-              // The ideal solution would be to make loan names unique or provide more context.
-              // For now, we'll pick the first one, but this might need refinement.
-              form.setValue('loanId', matchingLoans[0].id);
+              setValue('loanId', matchingLoans[0].id);
         } else {
-            form.setValue('loanId', '');
+            setValue('loanId', '');
         }
     } else {
-        form.setValue('loanId', '');
+        setValue('loanId', '');
     }
-  }, [selectedCategory, selectedSubCategory, loans, form]);
+  }, [selectedCategory, selectedSubCategory, loans, setValue]);
 
   useEffect(() => {
     if (isCalculated) {
       const calculatedAmount = (quantity || 0) * (rate || 0);
-      form.setValue('amount', calculatedAmount);
+      setValue('amount', calculatedAmount);
     }
-  }, [quantity, rate, isCalculated, form]);
+  }, [quantity, rate, isCalculated, setValue]);
 
   const availableSubCategories = useMemo(() => {
     if (selectedCategory === 'Interest & Loan Payments') {
@@ -243,18 +247,13 @@ export default function IncomeExpenseClient() {
   }, [selectedCategory, availableCategories, loans]);
 
   useEffect(() => {
-    const unsubTransactions = getTransactionsRealtime((data) => {
-        setTransactions(data);
-        setLoading(false);
-    }, (error) => {
-        console.error("Error fetching transactions: ", error);
-        setLoading(false);
-    });
+    const unsubIncome = getIncomeRealtime(data => setIncome(data), console.error);
+    const unsubExpenses = getExpensesRealtime(data => { setExpenses(data); setLoading(false); }, console.error);
     
     const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
     const unsubLoans = getLoansRealtime(setLoans, console.error);
-    const unsubIncome = getIncomeCategories(setIncomeCategories, console.error);
-    const unsubExpense = getExpenseCategories(setExpenseCategories, console.error);
+    const unsubIncomeCats = getIncomeCategories(setIncomeCategories, console.error);
+    const unsubExpenseCats = getExpenseCategories(setExpenseCategories, console.error);
     const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
     
     const projectsQuery = query(collection(db, 'projects'), orderBy('name', 'asc'));
@@ -264,10 +263,11 @@ export default function IncomeExpenseClient() {
     }, console.error);
 
     return () => {
-      unsubTransactions();
-      unsubFunds();
       unsubIncome();
-      unsubExpense();
+      unsubExpenses();
+      unsubFunds();
+      unsubIncomeCats();
+      unsubExpenseCats();
       unsubProjects();
       unsubLoans();
       unsubBankAccounts();
@@ -280,21 +280,15 @@ export default function IncomeExpenseClient() {
         balances.set('CashInHand', 0);
 
         fundTransactions.forEach(t => {
-            if (t.type === 'CapitalInflow') {
-                if (balances.has(t.destination)) {
-                    balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
-                }
-            } else if (t.type === 'CashTransfer') {
-                    if (balances.has(t.source)) {
-                        balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
-                    }
-                    if (balances.has(t.destination)) {
-                        balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
-                    }
-                }
+             if (balances.has(t.source)) {
+                balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
+            }
+            if (balances.has(t.destination)) {
+                balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
+            }
         });
         
-        transactions.forEach(t => {
+        allTransactions.forEach(t => {
             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
              if (balanceKey && balances.has(balanceKey)) {
                 if (t.transactionType === 'Income') {
@@ -306,19 +300,19 @@ export default function IncomeExpenseClient() {
         });
         
         return { balances };
-    }, [fundTransactions, transactions, bankAccounts]);
+    }, [fundTransactions, allTransactions, bankAccounts]);
 
 
   useEffect(() => {
-    form.setValue('category', '');
-    form.setValue('subCategory', '');
-  }, [selectedTransactionType, selectedExpenseNature, form]);
+    setValue('category', '');
+    setValue('subCategory', '');
+  }, [selectedTransactionType, selectedExpenseNature, setValue]);
 
   useEffect(() => {
-    form.setValue('subCategory', '');
-  }, [selectedCategory, form]);
+    setValue('subCategory', '');
+  }, [selectedCategory, setValue]);
 
-  const handleEdit = (transaction: Transaction) => {
+  const handleEdit = (transaction: DisplayTransaction) => {
     setIsEditing(transaction.id);
     let subCategoryToSet = transaction.subCategory;
     
@@ -327,7 +321,7 @@ export default function IncomeExpenseClient() {
         if (loan) subCategoryToSet = loan.loanName;
     }
     
-    form.reset({
+    reset({
       ...transaction,
       date: new Date(transaction.date), 
       taxAmount: transaction.taxAmount || 0,
@@ -343,14 +337,15 @@ export default function IncomeExpenseClient() {
     setActiveTab("form");
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (transaction: DisplayTransaction) => {
     try {
-      await deleteDoc(doc(db, "transactions", id));
-      toast({ title: "Transaction deleted.", variant: "success" });
-      if (isEditing === id) {
-        setIsEditing(null);
-        form.reset(getInitialFormState()); 
+      if (transaction.transactionType === 'Income') {
+        await deleteIncome(transaction.id);
+      } else {
+        await deleteExpense(transaction.id);
       }
+      toast({ title: "Transaction deleted.", variant: "success" });
+      if (isEditing === transaction.id) handleNew();
     } catch (error) {
       console.error("Error deleting transaction: ", error);
       toast({ title: "Failed to delete transaction.", variant: "destructive" });
@@ -362,11 +357,20 @@ export default function IncomeExpenseClient() {
         const balanceKey = values.bankAccountId || (values.paymentMethod === 'Cash' ? 'CashInHand' : '');
         const availableBalance = financialState.balances.get(balanceKey) || 0;
 
-        if (values.amount > availableBalance) {
+        // On edit, we need to consider the original amount of the transaction
+        let amountToCheck = values.amount;
+        if(isEditing) {
+            const originalTx = allTransactions.find(tx => tx.id === isEditing);
+            if(originalTx) {
+                amountToCheck = values.amount - originalTx.amount;
+            }
+        }
+        
+        if (amountToCheck > availableBalance) {
             const accountName = bankAccounts.find(acc => acc.id === balanceKey)?.accountHolderName || 'Cash in Hand';
             toast({
                 title: "Insufficient Balance",
-                description: `Cannot process expense of ${formatCurrency(values.amount)}. Available balance in ${accountName} is ${formatCurrency(availableBalance)}.`,
+                description: `This transaction exceeds the available balance in ${accountName}.`,
                 variant: "destructive"
             });
             return;
@@ -375,34 +379,31 @@ export default function IncomeExpenseClient() {
   
     setLoading(true);
     try {
-      const transactionData: Partial<TransactionFormData> = {
+      const transactionData = {
         ...values,
-        isCalculated,
-        isRecurring,
         date: format(values.date, "yyyy-MM-dd"), 
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
         projectId: values.projectId === 'none' ? '' : values.projectId,
+        nextDueDate: values.isRecurring && values.nextDueDate ? format(values.nextDueDate, "yyyy-MM-dd") : undefined,
+        bankAccountId: values.paymentMethod === 'Cash' ? undefined : values.bankAccountId,
       };
 
-      if (values.isRecurring && values.nextDueDate) {
-          transactionData.nextDueDate = format(values.nextDueDate, "yyyy-MM-dd");
-      } else {
-          delete transactionData.nextDueDate;
-      }
-      
-      if(values.paymentMethod === 'Cash'){
-          delete transactionData.bankAccountId;
-      }
-
       if (isEditing) {
-        await setDoc(doc(db, "transactions", isEditing), transactionData, { merge: true });
+        if (values.transactionType === 'Income') {
+            await updateIncome(isEditing, transactionData as Omit<Income, 'id'>);
+        } else {
+            await updateExpense(isEditing, transactionData as Omit<Expense, 'id'>);
+        }
         toast({ title: "Transaction updated.", variant: "success" });
       } else {
-        await addDoc(collection(db, "transactions"), transactionData);
+        if (values.transactionType === 'Income') {
+            await addIncome(transactionData as Omit<Income, 'id'>);
+        } else {
+            await addExpense(transactionData as Omit<Expense, 'id'>);
+        }
         toast({ title: "Transaction saved.", variant: "success" });
-
-        // If this is a loan payment, update the loan's next EMI due date
+        
         if (transactionData.loanId) {
             const loanToUpdate = loans.find(l => l.id === transactionData.loanId);
             if (loanToUpdate && loanToUpdate.nextEmiDueDate) {
@@ -422,7 +423,7 @@ export default function IncomeExpenseClient() {
     }
   };
 
-  const requestSort = (key: keyof Transaction) => {
+  const requestSort = (key: keyof DisplayTransaction) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
         direction = 'descending';
@@ -431,7 +432,7 @@ export default function IncomeExpenseClient() {
   };
 
   const sortedTransactions = useMemo(() => {
-    let sortableItems = [...transactions];
+    let sortableItems = [...allTransactions];
     if (sortConfig !== null) {
         sortableItems.sort((a, b) => {
             const valA = a[sortConfig.key] || '';
@@ -446,18 +447,18 @@ export default function IncomeExpenseClient() {
         });
     }
     return sortableItems;
-  }, [transactions, sortConfig]);
+  }, [allTransactions, sortConfig]);
   
   const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
-    const income = transactions.filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
-    const expense = transactions.filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
+    const incomeTotal = income.reduce((sum, t) => sum + t.amount, 0);
+    const expenseTotal = expenses.reduce((sum, t) => sum + t.amount, 0);
     return {
-      totalIncome: income,
-      totalExpense: expense,
-      netProfitLoss: income - expense,
-      totalTransactions: transactions.length,
+      totalIncome: incomeTotal,
+      totalExpense: expenseTotal,
+      netProfitLoss: incomeTotal - expenseTotal,
+      totalTransactions: allTransactions.length,
     };
-  }, [transactions]);
+  }, [income, expenses, allTransactions]);
 
   return (
     <div className="space-y-6">
@@ -526,7 +527,7 @@ export default function IncomeExpenseClient() {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(transaction.id)}>Continue</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -542,10 +543,10 @@ export default function IncomeExpenseClient() {
         <TabsContent value="form" className="mt-4">
            <SectionCard>
               <CardContent className="p-6">
-                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       
-                      <Controller name="transactionType" control={form.control} render={({ field }) => (
+                      <Controller name="transactionType" control={control} render={({ field }) => (
                           <div className="space-y-2">
                             <Label className="text-xs">Transaction Type</Label>
                             <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
@@ -561,7 +562,7 @@ export default function IncomeExpenseClient() {
                           </div>
                       )} />
                       
-                      <Controller name="date" control={form.control} render={({ field }) => (
+                      <Controller name="date" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Date</Label>
                             <Popover>
@@ -581,13 +582,13 @@ export default function IncomeExpenseClient() {
                       <div className="space-y-1">
                           <Label htmlFor="amount" className="text-xs">Amount</Label>
                           <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="amount" control={form.control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
+                              <Controller name="amount" control={control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
                           </InputWithIcon>
-                          {form.formState.errors.amount && <p className="text-xs text-destructive mt-1">{form.formState.errors.amount.message}</p>}
+                          {errors.amount && <p className="text-xs text-destructive mt-1">{errors.amount.message}</p>}
                       </div>
                        
                         {selectedTransactionType === 'Expense' && (
-                            <Controller name="expenseNature" control={form.control} render={({ field }) => (
+                            <Controller name="expenseNature" control={control} render={({ field }) => (
                               <div className="space-y-1">
                                 <Label className="text-xs">Expense Nature</Label>
                                 <Select onValueChange={field.onChange} value={field.value}>
@@ -603,7 +604,7 @@ export default function IncomeExpenseClient() {
                             )} />
                         )}
 
-                        <Controller name="category" control={form.control} render={({ field }) => (
+                        <Controller name="category" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Category</Label>
                             <Select onValueChange={field.onChange} value={field.value} disabled={availableCategories.length === 0}>
@@ -614,11 +615,11 @@ export default function IncomeExpenseClient() {
                                     {availableCategories.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
-                            {form.formState.errors.category && <p className="text-xs text-destructive mt-1">{form.formState.errors.category.message}</p>}
+                            {errors.category && <p className="text-xs text-destructive mt-1">{errors.category.message}</p>}
                           </div>
                         )} />
 
-                        <Controller name="subCategory" control={form.control} render={({ field }) => (
+                        <Controller name="subCategory" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Sub-Category</Label>
                             <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCategory}>
@@ -629,7 +630,7 @@ export default function IncomeExpenseClient() {
                                     {availableSubCategories.map(subCat => <SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>)}
                                 </SelectContent>
                             </Select>
-                            {form.formState.errors.subCategory && <p className="text-xs text-destructive mt-1">{form.formState.errors.subCategory.message}</p>}
+                            {errors.subCategory && <p className="text-xs text-destructive mt-1">{errors.subCategory.message}</p>}
                           </div>
                         )} />
 
@@ -638,19 +639,19 @@ export default function IncomeExpenseClient() {
                             {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                           </Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                               <Controller name="payee" control={form.control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" />} />
+                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" />} />
                            </InputWithIcon>
-                          {form.formState.errors.payee && <p className="text-xs text-destructive mt-1">{form.formState.errors.payee.message}</p>}
+                          {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                       </div>
 
                        <div className="space-y-1">
                           <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
                            <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                               <Controller name="invoiceNumber" control={form.control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
+                               <Controller name="invoiceNumber" control={control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
                            </InputWithIcon>
                       </div>
                       
-                      <Controller name="paymentMethod" control={form.control} render={({ field }) => (
+                      <Controller name="paymentMethod" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Payment Method</Label>
                             <Select onValueChange={field.onChange} value={field.value}>
@@ -666,7 +667,7 @@ export default function IncomeExpenseClient() {
                       )} />
                       
                       {selectedPaymentMethod !== 'Cash' && (
-                           <Controller name="bankAccountId" control={form.control} render={({ field }) => (
+                           <Controller name="bankAccountId" control={control} render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Bank Account</Label>
                                     <Select onValueChange={field.onChange} value={field.value} disabled={bankAccounts.length === 0}>
@@ -681,7 +682,7 @@ export default function IncomeExpenseClient() {
 
                         {selectedTransactionType === 'Expense' && (
                             <>
-                             <Controller name="projectId" control={form.control} render={({ field }) => (
+                             <Controller name="projectId" control={control} render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Project</Label>
                                     <Select onValueChange={field.onChange} value={field.value || 'none'}>
@@ -707,11 +708,11 @@ export default function IncomeExpenseClient() {
                             <>
                                 <div className="space-y-1">
                                     <Label htmlFor="quantity" className="text-xs">Quantity</Label>
-                                    <Controller name="quantity" control={form.control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
+                                    <Controller name="quantity" control={control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="rate" className="text-xs">Rate</Label>
-                                    <Controller name="rate" control={form.control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-8 text-sm" />} />
+                                    <Controller name="rate" control={control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-8 text-sm" />} />
                                 </div>
                             </>
                         )}
@@ -723,7 +724,7 @@ export default function IncomeExpenseClient() {
                         
                         {isRecurring && (
                             <>
-                                <Controller name="recurringFrequency" control={form.control} render={({ field }) => (
+                                <Controller name="recurringFrequency" control={control} render={({ field }) => (
                                     <div className="space-y-1">
                                         <Label className="text-xs">Frequency</Label>
                                         <Select onValueChange={field.onChange} value={field.value}>
@@ -737,7 +738,7 @@ export default function IncomeExpenseClient() {
                                         </Select>
                                     </div>
                                 )} />
-                                <Controller name="nextDueDate" control={form.control} render={({ field }) => (
+                                <Controller name="nextDueDate" control={control} render={({ field }) => (
                                     <div className="space-y-1">
                                         <Label className="text-xs">Next Due Date</Label>
                                         <Popover>
@@ -763,7 +764,7 @@ export default function IncomeExpenseClient() {
 
                         {isAdvanced && (
                             <>
-                                <Controller name="status" control={form.control} render={({ field }) => (
+                                <Controller name="status" control={control} render={({ field }) => (
                                     <div className="space-y-1">
                                         <Label className="text-xs">Status</Label>
                                         <Select onValueChange={field.onChange} value={field.value}>
@@ -779,12 +780,12 @@ export default function IncomeExpenseClient() {
                                 <div className="space-y-1">
                                     <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
                                     <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                        <Controller name="taxAmount" control={form.control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />} />
+                                        <Controller name="taxAmount" control={control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />} />
                                     </InputWithIcon>
                                 </div>
                                 {selectedTransactionType === 'Expense' && (
                                     <>
-                                        <Controller name="expenseType" control={form.control} render={({ field }) => (
+                                        <Controller name="expenseType" control={control} render={({ field }) => (
                                             <div className="space-y-2">
                                                 <Label className="text-xs">Expense Type</Label>
                                                 <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
@@ -804,7 +805,7 @@ export default function IncomeExpenseClient() {
                                 <div className="space-y-1">
                                     <Label htmlFor="mill" className="text-xs">Mill</Label>
                                     <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
-                                        <Controller name="mill" control={form.control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
+                                        <Controller name="mill" control={control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
                                     </InputWithIcon>
                                 </div>
                             </>
@@ -813,7 +814,7 @@ export default function IncomeExpenseClient() {
 
                       <div className="space-y-1 lg:col-span-3">
                           <Label htmlFor="description" className="text-xs">Description</Label>
-                          <Controller name="description" control={form.control} render={({ field }) => <Textarea id="description" {...field} className="text-sm" rows={3}/>} />
+                          <Controller name="description" control={control} render={({ field }) => <Textarea id="description" {...field} className="text-sm" rows={3}/>} />
                       </div>
                     </div>
                     <div className="flex justify-start space-x-4 pt-4">
@@ -823,7 +824,7 @@ export default function IncomeExpenseClient() {
                       {isEditing && (
                         <Button type="button" variant="outline" onClick={() => {
                           setIsEditing(null);
-                          form.reset(getInitialFormState());
+                          reset(getInitialFormState());
                         }} size="sm">
                           Cancel
                         </Button>

@@ -43,7 +43,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     const optionsToManage = managementType === 'variety' ? varietyOptions : paymentTypeOptions;
     
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
+        const value = toTitleCase(e.target.value);
         form.setValue('name', value);
         if (value.length > 1) {
             const uniqueSuppliers = Array.from(new Map(allSuppliers.map((s: Customer) => [s.customerId, s])).values());
@@ -71,6 +71,14 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         const value = e.target.value;
         form.setValue(field, toTitleCase(value) as any);
     };
+    
+    const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, selectionStart, selectionEnd } = e.target;
+        const capitalizedValue = toTitleCase(value);
+        form.setValue(name as any, capitalizedValue, { shouldValidate: true });
+        // Restore cursor position
+        e.target.setSelectionRange(selectionStart, selectionEnd);
+    }
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
         if (e.target.value === '0' || e.target.value === '0.00') {
@@ -124,7 +132,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                          <div className="space-y-1">
                             <Label htmlFor="vehicleNo" className="text-xs">Vehicle No.</Label>
                             <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
+                                <Controller name="vehicleNo" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} className="h-8 text-sm pl-10" /> )}/>
                             </InputWithIcon>
                         </div>
                     </div>
@@ -147,7 +155,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                     <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                                         <PopoverTrigger asChild>
                                             <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={(e) => { handleCapitalizeOnBlur(e); setTimeout(() => setIsNamePopoverOpen(false), 150); }} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
+                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => setTimeout(() => setIsNamePopoverOpen(false), 150)} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
                                             </InputWithIcon>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -161,13 +169,13 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <div className="space-y-1">
                                 <Label htmlFor="so" className="text-xs">S/O</Label>
                                 <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
+                                    <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} className="h-8 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="address" className="text-xs">Address</Label>
                                 <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
-                                <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onBlur={handleCapitalizeOnBlur} className="h-8 text-sm pl-10" /> )}/>
+                                <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} className="h-8 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                         </CardContent>
@@ -180,13 +188,13 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <div className="space-y-1">
                                 <Label className="text-xs">Payment Type</Label>
                                 <Controller name="paymentType" control={form.control} render={({ field }) => (
-                                    <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', newVal)} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found." onIconClick={() => openManagementDialog('paymentType')}/>
+                                    <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', {name: newVal})} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found." onIconClick={() => openManagementDialog('paymentType')}/>
                                 )} />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs">Variety</Label>
                                 <Controller name="variety" control={form.control} render={({ field }) => (
-                                    <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', newVal)} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found." onIconClick={() => openManagementDialog('variety')}/>
+                                    <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', {name: newVal})} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found." onIconClick={() => openManagementDialog('variety')}/>
                                 )} />
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (
