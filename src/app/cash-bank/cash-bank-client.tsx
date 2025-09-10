@@ -220,6 +220,8 @@ export default function CashBankClient() {
     const handleLoanSubmit = async () => {
         if (!currentLoan) return;
         
+        const isNewLoan = !currentLoan.id;
+
         // Handle Owner's Capital as a direct fund transaction
         if(currentLoan.loanType === 'OwnerCapital') {
             const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
@@ -262,11 +264,11 @@ export default function CashBankClient() {
                 await updateLoan(currentLoan.id, loanData);
                 toast({ title: "Loan updated successfully", variant: "success" });
             } else {
-                await addLoan(loanData as Omit<Loan, 'id'>);
+                const newLoan = await addLoan(loanData as Omit<Loan, 'id'>);
                 toast({ title: "Loan added successfully", variant: "success" });
                 
                 // If it's a new Bank or Outsider loan, create a CapitalInflow transaction
-                if (currentLoan.loanType === 'Bank' || currentLoan.loanType === 'Outsider') {
+                if (isNewLoan && (currentLoan.loanType === 'Bank' || currentLoan.loanType === 'Outsider')) {
                     const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                         type: 'CapitalInflow',
                         source: currentLoan.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
@@ -629,5 +631,7 @@ export default function CashBankClient() {
         </div>
     );
 }
+
+    
 
     
