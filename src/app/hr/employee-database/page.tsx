@@ -53,9 +53,12 @@ export default function EmployeeDatabasePage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    const isTextField = name === 'name' || name === 'position';
     setFormData(prev => ({ 
         ...prev, 
-        [name]: name === 'baseSalary' || name === 'monthlyLeaveAllowance' ? Number(value) : value 
+        [name]: isTextField 
+            ? toTitleCase(value) 
+            : (name === 'baseSalary' || name === 'monthlyLeaveAllowance' ? Number(value) : value) 
     }));
   };
 

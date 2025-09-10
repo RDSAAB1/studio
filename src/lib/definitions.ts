@@ -256,6 +256,7 @@ export type BankAccount = {
     bankName: string;
     accountNumber: string;
     ifscCode: string;
+    accountType?: 'Savings' | 'Current' | 'Loan' | 'Limit' | 'Other';
 }
 
 export type Order = {

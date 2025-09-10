@@ -16,6 +16,7 @@ import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { format } from "date-fns";
 import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toTitleCase } from '@/lib/utils';
 
 
 export default function ProjectManagementPage() {
@@ -72,11 +73,17 @@ export default function ProjectManagementPage() {
         }
 
         try {
-            if (currentProject.id) {
-                await updateProject(currentProject.id, currentProject);
+            const projectData = {
+                ...currentProject,
+                name: toTitleCase(currentProject.name),
+                description: currentProject.description ? toTitleCase(currentProject.description) : '',
+            };
+
+            if (projectData.id) {
+                await updateProject(projectData.id, projectData);
                 toast({ title: "Project updated", variant: "success" });
             } else {
-                await addProject(currentProject as Omit<Project, 'id'>);
+                await addProject(projectData as Omit<Project, 'id'>);
                 toast({ title: "Project created", variant: "success" });
             }
             setIsDialogOpen(false);

@@ -20,6 +20,7 @@ import { toast } from "@/hooks/use-toast";
 
 import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toTitleCase } from '@/lib/utils';
 
 export default function InventoryManagementPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -56,7 +57,11 @@ export default function InventoryManagementPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: name === 'stock' || name === 'purchasePrice' || name === 'sellingPrice' ? Number(value) : value });
+    if (name === 'name' || name === 'unit') {
+      setFormData({ ...formData, [name]: toTitleCase(value) });
+    } else {
+      setFormData({ ...formData, [name]: name === 'stock' || name === 'purchasePrice' || name === 'sellingPrice' ? Number(value) : value });
+    }
   };
 
   const handleAddInventoryItem = async () => {

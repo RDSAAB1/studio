@@ -33,6 +33,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Schemas
 const companyDetailsSchema = z.object({
@@ -231,12 +232,17 @@ export default function SettingsPage() {
         }
 
         try {
+            const dataToSave = {
+                ...currentBankAccount,
+                accountHolderName: toTitleCase(currentBankAccount.accountHolderName),
+                bankName: toTitleCase(currentBankAccount.bankName),
+            };
+
             if (currentBankAccount.id) {
-                await updateBankAccount(currentBankAccount.id, currentBankAccount);
+                await updateBankAccount(currentBankAccount.id, dataToSave);
                 toast({ title: "Bank account updated", variant: "success" });
             } else if (currentBankAccount.accountNumber) {
-                // Use account number as ID for new accounts
-                await addBankAccount(currentBankAccount);
+                await addBankAccount(dataToSave);
                 toast({ title: "Bank account added", variant: "success" });
             }
             setIsBankAccountDialogOpen(false);
@@ -273,6 +279,11 @@ export default function SettingsPage() {
             setSaving(false);
         }
     };
+    
+    const handleBankAccountInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setCurrentBankAccount(prev => ({...prev, [name]: toTitleCase(value)}));
+    }
 
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -372,7 +383,7 @@ export default function SettingsPage() {
                             {bankAccounts.map(account => (
                                 <div key={account.id} className="flex items-center justify-between p-3 border-b">
                                     <div>
-                                        <p className="font-semibold">{account.accountHolderName}</p>
+                                        <p className="font-semibold">{account.accountHolderName} {account.accountType && <span className="text-xs text-muted-foreground">({account.accountType})</span>}</p>
                                         <p className="text-sm text-muted-foreground">{account.bankName} - ...{account.accountNumber.slice(-4)}</p>
                                     </div>
                                     <div className="flex gap-1">
@@ -468,19 +479,32 @@ export default function SettingsPage() {
                     <div className="grid gap-4 py-4">
                         <div className="space-y-1">
                             <Label htmlFor="accountHolderName">Account Holder Name</Label>
-                            <Input id="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, accountHolderName: e.target.value }))} />
+                            <Input id="accountHolderName" name="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={handleBankAccountInputChange} />
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="bankName">Bank Name</Label>
-                            <Input id="bankName" value={currentBankAccount.bankName || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, bankName: e.target.value }))} />
+                            <Input id="bankName" name="bankName" value={currentBankAccount.bankName || ''} onChange={handleBankAccountInputChange} />
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="accountNumber">Account Number</Label>
-                            <Input id="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, accountNumber: e.target.value }))} />
+                            <Input id="accountNumber" name="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={handleBankAccountInputChange} />
                         </div>
                          <div className="space-y-1">
                             <Label htmlFor="ifscCode">IFSC Code</Label>
-                            <Input id="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={(e) => setCurrentBankAccount(prev => ({ ...prev, ifscCode: e.target.value }))} />
+                            <Input id="ifscCode" name="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={handleBankAccountInputChange} />
+                        </div>
+                        <div className="space-y-1">
+                           <Label htmlFor="accountType">Account Type</Label>
+                           <Select value={currentBankAccount.accountType} onValueChange={(value) => setCurrentBankAccount(prev => ({ ...prev, accountType: value as BankAccount['accountType'] }))}>
+                               <SelectTrigger><SelectValue placeholder="Select account type" /></SelectTrigger>
+                               <SelectContent>
+                                   <SelectItem value="Savings">Savings</SelectItem>
+                                   <SelectItem value="Current">Current</SelectItem>
+                                   <SelectItem value="Loan">Loan Account</SelectItem>
+                                   <SelectItem value="Limit">Limit Account</SelectItem>
+                                   <SelectItem value="Other">Other</SelectItem>
+                               </SelectContent>
+                           </Select>
                         </div>
                     </div>
                     <DialogFooter>
