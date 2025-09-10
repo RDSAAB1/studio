@@ -92,7 +92,7 @@ const OptionsManager = ({ type, options, onAdd, onUpdate, onDelete }: { type: 'v
                                     <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader><AlertDialogTitle>Delete "{toTitleCase(option.name)}"?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(collectionName, option.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(collectionName, option.id, option.name)}>Delete</AlertDialogAction></AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
                             </div>
@@ -234,7 +234,8 @@ export default function SettingsPage() {
             if (currentBankAccount.id) {
                 await updateBankAccount(currentBankAccount.id, currentBankAccount);
                 toast({ title: "Bank account updated", variant: "success" });
-            } else {
+            } else if (currentBankAccount.accountNumber) {
+                // Use account number as ID for new accounts
                 await addBankAccount(currentBankAccount);
                 toast({ title: "Bank account added", variant: "success" });
             }
@@ -421,7 +422,7 @@ export default function SettingsPage() {
                                         <div className="flex-1 space-y-1">
                                             <Label className="text-xs">Prefix</Label>
                                             <Input 
-                                                value={formatSettings[key].prefix}
+                                                value={formatSettings[key as keyof FormatSettings]?.prefix || ''}
                                                 onChange={e => handleFormatChange(key, 'prefix', e.target.value)}
                                                 className="h-8 text-sm"
                                             />
@@ -430,7 +431,7 @@ export default function SettingsPage() {
                                             <Label className="text-xs">Padding</Label>
                                             <Input 
                                                 type="number"
-                                                value={formatSettings[key].padding}
+                                                value={formatSettings[key as keyof FormatSettings]?.padding || 0}
                                                 onChange={e => handleFormatChange(key, 'padding', e.target.value)}
                                                 className="h-8 text-sm"
                                             />

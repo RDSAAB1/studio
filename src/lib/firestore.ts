@@ -71,12 +71,11 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
 
 export async function addOption(collectionName: string, optionData: { name: string }): Promise<void> {
     const docRef = doc(optionsCollection, collectionName);
-    // Use setDoc with merge: true to create the document if it doesn't exist,
-    // and update it if it does. This prevents the "No document to update" error.
     await setDoc(docRef, {
         items: arrayUnion(toTitleCase(optionData.name))
     }, { merge: true });
 }
+
 
 export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
     // Note: This is more complex if you need to rename, as you'd need the old value.
@@ -234,14 +233,15 @@ export function getBankAccountsRealtime(callback: (accounts: BankAccount[]) => v
 }
 
 export async function addBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
-    const docRef = await addDoc(bankAccountsCollection, accountData);
-    await updateDoc(docRef, { id: docRef.id });
-    return { id: docRef.id, ...accountData } as BankAccount;
+    const docRef = doc(bankAccountsCollection, accountData.accountNumber);
+    const newAccountData = { ...accountData, id: docRef.id };
+    await setDoc(docRef, newAccountData);
+    return newAccountData as BankAccount;
 }
 
 export async function updateBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
     const docRef = doc(bankAccountsCollection, id);
-    await updateDoc(docRef, accountData);
+    await setDoc(docRef, accountData, { merge: true });
 }
 
 export async function deleteBankAccount(id: string): Promise<void> {
