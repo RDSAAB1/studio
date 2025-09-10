@@ -72,7 +72,10 @@ export default function CashBankClient() {
     const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
     const formSourcesAndDestinations = useMemo(() => {
-        const accounts = bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }));
+        const accounts = bankAccounts.map(acc => ({
+            value: acc.id,
+            label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)})`
+        }));
         return [
             ...accounts,
             { value: 'CashInHand', label: 'Cash in Hand (Mill)' },
@@ -628,5 +631,3 @@ export default function CashBankClient() {
 }
 
     
-
-  
