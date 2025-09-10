@@ -222,7 +222,6 @@ export default function CashBankClient() {
     
         const isNewLoan = !currentLoan.id;
     
-        // Handle Owner's Capital as a direct fund transaction
         if (currentLoan.loanType === 'OwnerCapital') {
             const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                 type: 'CapitalInflow',
@@ -231,9 +230,13 @@ export default function CashBankClient() {
                 amount: currentLoan.totalAmount || 0,
                 description: `Owner's capital contribution`
             };
-            await addFundTransaction(capitalInflowData);
-            toast({ title: "Capital added successfully", variant: 'success' });
-            setIsLoanDialogOpen(false);
+            try {
+                await addFundTransaction(capitalInflowData);
+                toast({ title: "Capital added successfully", variant: 'success' });
+                setIsLoanDialogOpen(false);
+            } catch (error) {
+                toast({ title: "Failed to add capital", variant: "destructive" });
+            }
             return;
         }
     
@@ -251,7 +254,7 @@ export default function CashBankClient() {
             return;
         }
     
-        const loanData = {
+        const loanData: Partial<Loan> = {
             ...currentLoan,
             loanName: loanNameToSave,
             remainingAmount: (currentLoan.totalAmount || 0) - (currentLoan.amountPaid || 0),
@@ -259,31 +262,17 @@ export default function CashBankClient() {
         };
     
         try {
-            if (currentLoan.id) {
-                await updateLoan(currentLoan.id, loanData);
+            if (loanData.id) {
+                await updateLoan(loanData.id, loanData);
                 toast({ title: "Loan updated successfully", variant: "success" });
             } else {
-                const newLoan = await addLoan(loanData as Omit<Loan, 'id'>);
-                toast({ title: "Loan added successfully", variant: "success" });
-    
-                if (isNewLoan && (currentLoan.loanType === 'Bank' || currentLoan.loanType === 'Outsider')) {
-                    const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
-                        type: 'CapitalInflow',
-                        source: currentLoan.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
-                        destination: currentLoan.depositTo as any,
-                        amount: currentLoan.totalAmount || 0,
-                        description: `Capital inflow from ${loanNameToSave}`
-                    };
-                    await addFundTransaction(capitalInflowData);
-                    
-                    const destinationName = formSourcesAndDestinations.find(d => d.value === currentLoan.depositTo)?.label || 'account';
-                    toast({ title: "Capital inflow recorded", description: `${formatCurrency(currentLoan.totalAmount || 0)} added to ${destinationName}.`, variant: 'success' });
-                }
+                await addLoan(loanData as Omit<Loan, 'id'>);
+                toast({ title: "Loan added and funds deposited", variant: "success" });
             }
             setIsLoanDialogOpen(false);
         } catch (error) {
             console.error("Error saving loan: ", error);
-            toast({ title: `Failed to ${currentLoan.id ? 'update' : 'add'} loan`, variant: "destructive" });
+            toast({ title: `Failed to ${loanData.id ? 'update' : 'add'} loan`, description: (error as Error).message, variant: "destructive" });
         }
     };
     
@@ -635,3 +624,4 @@ export default function CashBankClient() {
     
 
     
+

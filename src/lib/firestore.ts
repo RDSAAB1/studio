@@ -545,8 +545,24 @@ export function getLoansRealtime(callback: (loans: Loan[]) => void, onError: (er
 }
 
 export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
-    const docRef = await addDoc(loansCollection, loanData);
-    return { id: docRef.id, ...loanData };
+    return runTransaction(db, async (transaction) => {
+        const newLoanRef = doc(collection(db, "loans"));
+        transaction.set(newLoanRef, { ...loanData, id: newLoanRef.id });
+
+        if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
+            const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
+                type: 'CapitalInflow',
+                source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
+                destination: loanData.depositTo,
+                amount: loanData.totalAmount,
+                description: `Capital inflow from ${loanData.loanName}`
+            };
+            const newFundTransactionRef = doc(collection(db, "fund_transactions"));
+            transaction.set(newFundTransactionRef, { ...capitalInflowData, date: new Date().toISOString().split('T')[0] });
+        }
+        
+        return { id: newLoanRef.id, ...loanData };
+    });
 }
 
 export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<void> {
@@ -653,3 +669,4 @@ export async function saveFormatSettings(settings: FormatSettings): Promise<void
 
 
     
+
