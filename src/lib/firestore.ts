@@ -25,8 +25,8 @@ import { toTitleCase, generateReadableId } from "./utils";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
-const supplierPaymentsCollection = collection(db, "supplierPayments");
-const customerPaymentsCollection = collection(db, "customerPayments");
+const supplierPaymentsCollection = collection(db, "payments");
+const customerPaymentsCollection = collection(db, "customer_payments");
 const incomesCollection = collection(db, "incomes");
 const expensesCollection = collection(db, "expenses");
 const loansCollection = collection(db, "loans");
@@ -71,9 +71,11 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
 
 export async function addOption(collectionName: string, optionData: { name: string }): Promise<void> {
     const docRef = doc(optionsCollection, collectionName);
-    await updateDoc(docRef, {
+    // Use setDoc with merge: true to create the document if it doesn't exist,
+    // and update it if it does. This prevents the "No document to update" error.
+    await setDoc(docRef, {
         items: arrayUnion(toTitleCase(optionData.name))
-    });
+    }, { merge: true });
 }
 
 export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
@@ -648,3 +650,6 @@ export async function saveFormatSettings(settings: FormatSettings): Promise<void
     const docRef = doc(settingsCollection, "formats");
     await setDoc(docRef, settings, { merge: true });
 }
+
+
+    
