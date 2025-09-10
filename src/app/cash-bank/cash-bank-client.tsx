@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { FundTransaction, Transaction, Loan, BankAccount } from "@/lib/definitions";
+import type { FundTransaction, Income, Expense, Loan, BankAccount } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths, differenceInMonths, parseISO } from "date-fns";
 
-import { addFundTransaction, getFundTransactionsRealtime, getTransactionsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
+import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -58,7 +58,8 @@ const initialLoanFormState: Partial<Loan> = {
 export default function CashBankClient() {
     
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [incomes, setIncomes] = useState<Income[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isClient, setIsClient] = useState(false);
@@ -67,6 +68,8 @@ export default function CashBankClient() {
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
     const [isFundTransactionDialogOpen, setIsFundTransactionDialogOpen] = useState(false);
     const [currentFundTransaction, setCurrentFundTransaction] = useState<Partial<FundTransaction> | null>(null);
+
+    const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
     const formSourcesAndDestinations = useMemo(() => {
         const accounts = bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }));
@@ -81,7 +84,8 @@ export default function CashBankClient() {
     useEffect(() => {
         setIsClient(true);
         const unsubscribeFunds = getFundTransactionsRealtime(setFundTransactions, (e) => toast({ title: "Error loading fund transactions", variant: "destructive" }));
-        const unsubscribeTransactions = getTransactionsRealtime(setTransactions, (e) => toast({ title: "Error loading income/expense data", variant: "destructive" }));
+        const unsubscribeIncomes = getIncomeRealtime(setIncomes, (e) => toast({ title: "Error loading income data", variant: "destructive" }));
+        const unsubscribeExpenses = getExpensesRealtime(setExpenses, (e) => toast({ title: "Error loading expense data", variant: "destructive" }));
         const unsubscribeLoans = getLoansRealtime(setLoans, (e) => toast({ title: "Error loading loan data", variant: "destructive" }));
         const unsubscribeBankAccounts = getBankAccountsRealtime(setBankAccounts, (e) => toast({ title: "Error loading bank accounts", variant: "destructive" }));
         
@@ -89,7 +93,8 @@ export default function CashBankClient() {
 
         return () => {
             unsubscribeFunds();
-            unsubscribeTransactions();
+            unsubscribeIncomes();
+            unsubscribeExpenses();
             unsubscribeLoans();
             unsubscribeBankAccounts();
         };
@@ -107,7 +112,7 @@ export default function CashBankClient() {
     
     const loansWithCalculatedRemaining = useMemo(() => {
         return loans.map(loan => {
-            const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
+            const paidTransactions = allTransactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
             const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
             
             let accumulatedInterest = 0;
@@ -122,7 +127,7 @@ export default function CashBankClient() {
             const remainingAmount = loan.totalAmount + accumulatedInterest - totalPaid;
             return { ...loan, remainingAmount, amountPaid: totalPaid };
         });
-    }, [loans, transactions]);
+    }, [loans, allTransactions]);
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -139,7 +144,7 @@ export default function CashBankClient() {
             }
         });
         
-        transactions.forEach(t => {
+        allTransactions.forEach(t => {
             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
                 if (t.transactionType === 'Income') {
@@ -154,7 +159,7 @@ export default function CashBankClient() {
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, transactions, loansWithCalculatedRemaining, bankAccounts]);
+    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)

@@ -20,22 +20,23 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment } from "@/lib/definitions";
-import { toTitleCase } from "./utils";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense } from "@/lib/definitions";
+import { toTitleCase, generateReadableId } from "./utils";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
-const paymentsCollection = collection(db, "payments");
-const customerPaymentsCollection = collection(db, "customer_payments");
-const transactionsCollection = collection(db, "transactions");
+const supplierPaymentsCollection = collection(db, "supplierPayments");
+const customerPaymentsCollection = collection(db, "customerPayments");
+const incomesCollection = collection(db, "incomes");
+const expensesCollection = collection(db, "expenses");
+const loansCollection = collection(db, "loans");
 const fundTransactionsCollection = collection(db, "fund_transactions");
 const banksCollection = collection(db, "banks");
 const bankBranchesCollection = collection(db, "bankBranches");
 const bankAccountsCollection = collection(db, "bankAccounts");
 const settingsCollection = collection(db, "settings");
+const optionsCollection = collection(db, "options");
 const usersCollection = collection(db, "users");
-const loansCollection = collection(db, "loans");
-
 
 // --- User Refresh Token Functions ---
 export async function saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
@@ -56,31 +57,36 @@ export async function getRefreshToken(userId: string): Promise<string | null> {
 // --- Dynamic Options Functions ---
 
 export function getOptionsRealtime(collectionName: string, callback: (options: OptionItem[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(collection(db, collectionName), orderBy("name", "asc"));
-    return onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as OptionItem));
-        callback(data);
+    const docRef = doc(optionsCollection, collectionName);
+    return onSnapshot(docRef, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
+            const options = data.items.map((name: string, index: number) => ({ id: `${name}-${index}`, name }));
+            callback(options);
+        } else {
+            callback([]);
+        }
     }, onError);
 }
 
-export async function addOption(collectionName: string, optionData: { name: string }): Promise<OptionItem> {
-    const docId = toTitleCase(optionData.name);
-    const docRef = doc(db, collectionName, docId);
-    await setDoc(docRef, { name: docId });
-    return { id: docId, ...optionData };
+export async function addOption(collectionName: string, optionData: { name: string }): Promise<void> {
+    const docRef = doc(optionsCollection, collectionName);
+    await updateDoc(docRef, {
+        items: arrayUnion(toTitleCase(optionData.name))
+    });
 }
 
 export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
-    // This is more complex now. If we rename, we might need to delete the old and create a new one.
-    // For now, let's assume we can't update the name, or if we do, we handle it carefully.
-    // A simple update would fail if the ID is the name itself.
-    // Let's prevent name updates for now and only allow delete/add.
-    console.warn("Updating option names is not recommended as the name is the ID. Delete and re-add if necessary.");
+    // Note: This is more complex if you need to rename, as you'd need the old value.
+    // This example assumes you might want to adjust something else, or handle rename logic in the component.
+    console.warn("Updating option names is not directly supported via this function. Please implement rename logic carefully.");
 }
 
-export async function deleteOption(collectionName: string, id: string): Promise<void> {
-    const optionRef = doc(db, collectionName, id);
-    await deleteDoc(optionRef);
+export async function deleteOption(collectionName: string, id: string, name: string): Promise<void> {
+    const docRef = doc(optionsCollection, collectionName);
+    await updateDoc(docRef, {
+        items: arrayRemove(name)
+    });
 }
 
 
@@ -107,7 +113,6 @@ export async function saveCompanySettings(userId: string, settings: { email: str
 
 export async function deleteCompanySettings(userId: string): Promise<void> {
     const userDocRef = doc(db, "users", userId);
-    // We update the document to remove the field, rather than deleting the user doc
     await updateDoc(userDocRef, {
         appPassword: '' 
     });
@@ -115,14 +120,10 @@ export async function deleteCompanySettings(userId: string): Promise<void> {
 
 
 export async function getRtgsSettings(): Promise<RtgsSettings> {
-    const docRef = doc(settingsCollection, "rtgs");
+    const docRef = doc(settingsCollection, "companyDetails");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-        const data = docSnap.data() as RtgsSettings;
-        if (!data.type) {
-            data.type = "SB";
-        }
-        return data;
+        return docSnap.data() as RtgsSettings;
     }
     return {
         companyName: "BizSuite DataFlow",
@@ -139,7 +140,7 @@ export async function getRtgsSettings(): Promise<RtgsSettings> {
 }
 
 export async function updateRtgsSettings(settings: Partial<RtgsSettings>): Promise<void> {
-    const docRef = doc(settingsCollection, "rtgs");
+    const docRef = doc(settingsCollection, "companyDetails");
     await setDoc(docRef, settings, { merge: true });
 }
 
@@ -193,7 +194,6 @@ export async function updateReceiptSettings(settings: ReceiptSettings): Promise<
     const docRef = doc(settingsCollection, "receiptDetails");
     await setDoc(docRef, settings, { merge: true });
 }
-
 
 // --- Bank & Branch Functions ---
 export function getBanksRealtime(callback: (banks: Bank[]) => void, onError: (error: Error) => void): () => void {
@@ -333,7 +333,6 @@ export async function deleteCustomer(id: string): Promise<void> {
 }
 
 // --- Inventory Item Functions ---
-// (These are assumed from inventory page, keeping them for completeness)
 export function getInventoryItems(callback: (items: any[]) => void, onError: (error: Error) => void) {
   const q = query(collection(db, "inventoryItems"), orderBy("createdAt", "desc"));
   return onSnapshot(q, (snapshot) => {
@@ -355,7 +354,7 @@ export async function deleteInventoryItem(id: string) {
 // --- Payment Functions ---
 
 export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(paymentsCollection, orderBy("date", "desc"));
+  const q = query(supplierPaymentsCollection, orderBy("date", "desc"));
   return onSnapshot(q, (snapshot) => {
     const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
     callback(payments);
@@ -376,7 +375,7 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
     return;
   }
   
-  const paymentsSnapshot = await getDocs(query(paymentsCollection));
+  const paymentsSnapshot = await getDocs(query(supplierPaymentsCollection));
   
   const batch = writeBatch(db);
   let paymentsDeleted = 0;
@@ -420,24 +419,6 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
 }
 
 
-// --- General Transaction Functions ---
-
-export function getTransactionsRealtime(callback: (transactions: Transaction[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(transactionsCollection, orderBy("date", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-    callback(transactions);
-  }, onError);
-}
-
-export async function addTransaction(transactionData: Omit<Transaction, 'id'>): Promise<Transaction> {
-    const docRef = await addDoc(transactionsCollection, transactionData);
-    const finalTransaction = { ...transactionData, id: docRef.id };
-    await updateDoc(docRef, { id: docRef.id });
-    return finalTransaction;
-}
-
-
 // --- Fund Transaction Functions ---
 
 export function getFundTransactionsRealtime(callback: (transactions: FundTransaction[]) => void, onError: (error: Error) => void): () => void {
@@ -448,9 +429,9 @@ export function getFundTransactionsRealtime(callback: (transactions: FundTransac
   }, onError);
 }
 
-export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id'>): Promise<FundTransaction> {
+export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId'>): Promise<FundTransaction> {
   const docRef = await addDoc(fundTransactionsCollection, transactionData);
-  return { id: docRef.id, ...transactionData };
+  return { id: docRef.id, transactionId: '', ...transactionData };
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
@@ -598,7 +579,7 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
 
 // --- Income and Expense specific functions ---
 export function getIncomeRealtime(callback: (income: Income[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(transactionsCollection, where("transactionType", "==", "Income"), orderBy("date", "desc"));
+    const q = query(incomesCollection, orderBy("date", "desc"));
     return onSnapshot(q, (snapshot) => {
         const incomeList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
         callback(incomeList);
@@ -606,7 +587,7 @@ export function getIncomeRealtime(callback: (income: Income[]) => void, onError:
 }
 
 export function getExpensesRealtime(callback: (expenses: Expense[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(transactionsCollection, where("transactionType", "==", "Expense"), orderBy("date", "desc"));
+    const q = query(expensesCollection, orderBy("date", "desc"));
     return onSnapshot(q, (snapshot) => {
         const expenseList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
         callback(expenseList);
@@ -614,31 +595,56 @@ export function getExpensesRealtime(callback: (expenses: Expense[]) => void, onE
 }
 
 export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
-    const docRef = await addDoc(transactionsCollection, incomeData);
+    const docRef = await addDoc(incomesCollection, incomeData);
     await updateDoc(docRef, { id: docRef.id });
     return { id: docRef.id, ...incomeData };
 }
 
 export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
-    const docRef = await addDoc(transactionsCollection, expenseData);
+    const docRef = await addDoc(expensesCollection, expenseData);
     await updateDoc(docRef, { id: docRef.id });
     return { id: docRef.id, ...expenseData };
 }
 
 export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
-    const docRef = doc(transactionsCollection, id);
+    const docRef = doc(incomesCollection, id);
     await updateDoc(docRef, incomeData);
 }
 
 export async function updateExpense(id: string, expenseData: Partial<Omit<Expense, 'id'>>): Promise<void> {
-    const docRef = doc(transactionsCollection, id);
+    const docRef = doc(expensesCollection, id);
     await updateDoc(docRef, expenseData);
 }
 
 export async function deleteIncome(id: string): Promise<void> {
-    await deleteDoc(doc(transactionsCollection, id));
+    await deleteDoc(doc(incomesCollection, id));
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-    await deleteDoc(doc(transactionsCollection, id));
+    await deleteDoc(doc(expensesCollection, id));
+}
+
+// --- Format Settings Functions ---
+export async function getFormatSettings(): Promise<FormatSettings> {
+    const docRef = doc(settingsCollection, "formats");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as FormatSettings;
+    }
+    // Return a default if it doesn't exist
+    return {
+        income: { prefix: 'IM', padding: 5 },
+        expense: { prefix: 'ES', padding: 5 },
+        loan: { prefix: 'LN', padding: 4 },
+        fundTransaction: { prefix: 'AT', padding: 4 },
+        supplier: { prefix: 'S', padding: 5 },
+        customer: { prefix: 'C', padding: 5 },
+        supplierPayment: { prefix: 'SP', padding: 5 },
+        customerPayment: { prefix: 'CP', padding: 5 },
+    };
+}
+
+export async function saveFormatSettings(settings: FormatSettings): Promise<void> {
+    const docRef = doc(settingsCollection, "formats");
+    await setDoc(docRef, settings, { merge: true });
 }

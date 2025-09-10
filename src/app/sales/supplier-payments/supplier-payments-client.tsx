@@ -2,10 +2,10 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -29,7 +29,7 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 const suppliersCollection = collection(db, "suppliers");
-const transactionsCollection = collection(db, "transactions");
+const expensesCollection = collection(db, "expenses");
 
 
 type PaymentOption = {
@@ -47,7 +47,8 @@ type SortConfig = {
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
@@ -104,6 +105,8 @@ export default function SupplierPaymentsClient() {
   const [calcMaxRate, setCalcMaxRate] = useState(2400);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [roundFigureToggle, setRoundFigureToggle] = useState(false);
+
+  const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
 
   const stableToast = useCallback(toast, []);
@@ -178,7 +181,7 @@ export default function SupplierPaymentsClient() {
         }
     });
     
-    transactions.forEach(t => {
+    allTransactions.forEach(t => {
         const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
          if (balanceKey && balances.has(balanceKey)) {
             if (t.transactionType === 'Income') {
@@ -190,7 +193,7 @@ export default function SupplierPaymentsClient() {
     });
     
     return { balances };
-  }, [fundTransactions, transactions, bankAccounts]);
+  }, [fundTransactions, allTransactions, bankAccounts]);
 
   const selectedEntries = useMemo(() => {
     return suppliers.filter(s => selectedEntryIds.has(s.id));
@@ -263,7 +266,8 @@ export default function SupplierPaymentsClient() {
         }
     });
     
-    const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
+    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
     const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
     const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
     
@@ -288,7 +292,8 @@ export default function SupplierPaymentsClient() {
       isSubscribed = false;
       unsubSuppliers();
       unsubPayments();
-      unsubTransactions();
+      unsubIncomes();
+      unsubExpenses();
       unsubFunds();
       unsubBankAccounts();
       unsubscribeBanks();
@@ -508,8 +513,8 @@ export default function SupplierPaymentsClient() {
             }
             
             // Create new expense transaction
-            const newTransactionRef = doc(collection(db, 'transactions'));
-            const expenseData: Partial<Transaction> = {
+            const newTransactionRef = doc(collection(db, 'expenses'));
+            const expenseData: Partial<Expense> = {
                 id: newTransactionRef.id,
                 date: new Date().toISOString().split('T')[0],
                 transactionType: 'Expense',
@@ -646,16 +651,16 @@ export default function SupplierPaymentsClient() {
                         if (!supplierDocsSnapshot.empty) {
                             const customerDoc = supplierDocsSnapshot.docs[0];
                             const currentSupplier = customerDoc.data() as Customer;
-                            const amountToRestore = detail.amount;
+                            const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                            transaction.update(doc(db, "suppliers", docSnapshot.id), { netAmount: Math.round(newNetAmount) });
                         }
                     }
                 }
                 
                 // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
-                    const expenseDocRef = doc(transactionsCollection, paymentToDelete.expenseTransactionId);
+                    const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
                 }
                 
@@ -945,5 +950,7 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
 
     

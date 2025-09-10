@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function toTitleCase(str: string) {
+export function toTitleCase(str: any) {
   if (typeof str !== 'string' || !str) return '';
   return str.replace(
     /\w\S*/g,
@@ -30,3 +30,9 @@ export function formatCurrency(amount: number): string {
   };
   return new Intl.NumberFormat('en-IN', options).format(Math.round(amount));
 }
+
+// Function to generate human-readable sequential IDs
+export const generateReadableId = (prefix: string, lastNumber: number, padding: number): string => {
+  const newNumber = lastNumber + 1;
+  return `${prefix}${String(newNumber).padStart(padding, '0')}`;
+};

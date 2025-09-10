@@ -1,12 +1,13 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount } from '@/lib/firestore';
-import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount } from '@/lib/definitions';
+import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings } from '@/lib/firestore';
+import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, SerialNumberFormat } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
@@ -118,7 +119,7 @@ export default function SettingsPage() {
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isBankAccountDialogOpen, setIsBankAccountDialogOpen] = useState(false);
     const [currentBankAccount, setCurrentBankAccount] = useState<Partial<BankAccount>>({});
-
+    const [formatSettings, setFormatSettings] = useState<FormatSettings>({});
 
     // Form Hooks
     const companyForm = useForm<CompanyFormValues>();
@@ -147,6 +148,9 @@ export default function SettingsPage() {
                 
                 const rcpSettings = await getReceiptSettings();
                 setReceiptSettings(rcpSettings);
+                
+                const fmtSettings = await getFormatSettings();
+                setFormatSettings(fmtSettings);
 
                 const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, console.error);
                 const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
@@ -247,6 +251,28 @@ export default function SettingsPage() {
         toast({ title: "Bank account deleted", variant: "success" });
     }
 
+    const handleFormatChange = (key: string, field: 'prefix' | 'padding', value: string | number) => {
+        setFormatSettings(prev => ({
+            ...prev,
+            [key]: {
+                ...prev[key],
+                [field]: field === 'padding' ? Number(value) : value
+            }
+        }));
+    };
+
+    const handleSaveFormats = async () => {
+        setSaving(true);
+        try {
+            await saveFormatSettings(formatSettings);
+            toast({ title: "Serial number formats saved successfully", variant: "success" });
+        } catch (e) {
+            toast({ title: "Failed to save formats", variant: "destructive" });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
     }
@@ -259,7 +285,7 @@ export default function SettingsPage() {
                     <TabsTrigger value="company">Company</TabsTrigger>
                     <TabsTrigger value="banks">Bank Accounts</TabsTrigger>
                     <TabsTrigger value="receipts">Receipts</TabsTrigger>
-                    <TabsTrigger value="data">App Data</TabsTrigger>
+                    <TabsTrigger value="formats">Formats & Data</TabsTrigger>
                     <TabsTrigger value="account">Account</TabsTrigger>
                 </TabsList>
                 <TabsContent value="company" className="mt-6">
@@ -381,11 +407,39 @@ export default function SettingsPage() {
                         )}
                     </SettingsCard>
                 </TabsContent>
-                 <TabsContent value="data" className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <OptionsManager type="variety" options={varietyOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
-                        <OptionsManager type="paymentType" options={paymentTypeOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
-                    </div>
+                 <TabsContent value="formats" className="mt-6">
+                    <SettingsCard 
+                        title="Serial Number Formats" 
+                        description="Define the prefix and padding for readable IDs across the app."
+                        footer={<Button onClick={handleSaveFormats} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Formats</Button>}
+                    >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            {Object.keys(formatSettings).map(key => (
+                                <div key={key} className="p-3 border rounded-lg">
+                                    <h4 className="font-medium text-sm mb-2">{toTitleCase(key.replace(/([A-Z])/g, ' $1'))}</h4>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 space-y-1">
+                                            <Label className="text-xs">Prefix</Label>
+                                            <Input 
+                                                value={formatSettings[key].prefix}
+                                                onChange={e => handleFormatChange(key, 'prefix', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div className="w-24 space-y-1">
+                                            <Label className="text-xs">Padding</Label>
+                                            <Input 
+                                                type="number"
+                                                value={formatSettings[key].padding}
+                                                onChange={e => handleFormatChange(key, 'padding', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </SettingsCard>
                  </TabsContent>
                  <TabsContent value="account" className="mt-6">
                     <SettingsCard title="Account Information" description="Manage your account details and sign out.">

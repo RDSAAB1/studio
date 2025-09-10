@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Transaction, FundTransaction, Loan, BankAccount, Customer, ExpenseCategory, Payment } from "@/lib/definitions";
+import type { Income, Expense, FundTransaction, Loan, BankAccount, Customer, ExpenseCategory, Payment } from "@/lib/definitions";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, subDays, differenceInMonths } from 'date-fns';
 import { DonutChart, BarChart, AreaChart } from '@tremor/react';
 import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List, Bank, Percent } from 'lucide-react';
-import { getExpenseCategories } from '@/lib/firestore';
+import { getExpenseCategories, getIncomeRealtime, getExpensesRealtime } from '@/lib/firestore';
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm">
@@ -41,7 +41,8 @@ const BalanceCard = ({ title, value, icon, colorClass, description }: { title: s
 );
 
 export default function DashboardOverviewClient() {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [incomes, setIncomes] = useState<Income[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
@@ -51,10 +52,11 @@ export default function DashboardOverviewClient() {
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
+
     useEffect(() => {
-        const unsubTransactions = onSnapshot(query(collection(db, "transactions"), orderBy("date", "desc")), (snapshot) => {
-            setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
-        });
+        const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
         const unsubFunds = onSnapshot(query(collection(db, "fund_transactions"), orderBy("date", "desc")), (snapshot) => {
             setFundTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction)));
         });
@@ -78,7 +80,8 @@ export default function DashboardOverviewClient() {
         setLoading(false);
 
         return () => {
-            unsubTransactions();
+            unsubIncomes();
+            unsubExpenses();
             unsubFunds();
             unsubPayments();
             unsubLoans();
@@ -100,7 +103,7 @@ export default function DashboardOverviewClient() {
             if (balances.has(t.destination)) balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
         });
         
-        transactions.forEach(t => {
+        allTransactions.forEach(t => {
             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
                 const amount = t.amount || 0;
@@ -113,7 +116,7 @@ export default function DashboardOverviewClient() {
         const totalCustomerDues = customers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0);
         
         const loanLiabilities = loans.reduce((sum, loan) => {
-            const paidTransactions = transactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
+            const paidTransactions = allTransactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
             const totalPaidTowardsPrincipal = paidTransactions.reduce((subSum, t) => subSum + t.amount, 0);
 
             let accumulatedInterest = 0;
@@ -137,11 +140,11 @@ export default function DashboardOverviewClient() {
         const totalAssets = cashAndBankAssets + totalCustomerDues;
         
         return { balances, totalAssets, totalLiabilities, totalSupplierDues, totalCustomerDues, loanLiabilities, cashAndBankAssets, totalCdReceived };
-    }, [fundTransactions, transactions, loans, bankAccounts, suppliers, customers, payments]);
+    }, [fundTransactions, allTransactions, loans, bankAccounts, suppliers, customers, payments]);
 
     const chartData = useMemo(() => {
         const thirtyDaysAgo = subDays(new Date(), 30);
-        const recentTransactions = transactions.filter(t => new Date(t.date) >= thirtyDaysAgo);
+        const recentTransactions = allTransactions.filter(t => new Date(t.date) >= thirtyDaysAgo);
         
         const dailyData = recentTransactions.reduce((acc, t) => {
             const date = format(new Date(t.date), 'dd-MMM');
@@ -153,14 +156,14 @@ export default function DashboardOverviewClient() {
 
         const timeSeriesData = Object.values(dailyData).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-        const expenseBreakdown = transactions.filter(t => t.transactionType === 'Expense').reduce((acc, t) => {
+        const expenseBreakdown = allTransactions.filter(t => t.transactionType === 'Expense').reduce((acc, t) => {
             const category = toTitleCase(t.category || 'Uncategorized');
             if (!acc[category]) acc[category] = 0;
             acc[category] += t.amount;
             return acc;
         }, {} as { [key: string]: number });
 
-        const incomeBreakdown = transactions.filter(t => t.transactionType === 'Income').reduce((acc, t) => {
+        const incomeBreakdown = allTransactions.filter(t => t.transactionType === 'Income').reduce((acc, t) => {
             const category = toTitleCase(t.category || 'Uncategorized');
             if (!acc[category]) acc[category] = 0;
             acc[category] += t.amount;
@@ -197,7 +200,7 @@ export default function DashboardOverviewClient() {
             financialHealthData,
             topCustomersChartData: topCustomers
         };
-    }, [transactions, financialState, customers]);
+    }, [allTransactions, financialState, customers]);
 
     if (loading) return <div>Loading Dashboard...</div>;
 
@@ -313,7 +316,7 @@ export default function DashboardOverviewClient() {
                         <Table>
                             <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Payee/Payer</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {transactions.slice(0, 5).map((tx) => (
+                                {allTransactions.slice(0, 5).map((tx) => (
                                     <TableRow key={tx.id}>
                                         <TableCell>{format(new Date(tx.date), 'dd-MMM-yy')}</TableCell>
                                         <TableCell><Badge variant={tx.transactionType === 'Income' ? 'default' : 'destructive'} className={cn(tx.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80', 'text-white')}>{tx.transactionType}</Badge></TableCell>
@@ -321,7 +324,7 @@ export default function DashboardOverviewClient() {
                                         <TableCell className={cn("text-right font-semibold", tx.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(tx.amount)}</TableCell>
                                     </TableRow>
                                 ))}
-                                {transactions.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">No recent transactions.</TableCell></TableRow>}
+                                {allTransactions.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">No recent transactions.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </CardContent>

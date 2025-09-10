@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
@@ -38,17 +39,16 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
     // This effect ensures that the submenu closes when the sidebar itself is collapsed or on mobile when it closes.
     if (!isSidebarActive) {
       setOpenSubMenu(null);
+    } else {
+        // If sidebar is active, check for active submenus
+        const activeParent = allMenuItems.find(item => 
+            item.subMenus?.some(sub => `/${sub.id}` === activePath)
+        );
+        if (activeParent) {
+            setOpenSubMenu(activeParent.id);
+        }
     }
-  }, [isSidebarActive]);
-
-  useEffect(() => {
-    for (const item of allMenuItems) {
-      if (item.subMenus && item.subMenus.some(subItem => `/${subItem.id}` === activePath)) {
-        setOpenSubMenu(item.id);
-        return;
-      }
-    }
-  }, [activePath]);
+  }, [isSidebarActive, activePath]);
   
   const handleSubMenuToggle = (e: React.MouseEvent, id: string) => {
     e.preventDefault();

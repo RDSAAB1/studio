@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -65,19 +66,16 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         form.setValue('contact', supplier.contact);
         setIsNamePopoverOpen(false);
     };
-
-    const handleCapitalizeOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-        const field = e.target.name as any;
-        const value = e.target.value;
-        form.setValue(field, toTitleCase(value) as any);
-    };
     
     const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, selectionStart, selectionEnd } = e.target;
         const capitalizedValue = toTitleCase(value);
         form.setValue(name as any, capitalizedValue, { shouldValidate: true });
-        // Restore cursor position
-        e.target.setSelectionRange(selectionStart, selectionEnd);
+        
+        // Use requestAnimationFrame to restore cursor position after the re-render
+        requestAnimationFrame(() => {
+             e.target.setSelectionRange(selectionStart, selectionEnd);
+        });
     }
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {

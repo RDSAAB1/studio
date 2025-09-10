@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -80,8 +81,11 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         const { name, value, selectionStart, selectionEnd } = e.target;
         const capitalizedValue = toTitleCase(value);
         form.setValue(name as any, capitalizedValue, { shouldValidate: true });
-        // Restore cursor position
-        e.target.setSelectionRange(selectionStart, selectionEnd);
+        
+        // Use requestAnimationFrame to restore cursor position after the re-render
+        requestAnimationFrame(() => {
+             e.target.setSelectionRange(selectionStart, selectionEnd);
+        });
     }
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -263,9 +267,9 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                                 )}
                             >
                                 <div className={cn(
-                                    "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
-                                    !isSameAsBilling ? 'bg-primary' : 'bg-secondary'
-                                )}>
+                                        "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                                        !isSameAsBilling ? 'bg-primary' : 'bg-secondary'
+                                    )}>
                                     <span className="text-sm font-bold text-primary-foreground">Shipment</span>
                                 </div>
                             </div>

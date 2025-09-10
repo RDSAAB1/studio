@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { Customer, CustomerSummary, CustomerPayment, BankAccount, Transaction, FundTransaction, PaidFor } from "@/lib/definitions";
+import type { Customer, CustomerSummary, CustomerPayment, BankAccount, Transaction, FundTransaction, PaidFor, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatSrNo, formatCurrency, cn } from "@/lib/utils";
 import {
   Card,
@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction, getDocs, where, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
-import { getReceiptSettings, getBankAccountsRealtime, getTransactionsRealtime, getFundTransactionsRealtime, getCustomerPaymentsRealtime, addCustomerPayment, deleteCustomerPayment } from "@/lib/firestore";
+import { getReceiptSettings, getBankAccountsRealtime, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getCustomerPaymentsRealtime, addCustomerPayment, deleteCustomerPayment } from "@/lib/firestore";
 import type { ReceiptSettings } from "@/lib/definitions";
 import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
@@ -48,14 +48,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 const customersCollection = collection(db, "customers");
-const transactionsCollection = collection(db, "transactions");
+const incomesCollection = collection(db, "incomes");
+const expensesCollection = collection(db, "expenses");
+
 
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
@@ -75,6 +78,8 @@ export default function CustomerPaymentsPage() {
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [activeTab, setActiveTab] = useState('processing');
+  
+  const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
   const customerSummary = useMemo(() => {
     const newSummary = new Map<string, CustomerSummary>();
@@ -135,12 +140,13 @@ export default function CustomerPaymentsPage() {
     }, (error) => toast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." }));
 
     const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
-    const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
+    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
     const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
 
     getReceiptSettings().then(setReceiptSettings);
 
-    return () => { unsubCustomers(); unsubPayments(); unsubBankAccounts(); unsubTransactions(); unsubFunds(); };
+    return () => { unsubCustomers(); unsubPayments(); unsubBankAccounts(); unsubIncomes(); unsubExpenses(); unsubFunds(); };
   }, [toast, getNextReceiptNo, editingPayment]);
   
   const handleCustomerSelect = (key: string) => {
@@ -203,7 +209,7 @@ export default function CustomerPaymentsPage() {
                 status: 'Paid', isRecurring: false
             };
             
-            const newTransactionRef = doc(collection(db, 'transactions'));
+            const newTransactionRef = doc(collection(db, 'incomes'));
             transaction.set(newTransactionRef, {...incomeTransaction, id: newTransactionRef.id});
             paymentData.incomeTransactionId = newTransactionRef.id;
             paymentData.bankAccountId = selectedAccountId === 'CashInHand' ? undefined : selectedAccountId;
@@ -285,7 +291,7 @@ export default function CustomerPaymentsPage() {
                 }
                 
                 if (paymentToDelete.incomeTransactionId) {
-                    const incomeDocRef = doc(transactionsCollection, paymentToDelete.incomeTransactionId);
+                    const incomeDocRef = doc(incomesCollection, paymentToDelete.incomeTransactionId);
                     transaction.delete(incomeDocRef);
                 }
                 
@@ -400,3 +406,5 @@ export default function CustomerPaymentsPage() {
     </div>
   );
 }
+
+    

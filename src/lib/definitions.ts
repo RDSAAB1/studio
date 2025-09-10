@@ -1,8 +1,8 @@
 
 
 export type Customer = {
-  id: string;
-  srNo: string;
+  id: string; // Firestore unique ID
+  srNo: string; // Human-readable sequential ID
   date: string;
   term: string;
   dueDate: string;
@@ -30,7 +30,6 @@ export type Customer = {
   receiptType: string;
   paymentType: string;
   customerId: string;
-  searchValue?: string;
   
   // Fields from RTGS form
   fatherName?: string;
@@ -46,9 +45,9 @@ export type Customer = {
   checkNo?: string;
   utrNo?: string;
   rtgsAmount?: number;
-  payments?: Payment[]; // To track which payments have been applied
+  payments?: Payment[];
 
-  // New fields for Customer Entry
+  // Fields for Customer Entry
   bags?: number;
   companyName?: string;
   brokerage?: number;
@@ -74,7 +73,8 @@ export type Customer = {
 };
 
 export type Transaction = {
-  id: string;
+  id: string; // Firestore unique ID
+  transactionId: string; // Human-readable ID (e.g., IM00001, ES00001)
   date: string;
   transactionType: 'Income' | 'Expense';
   category: string;
@@ -95,8 +95,8 @@ export type Transaction = {
   isCalculated?: boolean;
   quantity?: number;
   rate?: number;
-  projectId?: string; // Link to a project
-  loanId?: string; // Link to a loan
+  projectId?: string; 
+  loanId?: string; 
   bankAccountId?: string;
 };
 
@@ -117,11 +117,12 @@ export type ExpenseCategory = {
 }
 
 export type FundTransaction = {
-    id: string;
+    id: string; // Firestore unique ID
+    transactionId: string; // Human-readable ID (e.g., AT0001)
     date: string;
     type: 'CapitalInflow' | 'BankWithdrawal' | 'BankDeposit' | 'CashTransfer';
-    source: 'OwnerCapital' | 'BankLoan' | 'ExternalLoan' | 'BankAccount' | 'CashInHand' | 'CashAtHome';
-    destination: 'BankAccount' | 'CashInHand' | 'CashAtHome';
+    source: 'OwnerCapital' | 'BankLoan' | 'ExternalLoan' | 'BankAccount' | 'CashInHand' | 'CashAtHome' | string;
+    destination: 'BankAccount' | 'CashInHand' | 'CashAtHome' | string;
     amount: number;
     description?: string;
 }
@@ -129,7 +130,7 @@ export type FundTransaction = {
 export type PaidFor = {
     srNo: string;
     amount: number;
-    cdApplied?: boolean; // Optional for CustomerPayment
+    cdApplied?: boolean;
     supplierName?: string;
     supplierSo?: string;
     supplierContact?: string;
@@ -139,21 +140,18 @@ export type PaidFor = {
     bankIfsc?: string;
 }
 
-// Keeping a single Payment type for now
-export type Payment = {
-    id: string;
-    paymentId: string; // Pxxxxx or CRxxxxx
-    customerId: string; // Can be supplier or customer ID
+export type SupplierPayment = {
+    id: string; // Firestore unique ID
+    paymentId: string; // Human-readable ID (e.g., SP00001)
+    customerId: string; 
     date: string;
     amount: number;
     cdAmount?: number;
     cdApplied?: boolean;
-    type: string; // 'Full', 'Partial'
-    receiptType: string; // 'Cash', 'Online', 'RTGS'
+    type: string; 
+    receiptType: string; 
     notes?: string;
     paidFor?: PaidFor[];
-
-    // RTGS specific fields
     sixRNo?: string;
     sixRDate?: string;
     parchiNo?: string;
@@ -172,12 +170,24 @@ export type Payment = {
     rtgsFor?: 'Supplier' | 'Outsider';
     rtgsSrNo?: string; 
     expenseTransactionId?: string;
-    incomeTransactionId?: string;
     bankAccountId?: string; 
 }
 
+export type CustomerPayment = {
+    id: string; // Firestore unique ID
+    paymentId: string; // Human-readable ID (e.g., CP00001)
+    customerId: string;
+    date: string;
+    amount: number;
+    type: 'Full' | 'Partial';
+    paymentMethod: 'Cash' | 'Online';
+    notes?: string;
+    paidFor?: { srNo: string; amount: number }[];
+    incomeTransactionId?: string;
+    bankAccountId?: string;
+};
 
-export type CustomerPayment = Payment;
+export type Payment = SupplierPayment;
 
 export type CustomerSummary = {
     name: string;
@@ -193,7 +203,7 @@ export type CustomerSummary = {
     totalPaid: number;
     totalOutstanding: number;
     totalDeductions: number;
-    paymentHistory: (Payment | CustomerPayment)[];
+    paymentHistory: (SupplierPayment | CustomerPayment)[];
     outstandingEntryIds: string[];
     // New fields for Mill Overview
     totalGrossWeight: number;
@@ -213,7 +223,7 @@ export type CustomerSummary = {
     totalTransactions: number;
     totalOutstandingTransactions: number;
     allTransactions: Customer[];
-    allPayments: (Payment | CustomerPayment)[];
+    allPayments: (SupplierPayment | CustomerPayment)[];
     transactionsByVariety: { [key: string]: number };
 }
 
@@ -296,13 +306,10 @@ export type PayrollEntry = {
 };
 
 export type AttendanceEntry = {
-    id: string; // Composite key: `${date}-${employeeId}`
-    date: string; // Format: 'YYYY-MM-DD'
+    id: string; 
+    date: string; 
     employeeId: string;
     status: 'Present' | 'Absent' | 'Leave' | 'Half-day';
-    checkIn?: string; // e.g., '09:00 AM'
-    checkOut?: string; // e.g., '05:00 PM'
-    notes?: string;
 };
 
 export type Campaign = {
@@ -355,7 +362,6 @@ export type ReceiptSettings = {
     fields: ReceiptFieldSettings;
 };
 
-// New type for consolidated receipt data
 export type ConsolidatedReceiptData = {
     supplier: {
         name: string;
@@ -370,7 +376,6 @@ export type ConsolidatedReceiptData = {
 
 export type DocumentType = 'tax-invoice' | 'bill-of-supply' | 'challan';
 
-// Project Management Types
 export type Project = {
     id: string;
     name: string;
@@ -378,8 +383,8 @@ export type Project = {
     status: 'Open' | 'InProgress' | 'Completed' | 'OnHold';
     startDate: string;
     endDate?: string;
-    totalCost?: number; // Optional: Total estimated or actual cost of the project
-    totalBilled?: number; // Optional: Total amount billed or expensed against the project
+    totalCost?: number;
+    totalBilled?: number;
 };
 
 export type Task = {
@@ -394,17 +399,18 @@ export type Task = {
 
 export type Loan = {
     id: string;
+    loanId: string; // Human-readable ID
     loanName: string;
     loanType: 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital';
     bankLoanType?: 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit';
-    lenderName?: string; // For Bank or Outsider
-    productName?: string; // For Product loan
-    totalAmount: number; // Total cost for Product, Limit for Bank, Principal for Outsider
-    amountPaid: number; // DP for Product, amount repaid for others
+    lenderName?: string; 
+    productName?: string; 
+    totalAmount: number; 
+    amountPaid: number; 
     remainingAmount: number;
-    interestRate: number; // Annual for Bank, Monthly for Outsider
+    interestRate: number; 
     tenureMonths: number;
-    emiAmount: number; // Only for Product loan
+    emiAmount: number;
     startDate: string;
     status?: 'Active' | 'Paid';
     depositTo: 'BankAccount' | 'CashInHand' | 'CashAtHome' | string;
