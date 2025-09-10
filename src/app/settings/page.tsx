@@ -36,14 +36,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Schemas
-const companyDetailsSchema = z.object({
+const companySchema = z.object({
   companyName: z.string().min(1, "Company name is required."),
   companyAddress1: z.string().min(1, "Address line 1 is required."),
   companyAddress2: z.string().optional(),
   contactNo: z.string().min(1, "Contact number is required."),
   gmail: z.string().email("Invalid email address."),
 });
-type CompanyFormValues = z.infer<typeof companyDetailsSchema>;
+type CompanyFormValues = z.infer<typeof companySchema>;
 
 const emailSchema = z.object({
     email: z.string().email("Please enter a valid email address."),
@@ -178,6 +178,16 @@ export default function SettingsPage() {
         });
         return () => unsubscribeAuth();
     }, [router, companyForm, emailForm]);
+    
+    const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, selectionStart, selectionEnd } = e.target;
+        const capitalizedValue = toTitleCase(value);
+        companyForm.setValue(name as keyof CompanyFormValues, capitalizedValue, { shouldValidate: true });
+        
+        requestAnimationFrame(() => {
+             e.target.setSelectionRange(selectionStart, selectionEnd);
+        });
+    }
 
     const onCompanySubmit = async (data: CompanyFormValues) => {
         setSaving(true);
@@ -301,7 +311,23 @@ export default function SettingsPage() {
         }
     }
     
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+        if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+            const form = e.currentTarget;
+            const formElements = Array.from(form.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+
+            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+                e.preventDefault();
+                formElements[currentElementIndex + 1].focus();
+            } else if (currentElementIndex === formElements.length - 1) {
+                 e.preventDefault();
+                 (form.querySelector('[type=submit]') as HTMLButtonElement)?.click();
+            }
+        }
+    };
+    
+    const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
         if (e.key === 'Enter') {
             const form = e.currentTarget.querySelector('form');
             if (!form) return;
@@ -336,18 +362,18 @@ export default function SettingsPage() {
                 </TabsList>
                 <TabsContent value="company" className="mt-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                         <form onSubmit={companyForm.handleSubmit(onCompanySubmit)}>
+                         <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} onKeyDown={handleKeyDown}>
                             <SettingsCard title="Company Information" description="This information will be used across the application, including on reports and invoices." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Company Details</Button>}>
                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                   <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} /></div>
+                                   <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} onChange={handleCapitalizeOnChange} /></div>
                                    <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
                                    <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
-                                   <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} /></div>
-                                   <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} /></div>
+                                   <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} onChange={handleCapitalizeOnChange} /></div>
+                                   <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} onChange={handleCapitalizeOnChange}/></div>
                                </div>
                             </SettingsCard>
                         </form>
-                         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)}>
+                         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} onKeyDown={handleKeyDown}>
                              <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
                                 <div className="space-y-4">
                                      <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
@@ -508,7 +534,7 @@ export default function SettingsPage() {
             </Tabs>
 
             <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>
-                <DialogContent onKeyDown={handleKeyDown}>
+                <DialogContent onKeyDown={handleDialogKeyDown}>
                     <DialogHeader><DialogTitle>{currentBankAccount.id ? 'Edit' : 'Add'} Bank Account</DialogTitle></DialogHeader>
                     <form>
                     <div className="grid gap-4 py-4">
@@ -522,11 +548,11 @@ export default function SettingsPage() {
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="accountNumber">Account Number</Label>
-                            <Input id="accountNumber" name="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={handleBankAccountInputChange} />
+                            <Input id="accountNumber" name="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={e => setCurrentBankAccount(prev => ({...prev, accountNumber: e.target.value}))}/>
                         </div>
                          <div className="space-y-1">
                             <Label htmlFor="ifscCode">IFSC Code</Label>
-                            <Input id="ifscCode" name="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={handleBankAccountInputChange} className="uppercase"/>
+                            <Input id="ifscCode" name="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={e => setCurrentBankAccount(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} className="uppercase"/>
                         </div>
                         <div className="space-y-1">
                            <Label htmlFor="accountType">Account Type</Label>
@@ -553,3 +579,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+  

@@ -224,7 +224,7 @@ export default function DashboardOverviewClient() {
                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
                         const account = bankAccounts.find(acc => acc.id === key);
                         if (account) {
-                            return <BalanceCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={account.bankName}/>
+                            return <BalanceCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={`${account.bankName} - ...${account.accountNumber.slice(-4)}`} />
                         }
                         if (key === 'CashInHand') {
                             return <BalanceCard key={key} title="Cash in Hand" value={formatCurrency(balance)} icon={<HandCoins />} colorClass="text-yellow-500" description="At Mill/Office"/>
@@ -337,3 +337,5 @@ export default function DashboardOverviewClient() {
     
 
     
+
+  
