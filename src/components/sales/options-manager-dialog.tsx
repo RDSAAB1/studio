@@ -67,7 +67,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                         <Button onClick={handleAdd} size="sm">Add</Button>
                     </div>
                     <Separator />
-                    <ScrollArea className="max-h-60 pr-4">
+                    <ScrollArea className="h-60 pr-4">
                         <div className="space-y-2">
                             {options.map((option: OptionItem) => (
                                 <div key={option.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
