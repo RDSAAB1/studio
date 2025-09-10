@@ -182,13 +182,25 @@ export default function CashBankClient() {
             return;
         }
 
+        const transactionAmount = parseFloat(String(values.amount));
+        if (isNaN(transactionAmount) || transactionAmount <= 0) {
+            toast({ title: "Invalid amount", variant: "destructive" });
+            return;
+        }
+
         const availableBalance = financialState.balances.get(values.source) || 0;
-        if (values.amount > availableBalance) {
+        if (transactionAmount > availableBalance) {
              toast({ title: "Insufficient funds in the source account", variant: "destructive" });
             return;
         }
         
-        handleAddFundTransaction({ type: 'CashTransfer', source: values.source, destination: values.destination, amount: values.amount, description: values.description })
+        handleAddFundTransaction({ 
+            type: 'CashTransfer', 
+            source: values.source, 
+            destination: values.destination, 
+            amount: transactionAmount, 
+            description: values.description 
+        })
           .then(() => transferForm.reset({ amount: 0, description: "", source: "", destination: "" }));
     };
 
@@ -624,4 +636,5 @@ export default function CashBankClient() {
     
 
     
+
 
