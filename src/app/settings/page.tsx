@@ -51,6 +51,17 @@ const emailSchema = z.object({
 });
 type EmailFormValues = z.infer<typeof emailSchema>;
 
+const serialNumberFormats: { key: keyof FormatSettings; label: string }[] = [
+    { key: 'income', label: 'Income' },
+    { key: 'expense', label: 'Expense' },
+    { key: 'loan', label: 'Loan' },
+    { key: 'fundTransaction', label: 'Fund Transaction' },
+    { key: 'supplier', label: 'Supplier' },
+    { key: 'customer', label: 'Customer' },
+    { key: 'supplierPayment', label: 'Supplier Payment' },
+    { key: 'customerPayment', label: 'Customer Payment' },
+];
+
 const SettingsCard = ({ title, description, children, footer }: { title: string; description: string; children: React.ReactNode; footer?: React.ReactNode }) => (
     <Card>
         <CardHeader>
@@ -426,9 +437,9 @@ export default function SettingsPage() {
                         footer={<Button onClick={handleSaveFormats} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Formats</Button>}
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                            {Object.keys(formatSettings).map(key => (
+                            {serialNumberFormats.map(({ key, label }) => (
                                 <div key={key} className="p-3 border rounded-lg">
-                                    <h4 className="font-medium text-sm mb-2">{toTitleCase(key.replace(/([A-Z])/g, ' $1'))}</h4>
+                                    <h4 className="font-medium text-sm mb-2">{label}</h4>
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1 space-y-1">
                                             <Label className="text-xs">Prefix</Label>
@@ -517,3 +528,4 @@ export default function SettingsPage() {
         </div>
     );
 }
+
