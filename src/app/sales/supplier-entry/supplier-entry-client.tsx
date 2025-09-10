@@ -45,7 +45,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const getInitialFormState = (lastVariety?: string): Customer => {
+const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -54,7 +54,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
   };
 };
 
@@ -75,6 +75,7 @@ export default function SupplierEntryClient() {
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
+  const [lastPaymentType, setLastPaymentType] = useState<string>('');
   const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
@@ -104,7 +105,7 @@ export default function SupplierEntryClient() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ...getInitialFormState(lastVariety),
+      ...getInitialFormState(lastVariety, lastPaymentType),
     },
     shouldFocusError: false,
   });
@@ -158,6 +159,12 @@ export default function SupplierEntryClient() {
       setLastVariety(savedVariety);
       form.setValue('variety', savedVariety);
     }
+    
+    const savedPaymentType = localStorage.getItem('lastSelectedPaymentType');
+    if (savedPaymentType) {
+      setLastPaymentType(savedPaymentType);
+      form.setValue('paymentType', savedPaymentType);
+    }
 
     form.setValue('date', new Date());
 
@@ -176,6 +183,13 @@ export default function SupplierEntryClient() {
     }
   }
 
+  const handleSetLastPaymentType = (paymentType: string) => {
+    setLastPaymentType(paymentType);
+    if(isClient) {
+        localStorage.setItem('lastSelectedPaymentType', paymentType);
+    }
+  }
+
   const performCalculations = useCallback((data: Partial<FormValues>) => {
     const values = {...form.getValues(), ...data};
     const date = values.date;
@@ -190,7 +204,7 @@ export default function SupplierEntryClient() {
     const kartaWeight = weight * (kartaPercentage / 100);
     const kartaAmount = kartaWeight * rate;
     const netWeight = weight - kartaWeight;
-    const amount = weight * rate;
+    const amount = netWeight * rate;
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
@@ -253,14 +267,14 @@ export default function SupplierEntryClient() {
   const handleNew = useCallback(() => {
     setIsEditing(false);
     const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-    const newState = getInitialFormState(lastVariety);
+    const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum);
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  }, [safeSuppliers, lastVariety, resetFormToState]);
+  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeSuppliers.find(c => c.id === id);
@@ -285,7 +299,7 @@ export default function SupplierEntryClient() {
         setIsEditing(false);
         const currentId = isEditing ? currentSupplier.srNo : "";
         const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum), id: currentId };
+        const currentState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum), id: currentId };
         resetFormToState(currentState);
     }
   }
@@ -353,8 +367,9 @@ export default function SupplierEntryClient() {
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
+            toast({ title: "Payments Deleted", description: "Associated payments removed." });
             const savedEntry = await addSupplier(updatedEntry);
-            toast({ title: "Entry updated and payments deleted.", variant: "success" });
+            toast({ title: "Entry updated successfully.", variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
@@ -470,6 +485,7 @@ export default function SupplierEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}

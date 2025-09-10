@@ -57,7 +57,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const getInitialFormState = (lastVariety?: string): Customer => {
+const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dateStr = today.toISOString().split('T')[0];
@@ -68,7 +68,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
     kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
     // Fields that should not be here
     so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
   };
@@ -94,6 +94,7 @@ export default function CustomerEntryClient() {
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
+  const [lastPaymentType, setLastPaymentType] = useState<string>('');
   const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
@@ -123,7 +124,7 @@ export default function CustomerEntryClient() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ...getInitialFormState(lastVariety),
+      ...getInitialFormState(lastVariety, lastPaymentType),
     },
     shouldFocusError: false,
   });
@@ -178,6 +179,12 @@ export default function CustomerEntryClient() {
       form.setValue('variety', savedVariety);
     }
 
+    const savedPaymentType = localStorage.getItem('lastSelectedPaymentType');
+    if (savedPaymentType) {
+      setLastPaymentType(savedPaymentType);
+      form.setValue('paymentType', savedPaymentType);
+    }
+
     form.setValue('date', new Date());
 
     return () => {
@@ -192,6 +199,13 @@ export default function CustomerEntryClient() {
     setLastVariety(variety);
     if(isClient) {
         localStorage.setItem('lastSelectedVariety', variety);
+    }
+  }
+
+  const handleSetLastPaymentType = (paymentType: string) => {
+    setLastPaymentType(paymentType);
+    if(isClient) {
+        localStorage.setItem('lastSelectedPaymentType', paymentType);
     }
   }
 
@@ -301,14 +315,14 @@ export default function CustomerEntryClient() {
   const handleNew = useCallback(() => {
     setIsEditing(false);
     const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-    const newState = getInitialFormState(lastVariety);
+    const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'C');
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  }, [safeCustomers, lastVariety, resetFormToState]);
+  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);
@@ -333,7 +347,7 @@ export default function CustomerEntryClient() {
         setIsEditing(false);
         const currentId = isEditing ? currentCustomer.srNo : "";
         const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum, 'C'), id: currentId };
+        const currentState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'C'), id: currentId };
         resetFormToState(currentState);
     }
   }
@@ -562,6 +576,7 @@ export default function CustomerEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}

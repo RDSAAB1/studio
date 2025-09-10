@@ -37,7 +37,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, setLastVariety, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers }: any) => {
+export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allCustomers }: any) => {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -137,7 +137,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                      <Controller name="paymentType" control={form.control} render={({ field }) => (
                         <div className="space-y-1">
                             <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
-                            <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => form.setValue("paymentType", val)} onAdd={(newVal) => handleAddOption('paymentTypes', {name: newVal})} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
+                            <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} onAdd={(newVal) => handleAddOption('paymentTypes', {name: newVal})} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found."/>
                         </div>
                     )} />
                     <div className="space-y-1">
