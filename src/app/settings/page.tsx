@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { toTitleCase } from '@/lib/utils';
+import { toTitleCase, cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
@@ -614,3 +614,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
