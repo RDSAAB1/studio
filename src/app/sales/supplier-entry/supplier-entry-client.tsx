@@ -198,13 +198,13 @@ export default function SupplierEntryClient() {
     newDueDate.setDate(newDueDate.getDate() + termDays);
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight; // This is Final Wt.
+    const weight = grossWeight - teirWeight;
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     const kartaWeight = weight * (kartaPercentage / 100);
     const kartaAmount = kartaWeight * rate;
     const netWeight = weight - kartaWeight;
-    const amount = weight * rate; // This is the corrected calculation
+    const amount = weight * rate;
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
@@ -316,21 +316,35 @@ export default function SupplierEntryClient() {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Enter') {
-      const activeElement = document.activeElement as HTMLElement;
-      if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-        return;
-      }
-      const formEl = e.currentTarget;
-      const formElements = Array.from(formEl.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-      const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-      if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-        e.preventDefault();
-        formElements[currentElementIndex + 1].focus();
-      }
-    }
-  };
+    const handleKeyDown = useCallback((event: KeyboardEvent) => {
+        if (event.altKey) {
+            event.preventDefault();
+            switch (event.key.toLowerCase()) {
+                case 's':
+                    form.handleSubmit((values) => onSubmit(values))();
+                    break;
+                case 'p':
+                    handleSaveAndPrint();
+                    break;
+                case 'n':
+                    handleNew();
+                    break;
+                case 'd':
+                    if (isEditing && currentSupplier.id) {
+                        handleDelete(currentSupplier.id);
+                    }
+                    break;
+            }
+        }
+    }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
+
+    useEffect(() => {
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [handleKeyDown]);
+
 
   const handleDelete = async (id: string) => {
     try {
@@ -476,7 +490,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}

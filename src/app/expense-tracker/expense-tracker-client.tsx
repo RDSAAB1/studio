@@ -423,6 +423,37 @@ export default function IncomeExpenseClient() {
     }
   };
 
+    const handleKeyDown = useCallback((event: KeyboardEvent) => {
+        if (event.altKey) {
+            event.preventDefault();
+            switch (event.key.toLowerCase()) {
+                case 's':
+                    handleSubmit(onSubmit)();
+                    break;
+                case 'n':
+                    handleNew();
+                    break;
+                case 'd':
+                    if (isEditing) {
+                        const tx = allTransactions.find(t => t.id === isEditing);
+                        if (tx) handleDelete(tx);
+                    }
+                    break;
+                case 't':
+                    setActiveTab(prev => prev === 'form' ? 'history' : 'form');
+                    break;
+            }
+        }
+    }, [handleSubmit, onSubmit, handleNew, isEditing, allTransactions, handleDelete]);
+
+    useEffect(() => {
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [handleKeyDown]);
+
+
   const requestSort = (key: keyof DisplayTransaction) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -365,21 +364,35 @@ export default function CustomerEntryClient() {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Enter') {
-      const activeElement = document.activeElement as HTMLElement;
-      if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-        return;
-      }
-      const formEl = e.currentTarget;
-      const formElements = Array.from(formEl.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-      const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-      if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-        e.preventDefault();
-        formElements[currentElementIndex + 1].focus();
-      }
-    }
-  };
+    const handleKeyDown = useCallback((event: KeyboardEvent) => {
+        if (event.altKey) {
+            event.preventDefault();
+            switch (event.key.toLowerCase()) {
+                case 's':
+                    form.handleSubmit(() => onSubmit())();
+                    break;
+                case 'p':
+                    handleSaveAndPrint('tax-invoice'); // Default to tax-invoice
+                    break;
+                case 'n':
+                    handleNew();
+                    break;
+                case 'd':
+                    if (isEditing && currentCustomer.id) {
+                        handleDelete(currentCustomer.id);
+                    }
+                    break;
+            }
+        }
+    }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentCustomer]);
+
+    useEffect(() => {
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [handleKeyDown]);
+
 
   const handleDelete = async (id: string) => {
     if (!id) {
@@ -568,7 +581,7 @@ export default function CustomerEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit(() => onSubmit())} className="space-y-4">
             <CustomerForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
