@@ -278,7 +278,7 @@ export default function CashBankClient() {
                 await updateLoan(loanData.id, loanData);
                 toast({ title: "Loan updated successfully", variant: "success" });
             } else {
-                await addLoan(loanData as Omit<Loan, 'id'>);
+                const newLoan = await addLoan(loanData as Omit<Loan, 'id'>);
                 toast({ title: "Loan added and funds deposited", variant: "success" });
             }
             setIsLoanDialogOpen(false);
@@ -636,5 +636,6 @@ export default function CashBankClient() {
     
 
     
+
 
 

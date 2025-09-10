@@ -426,14 +426,18 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
 export function getFundTransactionsRealtime(callback: (transactions: FundTransaction[]) => void, onError: (error: Error) => void): () => void {
   const q = query(fundTransactionsCollection, orderBy("date", "desc"));
   return onSnapshot(q, (snapshot) => {
-    const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction));
+    const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate ? doc.data().date.toDate().toISOString() : doc.data().date } as FundTransaction));
     callback(transactions);
   }, onError);
 }
 
-export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId'>): Promise<FundTransaction> {
-  const docRef = await addDoc(fundTransactionsCollection, transactionData);
-  return { id: docRef.id, transactionId: '', ...transactionData };
+export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId' | 'date'>): Promise<FundTransaction> {
+  const dataWithDate = {
+    ...transactionData,
+    date: new Date().toISOString()
+  };
+  const docRef = await addDoc(fundTransactionsCollection, dataWithDate);
+  return { id: docRef.id, transactionId: '', ...dataWithDate };
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
@@ -550,15 +554,14 @@ export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
         transaction.set(newLoanRef, { ...loanData, id: newLoanRef.id });
 
         if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
-            const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
+            const capitalInflowData: Omit<FundTransaction, 'id' | 'date' > = {
                 type: 'CapitalInflow',
                 source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
                 destination: loanData.depositTo,
                 amount: loanData.totalAmount,
                 description: `Capital inflow from ${loanData.loanName}`
             };
-            const newFundTransactionRef = doc(collection(db, "fund_transactions"));
-            transaction.set(newFundTransactionRef, { ...capitalInflowData, date: new Date().toISOString().split('T')[0] });
+             await addFundTransaction(capitalInflowData);
         }
         
         return { id: newLoanRef.id, ...loanData };
@@ -669,4 +672,3 @@ export async function saveFormatSettings(settings: FormatSettings): Promise<void
 
 
     
-
