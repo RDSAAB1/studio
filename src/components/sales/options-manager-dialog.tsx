@@ -18,8 +18,8 @@ interface OptionsManagerDialogProps {
     setIsOpen: (isOpen: boolean) => void;
     type: 'variety' | 'paymentType' | null;
     options: OptionItem[];
-    onAdd: (collectionName: string, name: string) => void;
-    onUpdate: (collectionName: string, id: string, name: string) => void;
+    onAdd: (collectionName: string, optionData: { name: string }) => void;
+    onUpdate: (collectionName: string, id: string, optionData: { name: string }) => void;
     onDelete: (collectionName: string, id: string) => void;
 }
 
@@ -35,7 +35,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
 
     const handleSave = () => {
         if (editingOption) {
-            onUpdate(collectionName, editingOption.id, editingOption.name);
+            onUpdate(collectionName, editingOption.id, { name: editingOption.name });
             toast({ title: "Option updated successfully.", variant: "success" });
             setEditingOption(null);
         }
@@ -43,7 +43,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
     
     const handleAdd = () => {
         if (newOptionName.trim()) {
-            onAdd(collectionName, newOptionName);
+            onAdd(collectionName, { name: newOptionName });
             setNewOptionName("");
         }
     };
@@ -79,7 +79,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                                         />
                                     ) : (
-                                        <span className="flex-grow">{toTitleCase(option.name)}</span>
+                                        <span className="flex-grow">{toTitleCase(String(option.name))}</span>
                                     )}
                                     <div className="flex gap-1">
                                         {editingOption?.id === option.id ? (
@@ -94,7 +94,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>
                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>This will permanently delete the option "{toTitleCase(option.name)}".</AlertDialogDescription>
+                                                    <AlertDialogDescription>This will permanently delete the option "{toTitleCase(String(option.name))}".</AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
