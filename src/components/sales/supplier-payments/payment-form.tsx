@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen } from "lucide-react";
+import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins } from "lucide-react";
 import { format } from 'date-fns';
 import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -101,7 +101,7 @@ export const PaymentForm = ({
                                 <SelectValue placeholder="Select Account" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="CashInHand">Cash In Hand</SelectItem>
+                                <SelectItem value="CashInHand"><div className="flex items-center"><HandCoins className="mr-2 h-4 w-4" /> Cash In Hand</div></SelectItem>
                                 {bankAccounts.map((acc: any) => (
                                     <SelectItem key={acc.id} value={acc.id}>
                                         {acc.accountHolderName} ({formatCurrency(financialState.balances.get(acc.id) || 0)})
@@ -257,3 +257,4 @@ export const PaymentForm = ({
 };
 
     
+

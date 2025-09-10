@@ -1,13 +1,12 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings } from '@/lib/firestore';
-import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, SerialNumberFormat } from '@/lib/definitions';
+import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
+import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, SerialNumberFormat, Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
@@ -19,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, Check, ChevronsUpDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,6 +33,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { bankNames, bankBranches as staticBankBranches } from '@/lib/data';
+
 
 // Schemas
 const companySchema = z.object({
@@ -132,12 +135,28 @@ export default function SettingsPage() {
     const [isBankAccountDialogOpen, setIsBankAccountDialogOpen] = useState(false);
     const [currentBankAccount, setCurrentBankAccount] = useState<Partial<BankAccount>>({});
     const [formatSettings, setFormatSettings] = useState<FormatSettings>({});
+    const [banks, setBanks] = useState<Bank[]>([]);
+    const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
 
     // Form Hooks
     const companyForm = useForm<CompanyFormValues>();
     const emailForm = useForm<EmailFormValues>();
     
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+    
+    const availableBranches = React.useMemo(() => {
+        if (!currentBankAccount.bankName) return [];
+        const combined = [...staticBankBranches, ...bankBranches];
+        const uniqueBranches = Array.from(new Map(combined.map(item => [item.ifscCode + item.branchName, item])).values());
+        return uniqueBranches.filter(branch => branch.bankName.toLowerCase() === currentBankAccount.bankName?.toLowerCase());
+    }, [currentBankAccount.bankName, bankBranches]);
+
+    const handleBranchSelect = (branchName: string) => {
+        const selectedBranch = availableBranches.find(b => b.branchName === branchName);
+        if(selectedBranch) {
+            setCurrentBankAccount(prev => ({...prev, branchName: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
+        }
+    };
 
     useEffect(() => {
         const auth = getFirebaseAuth();
@@ -167,9 +186,17 @@ export default function SettingsPage() {
                 const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, console.error);
                 const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
                 const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+                const unsubBanks = getBanksRealtime(setBanks, console.error);
+                const unsubBankBranches = getBankBranchesRealtime(setBankBranches, console.error);
                 
                 setLoading(false);
-                return () => { unsubVarieties(); unsubPaymentTypes(); unsubBankAccounts(); };
+                return () => { 
+                    unsubVarieties(); 
+                    unsubPaymentTypes(); 
+                    unsubBankAccounts();
+                    unsubBanks();
+                    unsubBankBranches();
+                };
             } else {
                 setUser(null);
                 setLoading(false);
@@ -480,38 +507,44 @@ export default function SettingsPage() {
                     </SettingsCard>
                 </TabsContent>
                  <TabsContent value="formats" className="mt-6">
-                    <SettingsCard 
-                        title="Serial Number Formats" 
-                        description="Define the prefix and padding for readable IDs across the app."
-                        footer={<Button onClick={handleSaveFormats} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Formats</Button>}
-                    >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                            {serialNumberFormats.map(({ key, label }) => (
-                                <div key={key} className="p-3 border rounded-lg">
-                                    <h4 className="font-medium text-sm mb-2">{label}</h4>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1 space-y-1">
-                                            <Label className="text-xs">Prefix</Label>
-                                            <Input 
-                                                value={formatSettings[key as keyof FormatSettings]?.prefix || ''}
-                                                onChange={e => handleFormatChange(key, 'prefix', e.target.value)}
-                                                className="h-8 text-sm"
-                                            />
-                                        </div>
-                                        <div className="w-24 space-y-1">
-                                            <Label className="text-xs">Padding</Label>
-                                            <Input 
-                                                type="number"
-                                                value={formatSettings[key as keyof FormatSettings]?.padding || 0}
-                                                onChange={e => handleFormatChange(key, 'padding', e.target.value)}
-                                                className="h-8 text-sm"
-                                            />
+                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <SettingsCard 
+                            title="Serial Number Formats" 
+                            description="Define the prefix and padding for readable IDs across the app."
+                            footer={<Button onClick={handleSaveFormats} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Formats</Button>}
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                {serialNumberFormats.map(({ key, label }) => (
+                                    <div key={key} className="p-3 border rounded-lg">
+                                        <h4 className="font-medium text-sm mb-2">{label}</h4>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 space-y-1">
+                                                <Label className="text-xs">Prefix</Label>
+                                                <Input 
+                                                    value={formatSettings[key as keyof FormatSettings]?.prefix || ''}
+                                                    onChange={e => handleFormatChange(key, 'prefix', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
+                                            <div className="w-24 space-y-1">
+                                                <Label className="text-xs">Padding</Label>
+                                                <Input 
+                                                    type="number"
+                                                    value={formatSettings[key as keyof FormatSettings]?.padding || 0}
+                                                    onChange={e => handleFormatChange(key, 'padding', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                        </SettingsCard>
+                        <div className="grid grid-cols-1 gap-6">
+                            <OptionsManager type="variety" options={varietyOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
+                            <OptionsManager type="paymentType" options={paymentTypeOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
                         </div>
-                    </SettingsCard>
+                     </div>
                  </TabsContent>
                  <TabsContent value="account" className="mt-6">
                     <SettingsCard title="Account Information" description="Manage your account details and sign out.">
@@ -542,9 +575,10 @@ export default function SettingsPage() {
                             <Label htmlFor="accountHolderName">Account Holder Name</Label>
                             <Input id="accountHolderName" name="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={handleBankAccountInputChange} />
                         </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="bankName">Bank Name</Label>
-                            <Input id="bankName" name="bankName" value={currentBankAccount.bankName || ''} onChange={handleBankAccountInputChange} />
+                        <div className="space-y-1"><Label className="text-xs">Bank</Label>
+                            <Popover><PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between font-normal h-9 text-sm">{currentBankAccount.bankName || "Select bank"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search bank..." /><CommandEmpty>No bank found.</CommandEmpty><CommandList>{[...bankNames, ...banks.map((b:any) => b.name)].sort().map((bank) => (<CommandItem key={bank} value={bank} onSelect={(currentValue) => setCurrentBankAccount(prev => ({ ...prev, bankName: currentValue === prev.bankName ? "" : currentValue, branchName: '', ifscCode: '' }))}><Check className={cn("mr-2 h-4 w-4", currentBankAccount.bankName === bank ? "opacity-100" : "opacity-0")} />{bank}</CommandItem>))}</CommandList></Command></PopoverContent>
+                            </Popover>
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="accountNumber">Account Number</Label>
@@ -579,5 +613,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-  
