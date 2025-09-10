@@ -219,11 +219,11 @@ export default function CashBankClient() {
 
     const handleLoanSubmit = async () => {
         if (!currentLoan) return;
-        
+    
         const isNewLoan = !currentLoan.id;
-
+    
         // Handle Owner's Capital as a direct fund transaction
-        if(currentLoan.loanType === 'OwnerCapital') {
+        if (currentLoan.loanType === 'OwnerCapital') {
             const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                 type: 'CapitalInflow',
                 source: 'OwnerCapital',
@@ -236,29 +236,28 @@ export default function CashBankClient() {
             setIsLoanDialogOpen(false);
             return;
         }
-
-
+    
         let loanNameToSave = '';
         if (currentLoan.loanType === 'Product' && currentLoan.productName) {
             loanNameToSave = currentLoan.productName + ' Loan';
         } else if (currentLoan.loanType === 'Bank' && currentLoan.lenderName && currentLoan.bankLoanType) {
             loanNameToSave = `${currentLoan.lenderName} ${toTitleCase(currentLoan.bankLoanType)} Loan`;
         } else if (currentLoan.loanType === 'Outsider' && currentLoan.lenderName) {
-             loanNameToSave = `Loan from ${currentLoan.lenderName}`;
+            loanNameToSave = `Loan from ${currentLoan.lenderName}`;
         }
-
-        if (!loanNameToSave) {
-            toast({ title: "Product Name or Lender Name is required", variant: "destructive" });
+    
+        if (currentLoan.loanType !== 'Product' && !loanNameToSave) {
+            toast({ title: "Lender Name is required for this loan type", variant: "destructive" });
             return;
         }
-
+    
         const loanData = {
             ...currentLoan,
             loanName: loanNameToSave,
             remainingAmount: (currentLoan.totalAmount || 0) - (currentLoan.amountPaid || 0),
             nextEmiDueDate: currentLoan.startDate ? format(addMonths(new Date(currentLoan.startDate), 1), 'yyyy-MM-dd') : undefined,
         };
-
+    
         try {
             if (currentLoan.id) {
                 await updateLoan(currentLoan.id, loanData);
@@ -266,8 +265,7 @@ export default function CashBankClient() {
             } else {
                 const newLoan = await addLoan(loanData as Omit<Loan, 'id'>);
                 toast({ title: "Loan added successfully", variant: "success" });
-                
-                // If it's a new Bank or Outsider loan, create a CapitalInflow transaction
+    
                 if (isNewLoan && (currentLoan.loanType === 'Bank' || currentLoan.loanType === 'Outsider')) {
                     const capitalInflowData: Omit<FundTransaction, 'id' | 'date'> = {
                         type: 'CapitalInflow',
@@ -631,6 +629,8 @@ export default function CashBankClient() {
         </div>
     );
 }
+
+    
 
     
 
