@@ -334,7 +334,7 @@ export default function SupplierEntryClient() {
     const completeEntry: Customer = {
       ...currentSupplier,
       ...values,
-      id: values.srNo, // Use srNo as ID
+      id: values.srNo,
       date: values.date.toISOString().split("T")[0],
       dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
       term: String(values.term),
@@ -344,7 +344,6 @@ export default function SupplierEntryClient() {
 
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-          // If SR No. has changed, delete the old document
           await deleteSupplier(currentSupplier.id);
         }
 
@@ -465,7 +464,7 @@ export default function SupplierEntryClient() {
                   break;
           }
       }
-  }, [form, handleNew, isEditing, currentSupplier, onSubmit, handleSaveAndPrint]);
+  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
 
   useEffect(() => {
       document.addEventListener('keydown', handleKeyDown);
@@ -490,7 +489,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -498,7 +497,7 @@ export default function SupplierEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
-                setLastPaymentType={handleSetLastPaymentType}
+                setLastPaymentType={setLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}

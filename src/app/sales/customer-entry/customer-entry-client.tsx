@@ -385,7 +385,6 @@ export default function CustomerEntryClient() {
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
-    // Create a new clean object with only the fields relevant to the customer
     const dataToSave: Omit<Customer, 'id'> = {
         srNo: formValues.srNo,
         date: formValues.date.toISOString().split('T')[0],
@@ -401,7 +400,6 @@ export default function CustomerEntryClient() {
         paymentType: formValues.paymentType,
         customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
         
-        // Form fields for customer
         grossWeight: formValues.grossWeight,
         teirWeight: formValues.teirWeight,
         rate: formValues.rate,
@@ -411,14 +409,12 @@ export default function CustomerEntryClient() {
         kanta: formValues.kanta,
         isBrokerageIncluded: formValues.isBrokerageIncluded,
 
-        // Shipping details
         shippingName: toTitleCase(formValues.shippingName || ''),
         shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
         
-        // Values from calculations
         weight: currentCustomer.weight,
         netWeight: currentCustomer.netWeight,
         amount: currentCustomer.amount,
@@ -430,7 +426,6 @@ export default function CustomerEntryClient() {
         originalNetAmount: currentCustomer.originalNetAmount,
         netAmount: currentCustomer.netAmount,
 
-        // Fields to explicitly exclude
         so: '',
         kartaPercentage: 0,
         kartaWeight: 0,
@@ -556,7 +551,7 @@ export default function CustomerEntryClient() {
                 break;
         }
     }
-  }, [form, handleNew, isEditing, currentCustomer, onSubmit, handleSaveAndPrint]);
+  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentCustomer]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
