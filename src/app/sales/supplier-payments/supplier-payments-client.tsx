@@ -463,15 +463,12 @@ export default function SupplierPaymentsClient() {
         let finalPaymentData: Payment | null = null;
         
         await runTransaction(db, async (transaction) => {
-            // --- READ PHASE ---
             const supplierDocsToGet = new Set<string>();
             
-            // Get supplier documents to read for updates
             if (rtgsFor === 'Supplier') {
                 selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
             }
             
-            // Execute all reads
             const supplierDocs = new Map<string, any>();
             for (const id of supplierDocsToGet) {
                 const docRef = doc(db, "suppliers", id);
@@ -483,9 +480,6 @@ export default function SupplierPaymentsClient() {
                 }
             }
             
-            // --- WRITE PHASE ---
-            
-            // Apply new payment amounts to supplier entries
             let paidForDetails: PaidFor[] = [];
             if (rtgsFor === 'Supplier') {
                 let amountToDistribute = Math.round(totalPaidAmount);
@@ -512,7 +506,6 @@ export default function SupplierPaymentsClient() {
                 }
             }
             
-            // Create new expense transaction
             const newTransactionRef = doc(collection(db, 'expenses'));
             const expenseData: Partial<Expense> = {
                 id: newTransactionRef.id,
@@ -532,7 +525,6 @@ export default function SupplierPaymentsClient() {
             }
             transaction.set(newTransactionRef, expenseData);
 
-            // Create the new payment document
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: paymentId,
                 customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
@@ -653,7 +645,7 @@ export default function SupplierPaymentsClient() {
                             const currentSupplier = customerDoc.data() as Customer;
                             const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                            transaction.update(doc(db, "suppliers", docSnapshot.id), { netAmount: Math.round(newNetAmount) });
+                            transaction.update(doc(db, "suppliers", customerDoc.id), { netAmount: Math.round(newNetAmount) });
                         }
                     }
                 }
@@ -861,7 +853,7 @@ export default function SupplierPaymentsClient() {
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
