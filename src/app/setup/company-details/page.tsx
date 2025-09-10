@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -66,7 +67,7 @@ export default function CompanyDetailsPage() {
     const onSubmit = async (data: FormValues) => {
         setSaving(true);
         try {
-            await updateRtgsSettings(data);
+            await updateRtgsSettings({...data, ifscCode: data.ifscCode.toUpperCase()});
             toast({ title: "Company details saved!", description: "You're all set up." });
             router.push('/dashboard-overview');
         } catch (error) {
@@ -150,7 +151,7 @@ export default function CompanyDetailsPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label>IFSC Code</Label>
-                                    <Input {...form.register("ifscCode")} />
+                                    <Input {...form.register("ifscCode")} className="uppercase" />
                                      {form.formState.errors.ifscCode && <p className="text-xs text-destructive">{form.formState.errors.ifscCode.message}</p>}
                                 </div>
                                  <div className="space-y-1 md:col-span-2">

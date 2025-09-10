@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -214,7 +215,7 @@ export const PaymentForm = ({
                                     </Popover>
                                 </div>
                                 <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
-                                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} className="h-8 text-xs"/></div>
+                                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} className="h-8 text-xs uppercase"/></div>
                         </CardContent>
                     </Card>
                     <Card className="p-2 mt-3">

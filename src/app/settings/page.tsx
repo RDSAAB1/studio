@@ -243,10 +243,11 @@ export default function SettingsPage() {
         }
 
         try {
-            const dataToSave = {
+            const dataToSave: Partial<BankAccount> = {
                 ...currentBankAccount,
                 accountHolderName: toTitleCase(currentBankAccount.accountHolderName),
                 bankName: toTitleCase(currentBankAccount.bankName),
+                ifscCode: currentBankAccount.ifscCode?.toUpperCase(),
             };
 
             if (currentBankAccount.id) {
@@ -293,7 +294,11 @@ export default function SettingsPage() {
     
     const handleBankAccountInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setCurrentBankAccount(prev => ({...prev, [name]: toTitleCase(value)}));
+        if (name === 'ifscCode') {
+            setCurrentBankAccount(prev => ({...prev, [name]: value.toUpperCase()}));
+        } else {
+            setCurrentBankAccount(prev => ({...prev, [name]: toTitleCase(value)}));
+        }
     }
     
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -521,7 +526,7 @@ export default function SettingsPage() {
                         </div>
                          <div className="space-y-1">
                             <Label htmlFor="ifscCode">IFSC Code</Label>
-                            <Input id="ifscCode" name="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={handleBankAccountInputChange} />
+                            <Input id="ifscCode" name="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={handleBankAccountInputChange} className="uppercase"/>
                         </div>
                         <div className="space-y-1">
                            <Label htmlFor="accountType">Account Type</Label>
