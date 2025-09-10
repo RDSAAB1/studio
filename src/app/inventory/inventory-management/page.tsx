@@ -63,6 +63,28 @@ export default function InventoryManagementPage() {
       setFormData({ ...formData, [name]: name === 'stock' || name === 'purchasePrice' || name === 'sellingPrice' ? Number(value) : value });
     }
   };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter') {
+        const form = e.currentTarget.querySelector('form');
+        if (!form) return;
+
+        const formElements = Array.from(form.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+        const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+
+        if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+            e.preventDefault();
+            formElements[currentElementIndex + 1].focus();
+        } else if (currentElementIndex === formElements.length - 1) {
+             e.preventDefault();
+             if (currentInventoryItem) {
+                handleUpdateInventoryItem();
+            } else {
+                handleAddInventoryItem();
+            }
+        }
+    }
+  };
 
   const handleAddInventoryItem = async () => {
     try {
@@ -192,10 +214,11 @@ export default function InventoryManagementPage() {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
+        <DialogContent onKeyDown={handleKeyDown}>
           <DialogHeader>
             <DialogTitle>{currentInventoryItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
           </DialogHeader>
+          <form>
           <ScrollArea className="max-h-[70vh] pr-6 -mr-6">
             <div className="grid gap-4 py-4 pr-1">
               <div className="grid grid-cols-4 items-center gap-4">
@@ -224,6 +247,7 @@ export default function InventoryManagementPage() {
               </div>
             </div>
           </ScrollArea>
+          </form>
           <DialogFooter>
             <Button onClick={() => setIsModalOpen(false)} variant="outline">Cancel</Button>
             <Button onClick={currentInventoryItem ? handleUpdateInventoryItem : handleAddInventoryItem}>

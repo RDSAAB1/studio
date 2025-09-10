@@ -273,7 +273,7 @@ export default function SettingsPage() {
         setFormatSettings(prev => ({
             ...prev,
             [key]: {
-                ...prev[key],
+                ...(prev[key as keyof FormatSettings] || { prefix: '', padding: 0 }),
                 [field]: field === 'padding' ? Number(value) : value
             }
         }));
@@ -295,6 +295,24 @@ export default function SettingsPage() {
         const { name, value } = e.target;
         setCurrentBankAccount(prev => ({...prev, [name]: toTitleCase(value)}));
     }
+    
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter') {
+            const form = e.currentTarget.querySelector('form');
+            if (!form) return;
+
+            const formElements = Array.from(form.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+
+            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+                e.preventDefault();
+                formElements[currentElementIndex + 1].focus();
+            } else if (currentElementIndex === formElements.length - 1) {
+                 e.preventDefault();
+                 handleBankAccountSave();
+            }
+        }
+    };
 
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -485,8 +503,9 @@ export default function SettingsPage() {
             </Tabs>
 
             <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>
-                <DialogContent>
+                <DialogContent onKeyDown={handleKeyDown}>
                     <DialogHeader><DialogTitle>{currentBankAccount.id ? 'Edit' : 'Add'} Bank Account</DialogTitle></DialogHeader>
+                    <form>
                     <div className="grid gap-4 py-4">
                         <div className="space-y-1">
                             <Label htmlFor="accountHolderName">Account Holder Name</Label>
@@ -518,6 +537,7 @@ export default function SettingsPage() {
                            </Select>
                         </div>
                     </div>
+                    </form>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsBankAccountDialogOpen(false)}>Cancel</Button>
                         <Button onClick={handleBankAccountSave}>Save Account</Button>
@@ -528,4 +548,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-

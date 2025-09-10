@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { Employee } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 export default function EmployeeDatabasePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -97,6 +99,25 @@ export default function EmployeeDatabasePage() {
         toast({ title: `Failed to ${currentEmployee ? 'update' : 'add'} employee`, variant: "destructive" });
     }
   };
+  
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter') {
+            const form = e.currentTarget.querySelector('form');
+            if (!form) return;
+
+            const formElements = Array.from(form.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+
+            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+                e.preventDefault();
+                formElements[currentElementIndex + 1].focus();
+            } else if (currentElementIndex === formElements.length - 1) {
+                 e.preventDefault();
+                 handleSubmit();
+            }
+        }
+    };
+
 
   const handleDeleteEmployee = async (id: string) => {
     try {
@@ -190,10 +211,11 @@ export default function EmployeeDatabasePage() {
        </Card>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent onEscapeKeyDown={closeDialog}>
+        <DialogContent onKeyDown={handleKeyDown}>
           <DialogHeader>
             <DialogTitle>{currentEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
           </DialogHeader>
+          <form>
           <div className="grid gap-4 py-4">
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="employeeId" className="text-right">Employee ID</Label>
@@ -220,6 +242,7 @@ export default function EmployeeDatabasePage() {
               <Input id="monthlyLeaveAllowance" name="monthlyLeaveAllowance" type="number" value={formData.monthlyLeaveAllowance} onChange={handleInputChange} className="col-span-3" />
             </div>
           </div>
+          </form>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancel</Button>
             <Button onClick={handleSubmit}>
