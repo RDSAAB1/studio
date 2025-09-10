@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -43,7 +44,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
     
     const handleAdd = () => {
         if (newOptionName.trim()) {
-            onAdd(collectionName, { name: newOptionName });
+            onAdd(collectionName, { name: toTitleCase(newOptionName.trim()) });
             setNewOptionName("");
         }
     };
@@ -82,11 +83,11 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                         <span className="flex-grow">{toTitleCase(String(option.name))}</span>
                                     )}
                                     <div className="flex gap-1">
-                                        {editingOption?.id === option.id ? (
-                                            <Button size="icon" variant="ghost" onClick={handleSave}><Save className="h-4 w-4 text-green-500" /></Button>
-                                        ) : (
-                                            <Button size="icon" variant="ghost" onClick={() => setEditingOption({ id: option.id, name: option.name })}><Pen className="h-4 w-4" /></Button>
-                                        )}
+                                        <Button size="icon" variant="ghost" onClick={() => {
+                                            toast({title: "Feature Disabled", description: "Please delete and re-add the option to rename it."})
+                                        }} disabled>
+                                            <Pen className="h-4 w-4" />
+                                        </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <Button variant="ghost" size="icon"><Trash className="h-4 w-4 text-red-500" /></Button>

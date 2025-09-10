@@ -21,6 +21,7 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment } from "@/lib/definitions";
+import { toTitleCase } from "./utils";
 
 const suppliersCollection = collection(db, "suppliers");
 const customersCollection = collection(db, "customers");
@@ -63,13 +64,18 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
 }
 
 export async function addOption(collectionName: string, optionData: { name: string }): Promise<OptionItem> {
-    const docRef = await addDoc(collection(db, collectionName), optionData);
-    return { id: docRef.id, ...optionData };
+    const docId = toTitleCase(optionData.name);
+    const docRef = doc(db, collectionName, docId);
+    await setDoc(docRef, { name: docId });
+    return { id: docId, ...optionData };
 }
 
 export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
-    const optionRef = doc(db, collectionName, id);
-    await updateDoc(optionRef, optionData);
+    // This is more complex now. If we rename, we might need to delete the old and create a new one.
+    // For now, let's assume we can't update the name, or if we do, we handle it carefully.
+    // A simple update would fail if the ID is the name itself.
+    // Let's prevent name updates for now and only allow delete/add.
+    console.warn("Updating option names is not recommended as the name is the ID. Delete and re-add if necessary.");
 }
 
 export async function deleteOption(collectionName: string, id: string): Promise<void> {
@@ -356,7 +362,7 @@ export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onE
   }, onError);
 }
 
-export async function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
+export function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
   const q = query(customerPaymentsCollection, orderBy("date", "desc"));
   return onSnapshot(q, (snapshot) => {
     const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
@@ -572,14 +578,6 @@ export async function deleteLoan(id: string): Promise<void> {
 
 
 // --- Customer Payment Functions ---
-
-export function getCustomerPayments(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(customerPaymentsCollection, orderBy("date", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
-    callback(payments);
-  }, onError);
-}
 
 export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'>): Promise<CustomerPayment> {
     const docRef = doc(db, 'customer_payments', paymentData.paymentId);
