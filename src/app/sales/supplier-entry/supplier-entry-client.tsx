@@ -316,36 +316,6 @@ export default function SupplierEntryClient() {
     }
   }
 
-    const handleKeyDown = useCallback((event: KeyboardEvent) => {
-        if (event.altKey) {
-            event.preventDefault();
-            switch (event.key.toLowerCase()) {
-                case 's':
-                    form.handleSubmit((values) => onSubmit(values))();
-                    break;
-                case 'p':
-                    handleSaveAndPrint();
-                    break;
-                case 'n':
-                    handleNew();
-                    break;
-                case 'd':
-                    if (isEditing && currentSupplier.id) {
-                        handleDelete(currentSupplier.id);
-                    }
-                    break;
-            }
-        }
-    }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
-
-    useEffect(() => {
-        document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [handleKeyDown]);
-
-
   const handleDelete = async (id: string) => {
     try {
       await deleteSupplier(id);
@@ -475,6 +445,36 @@ export default function SupplierEntryClient() {
     }
   };
   
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+      if (event.altKey) {
+          event.preventDefault();
+          switch (event.key.toLowerCase()) {
+              case 's':
+                  form.handleSubmit((values) => onSubmit(values))();
+                  break;
+              case 'p':
+                  handleSaveAndPrint();
+                  break;
+              case 'n':
+                  handleNew();
+                  break;
+              case 'd':
+                  if (isEditing && currentSupplier.id) {
+                      handleDelete(currentSupplier.id);
+                  }
+                  break;
+          }
+      }
+  }, [form, handleNew, isEditing, currentSupplier, onSubmit, handleSaveAndPrint]);
+
+  useEffect(() => {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+          document.removeEventListener('keydown', handleKeyDown);
+      };
+  }, [handleKeyDown]);
+
+
   if (!isClient) {
     return null;
   }

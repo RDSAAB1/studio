@@ -364,36 +364,6 @@ export default function CustomerEntryClient() {
     }
   }
 
-    const handleKeyDown = useCallback((event: KeyboardEvent) => {
-        if (event.altKey) {
-            event.preventDefault();
-            switch (event.key.toLowerCase()) {
-                case 's':
-                    form.handleSubmit(() => onSubmit())();
-                    break;
-                case 'p':
-                    handleSaveAndPrint('tax-invoice'); // Default to tax-invoice
-                    break;
-                case 'n':
-                    handleNew();
-                    break;
-                case 'd':
-                    if (isEditing && currentCustomer.id) {
-                        handleDelete(currentCustomer.id);
-                    }
-                    break;
-            }
-        }
-    }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentCustomer]);
-
-    useEffect(() => {
-        document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [handleKeyDown]);
-
-
   const handleDelete = async (id: string) => {
     if (!id) {
       toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
@@ -565,6 +535,35 @@ export default function CustomerEntryClient() {
     setDocumentType('tax-invoice'); 
     setIsDocumentPreviewOpen(true);
   };
+
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.altKey) {
+        event.preventDefault();
+        switch (event.key.toLowerCase()) {
+            case 's':
+                form.handleSubmit(() => onSubmit())();
+                break;
+            case 'p':
+                handleSaveAndPrint('tax-invoice'); // Default to tax-invoice
+                break;
+            case 'n':
+                handleNew();
+                break;
+            case 'd':
+                if (isEditing && currentCustomer.id) {
+                    handleDelete(currentCustomer.id);
+                }
+                break;
+        }
+    }
+  }, [form, handleNew, isEditing, currentCustomer, onSubmit, handleSaveAndPrint]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
   if (!isClient) {
     return null;
