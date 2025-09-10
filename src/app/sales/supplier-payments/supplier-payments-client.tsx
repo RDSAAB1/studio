@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -346,7 +346,7 @@ export default function SupplierPaymentsClient() {
 
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
   }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentType]);
-
+  
   useEffect(() => {
     const finalAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
     setCalcTargetAmount(finalAmount > 0 ? finalAmount : 0);
@@ -643,7 +643,7 @@ export default function SupplierPaymentsClient() {
                         if (!supplierDocsSnapshot.empty) {
                             const customerDoc = supplierDocsSnapshot.docs[0];
                             const currentSupplier = customerDoc.data() as Customer;
-                            const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? (paymentToDelete.cdAmount || 0) / (paymentToDelete.paidFor?.length || 1) : 0);
+                            const amountToRestore = detail.amount;
                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                             transaction.update(doc(db, "suppliers", customerDoc.id), { netAmount: Math.round(newNetAmount) });
                         }
@@ -660,9 +660,11 @@ export default function SupplierPaymentsClient() {
                 transaction.delete(paymentRef);
             });
             if (!isEditing) {
-                toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
+                toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
             }
-            if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
+            if (editingPayment?.id === paymentIdToDelete) {
+              resetPaymentForm();
+            }
         } catch (error) {
             console.error("Error deleting payment:", error);
             toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
@@ -942,6 +944,8 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
 
     
 
