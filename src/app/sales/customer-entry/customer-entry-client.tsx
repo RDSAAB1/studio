@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -24,7 +24,7 @@ import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialo
 import { Hourglass } from "lucide-react";
 
 
-const formSchema = z.object({
+export const formSchema = z.object({
     srNo: z.string(),
     date: z.date(),
     bags: z.coerce.number().min(0),
@@ -54,7 +54,7 @@ const formSchema = z.object({
     shippingGstin: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+export type FormValues = z.infer<typeof formSchema>;
 
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
@@ -210,64 +210,8 @@ export default function CustomerEntryClient() {
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
     const values = {...form.getValues(), ...data};
-    const grossWeight = values.grossWeight || 0;
-    const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
-    
-    const bags = Number(values.bags) || 0;
-    const bagWeightPerBagKg = Number(values.bagWeightKg) || 0;
-    const totalBagWeightKg = bags * bagWeightPerBagKg;
-    const totalBagWeightQuintals = totalBagWeightKg / 100;
-    const netWeight = weight - totalBagWeightQuintals;
-    
-    const rate = values.rate || 0;
-    const amount = weight * rate;
-    
-    const brokerageRate = Number(values.brokerage) || 0;
-    const brokerageAmount = brokerageRate * weight;
-
-    const cdPercentage = Number(values.cd) || 0;
-    const cdAmount = (amount * cdPercentage) / 100;
-    
-    const kanta = Number(values.kanta) || 0;
-    
-    const bagRate = Number(values.bagRate) || 0;
-    const bagAmount = bags * bagRate;
-
-    let originalNetAmount = amount + kanta + bagAmount - cdAmount;
-    if (!values.isBrokerageIncluded) {
-        originalNetAmount -= brokerageAmount;
-    }
-
-    const totalPaidForThisEntry = paymentHistory
-        .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
-        .reduce((sum, p) => {
-            const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-            return sum + (paidForDetail?.amount || 0);
-        }, 0);
-      
-    const netAmount = originalNetAmount - totalPaidForThisEntry;
-
-    setCurrentCustomer(prev => {
-        const currentDate = values.date instanceof Date ? values.date : (prev.date ? new Date(prev.date) : new Date());
-        return {
-            ...prev,
-            ...values,
-            date: currentDate.toISOString().split("T")[0],
-            dueDate: (values.date ? new Date(values.date) : new Date()).toISOString().split("T")[0],
-            weight: parseFloat(weight.toFixed(2)),
-            netWeight: parseFloat(netWeight.toFixed(2)),
-            amount: parseFloat(amount.toFixed(2)),
-            brokerage: parseFloat(brokerageAmount.toFixed(2)),
-            brokerageRate: brokerageRate,
-            cd: parseFloat(cdAmount.toFixed(2)),
-            cdRate: cdPercentage,
-            kanta: parseFloat(kanta.toFixed(2)),
-            bagAmount: parseFloat(bagAmount.toFixed(2)),
-            originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
-            netAmount: parseFloat(netAmount.toFixed(2)),
-        }
-    });
+    const calculatedState = calculateCustomerEntry(values, paymentHistory);
+    setCurrentCustomer(prev => ({...prev, ...calculatedState}));
   }, [form, paymentHistory]);
   
   useEffect(() => {

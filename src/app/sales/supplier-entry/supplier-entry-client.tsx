@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -43,7 +43,7 @@ const formSchema = z.object({
     paymentType: z.string().min(1, "Payment type is required"),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+export type FormValues = z.infer<typeof formSchema>;
 
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
@@ -191,46 +191,9 @@ export default function SupplierEntryClient() {
   }
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const values = {...form.getValues(), ...data};
-    const date = values.date;
-    const termDays = Number(values.term) || 0;
-    const newDueDate = new Date(date);
-    newDueDate.setDate(newDueDate.getDate() + termDays);
-    const grossWeight = values.grossWeight || 0;
-    const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
-    const kartaPercentage = values.kartaPercentage || 0;
-    const rate = values.rate || 0;
-    const kartaWeight = weight * (kartaPercentage / 100);
-    const kartaAmount = kartaWeight * rate;
-    const netWeight = weight - kartaWeight;
-    const amount = weight * rate;
-    const labouryRate = values.labouryRate || 0;
-    const labouryAmount = weight * labouryRate;
-    const kanta = values.kanta || 0;
-    
-    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
-
-    const totalPaidForThisEntry = paymentHistory
-      .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
-      .reduce((sum, p) => {
-          const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-          return sum + (paidForDetail?.amount || 0);
-      }, 0);
-      
-    const netAmount = originalNetAmount - totalPaidForThisEntry;
-
-    setCurrentSupplier(prev => ({
-      ...prev, ...values,
-      date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
-      term: String(values.term), dueDate: newDueDate.toISOString().split("T")[0],
-      weight: parseFloat(weight.toFixed(2)), kartaWeight: parseFloat(kartaWeight.toFixed(2)),
-      kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
-      amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
-      kanta: parseFloat(kanta.toFixed(2)), 
-      originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
-      netAmount: parseFloat(netAmount.toFixed(2)),
-    }));
+    const values = { ...form.getValues(), ...data };
+    const calculatedState = calculateSupplierEntry(values, paymentHistory);
+    setCurrentSupplier(prev => ({...prev, ...calculatedState}));
   }, [form, paymentHistory]);
   
   useEffect(() => {
@@ -339,7 +302,7 @@ export default function SupplierEntryClient() {
       dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
       term: String(values.term),
       name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+      customerId: `${''}${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
     try {
@@ -489,7 +452,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -497,7 +460,7 @@ export default function SupplierEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
-                setLastPaymentType={setLastPaymentType}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
