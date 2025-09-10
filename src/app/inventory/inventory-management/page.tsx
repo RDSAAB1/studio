@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 
 import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function InventoryManagementPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -190,32 +191,34 @@ export default function InventoryManagementPage() {
           <DialogHeader>
             <DialogTitle>{currentInventoryItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">Name</Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleInputChange} className="col-span-3" />
+          <ScrollArea className="max-h-[70vh] pr-6 -mr-6">
+            <div className="grid gap-4 py-4 pr-1">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">Name</Label>
+                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="sku" className="text-right">SKU</Label>
+                <Input id="sku" name="sku" value={formData.sku} onChange={handleInputChange} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="stock" className="text-right">Stock</Label>
+                <Input id="stock" name="stock" type="number" value={formData.stock} onChange={handleInputChange} className="col-span-3" />
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="unit" className="text-right">Unit</Label>
+                <Input id="unit" name="unit" value={formData.unit} onChange={handleInputChange} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="purchasePrice" className="text-right">Purchase Price</Label>
+                <Input id="purchasePrice" name="purchasePrice" type="number" value={formData.purchasePrice} onChange={handleInputChange} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="sellingPrice" className="text-right">Selling Price</Label>
+                <Input id="sellingPrice" name="sellingPrice" type="number" value={formData.sellingPrice} onChange={handleInputChange} className="col-span-3" />
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sku" className="text-right">SKU</Label>
-              <Input id="sku" name="sku" value={formData.sku} onChange={handleInputChange} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="stock" className="text-right">Stock</Label>
-              <Input id="stock" name="stock" type="number" value={formData.stock} onChange={handleInputChange} className="col-span-3" />
-            </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="unit" className="text-right">Unit</Label>
-              <Input id="unit" name="unit" value={formData.unit} onChange={handleInputChange} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="purchasePrice" className="text-right">Purchase Price</Label>
-              <Input id="purchasePrice" name="purchasePrice" type="number" value={formData.purchasePrice} onChange={handleInputChange} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sellingPrice" className="text-right">Selling Price</Label>
-              <Input id="sellingPrice" name="sellingPrice" type="number" value={formData.sellingPrice} onChange={handleInputChange} className="col-span-3" />
-            </div>
-          </div>
+          </ScrollArea>
           <DialogFooter>
             <Button onClick={() => setIsModalOpen(false)} variant="outline">Cancel</Button>
             <Button onClick={currentInventoryItem ? handleUpdateInventoryItem : handleAddInventoryItem}>
