@@ -51,7 +51,7 @@ export function DynamicCombobox({
   const [inputValue, setInputValue] = React.useState("");
 
   const selectedOption = options.find(
-    (option) => option.value.toLowerCase() === value?.toLowerCase()
+    (option) => typeof option.value === 'string' && typeof value === 'string' && option.value.toLowerCase() === value?.toLowerCase()
   );
 
   const handleAddNew = () => {
@@ -63,10 +63,10 @@ export function DynamicCombobox({
   };
 
   const filteredOptions = options.filter(option => 
-    option.label.toLowerCase().includes(inputValue.toLowerCase())
+    typeof option.label === 'string' && option.label.toLowerCase().includes(inputValue.toLowerCase())
   );
   
-  const showAddNew = onAdd && inputValue && !filteredOptions.some(opt => opt.label.toLowerCase() === inputValue.toLowerCase());
+  const showAddNew = onAdd && inputValue && !filteredOptions.some(opt => typeof opt.label === 'string' && opt.label.toLowerCase() === inputValue.toLowerCase());
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -117,7 +117,7 @@ export function DynamicCombobox({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      selectedOption && selectedOption.value.toLowerCase() === option.value.toLowerCase()
+                      selectedOption && typeof option.value === 'string' && typeof selectedOption.value === 'string' && selectedOption.value.toLowerCase() === option.value.toLowerCase()
                         ? "opacity-100"
                         : "opacity-0"
                     )}
