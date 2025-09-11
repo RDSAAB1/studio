@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -25,7 +25,6 @@ import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profi
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { Calendar } from '@/components/ui/calendar';
-
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -267,6 +266,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     </>
     );
 };
+
 
 export default function SupplierProfilePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -588,5 +588,3 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
-
-    
