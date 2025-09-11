@@ -306,38 +306,6 @@ body {
     margin-left: 250px; /* Expanded sidebar width */
 }
 
-
-.main_container > .content {
-    padding: 30px;
-    overflow: auto;
-    flex-grow: 1;
-}
-
-.main_container p{
-    line-height: 22px;
-    margin-bottom: 20px;
-}
-
-/* Custom Scrollbar Styles */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: hsl(var(--card));
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted));
-  border-radius: 10px;
-  border: 2px solid hsl(var(--card));
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--border));
-}
-
 @media screen and (max-width: 1023px) {
     .wrapper .side_bar,
     .wrapper.active .side_bar {

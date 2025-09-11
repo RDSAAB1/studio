@@ -34,6 +34,7 @@ import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import TabBar from './tab-bar';
+import { ScrollArea } from "../ui/scroll-area";
 
 const pageComponents: { [key: string]: React.FC<any> } = {
     "/dashboard-overview": DashboardOverviewPage,
@@ -190,21 +191,23 @@ const AppContent = () => {
     
     return (
        <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
-          <div className="flex flex-col flex-grow">
+          <div className="flex flex-col flex-grow min-h-0">
               <div className="sticky top-0 z-30 flex-shrink-0">
                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
                 <Header onSignOut={logout} toggleSidebar={toggleSidebar} />
               </div>
-              <div className="content">
-                {openTabs.map(tab => {
-                    const PageComponent = pageComponents[`/${tab.id}`];
-                    return (
-                        <div key={tab.id} style={{ display: tab.id === activeTabId ? 'block' : 'none' }}>
-                            {PageComponent && <PageComponent />}
-                        </div>
-                    )
-                })}
-              </div>
+              <ScrollArea className="flex-grow">
+                <main className="p-4 sm:p-6">
+                    {openTabs.map(tab => {
+                        const PageComponent = pageComponents[`/${tab.id}`];
+                        return (
+                            <div key={tab.id} style={{ display: tab.id === activeTabId ? 'block' : 'none' }}>
+                                {PageComponent && <PageComponent />}
+                            </div>
+                        )
+                    })}
+                </main>
+              </ScrollArea>
           </div>
        </CustomSidebar>
     );
