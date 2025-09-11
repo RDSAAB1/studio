@@ -92,7 +92,7 @@ export function DynamicCombobox({
             </Button>
         )}
       </div>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[51]">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]">
         <Command>
           <CommandInput
             placeholder={searchPlaceholder}
