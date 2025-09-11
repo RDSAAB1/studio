@@ -9,13 +9,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Printer, Info, Pen, Trash } from "lucide-react";
+import { Printer, Info, Pen, Trash, Download } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPrintRtgs }: any) => {
+export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPrintRtgs, onExport }: any) => {
     return (
         <Card>
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
+            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-base">Payment History</CardTitle>
+                <Button onClick={onExport} size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>
+            </CardHeader>
             <CardContent className="p-0">
                 <ScrollArea className="h-96">
                     <div className="overflow-x-auto">

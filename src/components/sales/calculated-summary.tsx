@@ -7,7 +7,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
@@ -26,6 +26,8 @@ interface CalculatedSummaryProps {
     isCustomerForm?: boolean;
     isBrokerageIncluded?: boolean;
     onBrokerageToggle?: (checked: boolean) => void;
+    onImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onExport: () => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -58,7 +60,9 @@ export const CalculatedSummary = ({
     selectedIdsCount,
     isCustomerForm = false,
     isBrokerageIncluded,
-    onBrokerageToggle
+    onBrokerageToggle,
+    onImport,
+    onExport
 }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
@@ -83,14 +87,23 @@ export const CalculatedSummary = ({
                 <Separator />
 
                 <div className="flex items-center justify-between gap-2 w-full">
-                    <div className="relative w-full max-w-xs">
+                    <div className="flex items-center gap-2">
                          <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
                             <Input
                                 placeholder="Search by SR No, Name, or Contact..."
                                 onChange={(e) => onSearch && onSearch(e.target.value)}
-                                className="h-8 pl-10 text-xs"
+                                className="h-8 pl-10 text-xs w-48"
                             />
                         </InputWithIcon>
+                         <Button asChild size="sm" variant="outline" className="h-8 relative">
+                            <label htmlFor="import-file">
+                                <Upload className="mr-2 h-4 w-4"/> Import
+                                <input id="import-file" type="file" className="sr-only" onChange={onImport} accept=".xlsx, .xls"/>
+                            </label>
+                        </Button>
+                        <Button onClick={onExport} size="sm" variant="outline" className="h-8">
+                           <Download className="mr-2 h-4 w-4"/> Export
+                        </Button>
                     </div>
 
                     <div className="flex items-center gap-2">
