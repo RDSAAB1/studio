@@ -455,10 +455,11 @@ export default function SupplierEntryClient() {
               let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
               for (const item of json) {
-                  const supplierData: Partial<FormValues> = {
+                  const supplierData = {
                       srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
-                      date: item['DATE'] ? new Date(item['DATE']) : new Date(),
-                      term: item['TERM'] || 20,
+                      date: item['DATE'] || new Date().toISOString().split('T')[0],
+                      term: String(item['TERM'] || '20'),
+                      dueDate: item['DUE DATE'] || new Date().toISOString().split('T')[0],
                       name: toTitleCase(item['NAME']),
                       so: toTitleCase(item['S/O'] || ''),
                       address: toTitleCase(item['ADDRESS'] || ''),
@@ -467,14 +468,21 @@ export default function SupplierEntryClient() {
                       variety: toTitleCase(item['VARIETY'] || ''),
                       grossWeight: Number(item['GROSS']) || 0,
                       teirWeight: Number(item['TEIR']) || 0,
-                      rate: Number(item['RATE']) || 0,
+                      weight: Number(item['TOTAL']) || 0,
                       kartaPercentage: Number(item['KARTA %']) || 0,
+                      kartaWeight: Number(item['KARTA WT']) || 0,
+                      netWeight: Number(item['NET WT']) || 0,
+                      rate: Number(item['RATE']) || 0,
                       labouryRate: Number(item['LABOURY RATE']) || 0,
+                      labouryAmount: Number(item['LABOURY AMT']) || 0,
                       kanta: Number(item['KANTA']) || 0,
+                      amount: Number(item['AMOUNT']) || 0,
+                      originalNetAmount: Number(item['NET AMT']) || 0,
+                      netAmount: Number(item['NET AMT']) || 0, // Assume outstanding is same as net on fresh import
                       paymentType: item['PAYMENT TYPE'] || 'Full',
+                      customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
                   };
-                  const calculated = calculateSupplierEntry(supplierData as FormValues, paymentHistory);
-                  await addSupplier({ ...calculated, id: calculated.srNo } as Customer);
+                  await addSupplier({ ...supplierData, id: supplierData.srNo } as Customer);
               }
               toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
           } catch (error) {
