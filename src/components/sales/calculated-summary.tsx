@@ -26,8 +26,8 @@ interface CalculatedSummaryProps {
     isCustomerForm?: boolean;
     isBrokerageIncluded?: boolean;
     onBrokerageToggle?: (checked: boolean) => void;
-    onImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    onExport: () => void;
+    onImport?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onExport?: () => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -107,7 +107,7 @@ export const CalculatedSummary = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {isCustomerForm && (
+                        {isCustomerForm && onBrokerageToggle && (
                             <div className="flex items-center space-x-2">
                                 <Switch id="brokerage-toggle" checked={isBrokerageIncluded} onCheckedChange={onBrokerageToggle} />
                                 <Label htmlFor="brokerage-toggle" className="text-xs">Include Brokerage</Label>
@@ -126,6 +126,7 @@ export const CalculatedSummary = ({
                             </Button>
                         )}
                         
+                       {onSaveAndPrint && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button size="sm" className="h-8 rounded-md" disabled={isLoading}>
@@ -138,6 +139,7 @@ export const CalculatedSummary = ({
                                 <DropdownMenuItem onClick={() => onSaveAndPrint('challan')}>Challan</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+                       )}
 
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading}>
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}

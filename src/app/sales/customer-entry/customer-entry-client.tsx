@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -208,15 +209,14 @@ export default function CustomerEntryClient() {
     }
   }
 
-  const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const values = {...form.getValues(), ...data};
-    const calculatedState = calculateCustomerEntry(values, paymentHistory);
+  const performCalculations = useCallback((data: Partial<CustomerFormValues>) => {
+    const calculatedState = calculateCustomerEntry(data, paymentHistory);
     setCurrentCustomer(prev => ({...prev, ...calculatedState}));
-  }, [form, paymentHistory]);
+  }, [paymentHistory]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>);
+        performCalculations(value as Partial<CustomerFormValues>);
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
@@ -357,6 +357,14 @@ export default function CustomerEntryClient() {
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
+        so: '',
+        kartaPercentage: 0,
+        kartaWeight: 0,
+        kartaAmount: 0,
+        labouryRate: 0,
+        labouryAmount: 0,
+        barcode: '',
+        receiptType: 'Cash'
     };
     
     try {
@@ -454,6 +462,86 @@ export default function CustomerEntryClient() {
     setIsDocumentPreviewOpen(true);
   };
 
+    const handleExport = () => {
+        const dataToExport = customers.map(c => ({
+            srNo: c.srNo,
+            date: c.date,
+            name: c.name,
+            companyName: c.companyName,
+            address: c.address,
+            contact: c.contact,
+            gstin: c.gstin,
+            vehicleNo: c.vehicleNo,
+            variety: c.variety,
+            grossWeight: c.grossWeight,
+            teirWeight: c.teirWeight,
+            rate: c.rate,
+            bags: c.bags,
+            bagWeightKg: c.bagWeightKg,
+            bagRate: c.bagRate,
+            kanta: c.kanta,
+            cd: c.cd,
+            brokerage: c.brokerage,
+            isBrokerageIncluded: c.isBrokerageIncluded,
+            paymentType: c.paymentType,
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+        XLSX.writeFile(workbook, "CustomerEntries.xlsx");
+        toast({title: "Exported", description: "Customer data has been exported."});
+    }
+
+    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+                
+                let nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+
+                for (const item of json) {
+                    const customerData: Partial<Customer> = {
+                        srNo: item.srNo || formatSrNo(nextSrNum++, 'C'),
+                        date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        name: toTitleCase(item.name),
+                        companyName: toTitleCase(item.companyName || ''),
+                        address: toTitleCase(item.address || ''),
+                        contact: String(item.contact || ''),
+                        gstin: item.gstin || '',
+                        vehicleNo: toTitleCase(item.vehicleNo || ''),
+                        variety: toTitleCase(item.variety || ''),
+                        grossWeight: Number(item.grossWeight) || 0,
+                        teirWeight: Number(item.teirWeight) || 0,
+                        rate: Number(item.rate) || 0,
+                        bags: Number(item.bags) || 0,
+                        bagWeightKg: Number(item.bagWeightKg) || 0,
+                        bagRate: Number(item.bagRate) || 0,
+                        kanta: Number(item.kanta) || 0,
+                        cd: Number(item.cd) || 0,
+                        brokerage: Number(item.brokerage) || 0,
+                        isBrokerageIncluded: item.isBrokerageIncluded === 'TRUE' || item.isBrokerageIncluded === true,
+                        paymentType: item.paymentType || 'Full',
+                    };
+                    const calculated = calculateCustomerEntry(customerData, paymentHistory);
+                    await addCustomer({ ...customerData, ...calculated } as Omit<Customer, 'id'>);
+                }
+                toast({title: "Import Successful", description: `${json.length} customer entries have been imported.`});
+            } catch (error) {
+                console.error("Import failed:", error);
+                toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (event.altKey) {
         event.preventDefault();
@@ -522,6 +610,8 @@ export default function CustomerEntryClient() {
                 isCustomerForm={true}
                 isBrokerageIncluded={form.watch('isBrokerageIncluded')}
                 onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
+                onImport={handleImport}
+                onExport={handleExport}
             />
         </form>
       </FormProvider>      
@@ -581,3 +671,4 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+
