@@ -280,6 +280,10 @@ export default function SupplierEntryClient() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!id) {
+      toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
+      return;
+    }
     try {
       await deleteSupplier(id);
       await deletePaymentsForSrNo(currentSupplier.srNo);
@@ -294,27 +298,21 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    // This is the fully calculated and correct state
     const completeEntry: Customer = {
-        ...currentSupplier,
-        id: values.srNo,
-        srNo: values.srNo,
-        date: values.date.toISOString().split("T")[0],
-        term: String(values.term),
-        dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
-        name: toTitleCase(values.name),
-        so: toTitleCase(values.so),
-        address: toTitleCase(values.address),
-        contact: values.contact,
-        vehicleNo: toTitleCase(values.vehicleNo),
-        variety: toTitleCase(values.variety),
-        grossWeight: values.grossWeight,
-        teirWeight: values.teirWeight,
-        rate: values.rate,
-        kartaPercentage: values.kartaPercentage,
-        labouryRate: values.labouryRate,
-        kanta: values.kanta,
-        paymentType: values.paymentType,
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+      ...currentSupplier,
+      id: values.srNo, // Use srNo as ID
+      srNo: values.srNo,
+      date: values.date.toISOString().split("T")[0],
+      term: String(values.term),
+      name: toTitleCase(values.name),
+      so: toTitleCase(values.so),
+      address: toTitleCase(values.address),
+      contact: values.contact,
+      vehicleNo: toTitleCase(values.vehicleNo),
+      variety: toTitleCase(values.variety),
+      paymentType: values.paymentType,
+      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
     try {
@@ -419,95 +417,100 @@ export default function SupplierEntryClient() {
     }
   };
 
-  const handleExport = () => {
-      const dataToExport = suppliers.map(c => {
-          const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
-          return {
-            'SR NO.': c.srNo,
-            'DATE': c.date,
-            'TERM': c.term,
-            'DUE DATE': calculated.dueDate,
-            'NAME': c.name,
-            'S/O': c.so,
-            'ADDRESS': c.address,
-            'CONTACT': c.contact,
-            'VEHICLE': c.vehicleNo,
-            'VARIETY': c.variety,
-            'GROSS': c.grossWeight,
-            'TEIR': c.teirWeight,
-            'TOTAL': calculated.weight,
-            'KARTA %': c.kartaPercentage,
-            'KARTA WT': calculated.kartaWeight,
-            'NET WT': calculated.netWeight,
-            'RATE': c.rate,
-            'LABOURY RATE': c.labouryRate,
-            'LABOURY AMT': calculated.labouryAmount,
-            'KANTA': c.kanta,
-            'AMOUNT': calculated.amount,
-            'NET AMT': calculated.originalNetAmount,
-            'PAYMENT TYPE': c.paymentType,
-          }
-      });
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
-      XLSX.writeFile(workbook, "SupplierEntries.xlsx");
-      toast({title: "Exported", description: "Supplier data has been exported."});
-  }
+    const handleExport = () => {
+        const dataToExport = suppliers.map(c => {
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
+            return {
+                'SR NO.': c.srNo,
+                'DATE': c.date,
+                'TERM': c.term,
+                'DUE DATE': calculated.dueDate,
+                'NAME': c.name,
+                'S/O': c.so,
+                'ADDRESS': c.address,
+                'CONTACT': c.contact,
+                'VEHICLE': c.vehicleNo,
+                'VARIETY': c.variety,
+                'GROSS WT': c.grossWeight,
+                'TEIR WT': c.teirWeight,
+                'FINAL WT': calculated.weight,
+                'KARTA %': c.kartaPercentage,
+                'KARTA WT': calculated.kartaWeight,
+                'NET WT': calculated.netWeight,
+                'RATE': c.rate,
+                'LABOURY RATE': c.labouryRate,
+                'LABOURY AMT': calculated.labouryAmount,
+                'KANTA': c.kanta,
+                'AMOUNT': calculated.amount,
+                'NET AMOUNT': calculated.originalNetAmount,
+                'PAYMENT TYPE': c.paymentType,
+            };
+        });
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
+        XLSX.writeFile(workbook, "SupplierEntries.xlsx");
+        toast({title: "Exported", description: "Supplier data has been exported."});
+    };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-          try {
-              const data = e.target?.result;
-              const workbook = XLSX.read(data, { type: 'binary' });
-              const sheetName = workbook.SheetNames[0];
-              const worksheet = workbook.Sheets[sheetName];
-              const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-              
-              let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+                
+                let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
-              for (const item of json) {
-                  const supplierData: Partial<Customer> = {
-                      srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
-                      date: item['DATE'] || new Date().toISOString().split('T')[0],
-                      term: String(item['TERM'] || '20'),
-                      dueDate: item['DUE DATE'] || new Date().toISOString().split('T')[0],
-                      name: toTitleCase(item['NAME']),
-                      so: toTitleCase(item['S/O'] || ''),
-                      address: toTitleCase(item['ADDRESS'] || ''),
-                      contact: String(item['CONTACT'] || ''),
-                      vehicleNo: toTitleCase(item['VEHICLE'] || ''),
-                      variety: toTitleCase(item['VARIETY'] || ''),
-                      grossWeight: Number(item['GROSS']) || 0,
-                      teirWeight: Number(item['TEIR']) || 0,
-                      weight: Number(item['TOTAL']) || 0,
-                      kartaPercentage: Number(item['KARTA %']) || 0,
-                      kartaWeight: Number(item['KARTA WT']) || 0,
-                      netWeight: Number(item['NET WT']) || 0,
-                      rate: Number(item['RATE']) || 0,
-                      labouryRate: Number(item['LABOURY RATE']) || 0,
-                      labouryAmount: Number(item['LABOURY AMT']) || 0,
-                      kanta: Number(item['KANTA']) || 0,
-                      amount: Number(item['AMOUNT']) || 0,
-                      originalNetAmount: Number(item['NET AMT']) || 0,
-                      netAmount: Number(item['NET AMT']) || 0, // Assume outstanding is same as net on fresh import
-                      paymentType: item['PAYMENT TYPE'] || 'Full',
-                      customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
-                  };
-                  await addSupplier({ ...supplierData, id: supplierData.srNo } as Customer);
-              }
-              toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
-          } catch (error) {
-              console.error("Import failed:", error);
-              toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
-          }
-      };
-      reader.readAsBinaryString(file);
-  };
+                for (const item of json) {
+                    const supplierData: Partial<Customer> = {
+                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
+                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        term: String(item['TERM'] || '20'),
+                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        name: toTitleCase(item['NAME']),
+                        so: toTitleCase(item['S/O'] || ''),
+                        address: toTitleCase(item['ADDRESS'] || ''),
+                        contact: String(item['CONTACT'] || ''),
+                        vehicleNo: toTitleCase(item['VEHICLE'] || ''),
+                        variety: toTitleCase(item['VARIETY'] || ''),
+                        grossWeight: parseFloat(item['GROSS WT']) || 0,
+                        teirWeight: parseFloat(item['TEIR WT']) || 0,
+                        weight: parseFloat(item['FINAL WT']) || 0,
+                        kartaPercentage: parseFloat(item['KARTA %']) || 0,
+                        kartaWeight: parseFloat(item['KARTA WT']) || 0,
+                        netWeight: parseFloat(item['NET WT']) || 0,
+                        rate: parseFloat(item['RATE']) || 0,
+                        labouryRate: parseFloat(item['LABOURY RATE']) || 0,
+                        labouryAmount: parseFloat(item['LABOURY AMT']) || 0,
+                        kanta: parseFloat(item['KANTA']) || 0,
+                        amount: parseFloat(item['AMOUNT']) || 0,
+                        originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
+                        netAmount: parseFloat(item['NET AMOUNT']) || 0, // Assume outstanding is same as net on fresh import
+                        paymentType: item['PAYMENT TYPE'] || 'Full',
+                    };
+                    const completeData = {
+                        ...supplierData,
+                        customerId: `${toTitleCase(supplierData.name || '').toLowerCase()}|${String(supplierData.contact || '').toLowerCase()}`,
+                        id: supplierData.srNo,
+                    } as Customer;
+
+                    await addSupplier(completeData);
+                }
+                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
+            } catch (error) {
+                console.error("Import failed:", error);
+                toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
   
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
       if (event.altKey) {
@@ -630,3 +633,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    
