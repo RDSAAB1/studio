@@ -53,7 +53,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     
-    const kartaWeight = weight * (kartaPercentage / 100);
+    const kartaWeight = parseFloat((weight * (kartaPercentage / 100)).toFixed(2));
     const kartaAmount = kartaWeight * rate;
     
     const netWeight = weight - kartaWeight;
