@@ -214,8 +214,6 @@ export default function SupplierEntryClient() {
         formDate = today;
     }
     
-    // When editing, populate form directly from the saved state.
-    // This ensures all fields, including calculated ones, are exactly as saved.
     const formValues: FormValues = {
         srNo: customerState.srNo,
         date: formDate,
@@ -229,17 +227,14 @@ export default function SupplierEntryClient() {
         grossWeight: customerState.grossWeight || 0,
         teirWeight: customerState.teirWeight || 0,
         rate: customerState.rate || 0,
-        kartaPercentage: customerState.kartaPercentage || 0,
-        labouryRate: customerState.labouryRate || 0,
-        kanta: customerState.kanta || 0,
+        kartaPercentage: customerState.kartaPercentage || 1,
+        labouryRate: customerState.labouryRate || 2,
+        kanta: customerState.kanta || 50,
         paymentType: customerState.paymentType || 'Full',
     };
 
     setCurrentSupplier(customerState);
     form.reset(formValues);
-
-    // After setting the form, re-run calculations to update the summary view.
-    // Note: This won't change the form inputs, just the displayed `currentSupplier` state.
     performCalculations(formValues);
   }, [form, performCalculations]);
 
@@ -314,23 +309,20 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    // This is the fully calculated and correct state from `currentSupplier`
     const completeEntry: Customer = {
       ...currentSupplier,
-      id: values.srNo, // Use srNo as ID from the form
-      // Overwrite with form values where necessary to ensure they are the source of truth
+      id: values.srNo, // Use srNo as ID
       srNo: values.srNo,
       date: values.date.toISOString().split("T")[0],
       term: String(values.term),
-      name: toTitleCase(values.name),
-      so: toTitleCase(values.so),
-      address: toTitleCase(values.address),
+      name: toTitleCase(values.name), 
+      so: toTitleCase(values.so), 
+      address: toTitleCase(values.address), 
       contact: values.contact,
-      vehicleNo: toTitleCase(values.vehicleNo),
+      vehicleNo: toTitleCase(values.vehicleNo), 
       variety: toTitleCase(values.variety),
       paymentType: values.paymentType,
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-      // Also ensure form values for direct inputs are taken
       grossWeight: values.grossWeight,
       teirWeight: values.teirWeight,
       rate: values.rate,
@@ -453,7 +445,7 @@ export default function SupplierEntryClient() {
                 'S/O': c.so,
                 'ADDRESS': c.address,
                 'CONTACT': c.contact,
-                'VEHICLE': c.vehicleNo,
+                'VEHICLE NO': c.vehicleNo,
                 'VARIETY': c.variety,
                 'GROSS WT': c.grossWeight,
                 'TEIR WT': c.teirWeight,
@@ -503,7 +495,7 @@ export default function SupplierEntryClient() {
                         so: toTitleCase(item['S/O'] || ''),
                         address: toTitleCase(item['ADDRESS'] || ''),
                         contact: String(item['CONTACT'] || ''),
-                        vehicleNo: toTitleCase(item['VEHICLE'] || ''),
+                        vehicleNo: toTitleCase(item['VEHICLE NO'] || ''),
                         variety: toTitleCase(item['VARIETY'] || ''),
                         grossWeight: parseFloat(item['GROSS WT']) || 0,
                         teirWeight: parseFloat(item['TEIR WT']) || 0,
@@ -581,7 +573,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
