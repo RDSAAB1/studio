@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Customer, FormValues as SupplierFormValues } from './definitions';
@@ -48,13 +49,16 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
     newDueDate.setDate(newDueDate.getDate() + termDays);
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
+    const weight = grossWeight - teirWeight; // This is finalWeight
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
+    
+    const amount = weight * rate; // Corrected: amount is based on final weight
+    
     const kartaWeight = weight * (kartaPercentage / 100);
     const kartaAmount = kartaWeight * rate;
     const netWeight = weight - kartaWeight;
-    const amount = netWeight * rate;
+    
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
@@ -67,7 +71,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
           const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === values.srNo);
           return sum + (paidForDetail?.amount || 0);
       }, 0);
-
+      
     const netAmount = originalNetAmount - totalPaidForThisEntry;
 
     return {
@@ -77,7 +81,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
       weight: parseFloat(weight.toFixed(2)), kartaWeight: parseFloat(kartaWeight.toFixed(2)),
       kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
       amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
-      kanta: parseFloat(kanta.toFixed(2)),
+      kanta: parseFloat(kanta.toFixed(2)), 
       originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
       netAmount: parseFloat(netAmount.toFixed(2)),
     };

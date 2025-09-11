@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -506,9 +506,9 @@ export default function SupplierPaymentsClient() {
                 }
             }
             
-            const newTransactionRef = doc(collection(db, 'expenses'));
+            const expenseTransactionRef = doc(collection(db, 'expenses'));
             const expenseData: Partial<Expense> = {
-                id: newTransactionRef.id,
+                id: expenseTransactionRef.id,
                 date: new Date().toISOString().split('T')[0],
                 transactionType: 'Expense',
                 category: 'Supplier Payments',
@@ -523,7 +523,25 @@ export default function SupplierPaymentsClient() {
             if (paymentMethod !== 'Cash') {
                 expenseData.bankAccountId = selectedAccountId;
             }
-            transaction.set(newTransactionRef, expenseData);
+            transaction.set(expenseTransactionRef, expenseData);
+
+            if (cdEnabled && calculatedCdAmount > 0) {
+                const incomeTransactionRef = doc(collection(db, 'incomes'));
+                 const incomeData: Partial<Income> = {
+                    id: incomeTransactionRef.id,
+                    date: new Date().toISOString().split('T')[0],
+                    transactionType: 'Income',
+                    category: 'Cash Discount Received',
+                    subCategory: 'Supplier CD',
+                    amount: calculatedCdAmount,
+                    payee: supplierDetails.name,
+                    description: `CD received on payment ${paymentId}`,
+                    paymentMethod: 'Other',
+                    status: 'Paid',
+                    isRecurring: false,
+                };
+                transaction.set(incomeTransactionRef, incomeData);
+            }
 
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: paymentId,
@@ -538,7 +556,7 @@ export default function SupplierPaymentsClient() {
                 supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
                 bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
                 rtgsFor: rtgsFor,
-                expenseTransactionId: newTransactionRef.id,
+                expenseTransactionId: expenseTransactionRef.id,
             };
             
             if (paymentMethod === 'RTGS') {
@@ -645,7 +663,7 @@ export default function SupplierPaymentsClient() {
                             const currentSupplier = customerDoc.data() as Customer;
                             const amountToRestore = detail.amount;
                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                            transaction.update(doc(db, "suppliers", customerDoc.id), { netAmount: Math.round(newNetAmount) });
+                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
                         }
                     }
                 }

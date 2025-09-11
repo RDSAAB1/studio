@@ -330,6 +330,7 @@ export default function CustomerEntryClient() {
     const formValues = form.getValues();
     
     const dataToSave: Omit<Customer, 'id'> = {
+        ...currentCustomer,
         srNo: formValues.srNo,
         date: formValues.date.toISOString().split('T')[0],
         term: '0', 
@@ -343,7 +344,6 @@ export default function CustomerEntryClient() {
         variety: toTitleCase(formValues.variety),
         paymentType: formValues.paymentType,
         customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
-        
         grossWeight: formValues.grossWeight,
         teirWeight: formValues.teirWeight,
         rate: formValues.rate,
@@ -352,32 +352,11 @@ export default function CustomerEntryClient() {
         bagRate: formValues.bagRate,
         kanta: formValues.kanta,
         isBrokerageIncluded: formValues.isBrokerageIncluded,
-
         shippingName: toTitleCase(formValues.shippingName || ''),
         shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
-        
-        weight: currentCustomer.weight,
-        netWeight: currentCustomer.netWeight,
-        amount: currentCustomer.amount,
-        bagAmount: currentCustomer.bagAmount,
-        cd: currentCustomer.cd,
-        cdRate: currentCustomer.cdRate,
-        brokerage: currentCustomer.brokerage,
-        brokerageRate: currentCustomer.brokerageRate,
-        originalNetAmount: currentCustomer.originalNetAmount,
-        netAmount: currentCustomer.netAmount,
-
-        so: '',
-        kartaPercentage: 0,
-        kartaWeight: 0,
-        kartaAmount: 0,
-        labouryRate: 0,
-        labouryAmount: 0,
-        barcode: '',
-        receiptType: 'Cash',
     };
     
     try {
