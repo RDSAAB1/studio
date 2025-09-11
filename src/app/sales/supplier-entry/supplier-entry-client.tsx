@@ -53,7 +53,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
   return {
     id: "", srNo: 'S----', date: today.toISOString().split('T')[0], term: '20', dueDate: today.toISOString().split('T')[0], 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
-    weight: 0, kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
+    weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
   };
@@ -310,14 +310,25 @@ export default function SupplierEntryClient() {
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
-      ...currentSupplier,
-      ...values,
-      id: values.srNo, // Use srNo as ID
-      date: values.date.toISOString().split("T")[0],
-      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
-      term: String(values.term),
-      name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-      customerId: `${''}${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        ...values,
+        id: values.srNo, // Use srNo as ID
+        date: values.date.toISOString().split("T")[0],
+        dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
+        term: String(values.term),
+        name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        // Calculated values from state
+        weight: currentSupplier.weight,
+        kartaWeight: currentSupplier.kartaWeight,
+        kartaAmount: currentSupplier.kartaAmount,
+        netWeight: currentSupplier.netWeight,
+        labouryAmount: currentSupplier.labouryAmount,
+        amount: currentSupplier.amount,
+        netAmount: currentSupplier.netAmount,
+        originalNetAmount: currentSupplier.originalNetAmount,
+        // Default/empty values
+        barcode: '',
+        receiptType: 'Cash',
     };
 
     try {
@@ -517,20 +528,23 @@ export default function SupplierEntryClient() {
         reader.readAsBinaryString(file);
     };
   
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-      if (event.altKey) {
-          event.preventDefault();
+  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
+      if (event.ctrlKey) {
           switch (event.key.toLowerCase()) {
               case 's':
+                  event.preventDefault();
                   form.handleSubmit((values) => onSubmit(values))();
                   break;
               case 'p':
+                  event.preventDefault();
                   handleSaveAndPrint();
                   break;
               case 'n':
+                  event.preventDefault();
                   handleNew();
                   break;
               case 'd':
+                  event.preventDefault();
                   if (isEditing && currentSupplier.id) {
                       handleDelete(currentSupplier.id);
                   }
@@ -540,11 +554,11 @@ export default function SupplierEntryClient() {
   }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
 
   useEffect(() => {
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keydown', handleKeyboardShortcuts);
       return () => {
-          document.removeEventListener('keydown', handleKeyDown);
+          document.removeEventListener('keydown', handleKeyboardShortcuts);
       };
-  }, [handleKeyDown]);
+  }, [handleKeyboardShortcuts]);
 
 
   if (!isClient) {
@@ -570,6 +584,7 @@ export default function SupplierEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -639,3 +654,4 @@ export default function SupplierEntryClient() {
 }
 
     
+
