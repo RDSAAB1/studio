@@ -294,6 +294,8 @@ body {
     min-width: 0; /* Prevents content from overflowing container */
     margin-left: 80px; /* Collapsed sidebar width */
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 40;
 }
 
 .side_bar:hover ~ .main_container {
