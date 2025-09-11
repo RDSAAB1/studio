@@ -213,17 +213,33 @@ export default function SupplierEntryClient() {
     } catch {
         formDate = today;
     }
+    
+    // When editing, populate form directly from the saved state.
+    // This ensures all fields, including calculated ones, are exactly as saved.
     const formValues: FormValues = {
-      srNo: customerState.srNo, date: formDate, term: Number(customerState.term) || 20,
-      name: customerState.name, so: customerState.so, address: customerState.address,
-      contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
-      grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
-      labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
-      paymentType: customerState.paymentType || 'Full',
+        srNo: customerState.srNo,
+        date: formDate,
+        term: Number(customerState.term) || 20,
+        name: customerState.name,
+        so: customerState.so,
+        address: customerState.address,
+        contact: customerState.contact,
+        vehicleNo: customerState.vehicleNo,
+        variety: customerState.variety,
+        grossWeight: customerState.grossWeight || 0,
+        teirWeight: customerState.teirWeight || 0,
+        rate: customerState.rate || 0,
+        kartaPercentage: customerState.kartaPercentage || 0,
+        labouryRate: customerState.labouryRate || 0,
+        kanta: customerState.kanta || 0,
+        paymentType: customerState.paymentType || 'Full',
     };
+
     setCurrentSupplier(customerState);
     form.reset(formValues);
+
+    // After setting the form, re-run calculations to update the summary view.
+    // Note: This won't change the form inputs, just the displayed `currentSupplier` state.
     performCalculations(formValues);
   }, [form, performCalculations]);
 
@@ -298,10 +314,11 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    // This is the fully calculated and correct state
+    // This is the fully calculated and correct state from `currentSupplier`
     const completeEntry: Customer = {
       ...currentSupplier,
-      id: values.srNo, // Use srNo as ID
+      id: values.srNo, // Use srNo as ID from the form
+      // Overwrite with form values where necessary to ensure they are the source of truth
       srNo: values.srNo,
       date: values.date.toISOString().split("T")[0],
       term: String(values.term),
@@ -313,6 +330,13 @@ export default function SupplierEntryClient() {
       variety: toTitleCase(values.variety),
       paymentType: values.paymentType,
       customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+      // Also ensure form values for direct inputs are taken
+      grossWeight: values.grossWeight,
+      teirWeight: values.teirWeight,
+      rate: values.rate,
+      kartaPercentage: values.kartaPercentage,
+      labouryRate: values.labouryRate,
+      kanta: values.kanta,
     };
 
     try {
@@ -461,15 +485,16 @@ export default function SupplierEntryClient() {
         reader.onload = async (e) => {
             try {
                 const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
+                const workbook = XLSX.read(data, { type: 'binary', cellNF: true, cellText: false });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
                 
                 let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
                 for (const item of json) {
-                    const supplierData: Partial<Customer> = {
+                     const supplierData: Customer = {
+                        id: item['SR NO.'] || formatSrNo(nextSrNum++),
                         srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
                         date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         term: String(item['TERM'] || '20'),
@@ -485,6 +510,7 @@ export default function SupplierEntryClient() {
                         weight: parseFloat(item['FINAL WT']) || 0,
                         kartaPercentage: parseFloat(item['KARTA %']) || 0,
                         kartaWeight: parseFloat(item['KARTA WT']) || 0,
+                        kartaAmount: parseFloat(item['KARTA AMT']) || 0,
                         netWeight: parseFloat(item['NET WT']) || 0,
                         rate: parseFloat(item['RATE']) || 0,
                         labouryRate: parseFloat(item['LABOURY RATE']) || 0,
@@ -492,16 +518,14 @@ export default function SupplierEntryClient() {
                         kanta: parseFloat(item['KANTA']) || 0,
                         amount: parseFloat(item['AMOUNT']) || 0,
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
-                        netAmount: parseFloat(item['NET AMOUNT']) || 0, // Assume outstanding is same as net on fresh import
+                        netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+                        barcode: '',
+                        receiptType: 'Cash',
                     };
-                    const completeData = {
-                        ...supplierData,
-                        customerId: `${toTitleCase(supplierData.name || '').toLowerCase()}|${String(supplierData.contact || '').toLowerCase()}`,
-                        id: supplierData.srNo,
-                    } as Customer;
 
-                    await addSupplier(completeData);
+                    await addSupplier(supplierData);
                 }
                 toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
             } catch (error) {
@@ -557,7 +581,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -633,5 +657,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
