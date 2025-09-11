@@ -522,7 +522,7 @@ export default function SupplierProfilePage() {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]">
                         <Command>
                         <CommandInput placeholder="Search supplier..." />
                         <CommandList>
@@ -588,3 +588,5 @@ export default function SupplierProfilePage() {
     </div>
   );
 }
+
+    
