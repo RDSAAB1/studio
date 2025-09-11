@@ -217,7 +217,7 @@ export default function SupplierEntryClient() {
     const formValues: FormValues = {
         srNo: customerState.srNo,
         date: formDate,
-        term: Number(customerState.term) || 20,
+        term: Number(customerState.term) || 0,
         name: customerState.name,
         so: customerState.so,
         address: customerState.address,
@@ -227,9 +227,9 @@ export default function SupplierEntryClient() {
         grossWeight: customerState.grossWeight || 0,
         teirWeight: customerState.teirWeight || 0,
         rate: customerState.rate || 0,
-        kartaPercentage: customerState.kartaPercentage || 1,
-        labouryRate: customerState.labouryRate || 2,
-        kanta: customerState.kanta || 50,
+        kartaPercentage: customerState.kartaPercentage,
+        labouryRate: customerState.labouryRate,
+        kanta: customerState.kanta,
         paymentType: customerState.paymentType || 'Full',
     };
 
@@ -311,24 +311,13 @@ export default function SupplierEntryClient() {
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
       ...currentSupplier,
+      ...values,
       id: values.srNo, // Use srNo as ID
-      srNo: values.srNo,
       date: values.date.toISOString().split("T")[0],
+      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
       term: String(values.term),
-      name: toTitleCase(values.name), 
-      so: toTitleCase(values.so), 
-      address: toTitleCase(values.address), 
-      contact: values.contact,
-      vehicleNo: toTitleCase(values.vehicleNo), 
-      variety: toTitleCase(values.variety),
-      paymentType: values.paymentType,
-      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-      grossWeight: values.grossWeight,
-      teirWeight: values.teirWeight,
-      rate: values.rate,
-      kartaPercentage: values.kartaPercentage,
-      labouryRate: values.labouryRate,
-      kanta: values.kanta,
+      name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
+      customerId: `${''}${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
     try {
@@ -581,7 +570,6 @@ export default function SupplierEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
-                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -649,3 +637,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    
