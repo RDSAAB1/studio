@@ -17,7 +17,7 @@ import { Label } from "../ui/label";
 interface CalculatedSummaryProps {
     customer: Customer;
     onSave: () => void;
-    onSaveAndPrint: (docType: 'tax-invoice' | 'bill-of-supply' | 'challan') => void;
+    onSaveAndPrint?: (docType: 'tax-invoice' | 'bill-of-supply' | 'challan') => void;
     onNew: () => void;
     isEditing: boolean;
     onSearch?: (term: string) => void;
@@ -114,15 +114,15 @@ export const CalculatedSummary = ({
                             </div>
                         )}
 
-                        {onPrint && (
+                        {onPrint && !onSaveAndPrint && (
                              <Button
                                 onClick={onPrint}
-                                size="icon"
-                                variant={isPrintActionForSelected ? "default" : "outline"}
-                                className="h-8 w-8 rounded-full"
+                                size="sm"
+                                className="h-8 rounded-md"
                                 disabled={isLoading}
                             >
-                                <Printer className="h-4 w-4" />
+                                <Printer className="mr-2 h-4 w-4" /> 
+                                {isPrintActionForSelected ? `Print (${selectedIdsCount})` : 'Print'}
                             </Button>
                         )}
                         

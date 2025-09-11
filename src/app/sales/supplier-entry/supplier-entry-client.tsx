@@ -310,6 +310,7 @@ export default function SupplierEntryClient() {
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
+        ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
         date: values.date.toISOString().split("T")[0],
@@ -317,18 +318,6 @@ export default function SupplierEntryClient() {
         term: String(values.term),
         name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
         customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-        // Calculated values from state
-        weight: currentSupplier.weight,
-        kartaWeight: currentSupplier.kartaWeight,
-        kartaAmount: currentSupplier.kartaAmount,
-        netWeight: currentSupplier.netWeight,
-        labouryAmount: currentSupplier.labouryAmount,
-        amount: currentSupplier.amount,
-        netAmount: currentSupplier.netAmount,
-        originalNetAmount: currentSupplier.originalNetAmount,
-        // Default/empty values
-        barcode: '',
-        receiptType: 'Cash',
     };
 
     try {
@@ -576,7 +565,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -594,7 +583,6 @@ export default function SupplierEntryClient() {
             <CalculatedSummary 
                 customer={currentSupplier}
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
-                onSaveAndPrint={handleSaveAndPrint}
                 onNew={handleNew}
                 isEditing={isEditing}
                 onSearch={setSearchTerm}
@@ -652,6 +640,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
-
