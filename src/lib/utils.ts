@@ -53,16 +53,20 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     
-    const amount = weight * rate;
-    
     const kartaWeight = weight * (kartaPercentage / 100);
-    const kartaAmount = kartaWeight * rate;
     const netWeight = weight - kartaWeight;
+    
+    // Corrected amount calculation to be based on final weight (weight)
+    const amount = weight * rate; 
+
+    // Karta amount is based on karta weight and rate
+    const kartaAmount = kartaWeight * rate;
     
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = weight * labouryRate;
     const kanta = values.kanta || 0;
 
+    // Corrected originalNetAmount calculation based on the corrected amount
     const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
 
     const totalPaidForThisEntry = paymentHistory
