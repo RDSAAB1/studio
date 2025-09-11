@@ -192,8 +192,8 @@ export default function SupplierEntryClient() {
   }
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const calculatedState = calculateSupplierEntry(data, paymentHistory);
-    setCurrentSupplier(prev => ({...prev, ...calculatedState}));
+      const calculatedState = calculateSupplierEntry(data, paymentHistory);
+      setCurrentSupplier(prev => ({...prev, ...calculatedState}));
   }, [paymentHistory]);
   
   useEffect(() => {
@@ -295,14 +295,10 @@ export default function SupplierEntryClient() {
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
-      ...currentSupplier,
-      ...values,
+      ...calculateSupplierEntry(values, paymentHistory),
       id: values.srNo,
-      date: values.date.toISOString().split("T")[0],
-      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
-      term: String(values.term),
       name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-      customerId: `${''}${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
     try {
@@ -408,13 +404,34 @@ export default function SupplierEntryClient() {
   };
 
   const handleExport = () => {
-      const dataToExport = suppliers.map(c => ({
-          srNo: c.srNo, date: c.date, term: c.term, name: c.name, so: c.so,
-          address: c.address, contact: c.contact, vehicleNo: c.vehicleNo, variety: c.variety,
-          grossWeight: c.grossWeight, teirWeight: c.teirWeight, rate: c.rate,
-          kartaPercentage: c.kartaPercentage, labouryRate: c.labouryRate, kanta: c.kanta,
-          paymentType: c.paymentType,
-      }));
+      const dataToExport = suppliers.map(c => {
+          const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
+          return {
+            'SR NO.': c.srNo,
+            'DATE': c.date,
+            'TERM': c.term,
+            'DUE DATE': calculated.dueDate,
+            'NAME': c.name,
+            'S/O': c.so,
+            'ADDRESS': c.address,
+            'CONTACT': c.contact,
+            'VEHICLE': c.vehicleNo,
+            'VARIETY': c.variety,
+            'GROSS': c.grossWeight,
+            'TEIR': c.teirWeight,
+            'TOTAL': calculated.weight,
+            'KARTA %': c.kartaPercentage,
+            'KARTA WT': calculated.kartaWeight,
+            'NET WT': calculated.netWeight,
+            'RATE': c.rate,
+            'LABOURY RATE': c.labouryRate,
+            'LABOURY AMT': calculated.labouryAmount,
+            'KANTA': c.kanta,
+            'AMOUNT': calculated.amount,
+            'NET AMT': calculated.originalNetAmount,
+            'PAYMENT TYPE': c.paymentType,
+          }
+      });
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
@@ -438,25 +455,26 @@ export default function SupplierEntryClient() {
               let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
               for (const item of json) {
-                  const supplierData: Partial<Customer> = {
-                      srNo: item.srNo || formatSrNo(nextSrNum++),
-                      date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                      term: String(item.term || '20'),
-                      name: toTitleCase(item.name), so: toTitleCase(item.so || ''),
-                      address: toTitleCase(item.address || ''),
-                      contact: String(item.contact || ''),
-                      vehicleNo: toTitleCase(item.vehicleNo || ''),
-                      variety: toTitleCase(item.variety || ''),
-                      grossWeight: Number(item.grossWeight) || 0,
-                      teirWeight: Number(item.teirWeight) || 0,
-                      rate: Number(item.rate) || 0,
-                      kartaPercentage: Number(item.kartaPercentage) || 0,
-                      labouryRate: Number(item.labouryRate) || 0,
-                      kanta: Number(item.kanta) || 0,
-                      paymentType: item.paymentType || 'Full',
+                  const supplierData: Partial<FormValues> = {
+                      srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
+                      date: item['DATE'] ? new Date(item['DATE']) : new Date(),
+                      term: item['TERM'] || 20,
+                      name: toTitleCase(item['NAME']),
+                      so: toTitleCase(item['S/O'] || ''),
+                      address: toTitleCase(item['ADDRESS'] || ''),
+                      contact: String(item['CONTACT'] || ''),
+                      vehicleNo: toTitleCase(item['VEHICLE'] || ''),
+                      variety: toTitleCase(item['VARIETY'] || ''),
+                      grossWeight: Number(item['GROSS']) || 0,
+                      teirWeight: Number(item['TEIR']) || 0,
+                      rate: Number(item['RATE']) || 0,
+                      kartaPercentage: Number(item['KARTA %']) || 0,
+                      labouryRate: Number(item['LABOURY RATE']) || 0,
+                      kanta: Number(item['KANTA']) || 0,
+                      paymentType: item['PAYMENT TYPE'] || 'Full',
                   };
                   const calculated = calculateSupplierEntry(supplierData as FormValues, paymentHistory);
-                  await addSupplier({ ...supplierData, ...calculated } as Omit<Customer, 'id'>);
+                  await addSupplier({ ...calculated, id: calculated.srNo } as Customer);
               }
               toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
           } catch (error) {
