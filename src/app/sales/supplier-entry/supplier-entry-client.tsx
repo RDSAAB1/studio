@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -43,7 +44,7 @@ const formSchema = z.object({
     paymentType: z.string().min(1, "Payment type is required"),
 });
 
-export type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof formSchema>;
 
 const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
@@ -191,10 +192,9 @@ export default function SupplierEntryClient() {
   }
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const values = { ...form.getValues(), ...data };
-    const calculatedState = calculateSupplierEntry(values, paymentHistory);
+    const calculatedState = calculateSupplierEntry(data, paymentHistory);
     setCurrentSupplier(prev => ({...prev, ...calculatedState}));
-  }, [form, paymentHistory]);
+  }, [paymentHistory]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -406,6 +406,66 @@ export default function SupplierEntryClient() {
       }
     }
   };
+
+  const handleExport = () => {
+      const dataToExport = suppliers.map(c => ({
+          srNo: c.srNo, date: c.date, term: c.term, name: c.name, so: c.so,
+          address: c.address, contact: c.contact, vehicleNo: c.vehicleNo, variety: c.variety,
+          grossWeight: c.grossWeight, teirWeight: c.teirWeight, rate: c.rate,
+          kartaPercentage: c.kartaPercentage, labouryRate: c.labouryRate, kanta: c.kanta,
+          paymentType: c.paymentType,
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
+      XLSX.writeFile(workbook, "SupplierEntries.xlsx");
+      toast({title: "Exported", description: "Supplier data has been exported."});
+  }
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+          try {
+              const data = e.target?.result;
+              const workbook = XLSX.read(data, { type: 'binary' });
+              const sheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[sheetName];
+              const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+              
+              let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+
+              for (const item of json) {
+                  const supplierData: Partial<Customer> = {
+                      srNo: item.srNo || formatSrNo(nextSrNum++),
+                      date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                      term: String(item.term || '20'),
+                      name: toTitleCase(item.name), so: toTitleCase(item.so || ''),
+                      address: toTitleCase(item.address || ''),
+                      contact: String(item.contact || ''),
+                      vehicleNo: toTitleCase(item.vehicleNo || ''),
+                      variety: toTitleCase(item.variety || ''),
+                      grossWeight: Number(item.grossWeight) || 0,
+                      teirWeight: Number(item.teirWeight) || 0,
+                      rate: Number(item.rate) || 0,
+                      kartaPercentage: Number(item.kartaPercentage) || 0,
+                      labouryRate: Number(item.labouryRate) || 0,
+                      kanta: Number(item.kanta) || 0,
+                      paymentType: item.paymentType || 'Full',
+                  };
+                  const calculated = calculateSupplierEntry(supplierData as FormValues, paymentHistory);
+                  await addSupplier({ ...supplierData, ...calculated } as Omit<Customer, 'id'>);
+              }
+              toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
+          } catch (error) {
+              console.error("Import failed:", error);
+              toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
+          }
+      };
+      reader.readAsBinaryString(file);
+  };
   
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
       if (event.altKey) {
@@ -476,6 +536,8 @@ export default function SupplierEntryClient() {
                 onSearch={setSearchTerm}
                 onPrint={handlePrint}
                 selectedIdsCount={selectedSupplierIds.size}
+                onImport={handleImport}
+                onExport={handleExport}
             />
         </form>
       </FormProvider>      
