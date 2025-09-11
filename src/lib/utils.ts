@@ -53,7 +53,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     
-    const amount = weight * rate; // Corrected: amount is based on final weight
+    const amount = weight * rate;
     
     const kartaWeight = weight * (kartaPercentage / 100);
     const kartaAmount = kartaWeight * rate;
