@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
@@ -27,9 +26,14 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTa
   useEffect(() => {
     // Fetch company name from settings
     const fetchCompanyName = async () => {
-      const settings = await getRtgsSettings();
-      if (settings && settings.companyName) {
-        setCompanyName(settings.companyName);
+      try {
+        const settings = await getRtgsSettings();
+        if (settings && settings.companyName) {
+          setCompanyName(settings.companyName);
+        }
+      } catch (error) {
+        console.error("Could not fetch company settings (likely offline):", error);
+        // It's okay to fail, we'll just use the default name.
       }
     };
     fetchCompanyName();
