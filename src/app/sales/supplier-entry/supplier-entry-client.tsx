@@ -295,10 +295,26 @@ export default function SupplierEntryClient() {
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
-      ...calculateSupplierEntry(values, paymentHistory),
-      id: values.srNo,
-      name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        ...currentSupplier,
+        id: values.srNo,
+        srNo: values.srNo,
+        date: values.date.toISOString().split("T")[0],
+        term: String(values.term),
+        dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
+        name: toTitleCase(values.name),
+        so: toTitleCase(values.so),
+        address: toTitleCase(values.address),
+        contact: values.contact,
+        vehicleNo: toTitleCase(values.vehicleNo),
+        variety: toTitleCase(values.variety),
+        grossWeight: values.grossWeight,
+        teirWeight: values.teirWeight,
+        rate: values.rate,
+        kartaPercentage: values.kartaPercentage,
+        labouryRate: values.labouryRate,
+        kanta: values.kanta,
+        paymentType: values.paymentType,
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
     try {
@@ -455,7 +471,7 @@ export default function SupplierEntryClient() {
               let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
               for (const item of json) {
-                  const supplierData = {
+                  const supplierData: Partial<Customer> = {
                       srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
                       date: item['DATE'] || new Date().toISOString().split('T')[0],
                       term: String(item['TERM'] || '20'),
@@ -538,7 +554,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
