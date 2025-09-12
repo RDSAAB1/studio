@@ -1,11 +1,9 @@
 
 "use client";
 
-import { useState } from "react";
-import type { Customer, Payment } from "@/lib/definitions";
-import { format } from "date-fns";
+import { useState } from 'react';
+import { format } from 'date-fns';
 import { cn, toTitleCase, formatCurrency } from "@/lib/utils";
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -20,9 +18,9 @@ type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 interface DetailsDialogProps {
     isOpen?: boolean;
     onOpenChange: (isOpen: boolean) => void;
-    customer: Customer | null;
-    paymentHistory?: Payment[];
-    onPrint?: (customer: Customer) => void;
+    customer: any;
+    paymentHistory?: any[];
+    onPrint?: (customer: any) => void;
 }
 
 const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode, label: string, value: any, className?: string }) => (
@@ -55,16 +53,11 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                 <Printer className="h-4 w-4" />
                             </Button>
                         )}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent><DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}><DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem><DropdownMenuRadioItem value="compact"><LayoutList className="mr-2 h-4 w-4" />Compact</DropdownMenuRadioItem><DropdownMenuRadioItem value="grid"><LayoutGrid className="mr-2 h-4 w-4" />Grid</DropdownMenuRadioItem><DropdownMenuRadioItem value="step-by-step"><StepForward className="mr-2 h-4 w-4" />Step-by-Step</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuContent>
-                        </DropdownMenu>
                         <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button></DialogClose>
                     </div>
                 </DialogHeader>
                 <ScrollArea className="flex-grow">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
-                        {activeLayout === 'classic' && (
                         <div className="space-y-4">
                             <Card>
                                 <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
@@ -111,7 +104,6 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                 </CardContent>
                             </Card>  
                         </div>
-                        )}
                     </div>
                 </ScrollArea>
             </DialogContent>
