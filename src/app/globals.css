@@ -120,13 +120,13 @@ body {
     flex-shrink: 0;
 }
 
-/* Hide text when not active */
-.wrapper:not(.active) .side_bar .logo_wrap span.text,
-.side_bar:not(:hover) .logo_wrap span.text {
+/* Hide text when collapsed */
+.wrapper:not(.active) .side_bar:not(:hover) .logo_wrap .text,
+.side_bar:not(:hover) .logo_wrap .text {
   display: none;
 }
-.wrapper.active .side_bar .logo_wrap span.text,
-.side_bar:hover .logo_wrap span.text {
+.wrapper.active .side_bar .logo_wrap .text,
+.side_bar:hover .logo_wrap .text {
   display: inline;
 }
 
@@ -151,6 +151,7 @@ body {
     margin-bottom: 5px;	
     transition: color 0.2s ease, background-color 0.2s ease;			
     position: relative;
+    border-left: 4px solid transparent;
 }
 
 .side_bar_bottom ul li button:hover,
@@ -179,74 +180,25 @@ body {
 }
 
 /* Hide text when collapsed */
-.wrapper:not(.active):not(:hover) .side_bar .side_bar_bottom .item {
+.wrapper:not(.active) .side_bar:not(:hover) .item {
   display: none;
 }
-.wrapper.active .side_bar .side_bar_bottom .item,
-.side_bar:hover .side_bar_bottom .item {
+.wrapper.active .side_bar .item,
+.side_bar:hover .item {
   display: inline;
 }
 
 
 .side_bar_bottom ul li.active button {
-    background: hsl(var(--background));
+    background: hsl(var(--accent));
     color: hsl(var(--primary));
     font-weight: 600;
-    border-top-left-radius: 25px;
-    border-bottom-left-radius: 25px;
+    border-left-color: hsl(var(--primary));
 }
 .side_bar_bottom ul li.active button .icon {
   color: hsl(var(--primary));
 }
 
-
-.side_bar_bottom ul li.active .top_curve,
-.side_bar_bottom ul li.active .bottom_curve{
-    position: absolute;
-    left: 0;
-    width: 100%;
-    height: 20px;
-    background: hsl(var(--background));
-}
-
-.wrapper.active .side_bar_bottom ul li.active .top_curve,
-.wrapper.active .side_bar_bottom ul li.active .bottom_curve {
-    /* Only show curves when expanded */
-}
-
-/* Hide curves when collapsed */
-.wrapper:not(.active):not(:hover) .side_bar .side_bar_bottom ul li.active .top_curve,
-.wrapper:not(.active):not(:hover) .side_bar .side_bar_bottom ul li.active .bottom_curve {
-    display: none;
-}
-
-
-.side_bar_bottom ul li.active .top_curve{
-    top: -20px;
-}
-
-.side_bar_bottom ul li.active .bottom_curve{
-    bottom: -20px;	
-}
-
-.side_bar_bottom ul li.active .top_curve:before,
-.side_bar_bottom ul li.active .bottom_curve:before{
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: hsl(var(--card));
-}
-
-.side_bar_bottom ul li.active .top_curve:before{
-    border-bottom-right-radius: 25px;
-}
-
-.side_bar_bottom ul li.active .bottom_curve:before{
-    border-top-right-radius: 25px;
-}
 
 .shadow{
     display: none;
