@@ -33,8 +33,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
-import { bankNames, bankBranches as staticBankBranches } from '@/lib/data';
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { bankNames } from '@/lib/data';
 
 
 // Schemas
@@ -411,7 +411,7 @@ export default function SettingsPage() {
                                                                 </Card>
                                                                 
                                                                 <Card>
-                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create &amp; Copy Password</CardTitle></CardHeader>
+                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create & Copy Password</CardTitle></CardHeader>
                                                                     <CardContent className="p-4 pt-0 space-y-2 text-xs">
                                                                         <p className="font-bold">Follow these steps carefully on the Google page:</p>
                                                                         <ul className="list-decimal pl-5 space-y-1">
@@ -563,10 +563,10 @@ export default function SettingsPage() {
                             <Input id="accountHolderName" name="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={handleBankAccountInputChange} />
                         </div>
                         <div className="space-y-1"><Label className="text-xs">Bank</Label>
-                            <DynamicCombobox
+                            <CustomDropdown
                                 options={allBankOptions}
-                                value={currentBankAccount.bankName}
-                                onChange={(value) => setCurrentBankAccount(prev => ({...prev, bankName: value, branchName: '', ifscCode: ''}))}
+                                value={currentBankAccount.bankName || null}
+                                onChange={(value) => setCurrentBankAccount(prev => ({...prev, bankName: value || '', branchName: '', ifscCode: ''}))}
                                 placeholder="Select a bank"
                             />
                         </div>
@@ -580,7 +580,7 @@ export default function SettingsPage() {
                         </div>
                         <div className="space-y-1">
                            <Label htmlFor="accountType">Account Type</Label>
-                            <DynamicCombobox
+                            <CustomDropdown
                                 options={[
                                     { value: 'Savings', label: 'Savings' },
                                     { value: 'Current', label: 'Current' },
@@ -588,7 +588,7 @@ export default function SettingsPage() {
                                     { value: 'Limit', label: 'Limit Account' },
                                     { value: 'Other', label: 'Other' },
                                 ]}
-                                value={currentBankAccount.accountType}
+                                value={currentBankAccount.accountType || null}
                                 onChange={(value) => setCurrentBankAccount(prev => ({ ...prev, accountType: value as BankAccount['accountType'] }))}
                                 placeholder="Select account type"
                             />

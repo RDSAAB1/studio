@@ -11,13 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths, differenceInMonths, parseISO } from "date-fns";
@@ -108,8 +108,8 @@ export default function CashBankClient() {
         defaultValues: { 
             amount: 0, 
             description: "",
-            source: "",
-            destination: ""
+            source: null,
+            destination: null
         } 
     });
     
@@ -201,7 +201,7 @@ export default function CashBankClient() {
             amount: transactionAmount, 
             description: values.description 
         })
-          .then(() => transferForm.reset({ amount: 0, description: "", source: "", destination: "" }));
+          .then(() => transferForm.reset({ amount: 0, description: "", source: null, destination: null }));
     };
 
 
@@ -381,21 +381,13 @@ export default function CashBankClient() {
                                    <div className="space-y-1">
                                         <Label>From</Label>
                                         <Controller name="source" control={transferForm.control} render={({ field }) => (
-                                           <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Select Source" /></SelectTrigger>
-                                             <SelectContent>
-                                                {formSourcesAndDestinations.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                                             </SelectContent>
-                                           </Select>
+                                           <CustomDropdown options={formSourcesAndDestinations} value={field.value} onChange={field.onChange} placeholder="Select Source" />
                                         )} />
                                    </div>
                                     <div className="space-y-1">
                                         <Label>To</Label>
                                         <Controller name="destination" control={transferForm.control} render={({ field }) => (
-                                           <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Select Destination" /></SelectTrigger>
-                                             <SelectContent>
-                                                {formSourcesAndDestinations.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                                             </SelectContent>
-                                           </Select>
+                                           <CustomDropdown options={formSourcesAndDestinations} value={field.value} onChange={field.onChange} placeholder="Select Destination" />
                                         )} />
                                    </div>
                                    <div className="space-y-1">
@@ -523,15 +515,7 @@ export default function CashBankClient() {
                         <div className="grid gap-4 py-4 pr-1">
                              <div className="space-y-1">
                                 <Label>Type</Label>
-                                <Select name="loanType" value={currentLoan?.loanType || 'Product'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital'}))}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="OwnerCapital">Owner's Capital</SelectItem>
-                                    <SelectItem value="Product">Product Loan</SelectItem>
-                                    <SelectItem value="Bank">Bank Loan</SelectItem>
-                                    <SelectItem value="Outsider">Outsider Loan</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <CustomDropdown options={[{value: 'OwnerCapital', label: "Owner's Capital"}, {value: 'Product', label: 'Product Loan'}, {value: 'Bank', label: 'Bank Loan'}, {value: 'Outsider', label: 'Outsider Loan'}]} value={currentLoan?.loanType || 'Product'} onChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital'}))} />
                             </div>
 
                             {currentLoan.loanType === 'OwnerCapital' && (<div className="space-y-4">
@@ -556,15 +540,7 @@ export default function CashBankClient() {
                             
                             {currentLoan.loanType === 'Bank' && (<div className="space-y-4">
                                <div className="space-y-1"><Label>Bank Loan Type</Label>
-                                <Select name="bankLoanType" value={currentLoan?.bankLoanType || 'Fixed'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, bankLoanType: value as 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit'}))}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Fixed">Fixed Loan</SelectItem>
-                                    <SelectItem value="Limit">Limit Loan</SelectItem>
-                                    <SelectItem value="Overdraft">Overdraft Loan</SelectItem>
-                                    <SelectItem value="CashCredit">Cash Credit</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <CustomDropdown options={[{value: 'Fixed', label: 'Fixed Loan'}, {value: 'Limit', label: 'Limit Loan'}, {value: 'Overdraft', label: 'Overdraft Loan'}, {value: 'CashCredit', label: 'Cash Credit'}]} value={currentLoan?.bankLoanType || 'Fixed'} onChange={(value) => setCurrentLoan(prev => ({...prev, bankLoanType: value as 'Fixed' | 'Limit' | 'Overdraft' | 'CashCredit'}))} />
                                </div>
                                <div className="space-y-1"><Label htmlFor="lenderName">Bank Name</Label><Input id="lenderName" name="lenderName" value={currentLoan?.lenderName || ''} onChange={handleLoanInputChange}/></div>
                                <div className="space-y-1"><Label htmlFor="totalAmount">Limit Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
@@ -577,12 +553,7 @@ export default function CashBankClient() {
                             </div>
                              <div className="space-y-1">
                                 <Label>Deposit To</Label>
-                                <Select name="depositTo" value={currentLoan?.depositTo || 'CashInHand'} onValueChange={(value) => setCurrentLoan(prev => ({...prev, depositTo: value as any}))}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    {formSourcesAndDestinations.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
+                                <CustomDropdown options={formSourcesAndDestinations} value={currentLoan?.depositTo || 'CashInHand'} onChange={(value) => setCurrentLoan(prev => ({...prev, depositTo: value as any}))} />
                             </div>
                         </div>
                     </ScrollArea>
@@ -636,6 +607,7 @@ export default function CashBankClient() {
     
 
     
+
 
 
 

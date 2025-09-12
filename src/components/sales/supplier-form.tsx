@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState } from "react";
@@ -8,17 +7,17 @@ import { format } from "date-fns";
 import { cn, toTitleCase } from "@/lib/utils";
 import type { Customer, OptionItem } from "@/lib/definitions";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { OptionsManagerDialog } from "./options-manager-dialog";
-import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Scale, Weight, Calculator, Milestone, UserSquare, Wallet, Hourglass, Settings, InfoIcon, PlusCircle } from "lucide-react";
+import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Hourglass, Settings, Hash, Percent, Weight } from "lucide-react";
 import { Separator } from "../ui/separator";
+import { CustomDropdown } from "../ui/custom-dropdown";
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
     <div className="relative">
@@ -186,13 +185,13 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <div className="space-y-1">
                                 <Label className="text-xs">Payment Type</Label>
                                 <Controller name="paymentType" control={form.control} render={({ field }) => (
-                                    <DynamicCombobox options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} onAdd={(newVal) => handleAddOption('paymentTypes', {name: newVal})} placeholder="Select type..." searchPlaceholder="Search..." emptyPlaceholder="No type found." onIconClick={() => openManagementDialog('paymentType')}/>
+                                    <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} onAdd={(newVal) => handleAddOption('paymentTypes', {name: newVal})} placeholder="Select type..." />
                                 )} />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs">Variety</Label>
                                 <Controller name="variety" control={form.control} render={({ field }) => (
-                                    <DynamicCombobox options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', {name: newVal})} placeholder="Select variety..." searchPlaceholder="Search..." emptyPlaceholder="No variety found." onIconClick={() => openManagementDialog('variety')}/>
+                                    <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', {name: newVal})} placeholder="Select variety..." />
                                 )} />
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
 import { bankNames } from '@/lib/data';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DynamicCombobox } from '@/components/ui/dynamic-combobox';
+import { CustomDropdown } from '@/components/ui/custom-dropdown';
 
 export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onAddBranch }: any) => {
     const [newBankName, setNewBankName] = useState('');
@@ -51,10 +51,10 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                             <CardContent className="space-y-4">
                                 <div className="space-y-1">
                                     <Label>Select Bank</Label>
-                                    <DynamicCombobox
+                                    <CustomDropdown
                                         options={allBankOptions}
                                         value={newBranchData.bankName}
-                                        onChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}
+                                        onChange={(value) => setNewBranchData(prev => ({...prev, bankName: value || ''}))}
                                         placeholder="Select a bank"
                                         searchPlaceholder="Search banks..."
                                     />

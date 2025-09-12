@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +21,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
 import { Switch } from "@/components/ui/switch";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
@@ -622,15 +622,7 @@ export default function IncomeExpenseClient() {
                             <Controller name="expenseNature" control={control} render={({ field }) => (
                               <div className="space-y-1">
                                 <Label className="text-xs">Expense Nature</Label>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="h-9 text-sm">
-                                        <div className="flex items-center gap-2"><Layers3 className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Nature" /></div>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Permanent">Permanent</SelectItem>
-                                        <SelectItem value="Seasonal">Seasonal</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <CustomDropdown options={[{value: "Permanent", label: "Permanent"}, {value: "Seasonal", label: "Seasonal"}]} value={field.value} onChange={field.onChange} placeholder="Select Nature" />
                               </div>
                             )} />
                         )}
@@ -638,14 +630,7 @@ export default function IncomeExpenseClient() {
                         <Controller name="category" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Category</Label>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={availableCategories.length === 0}>
-                                <SelectTrigger className="h-9 text-sm">
-                                    <div className="flex items-center gap-2"><Tag className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Category" /></div>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availableCategories.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            <CustomDropdown options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} value={field.value} onChange={field.onChange} placeholder="Select Category" />
                             {errors.category && <p className="text-xs text-destructive mt-1">{errors.category.message}</p>}
                           </div>
                         )} />
@@ -653,14 +638,7 @@ export default function IncomeExpenseClient() {
                         <Controller name="subCategory" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Sub-Category</Label>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCategory}>
-                                <SelectTrigger className="h-9 text-sm">
-                                    <div className="flex items-center gap-2"><FolderTree className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Sub-Category" /></div>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availableSubCategories.map(subCat => <SelectItem key={subCat} value={subCat}>{subCat}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            <CustomDropdown options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} value={field.value} onChange={field.onChange} placeholder="Select Sub-Category" />
                             {errors.subCategory && <p className="text-xs text-destructive mt-1">{errors.subCategory.message}</p>}
                           </div>
                         )} />
@@ -685,15 +663,7 @@ export default function IncomeExpenseClient() {
                       <Controller name="paymentMethod" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Payment Method</Label>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Cash">Cash</SelectItem>
-                                    <SelectItem value="Online">Online</SelectItem>
-                                    <SelectItem value="Cheque">Cheque</SelectItem>
-                                     <SelectItem value="RTGS">RTGS</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <CustomDropdown options={[{value: "Cash", label: "Cash"}, {value: "Online", label: "Online"}, {value: "Cheque", label: "Cheque"}, {value: "RTGS", label: "RTGS"}]} value={field.value} onChange={field.onChange} placeholder="Select" />
                           </div>
                       )} />
                       
@@ -701,12 +671,7 @@ export default function IncomeExpenseClient() {
                            <Controller name="bankAccountId" control={control} render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Bank Account</Label>
-                                    <Select onValueChange={field.onChange} value={field.value} disabled={bankAccounts.length === 0}>
-                                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Bank" /></SelectTrigger>
-                                        <SelectContent>
-                                            {bankAccounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.accountHolderName}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
+                                    <CustomDropdown options={bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }))} value={field.value} onChange={field.onChange} placeholder="Select Bank" />
                                 </div>
                            )} />
                       )}
@@ -716,15 +681,7 @@ export default function IncomeExpenseClient() {
                              <Controller name="projectId" control={control} render={({ field }) => (
                                 <div className="space-y-1">
                                     <Label className="text-xs">Project</Label>
-                                    <Select onValueChange={field.onChange} value={field.value || 'none'}>
-                                        <SelectTrigger className="h-9 text-sm">
-                                            <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Select Project (Optional)" /></div>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">None</SelectItem>
-                                            {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
+                                    <CustomDropdown options={[{value: "none", label: "None"}, ...projects.map(p => ({ value: p.id, label: p.name }))]} value={field.value || 'none'} onChange={field.onChange} placeholder="Select Project (Optional)" />
                                 </div>
                              )} />
                             </>
@@ -758,15 +715,7 @@ export default function IncomeExpenseClient() {
                                 <Controller name="recurringFrequency" control={control} render={({ field }) => (
                                     <div className="space-y-1">
                                         <Label className="text-xs">Frequency</Label>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="daily">Daily</SelectItem>
-                                                <SelectItem value="weekly">Weekly</SelectItem>
-                                                <SelectItem value="monthly">Monthly</SelectItem>
-                                                <SelectItem value="yearly">Yearly</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <CustomDropdown options={[{value: 'daily', label: 'Daily'}, {value: 'weekly', label: 'Weekly'}, {value: 'monthly', label: 'Monthly'}, {value: 'yearly', label: 'Yearly'}]} value={field.value} onChange={field.onChange} />
                                     </div>
                                 )} />
                                 <Controller name="nextDueDate" control={control} render={({ field }) => (
@@ -798,14 +747,7 @@ export default function IncomeExpenseClient() {
                                 <Controller name="status" control={control} render={({ field }) => (
                                     <div className="space-y-1">
                                         <Label className="text-xs">Status</Label>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Paid">Paid</SelectItem>
-                                                <SelectItem value="Pending">Pending</SelectItem>
-                                                <SelectItem value="Cancelled">Cancelled</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <CustomDropdown options={[{value: "Paid", label: "Paid"}, {value: "Pending", label: "Pending"}, {value: "Cancelled", label: "Cancelled"}]} value={field.value} onChange={field.onChange} placeholder="Select" />
                                     </div>
                                 )} />
                                 <div className="space-y-1">

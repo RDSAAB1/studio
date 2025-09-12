@@ -20,7 +20,8 @@ import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Users, Calendar as CalendarIcon, Download, Printer, Search, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Users, Calendar as CalendarIcon, Download, Printer } from "lucide-react";
+import { CustomDropdown } from '@/components/ui/custom-dropdown';
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -269,12 +270,6 @@ export default function SupplierProfilePage() {
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
-  // New state for custom dropdown
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
@@ -311,20 +306,6 @@ export default function SupplierProfilePage() {
         unsubscribePayments(); 
     };
   }, []);
-  
-  // --- New Dropdown Logic ---
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
 
   const filteredData = useMemo(() => {
     let filteredSuppliers = suppliers;
@@ -488,33 +469,6 @@ export default function SupplierProfilePage() {
 
   const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
   
-    const supplierDropdownItems = useMemo(() => {
-        const allItems = Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({
-            id: key,
-            name: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim()
-        }));
-
-        if (!searchTerm) {
-            return allItems;
-        }
-        return allItems.filter(item =>
-            item.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [supplierSummaryMap, searchTerm]);
-
-    const handleSelect = (key: string) => {
-        setSelectedSupplierKey(key);
-        setSearchTerm('');
-        setIsDropdownOpen(false);
-    };
-
-    const handleClearSelection = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setSelectedSupplierKey(null);
-        setSearchTerm('');
-    };
-
-  
   if (!isClient || loading) {
     return (
         <div className="flex items-center justify-center h-64">
@@ -551,64 +505,14 @@ export default function SupplierProfilePage() {
                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
                 </Popover>
                 
-                <div className="relative w-full sm:w-[300px]" ref={dropdownRef}>
-                    <button
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="w-full flex justify-between items-center px-3 py-2 border border-input bg-background rounded-md text-sm h-9"
-                    >
-                        <span className="text-foreground truncate">
-                            {selectedSupplierData?.name || 'Search and select profile...'}
-                        </span>
-                        <div className="flex items-center space-x-2">
-                            {selectedSupplierKey && selectedSupplierKey !== MILL_OVERVIEW_KEY && (
-                            <X
-                                className="w-4 h-4 text-muted-foreground hover:text-destructive"
-                                onClick={handleClearSelection}
-                            />
-                            )}
-                            {isDropdownOpen ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            )}
-                        </div>
-                    </button>
-
-                    {isDropdownOpen && (
-                    <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60">
-                        <div className="relative p-2">
-                            <input
-                                type="text"
-                                placeholder="Search profile..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-8 pr-2 py-2 rounded-md border border-input bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                            />
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <ul className="py-1 max-h-48 overflow-y-auto">
-                            {supplierDropdownItems.length > 0 ? (
-                            supplierDropdownItems.map((item) => (
-                                <li
-                                    key={item.id}
-                                    onClick={() => handleSelect(item.id)}
-                                    className={`cursor-pointer px-4 py-2 text-sm hover:bg-accent ${
-                                    selectedSupplierKey === item.id ? 'bg-accent font-medium' : ''
-                                    }`}
-                                >
-                                    {item.name}
-                                </li>
-                            ))
-                            ) : (
-                            <li className="px-4 py-2 text-sm text-muted-foreground text-center">
-                                No profile found.
-                            </li>
-                            )}
-                        </ul>
-                    </div>
-                    )}
+                <div className="w-full sm:w-[300px]">
+                    <CustomDropdown
+                        options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
+                        value={selectedSupplierKey}
+                        onChange={setSelectedSupplierKey}
+                        placeholder="Search and select profile..."
+                    />
                 </div>
-
             </div>
         </CardContent>
       </Card>

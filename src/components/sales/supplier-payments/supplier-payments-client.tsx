@@ -2,21 +2,20 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getTransactionsRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
-import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc } from "firebase/firestore";
+import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Loader2, Pen } from "lucide-react";
+import { Loader2, Pen } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
@@ -29,7 +28,7 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 const suppliersCollection = collection(db, "suppliers");
-const transactionsCollection = collection(db, "transactions");
+const expensesCollection = collection(db, "expenses");
 
 
 type PaymentOption = {
@@ -47,7 +46,8 @@ type SortConfig = {
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
@@ -95,8 +95,7 @@ export default function SupplierPaymentsClient() {
   const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [activeTab, setActiveTab] = useState('processing');
-  const [openCombobox, setOpenCombobox] = useState(false);
-
+  
   // Combination Generator State
   const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [calcTargetAmount, setCalcTargetAmount] = useState(0);
@@ -104,6 +103,8 @@ export default function SupplierPaymentsClient() {
   const [calcMaxRate, setCalcMaxRate] = useState(2400);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [roundFigureToggle, setRoundFigureToggle] = useState(false);
+
+  const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
 
   const stableToast = useCallback(toast, []);
@@ -178,7 +179,7 @@ export default function SupplierPaymentsClient() {
         }
     });
     
-    transactions.forEach(t => {
+    allTransactions.forEach(t => {
         const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
          if (balanceKey && balances.has(balanceKey)) {
             if (t.transactionType === 'Income') {
@@ -190,7 +191,7 @@ export default function SupplierPaymentsClient() {
     });
     
     return { balances };
-  }, [fundTransactions, transactions, bankAccounts]);
+  }, [fundTransactions, allTransactions, bankAccounts]);
 
   const selectedEntries = useMemo(() => {
     return suppliers.filter(s => selectedEntryIds.has(s.id));
@@ -263,7 +264,8 @@ export default function SupplierPaymentsClient() {
         }
     });
     
-    const unsubTransactions = getTransactionsRealtime(setTransactions, console.error);
+    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
     const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
     const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
     
@@ -288,7 +290,8 @@ export default function SupplierPaymentsClient() {
       isSubscribed = false;
       unsubSuppliers();
       unsubPayments();
-      unsubTransactions();
+      unsubIncomes();
+      unsubExpenses();
       unsubFunds();
       unsubBankAccounts();
       unsubscribeBanks();
@@ -341,7 +344,7 @@ export default function SupplierPaymentsClient() {
 
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
   }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentType]);
-
+  
   useEffect(() => {
     const finalAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
     setCalcTargetAmount(finalAmount > 0 ? finalAmount : 0);
@@ -388,22 +391,24 @@ export default function SupplierPaymentsClient() {
     resetPaymentForm();
   }, [resetPaymentForm]);
 
-  const handleCustomerSelect = (key: string) => {
+  const handleCustomerSelect = (key: string | null) => {
     setSelectedCustomerKey(key);
-    const customerData = customerSummaryMap.get(key);
-    if(customerData) {
-        setSupplierDetails({
-            name: customerData.name || '',
-            fatherName: customerData.so || '',
-            address: customerData.address || '',
-            contact: customerData.contact || ''
-        });
-        setBankDetails({
-            acNo: customerData.acNo || '',
-            ifscCode: customerData.ifscCode || '',
-            bank: customerData.bank || '',
-            branch: customerData.branch || '',
-        });
+    if(key){
+        const customerData = customerSummaryMap.get(key);
+        if(customerData) {
+            setSupplierDetails({
+                name: customerData.name || '',
+                fatherName: customerData.so || '',
+                address: customerData.address || '',
+                contact: customerData.contact || ''
+            });
+            setBankDetails({
+                acNo: customerData.acNo || '',
+                ifscCode: customerData.ifscCode || '',
+                bank: customerData.bank || '',
+                branch: customerData.branch || '',
+            });
+        }
     }
     resetPaymentForm();
   };
@@ -456,31 +461,14 @@ export default function SupplierPaymentsClient() {
 
     try {
         let finalPaymentData: Payment | null = null;
+        
         await runTransaction(db, async (transaction) => {
-            const tempEditingPayment = editingPayment;
-            
-            // --- READ PHASE ---
             const supplierDocsToGet = new Set<string>();
-            const expenseDocsToDelete: any[] = [];
             
-            // 1. Get supplier documents to read
             if (rtgsFor === 'Supplier') {
                 selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
-                if (tempEditingPayment) {
-                    tempEditingPayment.paidFor?.forEach(pf => {
-                        const supplier = suppliers.find(s => s.srNo === pf.srNo);
-                        if (supplier) supplierDocsToGet.add(supplier.id);
-                    });
-                }
-            }
-
-            // 2. Get associated expense transaction to read (for deletion)
-            if (tempEditingPayment && tempEditingPayment.expenseTransactionId) {
-                const expenseDocRef = doc(transactionsCollection, tempEditingPayment.expenseTransactionId);
-                expenseDocsToDelete.push(expenseDocRef);
             }
             
-            // 3. Execute all reads
             const supplierDocs = new Map<string, any>();
             for (const id of supplierDocsToGet) {
                 const docRef = doc(db, "suppliers", id);
@@ -492,25 +480,6 @@ export default function SupplierPaymentsClient() {
                 }
             }
             
-            // --- WRITE PHASE ---
-            
-            // 1. Delete old expense transaction if editing
-            expenseDocsToDelete.forEach(ref => transaction.delete(ref));
-
-            // 2. Revert previous payment amounts if editing
-            if (tempEditingPayment && rtgsFor === 'Supplier') {
-                 for (const detail of tempEditingPayment.paidFor || []) {
-                    const supplier = suppliers.find(s => s.srNo === detail.srNo);
-                    if (supplier && supplierDocs.has(supplier.id)) {
-                        const currentNetAmount = Number(supplierDocs.get(supplier.id).netAmount) || 0;
-                        const amountToRestore = detail.amount + (tempEditingPayment.cdApplied ? (tempEditingPayment.cdAmount || 0) / (tempEditingPayment.paidFor?.length || 1) : 0);
-                        const supplierRef = doc(db, "suppliers", supplier.id);
-                        transaction.update(supplierRef, { netAmount: Math.round(currentNetAmount + amountToRestore) });
-                    }
-                }
-            }
-
-            // 3. Apply new payment amounts
             let paidForDetails: PaidFor[] = [];
             if (rtgsFor === 'Supplier') {
                 let amountToDistribute = Math.round(totalPaidAmount);
@@ -537,17 +506,16 @@ export default function SupplierPaymentsClient() {
                 }
             }
             
-            // 4. Create new expense transaction and link it
-            const newTransactionRef = doc(collection(db, 'transactions'));
-            const expenseData: Partial<Transaction> = {
-                id: newTransactionRef.id,
+            const expenseTransactionRef = doc(collection(db, 'expenses'));
+            const expenseData: Partial<Expense> = {
+                id: expenseTransactionRef.id,
                 date: new Date().toISOString().split('T')[0],
                 transactionType: 'Expense',
                 category: 'Supplier Payments',
                 subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
                 amount: finalPaymentAmount,
                 payee: supplierDetails.name,
-                description: `Payment ${tempEditingPayment ? tempEditingPayment.paymentId : paymentId} to ${supplierDetails.name}`,
+                description: `Payment ${paymentId} to ${supplierDetails.name}`,
                 paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
                 status: 'Paid',
                 isRecurring: false,
@@ -555,13 +523,28 @@ export default function SupplierPaymentsClient() {
             if (paymentMethod !== 'Cash') {
                 expenseData.bankAccountId = selectedAccountId;
             }
-            transaction.set(newTransactionRef, expenseData);
+            transaction.set(expenseTransactionRef, expenseData);
 
+            if (cdEnabled && calculatedCdAmount > 0) {
+                const incomeTransactionRef = doc(collection(db, 'incomes'));
+                 const incomeData: Partial<Income> = {
+                    id: incomeTransactionRef.id,
+                    date: new Date().toISOString().split('T')[0],
+                    transactionType: 'Income',
+                    category: 'Cash Discount Received',
+                    subCategory: 'Supplier CD',
+                    amount: calculatedCdAmount,
+                    payee: supplierDetails.name,
+                    description: `CD received on payment ${paymentId}`,
+                    paymentMethod: 'Other',
+                    status: 'Paid',
+                    isRecurring: false,
+                };
+                transaction.set(incomeTransactionRef, incomeData);
+            }
 
-            // 5. Create or update the payment document
-            const paymentData: Omit<Payment, 'id'> = {
-                paymentId: tempEditingPayment ? tempEditingPayment.paymentId : paymentId,
-                rtgsSrNo: paymentMethod === 'RTGS' ? (tempEditingPayment && tempEditingPayment.rtgsSrNo ? tempEditingPayment.rtgsSrNo : rtgsSrNo) : undefined,
+            const paymentDataBase: Omit<Payment, 'id'> = {
+                paymentId: paymentId,
                 customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
                 date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                 cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
@@ -573,25 +556,23 @@ export default function SupplierPaymentsClient() {
                 supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
                 bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
                 rtgsFor: rtgsFor,
-                expenseTransactionId: newTransactionRef.id, // Link to the new expense transaction
+                expenseTransactionId: expenseTransactionRef.id,
             };
             
+            if (paymentMethod === 'RTGS') {
+                paymentDataBase.rtgsSrNo = rtgsSrNo;
+            }
+            
             if (paymentMethod !== 'RTGS') {
-                delete (paymentData as Partial<Payment>).rtgsSrNo;
+                delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
             }
 
-            if (tempEditingPayment) {
-                const paymentRef = doc(db, "payments", tempEditingPayment.id);
-                transaction.update(paymentRef, paymentData);
-                finalPaymentData = { id: tempEditingPayment.id, ...paymentData };
-            } else {
-                const newPaymentRef = doc(collection(db, "payments"));
-                transaction.set(newPaymentRef, { ...paymentData, id: newPaymentRef.id });
-                finalPaymentData = { id: newPaymentRef.id, ...paymentData };
-            }
+            const newPaymentRef = doc(collection(db, "payments"));
+            transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
+            finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
         });
 
-        toast({ title: `Payment ${editingPayment ? 'updated' : 'processed'} successfully.`, variant: 'success' });
+        toast({ title: `Payment processed successfully.`, variant: 'success' });
         if (paymentMethod === 'RTGS' && finalPaymentData) {
             setRtgsReceiptData(finalPaymentData);
         }
@@ -605,33 +586,16 @@ export default function SupplierPaymentsClient() {
     const handleEditPayment = async (paymentToEdit: Payment) => {
         if (!paymentToEdit.id) return;
         
-        // Fill the form first
-        const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
+        await handleDeletePayment(paymentToEdit.id, true);
         
-        if (paymentToEdit.rtgsFor === 'Supplier' && srNosInPayment.length > 0) {
-            const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
-            const supplierDocs = await getDocs(q);
-            const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
-            
-            if (foundSrNos.size !== srNosInPayment.length) {
-                toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
-                return;
-            }
-
-            const newSelectedEntryIds = new Set<string>();
-            supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
-            setSelectedEntryIds(newSelectedEntryIds);
-        } else {
-            setSelectedEntryIds(new Set());
-        }
-
-        setSelectedCustomerKey(paymentToEdit.customerId);
+        setActiveTab('processing');
         setEditingPayment(paymentToEdit);
         setPaymentId(paymentToEdit.paymentId);
         setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
         setPaymentAmount(paymentToEdit.amount);
         setPaymentType(paymentToEdit.type);
         setPaymentMethod(paymentToEdit.receiptType);
+        setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
         setCdEnabled(paymentToEdit.cdApplied);
         setCalculatedCdAmount(paymentToEdit.cdAmount);
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
@@ -651,10 +615,30 @@ export default function SupplierPaymentsClient() {
             acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
             bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
         });
-        setActiveTab('processing');
         
-        // Then, delete the payment to allow reprocessing
-        await handleDeletePayment(paymentToEdit.id, true); // Pass a flag to prevent toast
+        if (paymentToEdit.rtgsFor === 'Supplier') {
+            setSelectedCustomerKey(paymentToEdit.customerId);
+            const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
+            if (srNosInPayment.length > 0) {
+              const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
+              const supplierDocs = await getDocs(q);
+              const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
+              if (foundSrNos.size !== srNosInPayment.length) {
+                  toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
+                  setEditingPayment(null); // Reset editing state
+                  return;
+              }
+              const newSelectedEntryIds = new Set<string>();
+              supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
+              setSelectedEntryIds(newSelectedEntryIds);
+            } else {
+                setSelectedEntryIds(new Set());
+            }
+        } else {
+            setSelectedCustomerKey(null);
+            setSelectedEntryIds(new Set());
+        }
+
         toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
     };
 
@@ -671,24 +655,22 @@ export default function SupplierPaymentsClient() {
                 
                 // Revert supplier netAmount
                 if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
-                    const srNos = paymentToDelete.paidFor.map(pf => pf.srNo);
-                    if (srNos.length > 0) {
-                        const q = query(suppliersCollection, where('srNo', 'in', srNos));
+                    for (const detail of paymentToDelete.paidFor) {
+                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
                         const supplierDocsSnapshot = await getDocs(q);
-                        const supplierDocsMap = new Map(supplierDocsSnapshot.docs.map(d => [d.id, d.data() as Customer]));
-                        
-                        supplierDocsSnapshot.forEach(docSnapshot => {
-                             const currentSupplier = docSnapshot.data() as Customer;
-                             const amountToRestore = paymentToDelete.amount + (paymentToDelete.cdAmount || 0);
-                             const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                             transaction.update(doc(db, "suppliers", docSnapshot.id), { netAmount: Math.round(newNetAmount) });
-                        });
+                        if (!supplierDocsSnapshot.empty) {
+                            const customerDoc = supplierDocsSnapshot.docs[0];
+                            const currentSupplier = customerDoc.data() as Customer;
+                            const amountToRestore = detail.amount;
+                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        }
                     }
                 }
                 
                 // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
-                    const expenseDocRef = doc(transactionsCollection, paymentToDelete.expenseTransactionId);
+                    const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
                 }
                 
@@ -696,9 +678,11 @@ export default function SupplierPaymentsClient() {
                 transaction.delete(paymentRef);
             });
             if (!isEditing) {
-                toast({ title: `Payment ${paymentToDelete.paymentId} deleted.`, variant: 'success', duration: 3000 });
+                toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
             }
-            if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
+            if (editingPayment?.id === paymentIdToDelete) {
+              resetPaymentForm();
+            }
         } catch (error) {
             console.error("Error deleting payment:", error);
             toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
@@ -855,15 +839,12 @@ export default function SupplierPaymentsClient() {
                             <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
                                 <div className="flex flex-1 items-center gap-2">
                                     <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
-                                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}><PopoverTrigger asChild><Button variant="outline" role="combobox" aria-expanded={openCombobox} className="h-8 text-xs flex-1 justify-between font-normal">{selectedCustomerKey ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '') + ` (${customerSummaryMap.get(selectedCustomerKey)?.contact || ''})` : "Search and select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search by name or contact..." /><CommandList><CommandEmpty>No supplier found.</CommandEmpty><CommandGroup>
-                                            {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                                                <CommandItem key={key} value={`${data.name} ${data.contact}`} onSelect={() => { handleCustomerSelect(key); setOpenCombobox(false); }}>
-                                                  <Check className={cn("mr-2 h-4 w-4", selectedCustomerKey === key ? "opacity-100" : "opacity-0")}/>{toTitleCase(data.name)} ({data.contact})
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup></CommandList></Command></PopoverContent>
-                                    </Popover>
+                                    <CustomDropdown
+                                        options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                                        value={selectedCustomerKey}
+                                        onChange={handleCustomerSelect}
+                                        placeholder="Search and select supplier..."
+                                    />
                                 </div>
                                 {selectedCustomerKey && (
                                     <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
@@ -980,3 +961,8 @@ export default function SupplierPaymentsClient() {
 }
 
     
+
+    
+
+    
+

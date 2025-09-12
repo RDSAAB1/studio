@@ -7,7 +7,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData, CustomerPayment } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -25,7 +25,7 @@ import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialo
 import { Hourglass } from "lucide-react";
 
 
-const formSchema = z.object({
+export const formSchema = z.object({
     srNo: z.string(),
     date: z.date(),
     bags: z.coerce.number().min(0),
@@ -55,9 +55,9 @@ const formSchema = z.object({
     shippingGstin: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+export type FormValues = z.infer<typeof formSchema>;
 
-const getInitialFormState = (lastVariety?: string): Customer => {
+const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dateStr = today.toISOString().split('T')[0];
@@ -68,7 +68,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
     kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
     // Fields that should not be here
     so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
   };
@@ -94,6 +94,7 @@ export default function CustomerEntryClient() {
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
+  const [lastPaymentType, setLastPaymentType] = useState<string>('');
   const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
@@ -123,7 +124,7 @@ export default function CustomerEntryClient() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ...getInitialFormState(lastVariety),
+      ...getInitialFormState(lastVariety, lastPaymentType),
     },
     shouldFocusError: false,
   });
@@ -178,6 +179,12 @@ export default function CustomerEntryClient() {
       form.setValue('variety', savedVariety);
     }
 
+    const savedPaymentType = localStorage.getItem('lastSelectedPaymentType');
+    if (savedPaymentType) {
+      setLastPaymentType(savedPaymentType);
+      form.setValue('paymentType', savedPaymentType);
+    }
+
     form.setValue('date', new Date());
 
     return () => {
@@ -195,71 +202,21 @@ export default function CustomerEntryClient() {
     }
   }
 
-  const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const values = {...form.getValues(), ...data};
-    const grossWeight = values.grossWeight || 0;
-    const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
-    
-    const bags = Number(values.bags) || 0;
-    const bagWeightPerBagKg = Number(values.bagWeightKg) || 0;
-    const totalBagWeightKg = bags * bagWeightPerBagKg;
-    const totalBagWeightQuintals = totalBagWeightKg / 100;
-    const netWeight = weight - totalBagWeightQuintals;
-    
-    const rate = values.rate || 0;
-    const amount = weight * rate;
-    
-    const brokerageRate = Number(values.brokerage) || 0;
-    const brokerageAmount = brokerageRate * weight;
-
-    const cdPercentage = Number(values.cd) || 0;
-    const cdAmount = (amount * cdPercentage) / 100;
-    
-    const kanta = Number(values.kanta) || 0;
-    
-    const bagRate = Number(values.bagRate) || 0;
-    const bagAmount = bags * bagRate;
-
-    let originalNetAmount = amount + kanta + bagAmount - cdAmount;
-    if (!values.isBrokerageIncluded) {
-        originalNetAmount -= brokerageAmount;
+  const handleSetLastPaymentType = (paymentType: string) => {
+    setLastPaymentType(paymentType);
+    if(isClient) {
+        localStorage.setItem('lastSelectedPaymentType', paymentType);
     }
+  }
 
-    const totalPaidForThisEntry = paymentHistory
-        .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
-        .reduce((sum, p) => {
-            const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-            return sum + (paidForDetail?.amount || 0);
-        }, 0);
-      
-    const netAmount = originalNetAmount - totalPaidForThisEntry;
-
-    setCurrentCustomer(prev => {
-        const currentDate = values.date instanceof Date ? values.date : (prev.date ? new Date(prev.date) : new Date());
-        return {
-            ...prev,
-            ...values,
-            date: currentDate.toISOString().split("T")[0],
-            dueDate: (values.date ? new Date(values.date) : new Date()).toISOString().split("T")[0],
-            weight: parseFloat(weight.toFixed(2)),
-            netWeight: parseFloat(netWeight.toFixed(2)),
-            amount: parseFloat(amount.toFixed(2)),
-            brokerage: parseFloat(brokerageAmount.toFixed(2)),
-            brokerageRate: brokerageRate,
-            cd: parseFloat(cdAmount.toFixed(2)),
-            cdRate: cdPercentage,
-            kanta: parseFloat(kanta.toFixed(2)),
-            bagAmount: parseFloat(bagAmount.toFixed(2)),
-            originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
-            netAmount: parseFloat(netAmount.toFixed(2)),
-        }
-    });
-  }, [form, paymentHistory]);
+  const performCalculations = useCallback((data: Partial<CustomerFormValues>) => {
+    const calculatedState = calculateCustomerEntry(data, paymentHistory);
+    setCurrentCustomer(prev => ({...prev, ...calculatedState}));
+  }, [paymentHistory]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>);
+        performCalculations(value as Partial<CustomerFormValues>);
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
@@ -301,14 +258,14 @@ export default function CustomerEntryClient() {
   const handleNew = useCallback(() => {
     setIsEditing(false);
     const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-    const newState = getInitialFormState(lastVariety);
+    const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'C');
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  }, [safeCustomers, lastVariety, resetFormToState]);
+  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);
@@ -333,7 +290,7 @@ export default function CustomerEntryClient() {
         setIsEditing(false);
         const currentId = isEditing ? currentCustomer.srNo : "";
         const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum, 'C'), id: currentId };
+        const currentState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'C'), id: currentId };
         resetFormToState(currentState);
     }
   }
@@ -350,36 +307,6 @@ export default function CustomerEntryClient() {
       }
     }
   }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Enter') {
-      const activeElement = document.activeElement as HTMLElement;
-      if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-        return;
-      }
-      const formEl = e.currentTarget;
-      const formElements = Array.from(formEl.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-      const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-      if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-        e.preventDefault();
-        formElements[currentElementIndex + 1].focus();
-      }
-    } else if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        form.handleSubmit(() => onSubmit())();
-    } else if (e.ctrlKey && e.key === 'p') {
-        e.preventDefault();
-        handleSaveAndPrint('tax-invoice'); // Or your default print action
-    } else if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault();
-        handleNew();
-    } else if (e.ctrlKey && e.key === 'd') {
-        e.preventDefault();
-        if(isEditing && currentCustomer.id) {
-            handleDelete(currentCustomer.id);
-        }
-    }
-  };
 
   const handleDelete = async (id: string) => {
     if (!id) {
@@ -402,8 +329,8 @@ export default function CustomerEntryClient() {
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
-    // Create a new clean object with only the fields relevant to the customer
     const dataToSave: Omit<Customer, 'id'> = {
+        ...currentCustomer,
         srNo: formValues.srNo,
         date: formValues.date.toISOString().split('T')[0],
         term: '0', 
@@ -417,8 +344,6 @@ export default function CustomerEntryClient() {
         variety: toTitleCase(formValues.variety),
         paymentType: formValues.paymentType,
         customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
-        
-        // Form fields for customer
         grossWeight: formValues.grossWeight,
         teirWeight: formValues.teirWeight,
         rate: formValues.rate,
@@ -427,27 +352,11 @@ export default function CustomerEntryClient() {
         bagRate: formValues.bagRate,
         kanta: formValues.kanta,
         isBrokerageIncluded: formValues.isBrokerageIncluded,
-
-        // Shipping details
         shippingName: toTitleCase(formValues.shippingName || ''),
         shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
-        
-        // Values from calculations
-        weight: currentCustomer.weight,
-        netWeight: currentCustomer.netWeight,
-        amount: currentCustomer.amount,
-        bagAmount: currentCustomer.bagAmount,
-        cd: currentCustomer.cd,
-        cdRate: currentCustomer.cdRate,
-        brokerage: currentCustomer.brokerage,
-        brokerageRate: currentCustomer.brokerageRate,
-        originalNetAmount: currentCustomer.originalNetAmount,
-        netAmount: currentCustomer.netAmount,
-
-        // Fields to explicitly exclude
         so: '',
         kartaPercentage: 0,
         kartaWeight: 0,
@@ -455,7 +364,7 @@ export default function CustomerEntryClient() {
         labouryRate: 0,
         labouryAmount: 0,
         barcode: '',
-        receiptType: 'Cash',
+        receiptType: 'Cash'
     };
     
     try {
@@ -553,6 +462,115 @@ export default function CustomerEntryClient() {
     setIsDocumentPreviewOpen(true);
   };
 
+    const handleExport = () => {
+        const dataToExport = customers.map(c => ({
+            srNo: c.srNo,
+            date: c.date,
+            name: c.name,
+            companyName: c.companyName,
+            address: c.address,
+            contact: c.contact,
+            gstin: c.gstin,
+            vehicleNo: c.vehicleNo,
+            variety: c.variety,
+            grossWeight: c.grossWeight,
+            teirWeight: c.teirWeight,
+            rate: c.rate,
+            bags: c.bags,
+            bagWeightKg: c.bagWeightKg,
+            bagRate: c.bagRate,
+            kanta: c.kanta,
+            cd: c.cd,
+            brokerage: c.brokerage,
+            isBrokerageIncluded: c.isBrokerageIncluded,
+            paymentType: c.paymentType,
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+        XLSX.writeFile(workbook, "CustomerEntries.xlsx");
+        toast({title: "Exported", description: "Customer data has been exported."});
+    }
+
+    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+                
+                let nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+
+                for (const item of json) {
+                    const customerData: Partial<Customer> = {
+                        srNo: item.srNo || formatSrNo(nextSrNum++, 'C'),
+                        date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        name: toTitleCase(item.name),
+                        companyName: toTitleCase(item.companyName || ''),
+                        address: toTitleCase(item.address || ''),
+                        contact: String(item.contact || ''),
+                        gstin: item.gstin || '',
+                        vehicleNo: toTitleCase(item.vehicleNo || ''),
+                        variety: toTitleCase(item.variety || ''),
+                        grossWeight: Number(item.grossWeight) || 0,
+                        teirWeight: Number(item.teirWeight) || 0,
+                        rate: Number(item.rate) || 0,
+                        bags: Number(item.bags) || 0,
+                        bagWeightKg: Number(item.bagWeightKg) || 0,
+                        bagRate: Number(item.bagRate) || 0,
+                        kanta: Number(item.kanta) || 0,
+                        cd: Number(item.cd) || 0,
+                        brokerage: Number(item.brokerage) || 0,
+                        isBrokerageIncluded: item.isBrokerageIncluded === 'TRUE' || item.isBrokerageIncluded === true,
+                        paymentType: item.paymentType || 'Full',
+                    };
+                    const calculated = calculateCustomerEntry(customerData, paymentHistory);
+                    await addCustomer({ ...customerData, ...calculated } as Omit<Customer, 'id'>);
+                }
+                toast({title: "Import Successful", description: `${json.length} customer entries have been imported.`});
+            } catch (error) {
+                console.error("Import failed:", error);
+                toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
+    if (event.ctrlKey) {
+        event.preventDefault();
+        switch (event.key.toLowerCase()) {
+            case 's':
+                form.handleSubmit(() => onSubmit())();
+                break;
+            case 'p':
+                handleSaveAndPrint('tax-invoice'); // Default to tax-invoice
+                break;
+            case 'n':
+                handleNew();
+                break;
+            case 'd':
+                if (isEditing && currentCustomer.id) {
+                    handleDelete(currentCustomer.id);
+                }
+                break;
+        }
+    }
+  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentCustomer]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyboardShortcuts);
+    return () => {
+        document.removeEventListener('keydown', handleKeyboardShortcuts);
+    };
+  }, [handleKeyboardShortcuts]);
+
   if (!isClient) {
     return null;
   }
@@ -568,7 +586,7 @@ export default function CustomerEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit(() => onSubmit())} className="space-y-4">
             <CustomerForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -576,6 +594,7 @@ export default function CustomerEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -591,6 +610,8 @@ export default function CustomerEntryClient() {
                 isCustomerForm={true}
                 isBrokerageIncluded={form.watch('isBrokerageIncluded')}
                 onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
+                onImport={handleImport}
+                onExport={handleExport}
             />
         </form>
       </FormProvider>      
@@ -650,3 +671,6 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+
+
+
