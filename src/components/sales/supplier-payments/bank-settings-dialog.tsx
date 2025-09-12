@@ -36,7 +36,7 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                     <DialogTitle>Bank Management</DialogTitle>
                     <DialogDescription>Add new banks and branches.</DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow overflow-y-auto px-6">
+                <div className="flex-grow overflow-y-auto px-6 scrollbar-hide">
                     <div className="space-y-6 py-4">
                         <Card>
                             <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
