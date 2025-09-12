@@ -218,6 +218,11 @@ body {
   max-height: 500px; /* Adjust as needed */
 }
 
+/* Automatically close submenu when not hovering sidebar */
+.wrapper:not(.active) .side_bar:not(:hover) .submenu {
+    max-height: 0;
+}
+
 .submenu li button {
   padding: 10px 15px; /* Consistent padding */
   font-size: 0.875rem; /* text-sm */
