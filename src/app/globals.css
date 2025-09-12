@@ -150,7 +150,26 @@ body {
     color: hsl(var(--primary-foreground));
     margin-bottom: 5px;	
     transition: color 0.2s ease, background-color 0.2s ease;			
+    position: relative;
 }
+
+.side_bar_bottom ul li button::before {
+    content: '';
+    position: absolute;
+    left: -20px; /* Start hidden outside */
+    top: 0;
+    height: 100%;
+    width: 4px;
+    background-color: hsl(var(--primary));
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    transition: left 0.3s ease;
+}
+
+.side_bar_bottom ul li button:hover::before {
+    left: 0; /* Bring it into view on hover */
+}
+
 
 .side_bar_bottom ul li button:hover,
 .side_bar_bottom ul li button:hover .icon {
@@ -177,7 +196,7 @@ body {
 }
 
 /* Hide text when collapsed */
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom .item {
+.wrapper:not(.active):not(:hover) .side_bar .side_bar_bottom .item {
   display: none;
 }
 .wrapper.active .side_bar .side_bar_bottom .item,
