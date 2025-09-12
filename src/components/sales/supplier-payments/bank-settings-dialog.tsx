@@ -38,7 +38,7 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                     <Card>
                         <CardHeader><CardTitle className="text-base">Add New Branch</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="space-y-1"><Label>Select Bank</Label><Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}><SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger><SelectContent>{banks.map((bank: any) => <SelectItem key={bank.name} value={bank.name}>{bank.name}</SelectItem>)}</SelectContent></Select></div>
+                            <div className="space-y-1"><Label>Select Bank</Label><Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}><SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger><SelectContent className="z-[99]">{banks.map((bank: any) => <SelectItem key={bank.name} value={bank.name}>{bank.name}</SelectItem>)}</SelectContent></Select></div>
                             <div className="space-y-1"><Label>Branch Name</Label><Input placeholder="Enter branch name" value={newBranchData.branchName} onChange={(e) => setNewBranchData(prev => ({...prev, branchName: e.target.value}))}/></div>
                             <div className="space-y-1"><Label>IFSC Code</Label><Input placeholder="Enter IFSC code" value={newBranchData.ifscCode} onChange={(e) => setNewBranchData(prev => ({...prev, ifscCode: e.target.value}))}/></div>
                             <Button onClick={handleAddNewBranch}><Plus className="mr-2 h-4 w-4" /> Add Branch</Button>
