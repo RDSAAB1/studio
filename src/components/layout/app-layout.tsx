@@ -141,6 +141,33 @@ const AppContent = () => {
             setActiveTabId(currentPathId);
         }
     }, [location.pathname, activeTabId]);
+
+    useEffect(() => {
+        const handleGlobalKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Enter') {
+                const activeElement = document.activeElement;
+                if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT')) {
+                    event.preventDefault();
+                    const form = (activeElement as HTMLElement).closest('form');
+                    const focusable = form 
+                        ? Array.from(form.querySelectorAll('input, select, button, textarea'))
+                        : Array.from(document.querySelectorAll('input, select, button, textarea'));
+
+                    const index = focusable.indexOf(activeElement);
+                    
+                    const nextElement = focusable[index + 1] as HTMLElement;
+                    if (nextElement) {
+                        nextElement.focus();
+                    }
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleGlobalKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleGlobalKeyDown);
+        };
+    }, []);
     
     const handleTabSelect = (tabId: string) => {
         setActiveTabId(tabId);
