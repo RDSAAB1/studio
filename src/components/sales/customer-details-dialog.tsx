@@ -40,8 +40,8 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
 
     const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
 
-    const displayBrokerageAmount = (customer.weight || 0) * (customer.brokerageRate || 0);
-    const displayCdAmount = (customer.amount || 0) * ((customer.cdRate || 0) / 100);
+    const displayBrokerageAmount = (Number(customer.weight) || 0) * (Number(customer.brokerageRate) || 0);
+    const displayCdAmount = (Number(customer.amount) || 0) * ((Number(customer.cdRate) || 0) / 100);
 
     return (
         <Dialog open={!!customer} onOpenChange={onOpenChange}>
@@ -92,11 +92,11 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                     <Separator />
                                     <table className="w-full text-xs">
                                         <tbody>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{customer.grossWeight.toFixed(2)} Qtl</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {customer.teirWeight.toFixed(2)} Qtl</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{customer.weight.toFixed(2)} Qtl</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less) ({(customer.bags || 0)} @ {(customer.bagWeightKg || 0).toFixed(2)}kg)</td><td className="text-right font-semibold">- {totalBagWeightKg.toFixed(2)} kg</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{customer.netWeight.toFixed(2)} Qtl</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{Number(customer.grossWeight || 0).toFixed(2)} Qtl</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {Number(customer.teirWeight || 0).toFixed(2)} Qtl</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{Number(customer.weight || 0).toFixed(2)} Qtl</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less) ({(customer.bags || 0)} @ {Number(customer.bagWeightKg || 0).toFixed(2)}kg)</td><td className="text-right font-semibold">- {totalBagWeightKg.toFixed(2)} kg</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{Number(customer.netWeight || 0).toFixed(2)} Qtl</td></tr>
                                         </tbody>
                                     </table>
                                 </CardContent>
@@ -106,13 +106,13 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                                 <CardContent className="p-4 pt-0">
                                     <table className="w-full text-xs">
                                         <tbody>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{customer.netWeight.toFixed(2)} Qtl</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(customer.rate)}</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(customer.amount)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({(customer.bags || 0)} @ {formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount || 0)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{(customer.cdRate || customer.cd || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount || 0)}</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerageRate || customer.brokerage || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Net Weight</td><td className="text-right font-semibold">{Number(customer.netWeight || 0).toFixed(2)} Qtl</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Rate</td><td className="text-right font-semibold">@ {formatCurrency(Number(customer.rate) || 0)}</td></tr>
+                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Total Amount</td><td className="text-right font-bold">{formatCurrency(Number(customer.amount) || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({(customer.bags || 0)} @ {formatCurrency(Number(customer.bagRate) || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.bagAmount) || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(Number(customer.kanta) || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{Number(customer.cdRate || customer.cd || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount || 0)}</td></tr>
+                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(Number(customer.brokerageRate || customer.brokerage) || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount || 0)}</td></tr>
                                         </tbody>
                                     </table>
                                 </CardContent>
