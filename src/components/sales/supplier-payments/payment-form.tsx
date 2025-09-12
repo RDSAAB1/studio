@@ -10,12 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins } from "lucide-react";
+import { Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins } from "lucide-react";
 import { format } from 'date-fns';
-import { bankNames, bankBranches as staticBankBranches } from "@/lib/data";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from '@/components/ui/switch';
+import { CustomDropdown } from '@/components/ui/custom-dropdown';
+
 
 const cdOptions = [
     { value: 'paid_amount', label: 'CD on Paid Amount' },
@@ -43,15 +43,17 @@ export const PaymentForm = ({
 
     const availableBranches = React.useMemo(() => {
         if (!bankDetails.bank) return [];
-        const combined = [...staticBankBranches, ...bankBranches];
-        const uniqueBranches = Array.from(new Map(combined.map(item => [item.ifscCode + item.branchName, item])).values());
-        return uniqueBranches.filter(branch => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase());
+        return bankBranches
+            .filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase())
+            .map((branch: any) => ({ value: branch.branchName, label: branch.branchName }));
     }, [bankDetails.bank, bankBranches]);
 
-    const handleBranchSelect = (branchValue: string) => {
-        const selectedBranch = availableBranches.find(b => b.branchName === branchValue);
+    const handleBranchSelect = (branchValue: string | null) => {
+        const selectedBranch = bankBranches.find((b: any) => b.branchName === branchValue);
         if(selectedBranch) {
           setBankDetails((prev: any) => ({...prev, branch: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
+        } else {
+            setBankDetails((prev: any) => ({...prev, branch: branchValue || ''}));
         }
     };
     
@@ -95,19 +97,12 @@ export const PaymentForm = ({
                  {paymentMethod !== 'Cash' && (
                     <div className="space-y-1">
                         <Label className="text-xs">Payment From</Label>
-                        <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                            <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Select Account" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="CashInHand"><div className="flex items-center"><HandCoins className="mr-2 h-4 w-4" /> Cash In Hand</div></SelectItem>
-                                {bankAccounts.map((acc: any) => (
-                                    <SelectItem key={acc.id} value={acc.id}>
-                                        {acc.accountHolderName} ({formatCurrency(financialState.balances.get(acc.id) || 0)})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                         <CustomDropdown
+                            options={[{ value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` }, ...bankAccounts.map((acc: any) => ({ value: acc.id, label: `${acc.accountHolderName} (${formatCurrency(financialState.balances.get(acc.id) || 0)})` }))]}
+                            value={selectedAccountId}
+                            onChange={setSelectedAccountId}
+                            placeholder="Select Account"
+                        />
                     </div>
                 )}
                 </CardContent>
@@ -204,14 +199,20 @@ export const PaymentForm = ({
                         </CardHeader>
                         <CardContent className="p-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                                 <div className="space-y-1"><Label className="text-xs">Bank</Label>
-                                    <Popover><PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">{bankDetails.bank || "Select bank"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]"><Command><CommandInput placeholder="Search bank..." /><CommandEmpty>No bank found.</CommandEmpty><CommandList>{[...bankNames, ...banks.map((b:any) => b.name)].sort().map((bank) => (<CommandItem key={bank} value={bank} onSelect={(currentValue) => setBankDetails({ ...bankDetails, bank: currentValue === bankDetails.bank ? "" : currentValue, branch: '', ifscCode: '' })}><Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />{bank}</CommandItem>))}</CommandList></Command></PopoverContent>
-                                    </Popover>
+                                    <CustomDropdown
+                                        options={[...banks.map((b: any) => ({ value: b.name, label: b.name })), ...bankNames.map(name => ({ value: name, label: name }))].sort((a,b) => a.label.localeCompare(b.label))}
+                                        value={bankDetails.bank}
+                                        onChange={(val) => setBankDetails({ ...bankDetails, bank: val || '', branch: '', ifscCode: '' })}
+                                        placeholder="Select bank"
+                                    />
                                 </div>
                                 <div className="space-y-1"><Label className="text-xs">Branch</Label>
-                                    <Popover><PopoverTrigger asChild disabled={!bankDetails.bank}><Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">{bankDetails.branch || "Select branch"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]"><Command><CommandInput placeholder="Search branch..." /><CommandEmpty>No branch found.</CommandEmpty><CommandList>{availableBranches.map((branch:any) => (<CommandItem key={branch.ifscCode} value={branch.branchName} onSelect={(currentValue) => handleBranchSelect(currentValue)}><Check className={cn("mr-2 h-4 w-4", bankDetails.branch === branch.branchName ? "opacity-100" : "opacity-0")} />{branch.branchName}</CommandItem>))}</CommandList></Command></PopoverContent>
-                                    </Popover>
+                                    <CustomDropdown
+                                        options={availableBranches}
+                                        value={bankDetails.branch}
+                                        onChange={handleBranchSelect}
+                                        placeholder="Select branch"
+                                    />
                                 </div>
                                 <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
                                 <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} className="h-8 text-xs uppercase"/></div>
