@@ -79,8 +79,8 @@ body {
 
 
 .side_bar_top{
-    padding-bottom: 20px;
-    margin-bottom: 20px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -157,11 +157,7 @@ body {
 
 
 .side_bar_bottom ul li button:hover {
-    background: hsl(var(--accent));
-}
-
-.side_bar_bottom ul li button:hover .icon {
-    color: hsl(var(--accent-foreground));
+  background: transparent;
 }
 
 
