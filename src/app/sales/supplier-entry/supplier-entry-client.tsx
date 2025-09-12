@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -269,6 +270,14 @@ export default function SupplierEntryClient() {
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
+    } else {
+        if (isEditing) {
+            setIsEditing(false);
+            const currentId = currentSupplier.srNo;
+            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
+            resetFormToState(newState);
+        }
     }
   }
 
@@ -651,3 +660,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    

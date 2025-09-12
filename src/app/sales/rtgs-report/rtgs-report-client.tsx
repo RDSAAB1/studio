@@ -65,55 +65,64 @@ export default function RtgsReportClient() {
 
     useEffect(() => {
         setLoading(true);
+        let currentSettings: RtgsSettings | null = null;
+        let unsubscribePayments: (() => void) | undefined;
+
         const fetchSettingsAndData = async () => {
             try {
                 const savedSettings = await getRtgsSettings();
-                setSettings(savedSettings);
+                if (savedSettings) {
+                    currentSettings = savedSettings;
+                    setSettings(savedSettings);
 
-                const unsubscribe = getPaymentsRealtime((payments) => {
-                    const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
-                    const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
-                        const srNo = p.rtgsSrNo || p.paymentId || '';
-                        return {
-                            paymentId: p.paymentId,
-                            date: p.date,
-                            checkNo: p.checkNo || '',
-                            type: p.type || (savedSettings?.type || 'SB'),
-                            srNo: srNo,
-                            supplierName: toTitleCase(p.supplierName || ''),
-                            fatherName: toTitleCase(p.supplierFatherName || ''),
-                            contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
-                            acNo: p.bankAcNo || '',
-                            ifscCode: p.bankIfsc || '',
-                            branch: toTitleCase(p.bankBranch || ''),
-                            bank: p.bankName || '',
-                            amount: p.rtgsAmount || p.amount || 0,
-                            rate: p.rate || 0,
-                            weight: p.quantity || 0,
-                            sixRNo: p.sixRNo || '',
-                            sixRDate: p.sixRDate || '',
-                            parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
-                        };
+                    // Now that settings are loaded, subscribe to payments
+                    unsubscribePayments = getPaymentsRealtime((payments) => {
+                        const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
+                        const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
+                            const srNo = p.rtgsSrNo || p.paymentId || '';
+                            return {
+                                paymentId: p.paymentId,
+                                date: p.date,
+                                checkNo: p.checkNo || '',
+                                type: p.type || (currentSettings?.type || 'SB'),
+                                srNo: srNo,
+                                supplierName: toTitleCase(p.supplierName || ''),
+                                fatherName: toTitleCase(p.supplierFatherName || ''),
+                                contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
+                                acNo: p.bankAcNo || '',
+                                ifscCode: p.bankIfsc || '',
+                                branch: toTitleCase(p.bankBranch || ''),
+                                bank: p.bankName || '',
+                                amount: p.rtgsAmount || p.amount || 0,
+                                rate: p.rate || 0,
+                                weight: p.quantity || 0,
+                                sixRNo: p.sixRNo || '',
+                                sixRDate: p.sixRDate || '',
+                                parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
+                            };
+                        });
+                        newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                        setReportRows(newReportRows);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error("Error fetching RTGS reports: ", error);
+                        setLoading(false);
                     });
-                    newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                    setReportRows(newReportRows);
-                    setLoading(false);
-                }, (error) => {
-                    console.error("Error fetching RTGS reports: ", error);
-                    setLoading(false);
-                });
-                return unsubscribe;
+                } else {
+                    setLoading(false); // Stop loading if settings fail
+                }
             } catch (error) {
                 console.error("Error fetching initial settings: ", error);
                 setLoading(false);
             }
         };
 
-        const unsubscribe = fetchSettingsAndData();
+        fetchSettingsAndData();
 
         return () => {
-            // How to handle unsubscribe from a promise?
-            // This needs to be refactored to handle async correctly.
+            if (unsubscribePayments) {
+                unsubscribePayments();
+            }
         };
     }, []);
 
@@ -487,7 +496,4 @@ export default function RtgsReportClient() {
     );
 }
 
-
-
-
-
+    
