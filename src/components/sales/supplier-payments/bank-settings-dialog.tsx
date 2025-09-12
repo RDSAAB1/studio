@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { bankNames } from '@/lib/data';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onAddBranch }: any) => {
     const [newBankName, setNewBankName] = useState('');
@@ -32,12 +33,13 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader><DialogTitle>Bank Management</DialogTitle><DialogDescription>Add new banks and branches.</DialogDescription></DialogHeader>
-                <div className="space-y-6">
+                <ScrollArea className="pr-4 -mr-4">
+                <div className="space-y-6 py-4">
                     <Card>
                         <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
                         <CardContent className="flex flex-col sm:flex-row gap-2">
                             <Input placeholder="Enter new bank name" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} />
-                            <Button onClick={handleAddNewBank} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" /> Add Bank</Button>
+                            <Button onClick={handleAddNewBank} className="w-full sm:w-auto shrink-0"><Plus className="mr-2 h-4 w-4" /> Add Bank</Button>
                         </CardContent>
                     </Card>
                     <Card>
@@ -62,6 +64,7 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                         </CardContent>
                     </Card>
                 </div>
+                </ScrollArea>
                 <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Done</Button></DialogFooter>
             </DialogContent>
         </Dialog>
