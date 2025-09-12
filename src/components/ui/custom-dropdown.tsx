@@ -37,25 +37,22 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
     useEffect(() => {
-        // When a value is selected, update the search term to reflect it
         setSearchTerm(selectedItem?.label || '');
     }, [selectedItem]);
     
     const filteredItems = useMemo(() => {
-        if (!searchTerm) {
+        if (!searchTerm || searchTerm === selectedItem?.label) {
             return options;
         }
-        // Match only from the beginning of the string (case-insensitive)
         return options.filter(item =>
             item.label.toLowerCase().startsWith(searchTerm.toLowerCase())
         );
-    }, [searchTerm, options]);
+    }, [searchTerm, options, selectedItem]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
-                // If dropdown is closed without selection, revert search term to selected item's label or clear it
                 setSearchTerm(selectedItem?.label || '');
             }
         };
@@ -72,17 +69,16 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     };
     
     const handleClear = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Stop the click from propagating to the main button
+        e.stopPropagation();
         onChange(null);
         setSearchTerm('');
-        setIsOpen(true); // Re-open the dropdown after clearing
-        dropdownRef.current?.querySelector('input')?.focus(); // Focus the input
+        setIsOpen(true);
+        dropdownRef.current?.querySelector('input')?.focus();
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
-        // If the user starts typing, we should clear the selected value
         if (value && newSearchTerm !== selectedItem?.label) {
             onChange(null);
         }
@@ -90,8 +86,10 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     };
 
     const handleInputClick = () => {
-        setSearchTerm(''); // Clear the search term on click to allow for a new search
-        onChange(null);
+        if (isOpen && searchTerm === selectedItem?.label) {
+            setSearchTerm('');
+            onChange(null);
+        }
         setIsOpen(true);
     };
 
@@ -104,33 +102,34 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
     return (
         <div className="relative w-full" ref={dropdownRef}>
-             <div className="flex items-center w-full border border-input bg-background rounded-md h-8 text-sm focus-within:border-primary/80">
-                <div className="relative flex-1">
+             <div className="flex items-center w-full border border-input bg-background rounded-md h-8 text-sm focus-within:ring-2 focus-within:ring-ring">
+                <div className="relative flex-grow flex items-center">
                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    <Input
+                    <input
                         type="text"
                         placeholder={placeholder}
                         value={searchTerm}
                         onChange={handleInputChange}
                         onClick={handleInputClick}
-                        className="w-full pl-8 pr-10 h-auto py-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="w-full pl-8 pr-2 h-full bg-transparent border-0 focus:outline-none text-sm"
                     />
                 </div>
-                <div className="flex items-center space-x-1 pr-2">
+                <div className="flex items-center space-x-1 pr-1.5 flex-shrink-0">
                     {value && (
-                        <button type="button" onClick={handleClear} className="p-1 focus:outline-none">
-                            <X className="w-4 h-4 text-muted-foreground hover:text-destructive transition-colors cursor-pointer" />
+                        <button type="button" onClick={handleClear} className="p-0.5 focus:outline-none rounded-full hover:bg-muted">
+                            <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
                         </button>
                     )}
+                    <div className="h-4 w-px bg-border"/>
                     <button
                         type="button"
                         onClick={() => setIsOpen(!isOpen)}
-                        className="p-1 focus:outline-none"
+                        className="p-0.5 focus:outline-none"
                     >
                         {isOpen ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground transition-transform" />
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
                         ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform" />
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         )}
                     </button>
                 </div>
