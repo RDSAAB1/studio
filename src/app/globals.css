@@ -22,7 +22,7 @@
   --destructive-foreground: 210 40% 98%;
   --border: 217 33% 25%;
   --input: 217 33% 22%;
-  --ring: 215 28% 91%;
+  --ring: hsl(var(--primary) / 0.4);
   --radius: 0.75rem;
   --chart-1: hsl(259 96% 67%);
   --chart-2: hsl(0 72% 51%);
@@ -171,16 +171,19 @@ body {
 }
 
 /* Adjust icon margin when collapsed */
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button .icon {
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button .icon,
+.side_bar:not(:hover) .side_bar_bottom ul li button .icon {
     margin-right: 0;
 }
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button {
+.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button,
+.side_bar:not(:hover) .side_bar_bottom ul li button {
     justify-content: center;
     padding: 12px 0;
 }
 
 /* Hide text when collapsed */
-.wrapper:not(.active) .side_bar:not(:hover) .item {
+.wrapper:not(.active) .side_bar:not(:hover) .item,
+.side_bar:not(:hover) .item {
   display: none !important;
 }
 .wrapper.active .side_bar .item,
@@ -208,11 +211,12 @@ body {
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease-in-out;
-  /* Hide submenu when sidebar is collapsed */
-  .wrapper:not(.active):not(:hover) .side_bar & {
-    display: none;
-  }
 }
+
+.wrapper:not(.active) .side_bar:not(:hover) .submenu {
+    display: none;
+}
+
 
 .submenu.open {
   max-height: 500px; /* Adjust as needed */
