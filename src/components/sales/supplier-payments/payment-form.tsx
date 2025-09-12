@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins, User, Building, Home, Landmark, Hash, Wallet, CircleDollarSign } from "lucide-react";
+import { Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins, User, Building, Home, Landmark, Hash, Wallet, CircleDollarSign, Weight } from "lucide-react";
 import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from '@/components/ui/switch';

@@ -88,22 +88,28 @@ export const CalculatedSummary = ({
 
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
                     <div className="flex items-center gap-2 flex-wrap">
-                         <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
-                            <Input
-                                placeholder="Search by SR No, Name, or Contact..."
-                                onChange={(e) => onSearch && onSearch(e.target.value)}
-                                className="h-8 pl-10 text-xs w-48 sm:w-64"
-                            />
-                        </InputWithIcon>
-                         <Button asChild size="sm" variant="outline" className="h-8 relative">
-                            <label htmlFor="import-file">
-                                <Upload className="mr-2 h-4 w-4"/> Import
-                                <input id="import-file" type="file" className="sr-only" onChange={onImport} accept=".xlsx, .xls"/>
-                            </label>
-                        </Button>
-                        <Button onClick={onExport} size="sm" variant="outline" className="h-8">
-                           <Download className="mr-2 h-4 w-4"/> Export
-                        </Button>
+                         {onSearch && (
+                            <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
+                                <Input
+                                    placeholder="Search by SR No, Name, or Contact..."
+                                    onChange={(e) => onSearch(e.target.value)}
+                                    className="h-8 pl-10 text-xs w-48 sm:w-64"
+                                />
+                            </InputWithIcon>
+                         )}
+                         {onImport && (
+                            <Button asChild size="sm" variant="outline" className="h-8 relative">
+                                <label htmlFor="import-file">
+                                    <Upload className="mr-2 h-4 w-4"/> Import
+                                    <input id="import-file" type="file" className="sr-only" onChange={onImport} accept=".xlsx, .xls"/>
+                                </label>
+                            </Button>
+                         )}
+                         {onExport && (
+                            <Button onClick={onExport} size="sm" variant="outline" className="h-8">
+                            <Download className="mr-2 h-4 w-4"/> Export
+                            </Button>
+                         )}
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap justify-end">
