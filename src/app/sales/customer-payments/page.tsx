@@ -12,13 +12,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -41,10 +34,9 @@ import { getReceiptSettings, getBankAccountsRealtime, getIncomeRealtime, getExpe
 import type { ReceiptSettings } from "@/lib/definitions";
 import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { OutstandingEntriesDialog } from "@/components/sales/supplier-payments/outstanding-entries-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 
 const customersCollection = collection(db, "customers");
@@ -76,7 +68,6 @@ export default function CustomerPaymentsPage() {
   const [paymentDetails, setPaymentDetails] = useState<CustomerPayment | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Customer | null>(null);
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
-  const [openCombobox, setOpenCombobox] = useState(false);
   const [activeTab, setActiveTab] = useState('processing');
   
   const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
@@ -122,7 +113,7 @@ export default function CustomerPaymentsPage() {
           const num = numMatch ? parseInt(numMatch[1], 10) : 0;
           return num > max ? num : max;
       }, 0);
-      return formatSrNo(lastNum + 1, 'CR');
+      return formatSrNo(lastNum + 1, 'R');
   }, []);
 
   useEffect(() => {
@@ -149,13 +140,15 @@ export default function CustomerPaymentsPage() {
     return () => { unsubCustomers(); unsubPayments(); unsubBankAccounts(); unsubIncomes(); unsubExpenses(); unsubFunds(); };
   }, [toast, getNextReceiptNo, editingPayment]);
   
-  const handleCustomerSelect = (key: string) => {
+  const handleCustomerSelect = (key: string | null) => {
     setSelectedCustomerKey(key);
     setSelectedEntryIds(new Set());
     setPaymentAmount(0);
     setPaymentType('Full');
     setEditingPayment(null);
-    setIsOutstandingModalOpen(true);
+    if(key) {
+        setIsOutstandingModalOpen(true);
+    }
   };
 
   const selectedEntries = useMemo(() => customers.filter(c => selectedEntryIds.has(c.id)), [customers, selectedEntryIds]);
@@ -321,12 +314,12 @@ export default function CustomerPaymentsPage() {
                 <CardContent className="p-3">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                     <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Customer:</Label>
-                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}><PopoverTrigger asChild><Button variant="outline" role="combobox" className="h-9 text-sm flex-1 justify-between font-normal">{selectedCustomerKey ? `${toTitleCase(customerSummary.get(selectedCustomerKey)?.name || '')} (${customerSummary.get(selectedCustomerKey)?.contact || ''})` : "Search and select customer..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-50"><Command><CommandInput placeholder="Search by name or contact..." /><CommandList><CommandEmpty>No customer found.</CommandEmpty><CommandGroup>
-                            {Array.from(customerSummary.entries()).map(([key, data]) => (
-                                <CommandItem key={key} value={`${data.name} ${data.contact}`} onSelect={() => { handleCustomerSelect(key); setOpenCombobox(false); }}><Check className={cn("mr-2 h-4 w-4", selectedCustomerKey === key ? "opacity-100" : "opacity-0")}/>{toTitleCase(data.name)} ({data.contact}) - bal: {formatCurrency(data.totalOutstanding)}</CommandItem>
-                            ))}</CommandGroup></CommandList></Command></PopoverContent>
-                    </Popover>
+                    <CustomDropdown
+                        options={Array.from(customerSummary.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact}) - bal: ${formatCurrency(data.totalOutstanding)}` }))}
+                        value={selectedCustomerKey}
+                        onChange={handleCustomerSelect}
+                        placeholder="Search and select customer..."
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -343,15 +336,20 @@ export default function CustomerPaymentsPage() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                           <div className="space-y-2"><Label htmlFor="receipt-no" className="text-xs">Receipt No.</Label><Input id="receipt-no" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} className="h-9 text-sm"/></div>
-                          <div className="space-y-2"><Label className="text-xs">Payment Type</Label><Select value={paymentType} onValueChange={setPaymentType}><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Full">Full</SelectItem><SelectItem value="Partial">Partial</SelectItem></SelectContent></Select></div>
+                          <div className="space-y-2"><Label className="text-xs">Payment Type</Label>
+                                <CustomDropdown 
+                                    options={[{value: "Full", label: "Full"}, {value: "Partial", label: "Partial"}]} 
+                                    value={paymentType} 
+                                    onChange={(v) => v && setPaymentType(v)} 
+                                />
+                          </div>
                           <div className="space-y-2"><Label htmlFor="payment-amount" className="text-xs">Payment Amount</Label><Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-9 text-sm"/></div>
                           <div className="space-y-2"><Label className="text-xs">Receive In</Label>
-                                <Select value={selectedAccountId} onValueChange={setSelectedAccountId}><SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select Account" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="CashInHand"><div className="flex items-center"><HandCoins className="mr-2 h-4 w-4" /> Cash In Hand</div></SelectItem>
-                                        {bankAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.accountHolderName}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
+                                <CustomDropdown 
+                                    options={[{value: "CashInHand", label: "Cash In Hand"}, ...bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }))]} 
+                                    value={selectedAccountId} 
+                                    onChange={(v) => v && setSelectedAccountId(v)} 
+                                />
                           </div>
                           <Button onClick={processPayment} disabled={selectedEntryIds.size === 0} className="h-9 w-full">Receive Payment</Button>
                       </div>
