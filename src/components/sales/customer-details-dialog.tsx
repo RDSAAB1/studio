@@ -45,8 +45,8 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
 
     return (
         <Dialog open={!!customer} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-0">
-                <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center">
+            <DialogContent className="max-w-4xl p-0 flex flex-col">
+                <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center flex-shrink-0">
                     <div>
                         <DialogTitle className="text-base font-semibold">Details for SR No: {customer.srNo}</DialogTitle>
                     </div>
@@ -59,7 +59,7 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                         </DialogClose>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="max-h-[85vh]">
+                <ScrollArea className="flex-grow">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
                         <Card>
                             <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
