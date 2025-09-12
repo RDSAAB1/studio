@@ -2,16 +2,15 @@
 "use client";
 
 import { useState } from 'react';
-import * as SelectPrimitive from "@radix-ui/react-select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { bankNames } from '@/lib/data';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DynamicCombobox } from '@/components/ui/dynamic-combobox';
 
 export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onAddBranch }: any) => {
     const [newBankName, setNewBankName] = useState('');
@@ -28,6 +27,8 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
         onAddBranch(newBranchData);
         setNewBranchData({ bankName: '', branchName: '', ifscCode: '' });
     };
+    
+    const allBankOptions = [...bankNames, ...banks.map((b: any) => b.name)].sort().map(name => ({ value: name, label: name }));
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -50,16 +51,13 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                             <CardContent className="space-y-4">
                                 <div className="space-y-1">
                                     <Label>Select Bank</Label>
-                                    <Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}>
-                                        <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
-                                        <SelectPrimitive.Portal>
-                                            <SelectContent className="z-[99]">
-                                                {[...bankNames, ...banks.map((b: any) => b.name)].sort().map((bank) => (
-                                                    <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </SelectPrimitive.Portal>
-                                    </Select>
+                                    <DynamicCombobox
+                                        options={allBankOptions}
+                                        value={newBranchData.bankName}
+                                        onChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}
+                                        placeholder="Select a bank"
+                                        searchPlaceholder="Search banks..."
+                                    />
                                 </div>
                                 <div className="space-y-1"><Label>Branch Name</Label><Input placeholder="Enter branch name" value={newBranchData.branchName} onChange={(e) => setNewBranchData(prev => ({...prev, branchName: e.target.value}))}/></div>
                                 <div className="space-y-1"><Label>IFSC Code</Label><Input placeholder="Enter IFSC code" value={newBranchData.ifscCode} onChange={(e) => setNewBranchData(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} className="uppercase"/></div>

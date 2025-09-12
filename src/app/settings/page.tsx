@@ -7,7 +7,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
-import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, SerialNumberFormat, Bank, BankBranch } from '@/lib/definitions';
+import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
@@ -33,9 +33,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { bankNames, bankBranches as staticBankBranches } from '@/lib/data';
 
 
@@ -144,20 +142,6 @@ export default function SettingsPage() {
     const emailForm = useForm<EmailFormValues>();
     
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
-    
-    const availableBranches = React.useMemo(() => {
-        if (!currentBankAccount.bankName) return [];
-        const combined = [...staticBankBranches, ...bankBranches];
-        const uniqueBranches = Array.from(new Map(combined.map(item => [item.ifscCode + item.branchName, item])).values());
-        return uniqueBranches.filter(branch => branch.bankName.toLowerCase() === currentBankAccount.bankName?.toLowerCase());
-    }, [currentBankAccount.bankName, bankBranches]);
-
-    const handleBranchSelect = (branchName: string) => {
-        const selectedBranch = availableBranches.find(b => b.branchName === branchName);
-        if(selectedBranch) {
-            setCurrentBankAccount(prev => ({...prev, branchName: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
-        }
-    };
 
     useEffect(() => {
         const auth = getFirebaseAuth();
@@ -372,6 +356,8 @@ export default function SettingsPage() {
             }
         }
     };
+    
+    const allBankOptions = [...bankNames, ...banks.map((b: any) => b.name)].sort().map(name => ({ value: name, label: name }));
 
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -577,9 +563,12 @@ export default function SettingsPage() {
                             <Input id="accountHolderName" name="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={handleBankAccountInputChange} />
                         </div>
                         <div className="space-y-1"><Label className="text-xs">Bank</Label>
-                            <Popover><PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between font-normal h-9 text-sm">{currentBankAccount.bankName || "Select bank"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search bank..." /><CommandEmpty>No bank found.</CommandEmpty><CommandList>{[...bankNames, ...banks.map((b:any) => b.name)].sort().map((bank) => (<CommandItem key={bank} value={bank} onSelect={(currentValue) => setCurrentBankAccount(prev => ({ ...prev, bankName: currentValue === prev.bankName ? "" : currentValue, branchName: '', ifscCode: '' }))}><Check className={cn("mr-2 h-4 w-4", currentBankAccount.bankName === bank ? "opacity-100" : "opacity-0")} />{bank}</CommandItem>))}</CommandList></Command></PopoverContent>
-                            </Popover>
+                            <DynamicCombobox
+                                options={allBankOptions}
+                                value={currentBankAccount.bankName}
+                                onChange={(value) => setCurrentBankAccount(prev => ({...prev, bankName: value, branchName: '', ifscCode: ''}))}
+                                placeholder="Select a bank"
+                            />
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="accountNumber">Account Number</Label>
@@ -591,16 +580,18 @@ export default function SettingsPage() {
                         </div>
                         <div className="space-y-1">
                            <Label htmlFor="accountType">Account Type</Label>
-                           <Select value={currentBankAccount.accountType} onValueChange={(value) => setCurrentBankAccount(prev => ({ ...prev, accountType: value as BankAccount['accountType'] }))}>
-                               <SelectTrigger><SelectValue placeholder="Select account type" /></SelectTrigger>
-                               <SelectContent>
-                                   <SelectItem value="Savings">Savings</SelectItem>
-                                   <SelectItem value="Current">Current</SelectItem>
-                                   <SelectItem value="Loan">Loan Account</SelectItem>
-                                   <SelectItem value="Limit">Limit Account</SelectItem>
-                                   <SelectItem value="Other">Other</SelectItem>
-                               </SelectContent>
-                           </Select>
+                            <DynamicCombobox
+                                options={[
+                                    { value: 'Savings', label: 'Savings' },
+                                    { value: 'Current', label: 'Current' },
+                                    { value: 'Loan', label: 'Loan Account' },
+                                    { value: 'Limit', label: 'Limit Account' },
+                                    { value: 'Other', label: 'Other' },
+                                ]}
+                                value={currentBankAccount.accountType}
+                                onChange={(value) => setCurrentBankAccount(prev => ({ ...prev, accountType: value as BankAccount['accountType'] }))}
+                                placeholder="Select account type"
+                            />
                         </div>
                     </div>
                     </form>

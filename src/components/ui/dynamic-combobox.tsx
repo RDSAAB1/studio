@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown, PlusCircle } from "lucide-react";
+import { Check, ChevronsUpDown, PlusCircle, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ interface DynamicComboboxProps {
   searchPlaceholder?: string;
   emptyPlaceholder?: string;
   onIconClick?: () => void;
+  className?: string;
 }
 
 export function DynamicCombobox({
@@ -45,7 +46,8 @@ export function DynamicCombobox({
   placeholder = "Select an option",
   searchPlaceholder = "Search...",
   emptyPlaceholder = "No options found.",
-  onIconClick
+  onIconClick,
+  className,
 }: DynamicComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState("");
@@ -57,9 +59,15 @@ export function DynamicCombobox({
   const handleAddNew = () => {
     if (onAdd && inputValue) {
       onAdd(inputValue);
+      onChange(inputValue); // Select the newly added item
       setInputValue("");
       setOpen(false);
     }
+  };
+  
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange("");
   };
 
   const filteredOptions = options.filter(option => 
@@ -70,27 +78,28 @@ export function DynamicCombobox({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className="relative">
+      <div className={cn("relative", className)}>
         <PopoverTrigger asChild>
             <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-start h-8 text-sm font-normal pr-10"
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between h-8 text-sm font-normal pr-8"
             >
-            {selectedOption ? toTitleCase(selectedOption.label) : placeholder}
+              <span className="truncate">
+                {selectedOption ? toTitleCase(selectedOption.label) : placeholder}
+              </span>
             </Button>
         </PopoverTrigger>
-         {onIconClick && (
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={onIconClick}
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-            >
-                <PlusCircle className="h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-        )}
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
+            {value && (
+                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={handleClear}><X className="h-3 w-3" /></Button>
+            )}
+            {onIconClick && (
+                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={onIconClick}><PlusCircle className="h-4 w-4 shrink-0 opacity-50" /></Button>
+            )}
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 ml-1" />
+        </div>
       </div>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]">
         <Command>
@@ -109,7 +118,7 @@ export function DynamicCombobox({
                   key={option.value}
                   value={option.value}
                   onSelect={() => {
-                    onChange(option.value);
+                    onChange(option.value === value ? "" : option.value);
                     setInputValue("");
                     setOpen(false);
                   }}
