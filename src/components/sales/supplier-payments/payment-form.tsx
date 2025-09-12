@@ -206,12 +206,12 @@ export const PaymentForm = ({
                         <CardContent className="p-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                                 <div className="space-y-1"><Label className="text-xs">Bank</Label>
                                     <Popover><PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">{bankDetails.bank || "Select bank"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search bank..." /><CommandEmpty>No bank found.</CommandEmpty><CommandList>{[...bankNames, ...banks.map((b:any) => b.name)].sort().map((bank) => (<CommandItem key={bank} value={bank} onSelect={(currentValue) => setBankDetails({ ...bankDetails, bank: currentValue === bankDetails.bank ? "" : currentValue, branch: '', ifscCode: '' })}><Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />{bank}</CommandItem>))}</CommandList></Command></PopoverContent>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]"><Command><CommandInput placeholder="Search bank..." /><CommandEmpty>No bank found.</CommandEmpty><CommandList>{[...bankNames, ...banks.map((b:any) => b.name)].sort().map((bank) => (<CommandItem key={bank} value={bank} onSelect={(currentValue) => setBankDetails({ ...bankDetails, bank: currentValue === bankDetails.bank ? "" : currentValue, branch: '', ifscCode: '' })}><Check className={cn("mr-2 h-4 w-4", bankDetails.bank === bank ? "opacity-100" : "opacity-0")} />{bank}</CommandItem>))}</CommandList></Command></PopoverContent>
                                     </Popover>
                                 </div>
                                 <div className="space-y-1"><Label className="text-xs">Branch</Label>
                                     <Popover><PopoverTrigger asChild disabled={!bankDetails.bank}><Button variant="outline" role="combobox" className="w-full justify-between font-normal h-8 text-xs">{bankDetails.branch || "Select branch"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search branch..." /><CommandEmpty>No branch found.</CommandEmpty><CommandList>{availableBranches.map((branch:any) => (<CommandItem key={branch.ifscCode} value={branch.branchName} onSelect={(currentValue) => handleBranchSelect(currentValue)}><Check className={cn("mr-2 h-4 w-4", bankDetails.branch === branch.branchName ? "opacity-100" : "opacity-0")} />{branch.branchName}</CommandItem>))}</CommandList></Command></PopoverContent>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]"><Command><CommandInput placeholder="Search branch..." /><CommandEmpty>No branch found.</CommandEmpty><CommandList>{availableBranches.map((branch:any) => (<CommandItem key={branch.ifscCode} value={branch.branchName} onSelect={(currentValue) => handleBranchSelect(currentValue)}><Check className={cn("mr-2 h-4 w-4", bankDetails.branch === branch.branchName ? "opacity-100" : "opacity-0")} />{branch.branchName}</CommandItem>))}</CommandList></Command></PopoverContent>
                                     </Popover>
                                 </div>
                                 <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
@@ -258,3 +258,4 @@ export const PaymentForm = ({
 
     
 
+    

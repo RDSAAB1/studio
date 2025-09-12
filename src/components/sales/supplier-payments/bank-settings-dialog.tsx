@@ -44,7 +44,7 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                                 <Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}>
                                     <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
                                      <SelectPrimitive.Portal>
-                                        <SelectContent>
+                                        <SelectContent className="z-[99]">
                                             {banks.map((bank: any) => <SelectItem key={bank.name} value={bank.name}>{bank.name}</SelectItem>)}
                                         </SelectContent>
                                      </SelectPrimitive.Portal>
