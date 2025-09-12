@@ -281,7 +281,7 @@ export const SupplierProfileView = ({
     onGenerateStatement: () => void;
 }) => {
     const [selectedChart, setSelectedChart] = useState<'financial' | 'variety'>('financial');
-    const { toast } = useToast();
+    const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
     const financialPieChartData = useMemo(() => {
         if (!selectedSupplierData) return [];
