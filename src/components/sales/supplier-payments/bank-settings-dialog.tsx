@@ -31,10 +31,13 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader><DialogTitle>Bank Management</DialogTitle><DialogDescription>Add new banks and branches.</DialogDescription></DialogHeader>
-                <ScrollArea className="max-h-[70vh] pr-4 -mr-4">
-                    <div className="space-y-6 py-4 pr-1">
+            <DialogContent className="sm:max-w-md p-0">
+                <DialogHeader className="p-6 pb-4">
+                    <DialogTitle>Bank Management</DialogTitle>
+                    <DialogDescription>Add new banks and branches.</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="px-6 flex-grow">
+                     <div className="space-y-6 py-4">
                         <Card>
                             <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
                             <CardContent className="flex flex-col sm:flex-row gap-2">
@@ -65,7 +68,9 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                         </Card>
                     </div>
                 </ScrollArea>
-                <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Done</Button></DialogFooter>
+                <DialogFooter className="p-6 pt-4 border-t">
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Done</Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
