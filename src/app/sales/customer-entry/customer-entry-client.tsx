@@ -542,8 +542,8 @@ export default function CustomerEntryClient() {
         reader.readAsBinaryString(file);
     };
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.altKey) {
+  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
+    if (event.ctrlKey) {
         event.preventDefault();
         switch (event.key.toLowerCase()) {
             case 's':
@@ -565,11 +565,11 @@ export default function CustomerEntryClient() {
   }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentCustomer]);
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyboardShortcuts);
     return () => {
-        document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keydown', handleKeyboardShortcuts);
     };
-  }, [handleKeyDown]);
+  }, [handleKeyboardShortcuts]);
 
   if (!isClient) {
     return null;
@@ -671,4 +671,5 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+
 
