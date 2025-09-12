@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from 'react';
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
+import { bankNames } from '@/lib/data';
 
 export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onAddBranch }: any) => {
     const [newBankName, setNewBankName] = useState('');
@@ -45,7 +47,9 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                                     <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
                                      <SelectPrimitive.Portal>
                                         <SelectContent className="z-[99]">
-                                            {banks.map((bank: any) => <SelectItem key={bank.name} value={bank.name}>{bank.name}</SelectItem>)}
+                                            {[...bankNames, ...banks.map((b: any) => b.name)].sort().map((bank) => (
+                                                <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+                                            ))}
                                         </SelectContent>
                                      </SelectPrimitive.Portal>
                                 </Select>
