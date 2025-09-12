@@ -799,7 +799,7 @@ export default function SupplierPaymentsClient() {
                     </TabsList>
                 </CardHeader>
                 <TabsContent value="processing" className="mt-0 p-4 space-y-3">
-                     <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2">
                         <Label>Payment Method:</Label>
                         <Button variant={paymentMethod === 'Cash' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('Cash')}>Cash</Button>
                         <Button variant={paymentMethod === 'Online' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('Online')}>Online</Button>
@@ -873,7 +873,7 @@ export default function SupplierPaymentsClient() {
                     )}
                 </TabsContent>
                 <TabsContent value="history" className="mt-0">
-                    <div className="p-4 space-y-3">
+                     <div className="p-4 space-y-3">
                         <PaymentHistory
                             payments={paymentHistory}
                             onEdit={handleEditPayment}
@@ -937,5 +937,3 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
