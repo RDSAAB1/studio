@@ -33,8 +33,8 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader><DialogTitle>Bank Management</DialogTitle><DialogDescription>Add new banks and branches.</DialogDescription></DialogHeader>
-                <ScrollArea className="pr-4 -mr-4">
-                <div className="space-y-6 py-4">
+                <ScrollArea className="max-h-[70vh] pr-4 -mr-4">
+                <div className="space-y-6 py-4 pr-1">
                     <Card>
                         <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
                         <CardContent className="flex flex-col sm:flex-row gap-2">
