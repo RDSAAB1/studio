@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState } from 'react';
@@ -31,12 +30,15 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader><DialogTitle>Bank Management</DialogTitle><DialogDescription>Add new banks and branches.</DialogDescription></DialogHeader>
                 <div className="space-y-6">
                     <Card>
                         <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
-                        <CardContent className="flex gap-2"><Input placeholder="Enter new bank name" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} /><Button onClick={handleAddNewBank}><Plus className="mr-2 h-4 w-4" /> Add Bank</Button></CardContent>
+                        <CardContent className="flex flex-col sm:flex-row gap-2">
+                            <Input placeholder="Enter new bank name" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} />
+                            <Button onClick={handleAddNewBank} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" /> Add Bank</Button>
+                        </CardContent>
                     </Card>
                     <Card>
                         <CardHeader><CardTitle className="text-base">Add New Branch</CardTitle></CardHeader>
@@ -55,8 +57,8 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
                                 </Select>
                             </div>
                             <div className="space-y-1"><Label>Branch Name</Label><Input placeholder="Enter branch name" value={newBranchData.branchName} onChange={(e) => setNewBranchData(prev => ({...prev, branchName: e.target.value}))}/></div>
-                            <div className="space-y-1"><Label>IFSC Code</Label><Input placeholder="Enter IFSC code" value={newBranchData.ifscCode} onChange={(e) => setNewBranchData(prev => ({...prev, ifscCode: e.target.value}))}/></div>
-                            <Button onClick={handleAddNewBranch}><Plus className="mr-2 h-4 w-4" /> Add Branch</Button>
+                            <div className="space-y-1"><Label>IFSC Code</Label><Input placeholder="Enter IFSC code" value={newBranchData.ifscCode} onChange={(e) => setNewBranchData(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} className="uppercase"/></div>
+                            <Button onClick={handleAddNewBranch} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" /> Add Branch</Button>
                         </CardContent>
                     </Card>
                 </div>
