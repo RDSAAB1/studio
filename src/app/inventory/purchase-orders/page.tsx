@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { format } from 'date-fns';
 import { Loader2, Edit, Trash2, PlusCircle } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function PurchaseOrdersPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
@@ -194,39 +195,41 @@ export default function PurchaseOrdersPage() {
           <DialogHeader>
             <DialogTitle>Add New Purchase Order</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Basic form fields for new order */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="supplierId" className="text-right">
-                Supplier ID
-              </Label>
-              <Input id="supplierId" value={newOrder.supplierId} onChange={(e) => setNewOrder({ ...newOrder, supplierId: e.target.value })} className="col-span-3" />
+          <ScrollArea className="max-h-[70vh] -mr-6 pr-6">
+            <div className="grid gap-4 py-4 pr-1">
+              {/* Basic form fields for new order */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="supplierId" className="text-right">
+                  Supplier ID
+                </Label>
+                <Input id="supplierId" value={newOrder.supplierId} onChange={(e) => setNewOrder({ ...newOrder, supplierId: e.target.value })} className="col-span-3" />
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="orderDate" className="text-right">
+                  Order Date
+                </Label>
+                <Input id="orderDate" type="date" value={newOrder.orderDate} onChange={(e) => setNewOrder({ ...newOrder, orderDate: e.target.value })} className="col-span-3" />
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deliveryDate" className="text-right">
+                  Delivery Date
+                </Label>
+                <Input id="deliveryDate" type="date" value={newOrder.deliveryDate} onChange={(e) => setNewOrder({ ...newOrder, deliveryDate: e.target.value })} className="col-span-3" />
+              </div>
+               {/* You would typically add fields here to manage 'items' and calculate 'totalAmount' */}
+               {/* For simplicity, adding a dummy total amount field */}
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="totalAmount" className="text-right">
+                  Total Amount
+                </Label>
+                <Input id="totalAmount" type="number" value={newOrder.totalAmount} onChange={(e) => setNewOrder({ ...newOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
+              </div>
+               {/* Items management would need more complex UI (e.g., list of items with quantity, price) */}
+               <div className="col-span-4 text-center text-sm text-muted-foreground">
+                   (Item management UI needs to be implemented)
+               </div>
             </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="orderDate" className="text-right">
-                Order Date
-              </Label>
-              <Input id="orderDate" type="date" value={newOrder.orderDate} onChange={(e) => setNewOrder({ ...newOrder, orderDate: e.target.value })} className="col-span-3" />
-            </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="deliveryDate" className="text-right">
-                Delivery Date
-              </Label>
-              <Input id="deliveryDate" type="date" value={newOrder.deliveryDate} onChange={(e) => setNewOrder({ ...newOrder, deliveryDate: e.target.value })} className="col-span-3" />
-            </div>
-             {/* You would typically add fields here to manage 'items' and calculate 'totalAmount' */}
-             {/* For simplicity, adding a dummy total amount field */}
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="totalAmount" className="text-right">
-                Total Amount
-              </Label>
-              <Input id="totalAmount" type="number" value={newOrder.totalAmount} onChange={(e) => setNewOrder({ ...newOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
-            </div>
-             {/* Items management would need more complex UI (e.g., list of items with quantity, price) */}
-             <div className="col-span-4 text-center text-sm text-muted-foreground">
-                 (Item management UI needs to be implemented)
-             </div>
-          </div>
+          </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
             <Button onClick={handleAddOrder}>Add Order</Button>
@@ -240,33 +243,35 @@ export default function PurchaseOrdersPage() {
           <DialogHeader>
             <DialogTitle>Edit Purchase Order</DialogTitle>
           </DialogHeader>
-          {editingOrder && (
-             <div className="grid gap-4 py-4">
-                {/* Basic form fields for editing order */}
-                <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-supplierId" className="text-right">
-                    Supplier ID
-                </Label>
-                <Input id="edit-supplierId" value={editingOrder.supplierId} onChange={(e) => setEditingOrder({ ...editingOrder, supplierId: e.target.value })} className="col-span-3" />
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit-orderDate" className="text-right">Order Date</Label>
-                     <Input id="edit-orderDate" type="date" value={editingOrder.orderDate ? format(new Date(editingOrder.orderDate), 'yyyy-MM-dd') : ''} onChange={(e) => setEditingOrder({ ...editingOrder, orderDate: e.target.value })} className="col-span-3" />
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit-deliveryDate" className="text-right">Delivery Date</Label>
-                     <Input id="edit-deliveryDate" type="date" value={editingOrder.deliveryDate ? format(new Date(editingOrder.deliveryDate), 'yyyy-MM-dd') : ''} onChange={(e) => setEditingOrder({ ...editingOrder, deliveryDate: e.target.value })} className="col-span-3" />
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit-status" className="text-right">Status</Label>
-                     <Input id="edit-status" value={editingOrder.status} onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value })} className="col-span-3" />
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit-totalAmount" className="text-right">Total Amount</Label>
-                     <Input id="edit-totalAmount" type="number" value={editingOrder.totalAmount} onChange={(e) => setEditingOrder({ ...editingOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
-                </div>
-             </div>
-          )}
+          <ScrollArea className="max-h-[70vh] -mr-6 pr-6">
+            {editingOrder && (
+               <div className="grid gap-4 py-4 pr-1">
+                  {/* Basic form fields for editing order */}
+                  <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-supplierId" className="text-right">
+                      Supplier ID
+                  </Label>
+                  <Input id="edit-supplierId" value={editingOrder.supplierId} onChange={(e) => setEditingOrder({ ...editingOrder, supplierId: e.target.value })} className="col-span-3" />
+                  </div>
+                   <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit-orderDate" className="text-right">Order Date</Label>
+                       <Input id="edit-orderDate" type="date" value={editingOrder.orderDate ? format(new Date(editingOrder.orderDate), 'yyyy-MM-dd') : ''} onChange={(e) => setEditingOrder({ ...editingOrder, orderDate: e.target.value })} className="col-span-3" />
+                  </div>
+                   <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit-deliveryDate" className="text-right">Delivery Date</Label>
+                       <Input id="edit-deliveryDate" type="date" value={editingOrder.deliveryDate ? format(new Date(editingOrder.deliveryDate), 'yyyy-MM-dd') : ''} onChange={(e) => setEditingOrder({ ...editingOrder, deliveryDate: e.target.value })} className="col-span-3" />
+                  </div>
+                   <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit-status" className="text-right">Status</Label>
+                       <Input id="edit-status" value={editingOrder.status} onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value })} className="col-span-3" />
+                  </div>
+                   <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit-totalAmount" className="text-right">Total Amount</Label>
+                       <Input id="edit-totalAmount" type="number" value={editingOrder.totalAmount} onChange={(e) => setEditingOrder({ ...editingOrder, totalAmount: parseFloat(e.target.value) || 0 })} className="col-span-3" />
+                  </div>
+               </div>
+            )}
+          </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsEditing(false); setEditingOrder(null); }}>Cancel</Button>
             <Button onClick={handleUpdateOrder}>Save Changes</Button>
@@ -276,3 +281,4 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
+
