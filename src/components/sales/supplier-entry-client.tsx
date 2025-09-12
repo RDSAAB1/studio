@@ -6,7 +6,8 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -45,7 +46,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const getInitialFormState = (lastVariety?: string): Customer => {
+const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Customer => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -54,7 +55,7 @@ const getInitialFormState = (lastVariety?: string): Customer => {
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
-    receiptType: 'Cash', paymentType: 'Full', customerId: '', searchValue: '',
+    receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '', searchValue: '',
   };
 };
 
@@ -75,6 +76,7 @@ export default function SupplierEntryClient() {
   const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
+  const [lastPaymentType, setLastPaymentType] = useState<string>('');
   const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
@@ -104,7 +106,7 @@ export default function SupplierEntryClient() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ...getInitialFormState(lastVariety),
+      ...getInitialFormState(lastVariety, lastPaymentType),
     },
     shouldFocusError: false,
   });
@@ -123,7 +125,7 @@ export default function SupplierEntryClient() {
       setSuppliers(data);
       if (isInitialLoad.current && data) {
           const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-          const initialSrNo = formatSrNo(nextSrNum);
+          const initialSrNo = formatSrNo(nextSrNum, 'S');
           form.setValue('srNo', initialSrNo);
           setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
           isInitialLoad.current = false;
@@ -158,6 +160,12 @@ export default function SupplierEntryClient() {
       setLastVariety(savedVariety);
       form.setValue('variety', savedVariety);
     }
+    
+    const savedPaymentType = localStorage.getItem('lastSelectedPaymentType');
+    if (savedPaymentType) {
+      setLastPaymentType(savedPaymentType);
+      form.setValue('paymentType', savedPaymentType);
+    }
 
     form.setValue('date', new Date());
 
@@ -176,48 +184,17 @@ export default function SupplierEntryClient() {
     }
   }
 
+  const handleSetLastPaymentType = (paymentType: string) => {
+    setLastPaymentType(paymentType);
+    if(isClient) {
+        localStorage.setItem('lastSelectedPaymentType', paymentType);
+    }
+  }
+
   const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const values = {...form.getValues(), ...data};
-    const date = values.date;
-    const termDays = Number(values.term) || 0;
-    const newDueDate = new Date(date);
-    newDueDate.setDate(newDueDate.getDate() + termDays);
-    const grossWeight = values.grossWeight || 0;
-    const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight;
-    const kartaPercentage = values.kartaPercentage || 0;
-    const rate = values.rate || 0;
-    const kartaWeight = weight * (kartaPercentage / 100);
-    const kartaAmount = kartaWeight * rate;
-    const netWeight = weight - kartaWeight;
-    const amount = netWeight * rate;
-    const labouryRate = values.labouryRate || 0;
-    const labouryAmount = weight * labouryRate;
-    const kanta = values.kanta || 0;
-    
-    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
-
-    const totalPaidForThisEntry = paymentHistory
-      .filter(p => p.paidFor?.some(pf => pf.srNo === values.srNo))
-      .reduce((sum, p) => {
-          const paidForDetail = p.paidFor?.find(pf => pf.srNo === values.srNo);
-          return sum + (paidForDetail?.amount || 0);
-      }, 0);
-      
-    const netAmount = originalNetAmount - totalPaidForThisEntry;
-
-    setCurrentSupplier(prev => ({
-      ...prev, ...values,
-      date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : prev.date,
-      term: String(values.term), dueDate: newDueDate.toISOString().split("T")[0],
-      weight: parseFloat(weight.toFixed(2)), kartaWeight: parseFloat(kartaWeight.toFixed(2)),
-      kartaAmount: parseFloat(kartaAmount.toFixed(2)), netWeight: parseFloat(netWeight.toFixed(2)),
-      amount: parseFloat(amount.toFixed(2)), labouryAmount: parseFloat(labouryAmount.toFixed(2)),
-      kanta: parseFloat(kanta.toFixed(2)), 
-      originalNetAmount: parseFloat(originalNetAmount.toFixed(2)),
-      netAmount: parseFloat(netAmount.toFixed(2)),
-    }));
-  }, [form, paymentHistory]);
+      const calculatedState = calculateSupplierEntry(data, paymentHistory);
+      setCurrentSupplier(prev => ({...prev, ...calculatedState}));
+  }, [paymentHistory]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -236,15 +213,26 @@ export default function SupplierEntryClient() {
     } catch {
         formDate = today;
     }
+    
     const formValues: FormValues = {
-      srNo: customerState.srNo, date: formDate, term: Number(customerState.term) || 20,
-      name: customerState.name, so: customerState.so, address: customerState.address,
-      contact: customerState.contact, vehicleNo: customerState.vehicleNo, variety: customerState.variety,
-      grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, kartaPercentage: customerState.kartaPercentage || 1,
-      labouryRate: customerState.labouryRate || 2, kanta: customerState.kanta || 50,
-      paymentType: customerState.paymentType || 'Full',
+        srNo: customerState.srNo,
+        date: formDate,
+        term: Number(customerState.term) || 0,
+        name: customerState.name,
+        so: customerState.so,
+        address: customerState.address,
+        contact: customerState.contact,
+        vehicleNo: customerState.vehicleNo,
+        variety: customerState.variety,
+        grossWeight: customerState.grossWeight || 0,
+        teirWeight: customerState.teirWeight || 0,
+        rate: customerState.rate || 0,
+        kartaPercentage: customerState.kartaPercentage,
+        labouryRate: customerState.labouryRate,
+        kanta: customerState.kanta,
+        paymentType: customerState.paymentType || 'Full',
     };
+
     setCurrentSupplier(customerState);
     form.reset(formValues);
     performCalculations(formValues);
@@ -253,14 +241,15 @@ export default function SupplierEntryClient() {
   const handleNew = useCallback(() => {
     setIsEditing(false);
     const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-    const newState = getInitialFormState(lastVariety);
-    newState.srNo = formatSrNo(nextSrNum);
+    const newState = getInitialFormState(lastVariety, lastPaymentType);
+    newState.srNo = formatSrNo(nextSrNum, 'S');
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  }, [safeSuppliers, lastVariety, resetFormToState]);
+    setTimeout(() => form.setFocus('srNo'), 50);
+  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeSuppliers.find(c => c.id === id);
@@ -274,7 +263,7 @@ export default function SupplierEntryClient() {
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
     if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
-        formattedSrNo = formatSrNo(parseInt(formattedSrNo));
+        formattedSrNo = formatSrNo(parseInt(formattedSrNo), 'S');
         form.setValue('srNo', formattedSrNo);
     }
     const foundCustomer = safeSuppliers.find(c => c.srNo === formattedSrNo);
@@ -282,11 +271,13 @@ export default function SupplierEntryClient() {
         setIsEditing(true);
         resetFormToState(foundCustomer);
     } else {
-        setIsEditing(false);
-        const currentId = isEditing ? currentSupplier.srNo : "";
-        const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety), srNo: formattedSrNo || formatSrNo(nextSrNum), id: currentId };
-        resetFormToState(currentState);
+        if (isEditing) {
+            setIsEditing(false);
+            const currentId = currentSupplier.srNo;
+            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
+            resetFormToState(newState);
+        }
     }
   }
 
@@ -302,23 +293,11 @@ export default function SupplierEntryClient() {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    if (e.key === 'Enter') {
-      const activeElement = document.activeElement as HTMLElement;
-      if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-        return;
-      }
-      const formEl = e.currentTarget;
-      const formElements = Array.from(formEl.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-      const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-      if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-        e.preventDefault();
-        formElements[currentElementIndex + 1].focus();
-      }
-    }
-  };
-
   const handleDelete = async (id: string) => {
+    if (!id) {
+      toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
+      return;
+    }
     try {
       await deleteSupplier(id);
       await deletePaymentsForSrNo(currentSupplier.srNo);
@@ -334,22 +313,21 @@ export default function SupplierEntryClient() {
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const completeEntry: Customer = {
-      ...currentSupplier,
-      ...values,
-      id: values.srNo, // Use srNo as ID
-      date: values.date.toISOString().split("T")[0],
-      dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
-      term: String(values.term),
-      name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-      customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        ...currentSupplier,
+        ...values,
+        id: values.srNo, // Use srNo as ID
+        date: values.date.toISOString().split("T")[0],
+        dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
+        term: String(values.term),
+        name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
     };
 
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-          // If SR No. has changed, delete the old document
-          await deleteSupplier(currentSupplier.id);
+            await deleteSupplier(currentSupplier.id);
         }
-
+        
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
@@ -446,7 +424,151 @@ export default function SupplierEntryClient() {
       }
     }
   };
+
+    const handleExport = () => {
+        const dataToExport = suppliers.map(c => {
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
+            return {
+                'SR NO.': c.srNo,
+                'DATE': c.date,
+                'TERM': c.term,
+                'DUE DATE': calculated.dueDate,
+                'NAME': c.name,
+                'S/O': c.so,
+                'ADDRESS': c.address,
+                'CONTACT': c.contact,
+                'VEHICLE NO': c.vehicleNo,
+                'VARIETY': c.variety,
+                'GROSS WT': c.grossWeight,
+                'TEIR WT': c.teirWeight,
+                'FINAL WT': calculated.weight,
+                'KARTA %': c.kartaPercentage,
+                'KARTA WT': calculated.kartaWeight,
+                'NET WT': calculated.netWeight,
+                'RATE': c.rate,
+                'LABOURY RATE': c.labouryRate,
+                'LABOURY AMT': calculated.labouryAmount,
+                'KANTA': c.kanta,
+                'AMOUNT': calculated.amount,
+                'NET AMOUNT': calculated.originalNetAmount,
+                'PAYMENT TYPE': c.paymentType,
+            };
+        });
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
+        XLSX.writeFile(workbook, "SupplierEntries.xlsx");
+        toast({title: "Exported", description: "Supplier data has been exported."});
+    };
+
+    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary', cellNF: true, cellText: false });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+                
+                let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+
+                for (const item of json) {
+                     const supplierData: Customer = {
+                        id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
+                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
+                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        term: String(item['TERM'] || '20'),
+                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        name: toTitleCase(item['NAME']),
+                        so: toTitleCase(item['S/O'] || ''),
+                        address: toTitleCase(item['ADDRESS'] || ''),
+                        contact: String(item['CONTACT'] || ''),
+                        vehicleNo: toTitleCase(item['VEHICLE NO'] || ''),
+                        variety: toTitleCase(item['VARIETY'] || ''),
+                        grossWeight: parseFloat(item['GROSS WT']) || 0,
+                        teirWeight: parseFloat(item['TEIR WT']) || 0,
+                        weight: parseFloat(item['FINAL WT']) || 0,
+                        kartaPercentage: parseFloat(item['KARTA %']) || 0,
+                        kartaWeight: parseFloat(item['KARTA WT']) || 0,
+                        kartaAmount: parseFloat(item['KARTA AMT']) || 0,
+                        netWeight: parseFloat(item['NET WT']) || 0,
+                        rate: parseFloat(item['RATE']) || 0,
+                        labouryRate: parseFloat(item['LABOURY RATE']) || 0,
+                        labouryAmount: parseFloat(item['LABOURY AMT']) || 0,
+                        kanta: parseFloat(item['KANTA']) || 0,
+                        amount: parseFloat(item['AMOUNT']) || 0,
+                        originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
+                        netAmount: parseFloat(item['NET AMOUNT']) || 0,
+                        paymentType: item['PAYMENT TYPE'] || 'Full',
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+                        barcode: '',
+                        receiptType: 'Cash',
+                    };
+
+                    await addSupplier(supplierData);
+                }
+                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
+            } catch (error) {
+                console.error("Import failed:", error);
+                toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
   
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+        if (e.key === 'Enter') {
+          const activeElement = document.activeElement as HTMLElement;
+          if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
+            return;
+          }
+          const formEl = e.currentTarget;
+          const formElements = Array.from(formEl.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+          const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+          if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+            e.preventDefault();
+            formElements[currentElementIndex + 1].focus();
+          }
+        }
+    };
+    
+  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
+      if (event.ctrlKey) {
+          switch (event.key.toLowerCase()) {
+              case 's':
+                  event.preventDefault();
+                  form.handleSubmit((values) => onSubmit(values))();
+                  break;
+              case 'p':
+                  event.preventDefault();
+                  handleSaveAndPrint();
+                  break;
+              case 'n':
+                  event.preventDefault();
+                  handleNew();
+                  break;
+              case 'd':
+                  event.preventDefault();
+                  if (isEditing && currentSupplier.id) {
+                      handleDelete(currentSupplier.id);
+                  }
+                  break;
+          }
+      }
+  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
+
+  useEffect(() => {
+      document.addEventListener('keydown', handleKeyboardShortcuts);
+      return () => {
+          document.removeEventListener('keydown', handleKeyboardShortcuts);
+      };
+  }, [handleKeyboardShortcuts]);
+
+
   if (!isClient) {
     return null;
   }
@@ -470,6 +592,7 @@ export default function SupplierEntryClient() {
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -485,6 +608,8 @@ export default function SupplierEntryClient() {
                 onSearch={setSearchTerm}
                 onPrint={handlePrint}
                 selectedIdsCount={selectedSupplierIds.size}
+                onImport={handleImport}
+                onExport={handleExport}
             />
         </form>
       </FormProvider>      

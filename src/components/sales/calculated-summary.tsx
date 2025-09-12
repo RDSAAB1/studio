@@ -17,7 +17,7 @@ import { Label } from "../ui/label";
 interface CalculatedSummaryProps {
     customer: Customer;
     onSave: () => void;
-    onSaveAndPrint?: (docType: 'tax-invoice' | 'bill-of-supply' | 'challan') => void;
+    onSaveAndPrint?: (docType: 'tax-invoice' | 'bill-of-supply' | 'challan' | 'receipt') => void;
     onNew: () => void;
     isEditing: boolean;
     onSearch?: (term: string) => void;
@@ -132,7 +132,7 @@ export const CalculatedSummary = ({
                             </Button>
                         )}
                         
-                       {onSaveAndPrint && (
+                       {onSaveAndPrint && isCustomerForm && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button size="sm" className="h-8 rounded-md" disabled={isLoading}>
@@ -146,6 +146,12 @@ export const CalculatedSummary = ({
                             </DropdownMenuContent>
                         </DropdownMenu>
                        )}
+
+                        {onSaveAndPrint && !isCustomerForm && (
+                            <Button onClick={() => onSaveAndPrint('receipt')} size="sm" className="h-8 rounded-md" disabled={isLoading}>
+                                <Save className="mr-2 h-4 w-4" /> Save & Print
+                            </Button>
+                        )}
 
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading}>
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
