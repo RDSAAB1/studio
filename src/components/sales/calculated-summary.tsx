@@ -86,13 +86,13 @@ export const CalculatedSummary = ({
                 
                 <Separator />
 
-                <div className="flex items-center justify-between gap-2 w-full">
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
+                    <div className="flex items-center gap-2 flex-wrap">
                          <InputWithIcon icon={<Search className="h-4 w-4 text-muted-foreground" />}>
                             <Input
                                 placeholder="Search by SR No, Name, or Contact..."
                                 onChange={(e) => onSearch && onSearch(e.target.value)}
-                                className="h-8 pl-10 text-xs w-48"
+                                className="h-8 pl-10 text-xs w-48 sm:w-64"
                             />
                         </InputWithIcon>
                          <Button asChild size="sm" variant="outline" className="h-8 relative">
@@ -106,7 +106,7 @@ export const CalculatedSummary = ({
                         </Button>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
                         {isCustomerForm && onBrokerageToggle && (
                             <div className="flex items-center space-x-2">
                                 <Switch id="brokerage-toggle" checked={isBrokerageIncluded} onCheckedChange={onBrokerageToggle} />

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState } from "react";
@@ -278,7 +277,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 </div>
 
                 {!isSameAsBilling && (
-                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="shippingName" className="text-xs">Shipping Name</Label>
                         <Input id="shippingName" {...form.register('shippingName')} className="h-8 text-xs" />
@@ -315,5 +314,3 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         </>
     );
 };
-
-    
