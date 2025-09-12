@@ -59,7 +59,7 @@ export const CustomerDetailsDialog = ({ customer, onOpenChange, onPrint, payment
                         </DialogClose>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="max-h-[70vh] flex-grow">
+                <ScrollArea className="max-h-[80vh] flex-grow">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
                         <Card>
                             <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
