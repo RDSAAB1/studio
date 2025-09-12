@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from '@/components/ui/switch';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { bankNames } from '@/lib/data';
 
 
 const cdOptions = [
