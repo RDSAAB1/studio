@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -14,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins } from "lucide-react";
 import { format } from 'date-fns';
-import { appOptionsData, bankNames, bankBranches as staticBankBranches } from "@/lib/data";
+import { bankNames, bankBranches as staticBankBranches } from "@/lib/data";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from '@/components/ui/switch';
 
@@ -30,7 +29,7 @@ export const PaymentForm = ({
     bankDetails, setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
     rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
     cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
-    setSetSixRDate, parchiNo, setParchiNo, checkNo, setCheckNo,
+    setSixRDate, parchiNo, setParchiNo, checkNo, setCheckNo,
     rtgsQuantity, setRtgsQuantity,
     rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, resetPaymentForm,
     editingPayment, setIsBankSettingsOpen,
@@ -255,8 +254,3 @@ export const PaymentForm = ({
         </>
     );
 };
-
-    
-
-    
-
