@@ -92,7 +92,7 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
                 <ScrollArea className="max-h-[70vh]">
                     <div ref={contentRef}>
                         {receipts.map((receiptData, index) => (
-                            <div key={index} className="receipt-container">
+                            <div key={index} className="receipt-container p-2">
                                 {settings && <ReceiptPreview data={receiptData} settings={settings} isCustomer={isCustomer}/>}
                             </div>
                         ))}
@@ -188,7 +188,7 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
                 <ScrollArea className="max-h-[70vh]">
                     <div ref={contentRef}>
                         {data && settings && (
-                            <div className="receipt-container">
+                            <div className="receipt-container p-2">
                                 <ConsolidatedReceiptPreview data={data} settings={settings} isCustomer={isCustomer}/>
                             </div>
                         )}

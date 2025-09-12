@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight, HandCoins, Printer, Boxes } from "lucide-react";
+import { Settings, X, Rows3, LayoutList, LayoutGrid, StepForward, User, Phone, Home, Truck, Wheat, Banknote, Landmark, UserSquare, Wallet, Calendar as CalendarIcon, Scale, Calculator, Percent, Server, Milestone, CircleDollarSign, Weight } from "lucide-react";
 
 type LayoutOption = 'classic' | 'compact' | 'grid' | 'step-by-step';
 
@@ -30,7 +30,7 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
         {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
         <div>
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="font-semibold text-sm break-words">{String(value) || '-'}</p>
+            <p className="font-semibold text-sm">{String(value)}</p>
         </div>
     </div>
 );
@@ -40,15 +40,9 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
 
     if (!customer) return null;
     
-    const paymentsForDetailsEntry = paymentHistory.filter(p => 
-      p.paidFor?.some(pf => pf.srNo === customer?.srNo)
+    const paymentsForDetailsEntry = paymentHistory.filter((p:any) => 
+      p.paidFor?.some((pf:any) => pf.srNo === customer?.srNo)
     );
-    
-    const totalBagWeightKg = (customer.bags || 0) * (customer.bagWeightKg || 0);
-
-    const displayBrokerageAmount = (customer.weight || 0) * (customer.brokerageRate || 0);
-    const displayCdAmount = (customer.amount || 0) * ((customer.cdRate || 0) / 100);
-
 
     return (
         <Dialog open={isOpen ?? !!customer} onOpenChange={onOpenChange}>
@@ -63,7 +57,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                         )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8"><Settings className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent><DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}><DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuContent>
+                            <DropdownMenuContent><DropdownMenuRadioGroup value={activeLayout} onValueChange={(v) => setActiveLayout(v as LayoutOption)}><DropdownMenuRadioItem value="classic"><Rows3 className="mr-2 h-4 w-4" />Classic</DropdownMenuRadioItem><DropdownMenuRadioItem value="compact"><LayoutList className="mr-2 h-4 w-4" />Compact</DropdownMenuRadioItem><DropdownMenuRadioItem value="grid"><LayoutGrid className="mr-2 h-4 w-4" />Grid</DropdownMenuRadioItem><DropdownMenuRadioItem value="step-by-step"><StepForward className="mr-2 h-4 w-4" />Step-by-Step</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuContent>
                         </DropdownMenu>
                         <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button></DialogClose>
                     </div>
@@ -79,92 +73,41 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
                                         <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(customer.name)} />
                                         <DetailItem icon={<Phone size={14} />} label="Contact" value={customer.contact} />
-                                        <DetailItem icon={<UserSquare size={14} />} label={customer.companyName ? "Company Name" : "S/O"} value={toTitleCase(customer.companyName || customer.so || '')} />
+                                        <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(customer.so)} />
                                         <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(customer.date), "PPP")} />
                                         <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(customer.dueDate), "PPP")} />
                                         <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(customer.address)} className="col-span-1 sm:col-span-2" />
                                     </div>
                                 </CardContent>
                             </Card>
-
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Card>
                                     <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0 space-y-3">
-                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2"><DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} /><DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} /><DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} /><DetailItem icon={<Boxes size={14} />} label="Bags" value={customer.bags || 0} /></div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2"><DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} /><DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} /><DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} /></div>
                                         <Separator />
-                                        <Table className="text-xs"><TableBody>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Gross Weight</td><td className="text-right font-semibold">{customer.grossWeight.toFixed(2)} Qtl</td></tr>
-                                            <tr className="[&_td]:p-1"><td className="text-muted-foreground">Teir Weight (Less)</td><td className="text-right font-semibold">- {customer.teirWeight.toFixed(2)} Qtl</td></tr>
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold">Final Weight</td><td className="text-right font-bold">{customer.weight.toFixed(2)} Qtl</td></tr>
-                                            {customer.bagWeightKg != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Weight (Less) ({customer.bags} @ {(customer.bagWeightKg || 0).toFixed(2)}kg)</td><td className="text-right font-semibold">- {totalBagWeightKg.toFixed(2)} kg</td></tr>}
-                                            <tr className="bg-muted/50 [&_td]:p-2"><td className="font-bold text-primary">Net Weight</td><td className="text-right font-bold text-primary">{customer.netWeight.toFixed(2)} Qtl</td></tr>
-                                        </TableBody></Table>
+                                        <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.grossWeight.toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {customer.teirWeight.toFixed(2)} kg</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{customer.weight.toFixed(2)} kg</TableCell></TableRow></TableBody></Table>
                                     </CardContent>
                                 </Card>
                                 <Card>
                                     <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0">
-                                    <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.weight.toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(customer.rate)}</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(customer.amount)}</TableCell></TableRow>
-                                            
-                                            {customer.bagAmount != null && customer.bagAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Bag Amount ({customer.bags} @ {formatCurrency(customer.bagRate || 0)})</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.bagAmount)}</td></tr>}
-                                            
-                                            {customer.kanta != null && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Kanta</td><td className="text-right font-semibold text-green-600">+ {formatCurrency(customer.kanta)}</td></tr>}
-                                            
-                                            {displayCdAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">CD (@{(customer.cdRate || 0).toFixed(2)}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayCdAmount)}</td></tr>}
-
-                                            {displayBrokerageAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Brokerage (@{formatCurrency(customer.brokerageRate || 0)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(displayBrokerageAmount)}</td></tr>}
-                                            
-                                            {customer.kartaAmount != null && customer.kartaAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Karta (@{customer.kartaPercentage}%)</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.kartaAmount)}</td></tr>}
-
-                                            {customer.labouryAmount != null && customer.labouryAmount > 0 && <tr className="[&_td]:p-1"><td className="text-muted-foreground">Laboury (@{customer.labouryRate.toFixed(2)})</td><td className="text-right font-semibold text-destructive">- {formatCurrency(customer.labouryAmount)}</td></tr>}
-                                        </TableBody></Table>
+                                    <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{customer.netWeight.toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(customer.rate)}</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(customer.amount)}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({customer.kartaPercentage}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kartaAmount)}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {customer.labouryRate.toFixed(2)}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.labouryAmount)}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.kanta)}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(customer.cd || 0)}</TableCell></TableRow></TableBody></Table>
                                     </CardContent>
                                 </Card>
                             </div>
-
                             <Card className="border-primary/50 bg-primary/5 text-center">
-                                <CardContent className="p-3">
-                                    <p className="text-sm text-primary/80 font-medium">Original Payable Amount</p>
-                                    <p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p>
-                                    <Separator className="my-2"/>
-                                    <p className="text-sm text-destructive font-medium">Final Outstanding Amount</p>
-                                    <p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p>
-                                </CardContent>
+                                <CardContent className="p-3"><p className="text-sm text-primary/80 font-medium">Original Total</p><p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p><Separator className="my-2"/><p className="text-sm text-destructive font-medium">Final Outstanding Amount</p><p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p></CardContent>
                             </Card>
-
                             <Card className="mt-4">
-                                <CardHeader className="p-4 pb-2">
-                                    <CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle>
-                                </CardHeader>
+                                <CardHeader className="p-4 pb-2"><CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle></CardHeader>
                                 <CardContent className="p-4 pt-0">
-                                    {paymentsForDetailsEntry.length > 0 ? (
-                                        <Table className="text-sm">
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="p-2 text-xs">Payment ID</TableHead>
-                                                    <TableHead className="p-2 text-xs">Date</TableHead>
-                                                    <TableHead className="p-2 text-xs">Type</TableHead>
-                                                    <TableHead className="p-2 text-xs text-right">Amount Paid</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {paymentsForDetailsEntry.map((payment: any, index: number) => {
-                                                    const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
-                                                    return (
-                                                        <TableRow key={payment.id || index}>
-                                                            <TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell>
-                                                            <TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell>
-                                                            <TableCell className="p-2">{payment.type}</TableCell>
-                                                            <TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell>
-                                                        </TableRow>
-                                                    );
-                                                })}
-                                            </TableBody>
-                                        </Table>
-                                    ) : (
-                                        <p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>
-                                    )}
+                                    {paymentsForDetailsEntry.length > 0 ? (<Table className="text-sm"><TableHeader><TableRow><TableHead className="p-2 text-xs">Payment ID</TableHead><TableHead className="p-2 text-xs">Date</TableHead><TableHead className="p-2 text-xs">Type</TableHead><TableHead className="p-2 text-xs">CD Applied</TableHead><TableHead className="p-2 text-xs text-right">CD Amount</TableHead><TableHead className="p-2 text-xs text-right">Amount Paid</TableHead></TableRow></TableHeader><TableBody>
+                                        {paymentsForDetailsEntry.map((payment: any, index: number) => {
+                                             const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
+                                             return (<TableRow key={payment.id || index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="p-2">{payment.type}</TableCell><TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell><TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell><TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell></TableRow>);
+                                        })}
+                                    </TableBody></Table>) : (<p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>)}
                                 </CardContent>
                             </Card>  
                         </div>
