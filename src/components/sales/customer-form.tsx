@@ -104,7 +104,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     return (
         <>
             <SectionCard>
-                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     {/* Row 1 */}
                     <Controller name="date" control={form.control} render={({ field }) => (
                         <div className="space-y-1">
@@ -150,7 +150,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
 
                  <Separator className="my-2" />
 
-                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="contact" className="text-xs">Contact</Label>
                         <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
@@ -188,7 +188,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 
                 <Separator className="my-2"/>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="rate" className="text-xs">Rate</Label>
                         <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
@@ -281,23 +281,23 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 <div className="pt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="shippingName" className="text-xs">Shipping Name</Label>
-                        <Input id="shippingName" {...form.register('shippingName')} className="h-8 text-sm" />
+                        <Input id="shippingName" {...form.register('shippingName')} className="h-8 text-xs" />
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="shippingCompanyName" className="text-xs">Shipping Company Name</Label>
-                        <Input id="shippingCompanyName" {...form.register('shippingCompanyName')} className="h-8 text-sm" />
+                        <Input id="shippingCompanyName" {...form.register('shippingCompanyName')} className="h-8 text-xs" />
                     </div>
                         <div className="space-y-1">
                         <Label htmlFor="shippingContact" className="text-xs">Shipping Contact</Label>
-                        <Input id="shippingContact" {...form.register('shippingContact')} className="h-8 text-sm" />
+                        <Input id="shippingContact" {...form.register('shippingContact')} className="h-8 text-xs" />
                     </div>
                     <div className="space-y-1 md:col-span-2">
                         <Label htmlFor="shippingAddress" className="text-xs">Shipping Address</Label>
-                        <Input id="shippingAddress" {...form.register('shippingAddress')} className="h-8 text-sm" />
+                        <Input id="shippingAddress" {...form.register('shippingAddress')} className="h-8 text-xs" />
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="shippingGstin" className="text-xs">Shipping GSTIN</Label>
-                        <Input id="shippingGstin" {...form.register('shippingGstin')} className="h-8 text-sm" />
+                        <Input id="shippingGstin" {...form.register('shippingGstin')} className="h-8 text-xs" />
                     </div>
                 </div>
                 )}
@@ -315,3 +315,5 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         </>
     );
 };
+
+    

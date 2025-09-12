@@ -207,7 +207,7 @@ export default function DashboardOverviewClient() {
     return (
         <div className="space-y-6">
             {/* Top Stat Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, Receivables" />
                 <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Loans and Payables" />
                 <StatCard title="Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
@@ -220,7 +220,7 @@ export default function DashboardOverviewClient() {
                     <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-5 w-5 text-primary"/>Bank & Cash Balances</CardTitle>
                     <CardDescription className="text-xs">Real-time balances of your accounts.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
                         const account = bankAccounts.find(acc => acc.id === key);
                         if (account) {
@@ -339,3 +339,5 @@ export default function DashboardOverviewClient() {
     
 
   
+
+    
