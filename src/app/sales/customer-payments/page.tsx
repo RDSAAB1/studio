@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { Customer, CustomerSummary, CustomerPayment, BankAccount, Transaction, FundTransaction, PaidFor, Income, Expense } from "@/lib/definitions";
+import type { Customer, CustomerSummary, CustomerPayment, BankAccount, Transaction, FundTransaction, PaidFor, Income, Expense, ReceiptSettings } from "@/lib/definitions";
 import { toTitleCase, formatSrNo, formatCurrency, cn } from "@/lib/utils";
 import {
   Card,
@@ -31,7 +31,6 @@ import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction
 import { db } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { getReceiptSettings, getBankAccountsRealtime, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getCustomerPaymentsRealtime, addCustomerPayment, deleteCustomerPayment } from "@/lib/firestore";
-import type { ReceiptSettings } from "@/lib/definitions";
 import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { OutstandingEntriesDialog } from "@/components/sales/supplier-payments/outstanding-entries-dialog";
@@ -105,11 +104,11 @@ export default function CustomerPaymentsPage() {
 
   const getNextReceiptNo = useCallback((payments: CustomerPayment[]) => {
       if (!payments || payments.length === 0) {
-          return formatSrNo(1, 'CR');
+          return formatSrNo(1, 'R');
       }
-      const customerReceipts = payments.filter(p => p.paymentId.startsWith('CR'));
+      const customerReceipts = payments.filter(p => p.paymentId.startsWith('CP'));
       const lastNum = customerReceipts.reduce((max, p) => {
-          const numMatch = p.paymentId?.match(/^CR(\d+)$/);
+          const numMatch = p.paymentId?.match(/^CP(\d+)$/);
           const num = numMatch ? parseInt(numMatch[1], 10) : 0;
           return num > max ? num : max;
       }, 0);
@@ -307,22 +306,28 @@ export default function CustomerPaymentsPage() {
   
   return (
     <div className="space-y-6">
-       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-           <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="processing">Payment Processing</TabsTrigger><TabsTrigger value="history">Full History</TabsTrigger></TabsList>
-           <TabsContent value="processing" className="mt-4 space-y-4">
-               <Card>
-                <CardContent className="p-3">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                    <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Customer:</Label>
-                    <CustomDropdown
-                        options={Array.from(customerSummary.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact}) - bal: ${formatCurrency(data.totalOutstanding)}` }))}
-                        value={selectedCustomerKey}
-                        onChange={handleCustomerSelect}
-                        placeholder="Search and select customer..."
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+       <Card>
+            <CardHeader className="p-0">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 rounded-t-lg rounded-b-none h-12">
+                        <TabsTrigger value="processing">Payment Processing</TabsTrigger>
+                        <TabsTrigger value="history">Full History</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+            </CardHeader>
+           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+           <TabsContent value="processing" className="mt-0 space-y-4 p-4">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-2 border p-2 rounded-lg">
+                    <div className="flex flex-1 items-center gap-2">
+                        <Label htmlFor="customer-select" className="text-sm font-semibold whitespace-nowrap">Select Customer:</Label>
+                        <CustomDropdown
+                            options={Array.from(customerSummary.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                            value={selectedCustomerKey}
+                            onChange={handleCustomerSelect}
+                            placeholder="Search and select customer..."
+                        />
+                    </div>
+                </div>
 
               {selectedCustomerKey && (
                 <Card>
@@ -357,10 +362,9 @@ export default function CustomerPaymentsPage() {
               </Card>
               )}
            </TabsContent>
-           <TabsContent value="history" className="mt-4">
-                 <Card>
-                    <CardHeader><CardTitle className="text-base">Full Payment History (Customers)</CardTitle></CardHeader>
-                    <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-center">Actions</TableHead></TableRow></TableHeader>
+           <TabsContent value="history" className="mt-0">
+                 <CardContent>
+                    <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Payment ID</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-center">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                         {paymentHistory.map(p => {
                             const customerName = customerSummary.get(p.customerId)?.name;
@@ -385,10 +389,11 @@ export default function CustomerPaymentsPage() {
                             </TableRow>
                         )})}
                     </TableBody>
-                    </Table></div></CardContent>
-                </Card>
+                    </Table></div>
+                </CardContent>
            </TabsContent>
-       </Tabs>
+        </Tabs>
+       </Card>
 
      <OutstandingEntriesDialog
         isOpen={isOutstandingModalOpen}
@@ -406,4 +411,5 @@ export default function CustomerPaymentsPage() {
 }
 
     
+
 
