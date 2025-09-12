@@ -33,6 +33,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
@@ -45,7 +46,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
             return options;
         }
         return options.filter(item =>
-            item.label.toLowerCase().startsWith(searchTerm.toLowerCase())
+            item.label.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [searchTerm, options, selectedItem]);
 
@@ -73,7 +74,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         onChange(null);
         setSearchTerm('');
         setIsOpen(true);
-        dropdownRef.current?.querySelector('input')?.focus();
+        inputRef.current?.focus();
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,15 +83,15 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         if (value && newSearchTerm !== selectedItem?.label) {
             onChange(null);
         }
-        setIsOpen(true);
-    };
-
-    const handleInputClick = () => {
-        if (isOpen && searchTerm === selectedItem?.label) {
-            setSearchTerm('');
-            onChange(null);
+        if(!isOpen) {
+            setIsOpen(true);
         }
-        setIsOpen(true);
+    };
+    
+    const handleInputClick = () => {
+        if (!isOpen) {
+           setIsOpen(true);
+        }
     };
 
     const handleAddNew = () => {
@@ -102,25 +103,24 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
     return (
         <div className="relative w-full" ref={dropdownRef}>
-             <div className="flex items-center w-full border border-input bg-background rounded-md h-8 text-sm focus-within:ring-2 focus-within:ring-ring">
-                <div className="relative flex-grow flex items-center">
-                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    <input
-                        type="text"
-                        placeholder={placeholder}
-                        value={searchTerm}
-                        onChange={handleInputChange}
-                        onClick={handleInputClick}
-                        className="w-full pl-8 pr-2 h-full bg-transparent border-0 focus:outline-none text-sm"
-                    />
-                </div>
-                <div className="flex items-center space-x-1 pr-1.5 flex-shrink-0">
+            <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                    ref={inputRef}
+                    type="text"
+                    placeholder={placeholder}
+                    value={searchTerm}
+                    onChange={handleInputChange}
+                    onClick={handleInputClick}
+                    onFocus={handleInputClick}
+                    className="w-full pl-8 pr-8 h-8 text-sm"
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
                     {value && (
                         <button type="button" onClick={handleClear} className="p-0.5 focus:outline-none rounded-full hover:bg-muted">
                             <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
                         </button>
                     )}
-                    <div className="h-4 w-px bg-border"/>
                     <button
                         type="button"
                         onClick={() => setIsOpen(!isOpen)}
