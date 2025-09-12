@@ -217,41 +217,43 @@ export const BankMailFormatDialog = ({ isOpen, onOpenChange, payments, settings 
                 <DialogHeader className="bg-muted px-4 py-2 rounded-t-lg">
                     <DialogTitle className="text-base font-normal">New Message</DialogTitle>
                 </DialogHeader>
-                <div className="p-4 space-y-3 flex-grow flex flex-col min-h-0">
-                    <div className="flex items-center border-b pb-2">
-                        <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
-                        <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                 <ScrollArea className="flex-grow">
+                    <div className="p-4 space-y-3 flex flex-col min-h-0">
+                        <div className="flex items-center border-b pb-2">
+                            <Label htmlFor="to" className="text-sm text-muted-foreground w-16">To</Label>
+                            <Input id="to" placeholder="Recipients (comma-separated)" value={emailData.to} onChange={(e) => setEmailData({...emailData, to: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                        </div>
+                         <div className="flex items-center border-b pb-2">
+                            <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
+                            <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
+                        </div>
+                        <Textarea 
+                            value={emailData.body}
+                            onChange={(e) => setEmailData({...emailData, body: e.target.value})}
+                            className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
+                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                            {attachments.map((att, index) => (
+                                 <Card key={index} className="relative flex items-center gap-2 p-2">
+                                    <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                    <div className="flex-grow overflow-hidden">
+                                        <p className="text-sm font-medium truncate">{att.filename}</p>
+                                        <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={() => removeAttachment(index)}
+                                        className="absolute top-1 right-1 rounded-full h-5 w-5"
+                                        variant="ghost"
+                                        size="icon"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                </Card>
+                            ))}
+                        </div>
                     </div>
-                     <div className="flex items-center border-b pb-2">
-                        <Label htmlFor="subject" className="text-sm text-muted-foreground w-16">Subject</Label>
-                        <Input id="subject" value={emailData.subject} onChange={(e) => setEmailData({...emailData, subject: e.target.value})} className="border-0 focus-visible:ring-0 shadow-none h-auto p-0" />
-                    </div>
-                    <Textarea 
-                        value={emailData.body}
-                        onChange={(e) => setEmailData({...emailData, body: e.target.value})}
-                        className="border-0 focus-visible:ring-0 shadow-none p-0 resize-y flex-grow min-h-[150px]"
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                        {attachments.map((att, index) => (
-                             <Card key={index} className="relative flex items-center gap-2 p-2">
-                                <FileSpreadsheet className="h-6 w-6 text-green-600 flex-shrink-0" />
-                                <div className="flex-grow overflow-hidden">
-                                    <p className="text-sm font-medium truncate">{att.filename}</p>
-                                    <p className="text-xs text-muted-foreground">Excel Spreadsheet</p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    onClick={() => removeAttachment(index)}
-                                    className="absolute top-1 right-1 rounded-full h-5 w-5"
-                                    variant="ghost"
-                                    size="icon"
-                                >
-                                    <X className="h-3 w-3" />
-                                </Button>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
+                </ScrollArea>
                 <DialogFooter className="bg-muted p-3 rounded-b-lg flex justify-between items-center">
                     <div className="relative">
                         <Button size="icon" variant="ghost" asChild>

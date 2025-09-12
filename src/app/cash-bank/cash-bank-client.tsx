@@ -571,26 +571,28 @@ export default function CashBankClient() {
                     <DialogHeader>
                         <DialogTitle>Edit Fund Transaction</DialogTitle>
                     </DialogHeader>
-                    {currentFundTransaction && (
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-1">
-                                <Label>Amount</Label>
-                                <Input 
-                                    type="number" 
-                                    value={currentFundTransaction.amount || 0}
-                                    onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, amount: Number(e.target.value)} : null)}
-                                    readOnly={currentFundTransaction.type === 'CapitalInflow'}
-                                />
+                    <ScrollArea className="max-h-[70vh]">
+                        {currentFundTransaction && (
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-1">
+                                    <Label>Amount</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={currentFundTransaction.amount || 0}
+                                        onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, amount: Number(e.target.value)} : null)}
+                                        readOnly={currentFundTransaction.type === 'CapitalInflow'}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Description</Label>
+                                    <Textarea 
+                                        value={currentFundTransaction.description || ''}
+                                        onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <Label>Description</Label>
-                                <Textarea 
-                                    value={currentFundTransaction.description || ''}
-                                    onChange={(e) => setCurrentFundTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-                                />
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </ScrollArea>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsFundTransactionDialogOpen(false)}>Cancel</Button>
                         <Button onClick={handleUpdateFundTransaction}>Save Changes</Button>
@@ -607,6 +609,7 @@ export default function CashBankClient() {
     
 
     
+
 
 
 
