@@ -34,36 +34,36 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
             <DialogContent className="sm:max-w-md">
                 <DialogHeader><DialogTitle>Bank Management</DialogTitle><DialogDescription>Add new banks and branches.</DialogDescription></DialogHeader>
                 <ScrollArea className="max-h-[70vh] pr-4 -mr-4">
-                <div className="space-y-6 py-4 pr-1">
-                    <Card>
-                        <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
-                        <CardContent className="flex flex-col sm:flex-row gap-2">
-                            <Input placeholder="Enter new bank name" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} />
-                            <Button onClick={handleAddNewBank} className="w-full sm:w-auto shrink-0"><Plus className="mr-2 h-4 w-4" /> Add Bank</Button>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader><CardTitle className="text-base">Add New Branch</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-1">
-                                <Label>Select Bank</Label>
-                                <Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}>
-                                    <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
-                                     <SelectPrimitive.Portal>
-                                        <SelectContent className="z-[99]">
-                                            {[...bankNames, ...banks.map((b: any) => b.name)].sort().map((bank) => (
-                                                <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                     </SelectPrimitive.Portal>
-                                </Select>
-                            </div>
-                            <div className="space-y-1"><Label>Branch Name</Label><Input placeholder="Enter branch name" value={newBranchData.branchName} onChange={(e) => setNewBranchData(prev => ({...prev, branchName: e.target.value}))}/></div>
-                            <div className="space-y-1"><Label>IFSC Code</Label><Input placeholder="Enter IFSC code" value={newBranchData.ifscCode} onChange={(e) => setNewBranchData(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} className="uppercase"/></div>
-                            <Button onClick={handleAddNewBranch} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" /> Add Branch</Button>
-                        </CardContent>
-                    </Card>
-                </div>
+                    <div className="space-y-6 py-4 pr-1">
+                        <Card>
+                            <CardHeader><CardTitle className="text-base">Add New Bank</CardTitle></CardHeader>
+                            <CardContent className="flex flex-col sm:flex-row gap-2">
+                                <Input placeholder="Enter new bank name" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} />
+                                <Button onClick={handleAddNewBank} className="w-full sm:w-auto shrink-0"><Plus className="mr-2 h-4 w-4" /> Add Bank</Button>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader><CardTitle className="text-base">Add New Branch</CardTitle></CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-1">
+                                    <Label>Select Bank</Label>
+                                    <Select value={newBranchData.bankName} onValueChange={(value) => setNewBranchData(prev => ({...prev, bankName: value}))}>
+                                        <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
+                                        <SelectPrimitive.Portal>
+                                            <SelectContent className="z-[99]">
+                                                {[...bankNames, ...banks.map((b: any) => b.name)].sort().map((bank) => (
+                                                    <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </SelectPrimitive.Portal>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1"><Label>Branch Name</Label><Input placeholder="Enter branch name" value={newBranchData.branchName} onChange={(e) => setNewBranchData(prev => ({...prev, branchName: e.target.value}))}/></div>
+                                <div className="space-y-1"><Label>IFSC Code</Label><Input placeholder="Enter IFSC code" value={newBranchData.ifscCode} onChange={(e) => setNewBranchData(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} className="uppercase"/></div>
+                                <Button onClick={handleAddNewBranch} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" /> Add Branch</Button>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </ScrollArea>
                 <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Done</Button></DialogFooter>
             </DialogContent>
