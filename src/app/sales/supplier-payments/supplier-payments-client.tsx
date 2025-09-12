@@ -13,9 +13,7 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Loader2, Pen } from "lucide-react";
+import { Loader2, Pen } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
@@ -26,6 +24,7 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
+import { CustomDropdown } from '@/components/ui/custom-dropdown';
 
 
 const suppliersCollection = collection(db, "suppliers");
@@ -96,8 +95,7 @@ export default function SupplierPaymentsClient() {
   const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [activeTab, setActiveTab] = useState('processing');
-  const [openCombobox, setOpenCombobox] = useState(false);
-
+  
   // Combination Generator State
   const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [calcTargetAmount, setCalcTargetAmount] = useState(0);
@@ -393,22 +391,24 @@ export default function SupplierPaymentsClient() {
     resetPaymentForm();
   }, [resetPaymentForm]);
 
-  const handleCustomerSelect = (key: string) => {
+  const handleCustomerSelect = (key: string | null) => {
     setSelectedCustomerKey(key);
-    const customerData = customerSummaryMap.get(key);
-    if(customerData) {
-        setSupplierDetails({
-            name: customerData.name || '',
-            fatherName: customerData.so || '',
-            address: customerData.address || '',
-            contact: customerData.contact || ''
-        });
-        setBankDetails({
-            acNo: customerData.acNo || '',
-            ifscCode: customerData.ifscCode || '',
-            bank: customerData.bank || '',
-            branch: customerData.branch || '',
-        });
+    if(key){
+        const customerData = customerSummaryMap.get(key);
+        if(customerData) {
+            setSupplierDetails({
+                name: customerData.name || '',
+                fatherName: customerData.so || '',
+                address: customerData.address || '',
+                contact: customerData.contact || ''
+            });
+            setBankDetails({
+                acNo: customerData.acNo || '',
+                ifscCode: customerData.ifscCode || '',
+                bank: customerData.bank || '',
+                branch: customerData.branch || '',
+            });
+        }
     }
     resetPaymentForm();
   };
@@ -839,15 +839,12 @@ export default function SupplierPaymentsClient() {
                             <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
                                 <div className="flex flex-1 items-center gap-2">
                                     <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
-                                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}><PopoverTrigger asChild><Button variant="outline" role="combobox" aria-expanded={openCombobox} className="h-8 text-xs flex-1 justify-between font-normal">{selectedCustomerKey ? toTitleCase(customerSummaryMap.get(selectedCustomerKey)?.name || '') + ` (${customerSummaryMap.get(selectedCustomerKey)?.contact || ''})` : "Search and select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search by name or contact..." /><CommandList><CommandEmpty>No supplier found.</CommandEmpty><CommandGroup>
-                                            {Array.from(customerSummaryMap.entries()).map(([key, data]) => (
-                                                <CommandItem key={key} value={`${data.name} ${data.contact}`} onSelect={() => { handleCustomerSelect(key); setOpenCombobox(false); }}>
-                                                  <Check className={cn("mr-2 h-4 w-4", selectedCustomerKey === key ? "opacity-100" : "opacity-0")}/>{toTitleCase(data.name)} ({data.contact})
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup></CommandList></Command></PopoverContent>
-                                    </Popover>
+                                    <CustomDropdown
+                                        options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                                        value={selectedCustomerKey}
+                                        onChange={handleCustomerSelect}
+                                        placeholder="Search and select supplier..."
+                                    />
                                 </div>
                                 {selectedCustomerKey && (
                                     <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
@@ -968,3 +965,4 @@ export default function SupplierPaymentsClient() {
     
 
     
+
