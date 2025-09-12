@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -156,6 +155,7 @@ export default function IncomeExpenseClient() {
     handleSubmit,
     reset,
     setValue,
+    setFocus,
     formState: { errors },
   } = form;
   
@@ -174,8 +174,8 @@ export default function IncomeExpenseClient() {
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-    setTimeout(() => form.setFocus('transactionType'), 50);
-  }, [reset, form]);
+    setTimeout(() => setFocus('transactionType'), 50);
+  }, [reset, setFocus]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -357,13 +357,14 @@ export default function IncomeExpenseClient() {
     if (values.transactionType === 'Expense') {
         const balanceKey = values.bankAccountId || (values.paymentMethod === 'Cash' ? 'CashInHand' : '');
         const availableBalance = financialState.balances.get(balanceKey) || 0;
-
-        // On edit, we need to consider the original amount of the transaction
+        
         let amountToCheck = values.amount;
-        if(isEditing) {
+        if (isEditing) {
             const originalTx = allTransactions.find(tx => tx.id === isEditing);
-            if(originalTx) {
-                amountToCheck = values.amount - originalTx.amount;
+            // If the account hasn't changed, we adjust the check amount.
+            // If it has changed, we must check the full amount against the new account.
+            if (originalTx && (originalTx.bankAccountId || 'CashInHand') === (values.bankAccountId || 'CashInHand')) {
+                 amountToCheck = values.amount - originalTx.amount;
             }
         }
         
@@ -889,5 +890,3 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
-
-    

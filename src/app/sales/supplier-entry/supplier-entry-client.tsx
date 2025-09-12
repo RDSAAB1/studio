@@ -124,7 +124,7 @@ export default function SupplierEntryClient() {
       setSuppliers(data);
       if (isInitialLoad.current && data) {
           const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-          const initialSrNo = formatSrNo(nextSrNum);
+          const initialSrNo = formatSrNo(nextSrNum, 'S');
           form.setValue('srNo', initialSrNo);
           setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
           isInitialLoad.current = false;
@@ -241,7 +241,7 @@ export default function SupplierEntryClient() {
     setIsEditing(false);
     const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum);
+    newState.srNo = formatSrNo(nextSrNum, 'S');
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
@@ -262,19 +262,13 @@ export default function SupplierEntryClient() {
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
     if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
-        formattedSrNo = formatSrNo(parseInt(formattedSrNo));
+        formattedSrNo = formatSrNo(parseInt(formattedSrNo), 'S');
         form.setValue('srNo', formattedSrNo);
     }
     const foundCustomer = safeSuppliers.find(c => c.srNo === formattedSrNo);
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
-    } else {
-        setIsEditing(false);
-        const currentId = isEditing ? currentSupplier.srNo : "";
-        const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum), id: currentId };
-        resetFormToState(currentState);
     }
   }
 
@@ -322,9 +316,9 @@ export default function SupplierEntryClient() {
 
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-          await deleteSupplier(currentSupplier.id);
+            await deleteSupplier(currentSupplier.id);
         }
-
+        
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
@@ -475,8 +469,8 @@ export default function SupplierEntryClient() {
 
                 for (const item of json) {
                      const supplierData: Customer = {
-                        id: item['SR NO.'] || formatSrNo(nextSrNum++),
-                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
+                        id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
+                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
                         date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         term: String(item['TERM'] || '20'),
                         dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
