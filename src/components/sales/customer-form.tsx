@@ -17,7 +17,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DynamicCombobox } from "@/components/ui/dynamic-combobox";
 import { OptionsManagerDialog } from "./options-manager-dialog";
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "../ui/separator";
 import { Calendar as CalendarIcon, User, Phone, Home, Truck, Wheat, Banknote, Landmark, FileText, Hash, Percent, Weight, Boxes, Briefcase, PackageSearch, Wallet, Settings, InfoIcon } from "lucide-react";
 
 const SectionCard = ({ icon, children, className }: { icon?: React.ReactNode, children: React.ReactNode, className?: string }) => (
@@ -188,7 +188,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 
                 <Separator className="my-2"/>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="rate" className="text-xs">Rate</Label>
                         <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
@@ -278,7 +278,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 </div>
 
                 {!isSameAsBilling && (
-                <div className="pt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="shippingName" className="text-xs">Shipping Name</Label>
                         <Input id="shippingName" {...form.register('shippingName')} className="h-8 text-xs" />

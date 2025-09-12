@@ -207,7 +207,7 @@ export default function DashboardOverviewClient() {
     return (
         <div className="space-y-6">
             {/* Top Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" description="Cash, Bank, Receivables" />
                 <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Loans and Payables" />
                 <StatCard title="Supplier Dues" value={formatCurrency(financialState.totalSupplierDues)} icon={<Truck />} colorClass="text-orange-500" description="Accounts Payable"/>
@@ -241,26 +241,26 @@ export default function DashboardOverviewClient() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card>
                     <CardHeader><CardTitle className="text-base">Assets Breakdown</CardTitle></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                        <DonutChart className="h-48" data={chartData.assetsBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['sky', 'blue', 'teal']} />
+                    <CardContent className="flex items-center justify-center h-48">
+                        <DonutChart data={chartData.assetsBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['sky', 'blue', 'teal']} />
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader><CardTitle className="text-base">Liabilities Breakdown</CardTitle></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                         <DonutChart className="h-48" data={chartData.liabilitiesBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['rose', 'orange']} />
+                    <CardContent className="flex items-center justify-center h-48">
+                         <DonutChart data={chartData.liabilitiesBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['rose', 'orange']} />
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader><CardTitle className="text-base">Income Sources</CardTitle></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                        <DonutChart className="h-48" data={chartData.incomeBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['emerald', 'teal', 'cyan']} />
+                    <CardContent className="flex items-center justify-center h-48">
+                        <DonutChart data={chartData.incomeBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['emerald', 'teal', 'cyan']} />
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader><CardTitle className="text-base">Expense Categories</CardTitle></CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                        <DonutChart className="h-48" data={chartData.expenseBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['slate', 'stone', 'gray', 'zinc', 'neutral']} />
+                    <CardContent className="flex items-center justify-center h-48">
+                        <DonutChart data={chartData.expenseBreakdownChartData} category="value" index="name" valueFormatter={formatCurrency} colors={['slate', 'stone', 'gray', 'zinc', 'neutral']} />
                     </CardContent>
                 </Card>
             </div>
@@ -269,9 +269,8 @@ export default function DashboardOverviewClient() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                     <CardHeader><CardTitle>Income vs Expense (Last 30 Days)</CardTitle></CardHeader>
-                    <CardContent>
+                    <CardContent className="h-72">
                          <AreaChart
-                            className="h-72"
                             data={chartData.timeSeriesData}
                             index="date"
                             categories={['Income', 'Expense']}
@@ -283,9 +282,8 @@ export default function DashboardOverviewClient() {
                 </Card>
                 <Card>
                     <CardHeader><CardTitle>Financial Health</CardTitle></CardHeader>
-                    <CardContent>
+                    <CardContent className="h-72">
                         <BarChart
-                            className="mt-6 h-72"
                             data={chartData.financialHealthData}
                             index="name"
                             categories={['Amount']}
@@ -297,9 +295,8 @@ export default function DashboardOverviewClient() {
                 </Card>
                  <Card>
                     <CardHeader><CardTitle>Top 5 Outstanding Customers</CardTitle></CardHeader>
-                    <CardContent>
+                    <CardContent className="h-72">
                        <BarChart
-                            className="mt-6 h-72"
                             data={chartData.topCustomersChartData}
                             index="name"
                             categories={["Amount"]}
