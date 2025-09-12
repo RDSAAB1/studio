@@ -157,7 +157,7 @@ body {
 
 
 .side_bar_bottom ul li button:hover {
-  background: transparent;
+  background: hsl(var(--accent) / 0.5);
 }
 
 
