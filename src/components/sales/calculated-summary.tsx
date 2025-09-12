@@ -120,7 +120,7 @@ export const CalculatedSummary = ({
                             </div>
                         )}
 
-                        {onPrint && !onSaveAndPrint && (
+                        {onPrint && (
                              <Button
                                 onClick={onPrint}
                                 size="sm"

@@ -520,22 +520,6 @@ export default function SupplierEntryClient() {
         reader.readAsBinaryString(file);
     };
   
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-        if (e.key === 'Enter') {
-          const activeElement = document.activeElement as HTMLElement;
-          if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-            return;
-          }
-          const formEl = e.currentTarget;
-          const formElements = Array.from(formEl.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-          const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-          if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-            e.preventDefault();
-            formElements[currentElementIndex + 1].focus();
-          }
-        }
-    };
-    
   const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
       if (event.ctrlKey) {
           switch (event.key.toLowerCase()) {
@@ -584,7 +568,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={() => {}} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -602,7 +586,7 @@ export default function SupplierEntryClient() {
             <CalculatedSummary 
                 customer={currentSupplier}
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
-                onSaveAndPrint={handleSaveAndPrint}
+                onSaveAndPrint={() => handleSaveAndPrint()}
                 onNew={handleNew}
                 isEditing={isEditing}
                 onSearch={setSearchTerm}
@@ -660,5 +644,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
