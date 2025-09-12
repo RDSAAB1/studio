@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -265,7 +264,8 @@ export default function CustomerEntryClient() {
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState]);
+    setTimeout(() => form.setFocus('srNo'), 50);
+  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);
@@ -671,5 +671,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-
-

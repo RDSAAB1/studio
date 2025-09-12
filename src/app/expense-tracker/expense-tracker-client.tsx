@@ -174,7 +174,8 @@ export default function IncomeExpenseClient() {
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-  }, [reset]);
+    setTimeout(() => form.setFocus('transactionType'), 50);
+  }, [reset, form]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -652,158 +653,224 @@ export default function IncomeExpenseClient() {
                            </InputWithIcon>
                           {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                       </div>
+                    </div>
 
-                       <div className="space-y-1">
-                          <Label htmlFor="invoiceNumber" className="text-xs">Invoice #</Label>
-                           <InputWithIcon icon={<Hash className="h-4 w-4 text-muted-foreground" />}>
-                               <Controller name="invoiceNumber" control={control} render={({ field }) => <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />} />
-                           </InputWithIcon>
-                      </div>
-                      
-                      <Controller name="paymentMethod" control={control} render={({ field }) => (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Payment Method</Label>
-                            <CustomDropdown options={[{value: "Cash", label: "Cash"}, {value: "Online", label: "Online"}, {value: "Cheque", label: "Cheque"}, {value: "RTGS", label: "RTGS"}]} value={field.value} onChange={field.onChange} placeholder="Select" />
-                          </div>
-                      )} />
-                      
-                      {selectedPaymentMethod !== 'Cash' && (
-                           <Controller name="bankAccountId" control={control} render={({ field }) => (
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Bank Account</Label>
-                                    <CustomDropdown options={bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }))} value={field.value} onChange={field.onChange} placeholder="Select Bank" />
+                    {isAdvanced && (
+                        <div className="border-t pt-4 mt-4">
+                            <h3 className="text-sm font-semibold mb-2">Advanced Options</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                
+                                 <div className="space-y-1">
+                                    <Label htmlFor="paymentMethod" className="text-xs">Payment Method</Label>
+                                    <CustomDropdown
+                                        options={[
+                                            { value: "Cash", label: "Cash" },
+                                            ...bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }))
+                                        ]}
+                                        value={selectedPaymentMethod === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === selectedPaymentMethod)?.id}
+                                        onChange={(value) => {
+                                            if (value === 'Cash') {
+                                                setValue('paymentMethod', 'Cash');
+                                                setValue('bankAccountId', undefined);
+                                            } else {
+                                                setValue('paymentMethod', bankAccounts.find(acc => acc.id === value)?.accountHolderName || '');
+                                                setValue('bankAccountId', value);
+                                            }
+                                        }}
+                                        placeholder="Select Payment Method"
+                                    />
                                 </div>
-                           )} />
-                      )}
 
-                        {selectedTransactionType === 'Expense' && (
-                            <>
-                             <Controller name="projectId" control={control} render={({ field }) => (
                                 <div className="space-y-1">
-                                    <Label className="text-xs">Project</Label>
-                                    <CustomDropdown options={[{value: "none", label: "None"}, ...projects.map(p => ({ value: p.id, label: p.name }))]} value={field.value || 'none'} onChange={field.onChange} placeholder="Select Project (Optional)" />
+                                    <Label htmlFor="status" className="text-xs">Status</Label>
+                                    <Controller
+                                        name="status"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <CustomDropdown
+                                                options={[
+                                                    { value: "Paid", label: "Paid" },
+                                                    { value: "Pending", label: "Pending" },
+                                                    { value: "Overdue", label: "Overdue" }
+                                                ]}
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                placeholder="Select Status"
+                                            />
+                                        )}
+                                    />
                                 </div>
-                             )} />
-                            </>
-                        )}
 
-                        <div className="flex items-center space-x-2 pt-6">
-                            <Switch id="calculate-toggle" checked={isCalculated} onCheckedChange={setIsCalculated} />
-                            <Label htmlFor="calculate-toggle" className="text-sm font-normal flex items-center gap-2"><Calculator className="h-4 w-4"/> Calculate Amount</Label>
-                        </div>
-                      
-                      {isCalculated && (
-                            <>
                                 <div className="space-y-1">
-                                    <Label htmlFor="quantity" className="text-xs">Quantity</Label>
-                                    <Controller name="quantity" control={control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
+                                    <Label htmlFor="invoiceNumber" className="text-xs">Invoice Number</Label>
+                                    <Controller
+                                        name="invoiceNumber"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                                                <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />
+                                            </InputWithIcon>
+                                        )}
+                                    />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="rate" className="text-xs">Rate</Label>
-                                    <Controller name="rate" control={control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-8 text-sm" />} />
-                                </div>
-                            </>
-                        )}
-                        
-                        <div className="flex items-center space-x-2 pt-6">
-                            <Switch id="recurring-toggle" checked={isRecurring} onCheckedChange={setIsRecurring} />
-                            <Label htmlFor="recurring-toggle" className="text-sm font-normal flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Recurring Transaction</Label>
-                        </div>
-                        
-                        {isRecurring && (
-                            <>
-                                <Controller name="recurringFrequency" control={control} render={({ field }) => (
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Frequency</Label>
-                                        <CustomDropdown options={[{value: 'daily', label: 'Daily'}, {value: 'weekly', label: 'Weekly'}, {value: 'monthly', label: 'Monthly'}, {value: 'yearly', label: 'Yearly'}]} value={field.value} onChange={field.onChange} />
-                                    </div>
-                                )} />
-                                <Controller name="nextDueDate" control={control} render={({ field }) => (
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Next Due Date</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {field.value ? format(field.value, "PPP") : <span>Pick next due date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0 z-[51]">
-                                                <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date)} initialFocus />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                )} />
-                            </>
-                        )}
 
-                        <div className="flex items-center space-x-2 pt-6">
-                            <Switch id="advanced-toggle" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
-                            <Label htmlFor="advanced-toggle" className="text-sm font-normal flex items-center gap-2"><SlidersHorizontal className="h-4 w-4"/> Advanced Fields</Label>
-                        </div>
-
-                        {isAdvanced && (
-                            <>
-                                <Controller name="status" control={control} render={({ field }) => (
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Status</Label>
-                                        <CustomDropdown options={[{value: "Paid", label: "Paid"}, {value: "Pending", label: "Pending"}, {value: "Cancelled", label: "Cancelled"}]} value={field.value} onChange={field.onChange} placeholder="Select" />
-                                    </div>
-                                )} />
                                 <div className="space-y-1">
                                     <Label htmlFor="taxAmount" className="text-xs">Tax Amount</Label>
-                                    <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                                        <Controller name="taxAmount" control={control} render={({ field }) => <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />} />
-                                    </InputWithIcon>
+                                    <Controller
+                                        name="taxAmount"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
+                                                <Input id="taxAmount" type="number" {...field} className="h-8 text-sm pl-10" />
+                                            </InputWithIcon>
+                                        )}
+                                    />
                                 </div>
+
                                 {selectedTransactionType === 'Expense' && (
-                                    <>
-                                        <Controller name="expenseType" control={control} render={({ field }) => (
-                                            <div className="space-y-2">
+                                    <Controller
+                                        name="expenseType"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <div className="space-y-1">
                                                 <Label className="text-xs">Expense Type</Label>
-                                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                                                    <div className="flex items-center space-x-2">
-                                                        <RadioGroupItem value="Business" id="type-business" />
-                                                        <Label htmlFor="type-business" className="font-normal text-sm flex items-center gap-2"><Briefcase className="h-4 w-4"/> Business</Label>
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <RadioGroupItem value="Personal" id="type-personal" />
-                                                        <Label htmlFor="type-personal" className="font-normal text-sm flex items-center gap-2"><UserCircle className="h-4 w-4"/> Personal</Label>
-                                                    </div>
-                                                </RadioGroup>
+                                                <CustomDropdown
+                                                    options={[
+                                                        { value: "Personal", label: "Personal" },
+                                                        { value: "Business", label: "Business" }
+                                                    ]}
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="Select Expense Type"
+                                                />
                                             </div>
-                                        )} />
-                                    </>
+                                        )}
+                                    />
                                 )}
+
                                 <div className="space-y-1">
                                     <Label htmlFor="mill" className="text-xs">Mill</Label>
-                                    <InputWithIcon icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
-                                        <Controller name="mill" control={control} render={({ field }) => <Input id="mill" {...field} className="h-8 text-sm pl-10" />} />
-                                    </InputWithIcon>
+                                    <Controller
+                                        name="mill"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
+                                                <Input id="mill" {...field} className="h-8 text-sm pl-10" />
+                                            </InputWithIcon>
+                                        )}
+                                    />
                                 </div>
-                            </>
-                        )}
-                      
+                                
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Project</Label>
+                                    <Controller
+                                        name="projectId"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <CustomDropdown
+                                                options={[
+                                                    { value: 'none', label: 'None' },
+                                                    ...projects.map(project => ({ value: project.id, label: project.name }))
+                                                ]}
+                                                value={field.value || 'none'}
+                                                onChange={field.onChange}
+                                                placeholder="Select Project"
+                                            />
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {isCalculated && (
+                      <div className="border-t pt-4 mt-4">
+                        <h3 className="text-sm font-semibold mb-2">Calculation</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="quantity" className="text-xs">Quantity</Label>
+                                <Controller name="quantity" control={control} render={({ field }) => <Input id="quantity" type="number" {...field} className="h-8 text-sm" />} />
+                            </div>
 
-                      <div className="space-y-1 lg:col-span-3">
-                          <Label htmlFor="description" className="text-xs">Description</Label>
-                          <Controller name="description" control={control} render={({ field }) => <Textarea id="description" {...field} className="text-sm" rows={3}/>} />
+                            <div className="space-y-1">
+                                <Label htmlFor="rate" className="text-xs">Rate</Label>
+                                <Controller name="rate" control={control} render={({ field }) => <Input id="rate" type="number" {...field} className="h-8 text-sm" />} />
+                            </div>
+                          </div>
+                      </div>
+                    )}
+
+                    {isRecurring && (
+                      <div className="border-t pt-4 mt-4">
+                        <h3 className="text-sm font-semibold mb-2">Recurring Details</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              <Controller name="recurringFrequency" control={control} render={({ field }) => (
+                                  <div className="space-y-1">
+                                      <Label className="text-xs">Frequency</Label>
+                                      <CustomDropdown
+                                          options={[
+                                              { value: "daily", label: "Daily" },
+                                              { value: "weekly", label: "Weekly" },
+                                              { value: "monthly", label: "Monthly" },
+                                              { value: "yearly", label: "Yearly" }
+                                          ]}
+                                          value={field.value}
+                                          onChange={field.onChange}
+                                          placeholder="Select Frequency"
+                                      />
+                                  </div>
+                              )} />
+
+                              <Controller name="nextDueDate" control={control} render={({ field }) => (
+                                  <div className="space-y-1">
+                                      <Label className="text-xs">Next Due Date</Label>
+                                      <Popover>
+                                          <PopoverTrigger asChild>
+                                              <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 text-sm", !field.value && "text-muted-foreground")}>
+                                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                                  {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                              </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0 z-[51]">
+                                              <CalendarComponent mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
+                                          </PopoverContent>
+                                      </Popover>
+                                  </div>
+                              )} />
+                          </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="description" className="text-xs">Description</Label>
+                      <Controller name="description" control={control} render={({ field }) => <Textarea id="description" placeholder="Brief description of the transaction..." className="h-16 text-sm" {...field} />} />
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                          <Switch id="isAdvanced" checked={isAdvanced} onCheckedChange={setIsAdvanced} />
+                          <Label htmlFor="isAdvanced" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                              Advanced
+                          </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                          <Switch id="isCalculated" checked={isCalculated} onCheckedChange={setIsCalculated} />
+                          <Label htmlFor="isCalculated" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                              Calculate
+                          </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                          <Switch id="isRecurring" checked={isRecurring} onCheckedChange={setIsRecurring} />
+                          <Label htmlFor="isRecurring" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                              Recurring
+                          </Label>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
+                        <Button type="submit" disabled={loading}><Save className="mr-2 h-4 w-4" />{isEditing ? 'Update' : 'Save'}</Button>
                       </div>
                     </div>
-                    <div className="flex justify-start space-x-4 pt-4">
-                      <Button type="submit" size="sm">
-                        {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update Transaction</> : <><Save className="mr-2 h-4 w-4" /> Save Transaction</>}
-                      </Button>
-                      {isEditing && (
-                        <Button type="button" variant="outline" onClick={() => {
-                          setIsEditing(null);
-                          reset(getInitialFormState());
-                        }} size="sm">
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  </form>
+                 </form>
               </CardContent>
            </SectionCard>
         </TabsContent>
@@ -822,3 +889,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    

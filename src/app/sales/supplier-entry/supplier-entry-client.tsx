@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -248,7 +247,8 @@ export default function SupplierEntryClient() {
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState]);
+    setTimeout(() => form.setFocus('srNo'), 50);
+  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeSuppliers.find(c => c.id === id);
@@ -565,7 +565,7 @@ export default function SupplierEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} className="space-y-4">
+        <form onSubmit={form.handleSubmit((values) => onSubmit(values))} onKeyDown={handleKeyDown} className="space-y-4">
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -583,6 +583,7 @@ export default function SupplierEntryClient() {
             <CalculatedSummary 
                 customer={currentSupplier}
                 onSave={() => form.handleSubmit((values) => onSubmit(values))()}
+                onSaveAndPrint={handleSaveAndPrint}
                 onNew={handleNew}
                 isEditing={isEditing}
                 onSearch={setSearchTerm}
@@ -640,4 +641,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
