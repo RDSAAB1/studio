@@ -34,6 +34,8 @@ const DetailItem = ({ icon, label, value, className }: { icon?: React.ReactNode,
 );
 
 export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory = [], onPrint }: DetailsDialogProps) => {
+    const [activeLayout, setActiveLayout] = useState<LayoutOption>('classic');
+
     if (!customer) return null;
     
     const paymentsForDetailsEntry = paymentHistory.filter((p:any) => 
@@ -42,7 +44,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
 
     return (
         <Dialog open={isOpen ?? !!customer} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-0 flex flex-col">
+            <DialogContent className="max-w-4xl p-0">
                 <DialogHeader className="p-4 pb-2 sm:p-6 sm:pb-2 flex flex-row justify-between items-center flex-shrink-0">
                     <div><DialogTitle className="text-base font-semibold">Details for SR No: {customer.srNo}</DialogTitle></div>
                     <div className="flex items-center gap-2">
@@ -54,52 +56,56 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                         <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button></DialogClose>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="flex-grow">
+                <ScrollArea className="flex-grow overflow-y-auto">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
-                        <Card>
-                            <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
-                                <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full"><p className="text-xs text-muted-foreground">SR No.</p><p className="text-2xl font-bold font-mono text-primary">{customer.srNo}</p></div>
-                                <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" /><Separator orientation="horizontal" className="w-full md:hidden" />
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
-                                    <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(customer.name)} />
-                                    <DetailItem icon={<Phone size={14} />} label="Contact" value={customer.contact} />
-                                    <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(customer.so)} />
-                                    <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(customer.date), "PPP")} />
-                                    <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(customer.dueDate), "PPP")} />
-                                    <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(customer.address)} className="col-span-1 sm:col-span-2" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {activeLayout === 'classic' && (
+                        <div className="space-y-4">
                             <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-3">
-                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2"><DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} /><DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} /><DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} /></div>
-                                    <Separator />
-                                    <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(customer.grossWeight).toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {Number(customer.teirWeight).toFixed(2)} kg</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{Number(customer.weight).toFixed(2)} kg</TableCell></TableRow></TableBody></Table>
+                                <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
+                                    <div className="flex flex-col items-center justify-center space-y-2 p-4 bg-muted rounded-lg h-full"><p className="text-xs text-muted-foreground">SR No.</p><p className="text-2xl font-bold font-mono text-primary">{customer.srNo}</p></div>
+                                    <Separator orientation="vertical" className="h-auto mx-4 hidden md:block" /><Separator orientation="horizontal" className="w-full md:hidden" />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 text-sm">
+                                        <DetailItem icon={<User size={14} />} label="Name" value={toTitleCase(customer.name)} />
+                                        <DetailItem icon={<Phone size={14} />} label="Contact" value={customer.contact} />
+                                        <DetailItem icon={<UserSquare size={14} />} label="S/O" value={toTitleCase(customer.so)} />
+                                        <DetailItem icon={<CalendarIcon size={14} />} label="Transaction Date" value={format(new Date(customer.date), "PPP")} />
+                                        <DetailItem icon={<CalendarIcon size={14} />} label="Due Date" value={format(new Date(customer.dueDate), "PPP")} />
+                                        <DetailItem icon={<Home size={14} />} label="Address" value={toTitleCase(customer.address)} className="col-span-1 sm:col-span-2" />
+                                    </div>
                                 </CardContent>
                             </Card>
-                            <Card>
-                                <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card>
+                                    <CardHeader className="p-4"><CardTitle className="text-base">Transaction & Weight</CardTitle></CardHeader>
+                                    <CardContent className="p-4 pt-0 space-y-3">
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2"><DetailItem icon={<Truck size={14} />} label="Vehicle No." value={customer.vehicleNo.toUpperCase()} /><DetailItem icon={<Wheat size={14} />} label="Variety" value={toTitleCase(customer.variety)} /><DetailItem icon={<Wallet size={14} />} label="Payment Type" value={customer.paymentType} /></div>
+                                        <Separator />
+                                        <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Gross Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(customer.grossWeight).toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Weight size={12} />Teir Weight (Less)</TableCell><TableCell className="text-right font-semibold p-1">- {Number(customer.teirWeight).toFixed(2)} kg</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Scale size={12} />Final Weight</TableCell><TableCell className="text-right font-bold p-2">{Number(customer.weight).toFixed(2)} kg</TableCell></TableRow></TableBody></Table>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader className="p-4"><CardTitle className="text-base">Financial Calculation</CardTitle></CardHeader>
+                                    <CardContent className="p-4 pt-0">
+                                    <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(customer.netWeight).toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(Number(customer.rate))}</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(Number(customer.amount))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({Number(customer.kartaPercentage)}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.kartaAmount))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {Number(customer.labouryRate).toFixed(2)}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.labouryAmount))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.kanta))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.cd || 0))}</TableCell></TableRow></TableBody></Table>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            <Card className="border-primary/50 bg-primary/5 text-center">
+                                <CardContent className="p-3"><p className="text-sm text-primary/80 font-medium">Original Total</p><p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p><Separator className="my-2"/><p className="text-sm text-destructive font-medium">Final Outstanding Amount</p><p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p></CardContent>
+                            </Card>
+                            <Card className="mt-4">
+                                <CardHeader className="p-4 pb-2"><CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle></CardHeader>
                                 <CardContent className="p-4 pt-0">
-                                <Table className="text-xs"><TableBody><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Scale size={12} />Net Weight</TableCell><TableCell className="text-right font-semibold p-1">{Number(customer.netWeight).toFixed(2)} kg</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 flex items-center gap-2"><Calculator size={12} />Rate</TableCell><TableCell className="text-right font-semibold p-1">@ {formatCurrency(Number(customer.rate))}</TableCell></TableRow><TableRow className="bg-muted/50"><TableCell className="font-bold p-2 flex items-center gap-2"><Banknote size={12} />Total Amount</TableCell><TableCell className="text-right font-bold p-2">{formatCurrency(Number(customer.amount))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Percent size={12} />Karta ({Number(customer.kartaPercentage)}%)</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.kartaAmount))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Server size={12} />Laboury Rate</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">@ {Number(customer.labouryRate).toFixed(2)}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Milestone size={12} />Laboury Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.labouryAmount))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><Landmark size={12} />Kanta</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.kanta))}</TableCell></TableRow><TableRow><TableCell className="text-muted-foreground p-1 text-destructive flex items-center gap-2"><CircleDollarSign size={12} />CD Amount</TableCell><TableCell className="text-right font-semibold p-1 text-destructive">- {formatCurrency(Number(customer.cd || 0))}</TableCell></TableRow></TableBody></Table>
+                                    {paymentsForDetailsEntry.length > 0 ? (<Table className="text-sm"><TableHeader><TableRow><TableHead className="p-2 text-xs">Payment ID</TableHead><TableHead className="p-2 text-xs">Date</TableHead><TableHead className="p-2 text-xs">Type</TableHead><TableHead className="p-2 text-xs">CD Applied</TableHead><TableHead className="p-2 text-xs text-right">CD Amount</TableHead><TableHead className="p-2 text-xs text-right">Amount Paid</TableHead></TableRow></TableHeader><TableBody>
+                                        {paymentsForDetailsEntry.map((payment: any, index: number) => {
+                                             const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
+                                             return (<TableRow key={payment.id || index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="p-2">{payment.type}</TableCell><TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell><TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell><TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell></TableRow>);
+                                        })}
+                                    </TableBody></Table>) : (<p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>)}
                                 </CardContent>
-                            </Card>
+                            </Card>  
                         </div>
-                        <Card className="border-primary/50 bg-primary/5 text-center">
-                            <CardContent className="p-3"><p className="text-sm text-primary/80 font-medium">Original Total</p><p className="text-2xl font-bold text-primary/90 font-mono">{formatCurrency(Number(customer.originalNetAmount))}</p><Separator className="my-2"/><p className="text-sm text-destructive font-medium">Final Outstanding Amount</p><p className="text-3xl font-bold text-destructive font-mono">{formatCurrency(Number(customer.netAmount))}</p></CardContent>
-                        </Card>
-                        <Card className="mt-4">
-                            <CardHeader className="p-4 pb-2"><CardTitle className="text-base flex items-center gap-2"><Banknote size={16} />Payment Details</CardTitle></CardHeader>
-                            <CardContent className="p-4 pt-0">
-                                {paymentsForDetailsEntry.length > 0 ? (<Table className="text-sm"><TableHeader><TableRow><TableHead className="p-2 text-xs">Payment ID</TableHead><TableHead className="p-2 text-xs">Date</TableHead><TableHead className="p-2 text-xs">Type</TableHead><TableHead className="p-2 text-xs">CD Applied</TableHead><TableHead className="p-2 text-xs text-right">CD Amount</TableHead><TableHead className="p-2 text-xs text-right">Amount Paid</TableHead></TableRow></TableHeader><TableBody>
-                                    {paymentsForDetailsEntry.map((payment: any, index: number) => {
-                                         const paidForThis = payment.paidFor?.find((pf: any) => pf.srNo === customer?.srNo);
-                                         return (<TableRow key={payment.id || index}><TableCell className="p-2">{payment.paymentId || 'N/A'}</TableCell><TableCell className="p-2">{payment.date ? format(new Date(payment.date), "dd-MMM-yy") : 'N/A'}</TableCell><TableCell className="p-2">{payment.type}</TableCell><TableCell className="p-2">{payment.cdApplied ? 'Yes' : 'No'}</TableCell><TableCell className="p-2 text-right">{formatCurrency(payment.cdAmount || 0)}</TableCell><TableCell className="p-2 text-right font-semibold">{formatCurrency(paidForThis?.amount || 0)}</TableCell></TableRow>);
-                                    })}
-                                </TableBody></Table>) : (<p className="text-center text-muted-foreground text-sm py-4">No payments have been applied to this entry yet.</p>)}
-                            </CardContent>
-                        </Card>  
+                        )}
                     </div>
                 </ScrollArea>
             </DialogContent>
