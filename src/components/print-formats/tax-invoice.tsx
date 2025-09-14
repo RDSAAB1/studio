@@ -232,3 +232,5 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
         </div>
     );
 }
+
+    

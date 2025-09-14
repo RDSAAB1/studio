@@ -373,6 +373,7 @@ export type ReceiptSettings = {
     companyStateCode?: string;
     fields: ReceiptFieldSettings;
     defaultBankAccountId?: string;
+    defaultBank?: BankAccount;
 };
 
 export type ConsolidatedReceiptData = {
@@ -438,3 +439,6 @@ export type SerialNumberFormat = {
 export type FormatSettings = {
     [key: string]: SerialNumberFormat;
 };
+
+
+    

@@ -94,7 +94,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         try {
             for (const payment of advancePayments) {
                 if (payment.amount > 0) {
-                     const expenseData: Omit<Expense, 'id'> = {
+                     const expenseData: Partial<Expense> = {
                         date: new Date().toISOString().split('T')[0],
                         transactionType: 'Expense',
                         category: 'Freight & Advance',
@@ -103,11 +103,13 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                         payee: customer.name,
                         description: `Advance for SR# ${customer.srNo} via ${bankAccounts.find(b => b.id === payment.accountId)?.accountHolderName || 'Cash'}`,
                         paymentMethod: payment.accountId === 'CashInHand' ? 'Cash' : 'Online',
-                        bankAccountId: payment.accountId !== 'CashInHand' ? payment.accountId : undefined,
                         status: 'Paid',
                         isRecurring: false,
                     };
-                    await addExpense(expenseData);
+                    if (payment.accountId !== 'CashInHand') {
+                        expenseData.bankAccountId = payment.accountId;
+                    }
+                    await addExpense(expenseData as Omit<Expense, 'id'>);
                 }
             }
             toast({ title: "Success", description: "Advance payments recorded as expenses." });
@@ -307,3 +309,5 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
+
+    
