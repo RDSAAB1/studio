@@ -88,24 +88,16 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const auth = getFirebaseAuth();
         let isComponentMounted = true;
-        setAuthLoading(true);
-
+        
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             if (isComponentMounted) {
                 setUser(currentUser);
-                 // We will set loading to false after checking bypass as well.
+                // Check for bypass after auth state is confirmed
+                const bypass = sessionStorage.getItem('bypass') === 'true';
+                setIsBypassed(bypass);
+                setAuthLoading(false); // Set loading to false here
             }
         });
-        
-        if (typeof window !== 'undefined') {
-            const bypass = sessionStorage.getItem('bypass') === 'true';
-            if (isComponentMounted) {
-                setIsBypassed(bypass);
-            }
-        }
-        
-        // This will run after the initial auth state check and bypass check
-        setAuthLoading(false);
 
         return () => {
             unsubscribe();
