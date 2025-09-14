@@ -109,7 +109,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         color: #000 !important; 
                         border-color: #ccc !important;
                     }
-                    .print-table thead tr, .print-bg-gray-800 {
+                    .print-bg-gray-800 {
                         background-color: #f2f2f2 !important;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
@@ -207,12 +207,21 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </div>
                         <div className="border border-gray-200 rounded-lg p-3">
                             <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
-                            <div className="text-xs space-y-0.5">
-                                <p><span className="font-semibold">Bank:</span> {settings.defaultBank?.bankName || ''}</p>
-                                <p><span className="font-semibold">A/C No:</span> {settings.defaultBank?.accountNumber || ''}</p>
-                                <p><span className="font-semibold">Branch:</span> {settings.defaultBank?.branchName || ''}</p>
-                                <p><span className="font-semibold">IFSC:</span> {settings.defaultBank?.ifscCode || ''}</p>
-                            </div>
+                            {settings.defaultBank?.bankName ? (
+                                <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
+                                    <p><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
+                                    <p><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || ''}</p>
+                                    <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
+                                </div>
+                            ) : (
+                                 <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span></p>
+                                    <p><span className="font-semibold">A/C No:</span></p>
+                                    <p><span className="font-semibold">Branch:</span></p>
+                                    <p><span className="font-semibold">IFSC:</span></p>
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
