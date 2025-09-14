@@ -61,25 +61,30 @@ const formatCurrency = (amount: number): string => {
 export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invoiceDetails }) => {
     const taxRate = Number(invoiceDetails.taxRate) || 0;
     const isGstIncluded = invoiceDetails.isGstIncluded;
+    const rate = Number(customer.rate) || 0;
+    const netWeight = Number(customer.netWeight) || 0;
 
     let taxableAmount: number;
+    let totalTaxAmount: number;
     let totalInvoiceValue: number;
-    let rate = Number(customer.rate) || 0;
-    const netWeight = Number(customer.netWeight) || 0;
-    
+
     if (isGstIncluded) {
-        // GST is included in the rate, so we need to back-calculate the taxable amount.
-        taxableAmount = Math.round((netWeight * rate) / (1 + (taxRate / 100)));
+        // Amount = Taxable Amount + (Taxable Amount * Tax Rate)
+        // Amount = Taxable Amount * (1 + Tax Rate)
+        // Taxable Amount = Amount / (1 + Tax Rate)
+        const totalValue = netWeight * rate;
+        taxableAmount = totalValue / (1 + (taxRate / 100));
+        totalTaxAmount = totalValue - taxableAmount;
+        totalInvoiceValue = totalValue + (invoiceDetails.totalAdvance || 0);
     } else {
-        // GST is excluded, so the taxable amount is straightforward.
-        taxableAmount = Math.round(netWeight * rate);
+        // Amount is the taxable amount
+        taxableAmount = netWeight * rate;
+        totalTaxAmount = taxableAmount * (taxRate / 100);
+        totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
     }
 
-    const totalTaxAmount = Math.round(taxableAmount * (taxRate / 100));
-    totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
-    
-    const cgstAmount = Math.round(totalTaxAmount / 2);
-    const sgstAmount = Math.round(totalTaxAmount / 2);
+    const cgstAmount = totalTaxAmount / 2;
+    const sgstAmount = totalTaxAmount / 2;
     
     const hsnCode = invoiceDetails.hsnCode || "N/A";
 
@@ -168,7 +173,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-left print-table text-base">
                         <thead>
-                            <tr className="uppercase text-xs text-gray-600 print-bg-gray-800">
+                             <tr className="uppercase text-xs text-gray-600 print-bg-gray-800">
                                 <th className="p-3 font-semibold text-center w-[5%]">#</th>
                                 <th className="p-3 font-semibold w-[35%]">Item & Description</th>
                                 <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
@@ -188,7 +193,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                                 <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
                                 <td className="p-3 text-center">{netWeight.toFixed(2)}</td>
                                 <td className="p-3 text-right">{formatCurrency(rate)}</td>
-                                <td className="p-3 text-right font-semibold">{formatCurrency(taxableAmount)}</td>
+                                <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(taxableAmount))}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -231,12 +236,12 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
-                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Taxable Amount:</span><span className="font-semibold">{formatCurrency(taxableAmount)}</span></div>
-                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(cgstAmount)}</span></div>
-                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(sgstAmount)}</span></div>
+                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Taxable Amount:</span><span className="font-semibold">{formatCurrency(Math.round(taxableAmount))}</span></div>
+                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(cgstAmount))}</span></div>
+                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(sgstAmount))}</span></div>
                          {invoiceDetails.totalAdvance > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(invoiceDetails.totalAdvance)}</span></div>}
                         <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl print-bg-gray-800">
-                            <span>Balance Due:</span><span>{formatCurrency(totalInvoiceValue)}</span>
+                            <span>Balance Due:</span><span>{formatCurrency(Math.round(totalInvoiceValue))}</span>
                         </div>
                     </div>
                 </div>
