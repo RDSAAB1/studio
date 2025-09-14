@@ -89,7 +89,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
     const shipToDetails = {
         name: toTitleCase(customer.shippingName || customer.name),
-        companyName: toTitleCase(customer.shippingCompanyName || customer.companyName || ''),
+        companyName: toTitleCase(customer.shippingCompanyName || ''),
         address: toTitleCase(customer.shippingAddress || customer.address),
         contact: customer.shippingContact || customer.contact,
         gstin: customer.shippingGstin || customer.gstin || 'N/A',
@@ -126,7 +126,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     <div className="border border-gray-200 p-4 rounded-lg">
                         <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Bill To</h3>
                         <p className="font-bold text-lg">{billToDetails.companyName || billToDetails.name}</p>
-                        {billToDetails.companyName && <p className="text-sm">Attn: {billToDetails.name}</p>}
+                        
                         <p className="text-base">{billToDetails.address}</p>
                         <p className="text-base">State: {billToDetails.stateName} (Code: {billToDetails.stateCode})</p>
                         <p className="text-base">Phone: {billToDetails.contact}</p>
@@ -135,7 +135,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                      <div className="border border-gray-200 p-4 rounded-lg">
                          <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Ship To</h3>
                         <p className="font-bold text-lg">{shipToDetails.companyName || shipToDetails.name}</p>
-                        {shipToDetails.companyName && <p className="text-sm">Attn: {shipToDetails.name}</p>}
+                        
                         <p className="text-base">{shipToDetails.address}</p>
                         <p className="text-base">State: {shipToDetails.stateName} (Code: {shipToDetails.stateCode})</p>
                         <p className="text-base">Phone: {shipToDetails.contact}</p>
@@ -147,7 +147,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                      <thead>
                         <tr className="bg-gray-800 text-black uppercase text-xs">
                             <th className="p-3 font-semibold text-center w-[5%]">#</th>
-                            <th className="p-3 font-semibold w-[35%]">Item & Description</th>
+                            <th className="p-3 font-semibold w-[35%]">Item &amp; Description</th>
                             <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
                             <th className="p-3 font-semibold text-center w-[10%]">UOM (Bags)</th>
                             <th className="p-3 font-semibold text-center w-[10%]">QTY (QTL)</th>
@@ -210,7 +210,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(cgstAmount)}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(sgstAmount)}</span></div>
                          {invoiceDetails.totalAdvance > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(invoiceDetails.totalAdvance)}</span></div>}
-                        <div className="flex justify-between p-3 mt-1 print-bg-gray-800 bg-gray-800 text-black font-bold rounded-lg text-xl">
+                        <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl">
                             <span>Balance Due:</span><span>{formatCurrency(totalInvoiceValue)}</span>
                         </div>
                     </div>
@@ -218,7 +218,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 <div className="border-t border-gray-300 pt-6 mt-6">
                     <div className="flex justify-between items-end">
                         <div className="w-3/5">
-                            <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Terms & Conditions</h4>
+                            <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Terms &amp; Conditions</h4>
                             <ul className="list-disc list-inside text-gray-600 space-y-1 text-sm">
                                 <li>Goods once sold will not be taken back or exchanged.</li>
                                 <li>Interest @18% p.a. will be charged on all overdue payments.</li>
