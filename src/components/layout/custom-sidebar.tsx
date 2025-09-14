@@ -11,13 +11,12 @@ import { getRtgsSettings } from '@/lib/firestore'; // Import the settings functi
 
 interface CustomSidebarProps {
   children: ReactNode;
-  onSignOut: () => void;
   onTabSelect: (menuItem: MenuItemType) => void;
   isSidebarActive: boolean;
   toggleSidebar: () => void;
 }
 
-const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onSignOut, onTabSelect, isSidebarActive, toggleSidebar }) => {
+const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, isSidebarActive, toggleSidebar }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('BizSuite DataFlow'); // Default name
   const location = useLocation();

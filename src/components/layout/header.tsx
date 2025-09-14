@@ -14,12 +14,10 @@ import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
-import { useAuth } from "@/components/layout/app-layout";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 
 
 interface HeaderProps {
-  onSignOut: () => void;
   toggleSidebar: () => void;
 }
 
@@ -97,9 +95,8 @@ const NotificationBell = () => {
     )
 }
 
-export function Header({ onSignOut, toggleSidebar }: HeaderProps) {
+export function Header({ toggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 flex h-10 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
@@ -131,9 +128,9 @@ export function Header({ onSignOut, toggleSidebar }: HeaderProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onSignOut}>
+              <DropdownMenuItem onClick={() => alert('Sign out functionality needs to be reconnected.')}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Sign out</span>
               </DropdownMenuItem>

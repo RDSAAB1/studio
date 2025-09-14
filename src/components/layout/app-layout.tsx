@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom';
-import { type User } from "firebase/auth";
 import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
@@ -89,7 +88,7 @@ const AppContent = () => {
                  }
             }
         }
-    }, [location.pathname]);
+    }, [location.pathname, openTabs, activeTabId]);
     
     const handleTabSelect = (tabId: string) => {
         setActiveTabId(tabId);
@@ -135,11 +134,11 @@ const AppContent = () => {
     };
     
     return (
-       <CustomSidebar onSignOut={() => {}} onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
+       <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
               <div className="sticky top-0 z-30 flex-shrink-0">
                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
-                <Header onSignOut={() => {}} toggleSidebar={toggleSidebar} />
+                <Header toggleSidebar={toggleSidebar} />
               </div>
               <ScrollArea className="flex-grow">
                 <main className="p-4 sm:p-6">
