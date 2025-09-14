@@ -141,14 +141,14 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     </div>
                 </div>
                 
-                <table className="w-full text-left mb-2 print-table text-base">
+                <table className="w-full text-left mb-4 print-table text-base">
                     <thead>
                         <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
                             <th className="p-3 font-semibold text-center w-[5%]">#</th>
                             <th className="p-3 font-semibold w-[35%]">Item & Description</th>
                             <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
-                            <th className="p-3 font-semibold text-center w-[10%]">UOM</th>
-                            <th className="p-3 font-semibold text-center w-[10%]">QTY (QTL)</th>
+                            <th className="p-3 font-semibold text-center w-[10%] whitespace-nowrap">UOM (Bags)</th>
+                            <th className="p-3 font-semibold text-center w-[10%] whitespace-nowrap">QTY (QTL)</th>
                             <th className="p-3 font-semibold text-right w-[15%]">Rate</th>
                             <th className="p-3 font-semibold text-right w-[15%]">Total</th>
                         </tr>
@@ -167,7 +167,6 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </tr>
                     </tbody>
                 </table>
-
                  <div className="border border-gray-200 p-3 rounded-lg mb-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">6R No:</span><span>{invoiceDetails.sixRNo}</span></div>
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">Gate Pass No:</span><span>{invoiceDetails.gatePassNo}</span></div>
@@ -188,18 +187,18 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <div className="border border-gray-200 rounded-lg p-3">
                             <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
                             {settings.defaultBank ? (
-                                <>
-                                    <p className="text-xs"><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
-                                    <p className="text-xs"><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
-                                    <p className="text-xs"><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || ''}</p>
-                                    <p className="text-xs"><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
-                                </>
+                                <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
+                                    <p><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
+                                    <p><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || 'N/A'}</p>
+                                    <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
+                                </div>
                             ) : (
-                                <div className="text-xs text-gray-500">
-                                   <p><span className="font-semibold">Bank Name:</span> <span></span></p>
-                                   <p><span className="font-semibold">Account No:</span> <span></span></p>
-                                   <p><span className="font-semibold">Branch:</span> <span></span></p>
-                                   <p><span className="font-semibold">IFSC Code:</span> <span></span></p>
+                                <div className="text-xs grid grid-cols-2 gap-x-4">
+                                   <p><span className="font-semibold">Bank Name:</span></p>
+                                   <p><span className="font-semibold">Account No:</span></p>
+                                   <p><span className="font-semibold">Branch:</span></p>
+                                   <p><span className="font-semibold">IFSC Code:</span></p>
                                 </div>
                             )}
                         </div>
