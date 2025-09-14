@@ -3,8 +3,7 @@
 
 import React, { useState, useEffect, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom';
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebase";
+import { type User } from "firebase/auth";
 import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
@@ -81,42 +80,16 @@ export const useAuth = () => {
 };
 
 const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [authLoading, setAuthLoading] = useState(true);
-    const [isBypassed, setIsBypassed] = useState(false);
-    
-    useEffect(() => {
-        const auth = getFirebaseAuth();
-        let isComponentMounted = true;
-        
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            if (isComponentMounted) {
-                setUser(currentUser);
-                // Check for bypass after auth state is confirmed
-                const bypass = sessionStorage.getItem('bypass') === 'true';
-                setIsBypassed(bypass);
-                setAuthLoading(false); // Set loading to false here
-            }
-        });
-
-        return () => {
-            unsubscribe();
-            isComponentMounted = false;
-        };
-    }, []);
-
-    const logout = async () => {
-        const auth = getFirebaseAuth();
-        await signOut(auth);
-        if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('bypass');
-        }
+    const value = {
+      user: null,
+      authLoading: false,
+      isAuthenticated: true, // Always authenticated
+      isBypassed: true,
+      logout: async () => {}, // Dummy function
     };
-
-    const isAuthenticated = !!user || isBypassed;
     
     return (
-        <AuthContext.Provider value={{ user, authLoading, isAuthenticated, isBypassed, logout }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
