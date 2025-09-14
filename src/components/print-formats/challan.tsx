@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -102,6 +103,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
             </div>
 
             <div className="flex-grow-0">
+                 {/* Footer & Signature */}
                 <div className="border-t border-gray-300 pt-4 mt-4">
                     <div className="flex justify-between items-end">
                         <div className="w-2/5 text-center">

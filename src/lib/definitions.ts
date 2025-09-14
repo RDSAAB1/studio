@@ -67,6 +67,10 @@ export type Customer = {
   shippingAddress?: string;
   shippingContact?: string;
   shippingGstin?: string;
+  stateName?: string;
+  stateCode?: string;
+  shippingStateName?: string;
+  shippingStateCode?: string;
 
   // New field
   otherCharges?: number;
@@ -325,6 +329,9 @@ export type RtgsSettings = {
     companyName: string;
     companyAddress1: string;
     companyAddress2: string;
+    companyGstin?: string;
+    companyStateName?: string;
+    companyStateCode?: string;
     bankName: string;
     ifscCode: string;
     branchName: string;

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -58,7 +59,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
         } else if (number < 100) {
             str = b[Math.floor(number/10)] + a[number%10];
         } else if (number < 1000) {
-            str = numberToWords(Math.floor(number/100)) + 'hundred ' + numberToWords(number % 100);
+            str = a[Math.floor(number/100)] + 'hundred ' + numberToWords(number % 100);
         } else if (number < 100000) {
             str = numberToWords(Math.floor(number/1000)) + 'thousand ' + numberToWords(number % 1000);
         } else if (number < 10000000) {
@@ -198,6 +199,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                                 <li>Goods once sold will not be taken back or exchanged.</li>
                                 <li>Interest @18% p.a. will be charged on all overdue payments.</li>
                                 <li>All disputes are subject to Shahjahanpur jurisdiction only.</li>
+                                <li>Please check the goods on delivery. No claims will be entertained later.</li>
                             </ul>
                         </div>
                         <div className="w-2/5 text-center">
