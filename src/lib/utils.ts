@@ -1,8 +1,34 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Customer, FormValues as SupplierFormValues } from './definitions';
-import type { FormValues as CustomerFormValues } from '../app/sales/customer-entry/customer-entry-client';
+import type { Customer, Payment } from './definitions';
+
+interface SupplierFormValues {
+    date: Date;
+    term: string | number;
+    srNo?: string;
+    grossWeight?: number;
+    teirWeight?: number;
+    kartaPercentage?: number;
+    rate?: number;
+    labouryRate?: number;
+    kanta?: number;
+}
+
+interface CustomerFormValues {
+    date: Date;
+    srNo?: string;
+    grossWeight?: number;
+    teirWeight?: number;
+    bags?: number;
+    bagWeightKg?: number;
+    rate?: number;
+    brokerage?: number;
+    cd?: number;
+    kanta?: number;
+    bagRate?: number;
+    isBrokerageIncluded?: boolean;
+}
 
 
 export function cn(...inputs: ClassValue[]) {
@@ -43,14 +69,15 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
 };
 
 
-export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistory: any[]) => {
+export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory: any[]) => {
     const date = values.date;
     const termDays = Number(values.term) || 0;
-    const newDueDate = new Date(date);
-    newDueDate.setDate(newDueDate.getDate() + termDays);
+    const newDueDate = date ? new Date(date) : new Date();
+    if (date) newDueDate.setDate(newDueDate.getDate() + termDays);
+
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
-    const weight = grossWeight - teirWeight; // This is finalWeight
+    const weight = grossWeight - teirWeight;
     const kartaPercentage = values.kartaPercentage || 0;
     const rate = values.rate || 0;
     
@@ -59,7 +86,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
     
     const netWeight = weight - kartaWeight;
     
-    const amount = Math.round(weight * rate);
+    const amount = Math.round(netWeight * rate); // Changed from weight to netWeight
 
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = Math.round(weight * labouryRate);
@@ -67,7 +94,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
 
     const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
 
-    const totalPaidForThisEntry = paymentHistory
+    const totalPaidForThisEntry = (paymentHistory || [])
       .filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo))
       .reduce((sum, p) => {
           const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === values.srNo);
@@ -78,7 +105,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
 
     return {
       ...values,
-      date: values.date instanceof Date ? values.date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      date: date instanceof Date ? date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
       term: String(values.term), dueDate: newDueDate.toISOString().split("T")[0],
       weight: weight,
       kartaWeight: kartaWeight,
@@ -92,7 +119,7 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
     };
 };
 
-export const calculateCustomerEntry = (values: CustomerFormValues, paymentHistory: any[]) => {
+export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paymentHistory: any[]) => {
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
@@ -104,13 +131,13 @@ export const calculateCustomerEntry = (values: CustomerFormValues, paymentHistor
     const netWeight = weight - totalBagWeightQuintals;
     
     const rate = values.rate || 0;
-    const amount = Math.round(weight * rate);
+    const amount = Math.round(netWeight * rate);
     
     const brokerageRate = Number(values.brokerage) || 0;
     const brokerageAmount = Math.round(netWeight * brokerageRate);
 
     const cdPercentage = Number(values.cd) || 0;
-    const cdAmount = Math.round(((netWeight * rate) * cdPercentage) / 100);
+    const cdAmount = Math.round((netWeight * rate * cdPercentage) / 100);
     
     const kanta = Number(values.kanta) || 0;
     
@@ -122,7 +149,7 @@ export const calculateCustomerEntry = (values: CustomerFormValues, paymentHistor
         originalNetAmount -= brokerageAmount;
     }
 
-    const totalPaidForThisEntry = paymentHistory
+    const totalPaidForThisEntry = (paymentHistory || [])
         .filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo))
         .reduce((sum, p) => {
             const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === values.srNo);
