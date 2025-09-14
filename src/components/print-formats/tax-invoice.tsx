@@ -67,7 +67,13 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     let rate = Number(customer.rate) || 0;
     const netWeight = Number(customer.netWeight) || 0;
     
-    taxableAmount = Math.round(netWeight * rate);
+    if (isGstIncluded) {
+        // GST is included in the rate, so we need to back-calculate the taxable amount.
+        taxableAmount = Math.round((netWeight * rate) / (1 + (taxRate / 100)));
+    } else {
+        // GST is excluded, so the taxable amount is straightforward.
+        taxableAmount = Math.round(netWeight * rate);
+    }
 
     const totalTaxAmount = Math.round(taxableAmount * (taxRate / 100));
     totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
@@ -215,11 +221,11 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                                     <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
                                 </div>
                             ) : (
-                                 <div className="text-xs space-y-0.5">
-                                    <p><span className="font-semibold">Bank:</span></p>
-                                    <p><span className="font-semibold">A/C No:</span></p>
-                                    <p><span className="font-semibold">Branch:</span></p>
-                                    <p><span className="font-semibold">IFSC:</span></p>
+                                <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span> </p>
+                                    <p><span className="font-semibold">A/C No:</span> </p>
+                                    <p><span className="font-semibold">Branch:</span> </p>
+                                    <p><span className="font-semibold">IFSC:</span> </p>
                                 </div>
                             )}
                         </div>
