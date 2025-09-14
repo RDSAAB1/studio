@@ -34,6 +34,7 @@ import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import TabBar from './tab-bar';
 import { ScrollArea } from "../ui/scroll-area";
 
+
 const pageComponents: { [key: string]: React.FC<any> } = {
     "/dashboard-overview": DashboardOverviewPage,
     "/supplier-entry": SupplierEntryPage,
@@ -79,7 +80,6 @@ const AppContent = () => {
     useEffect(() => {
         const currentPathId = location.pathname.substring(1);
         if (currentPathId && currentPathId !== activeTabId) {
-            // Find the menu item to ensure it's a valid page
             const menuItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === currentPathId);
             if(menuItem) {
                  setActiveTabId(currentPathId);
@@ -109,7 +109,6 @@ const AppContent = () => {
                 setActiveTabId(newActiveTab.id);
                 navigate(`/${newActiveTab.id}`);
             } else {
-                 // Fallback if all tabs are closed
                 const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
                 if (dashboardTab) {
                     setOpenTabs([dashboardTab]);

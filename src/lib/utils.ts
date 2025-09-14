@@ -26,6 +26,7 @@ export function formatPaymentId(num: number | string) {
 }
 
 export function formatCurrency(amount: number): string {
+  if (isNaN(amount)) amount = 0;
   const options = {
     style: 'currency',
     currency: 'INR',
@@ -54,17 +55,17 @@ export const calculateSupplierEntry = (values: SupplierFormValues, paymentHistor
     const rate = values.rate || 0;
     
     const kartaWeight = parseFloat((weight * (kartaPercentage / 100)).toFixed(2));
-    const kartaAmount = kartaWeight * rate;
+    const kartaAmount = Math.round(kartaWeight * rate);
     
     const netWeight = weight - kartaWeight;
     
-    const amount = weight * rate;
+    const amount = Math.round(weight * rate);
 
     const labouryRate = values.labouryRate || 0;
-    const labouryAmount = weight * labouryRate;
+    const labouryAmount = Math.round(weight * labouryRate);
     const kanta = values.kanta || 0;
 
-    const originalNetAmount = amount - labouryAmount - kanta - kartaAmount;
+    const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
 
     const totalPaidForThisEntry = paymentHistory
       .filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo))
@@ -103,20 +104,20 @@ export const calculateCustomerEntry = (values: CustomerFormValues, paymentHistor
     const netWeight = weight - totalBagWeightQuintals;
     
     const rate = values.rate || 0;
-    const amount = weight * rate;
+    const amount = Math.round(weight * rate);
     
     const brokerageRate = Number(values.brokerage) || 0;
-    const brokerageAmount = brokerageRate * weight;
+    const brokerageAmount = Math.round(netWeight * brokerageRate);
 
     const cdPercentage = Number(values.cd) || 0;
-    const cdAmount = (amount * cdPercentage) / 100;
+    const cdAmount = Math.round(((netWeight * rate) * cdPercentage) / 100);
     
     const kanta = Number(values.kanta) || 0;
     
     const bagRate = Number(values.bagRate) || 0;
-    const bagAmount = bags * bagRate;
+    const bagAmount = Math.round(bags * bagRate);
 
-    let originalNetAmount = amount + kanta + bagAmount - cdAmount;
+    let originalNetAmount = Math.round(amount + kanta + bagAmount - cdAmount);
     if (!values.isBrokerageIncluded) {
         originalNetAmount -= brokerageAmount;
     }

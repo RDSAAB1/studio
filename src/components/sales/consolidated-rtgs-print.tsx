@@ -135,7 +135,10 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
 
     const handlePrint = () => {
         const node = printRef.current;
-        if (!node) return;
+        if (!node) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
+            return;
+        }
 
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
@@ -153,7 +156,6 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         iframeDoc.open();
         iframeDoc.write('<html><head><title>RTGS Advice</title>');
         
-        // This is a more robust way to copy styles
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
@@ -177,16 +179,16 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     print-color-adjust: exact !important;
                 }
                 .page-break-after { page-break-after: always !important; }
-                .printable-area, .printable-area * { 
-                    background-color: #fff !important; 
-                    color: #000 !important; 
-                    border-color: #ccc !important; 
+                .printable-area, .printable-area * {
+                    background-color: #fff !important;
+                    color: #000 !important;
+                    border-color: #ccc !important;
                 }
-                .print-table tbody tr, .print-table tbody td {
+                .printable-area tbody tr, .printable-area tbody td {
                     color: #000 !important;
                 }
                 thead tr {
-                    background-color: #e5e7eb !important;
+                    background-color: #f2f2f2 !important;
                 }
             }
         `;
