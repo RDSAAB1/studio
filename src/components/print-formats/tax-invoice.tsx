@@ -190,16 +190,10 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </div>
                         <div className="border border-gray-200 rounded-lg p-3">
                             <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
-                            {settings.defaultBank ? (
-                                <>
-                                    <p className="text-xs"><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
-                                    <p className="text-xs"><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
-                                    <p className="text-xs"><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || 'N/A'}</p>
-                                    <p className="text-xs"><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
-                                </>
-                            ) : (
-                                <p className="text-xs text-center text-red-500 py-2">No default bank account selected. Please set one in Settings.</p>
-                            )}
+                            <p className="text-xs"><span className="font-semibold">Bank:</span> {settings.defaultBank?.bankName || ''}</p>
+                            <p className="text-xs"><span className="font-semibold">A/C No:</span> {settings.defaultBank?.accountNumber || ''}</p>
+                            <p className="text-xs"><span className="font-semibold">Branch:</span> {settings.defaultBank?.branchName || ''}</p>
+                            <p className="text-xs"><span className="font-semibold">IFSC:</span> {settings.defaultBank?.ifscCode || ''}</p>
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
