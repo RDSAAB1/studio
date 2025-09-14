@@ -62,41 +62,7 @@ const pageComponents: { [key: string]: React.FC<any> } = {
 };
 
 
-interface AuthContextType {
-  user: User | null;
-  authLoading: boolean;
-  isAuthenticated: boolean;
-  isBypassed: boolean;
-  logout: () => Promise<void>;
-}
-const AuthContext = React.createContext<AuthContextType | null>(null);
-
-export const useAuth = () => {
-    const context = React.useContext(AuthContext);
-    if (!context) {
-        throw new Error("useAuth must be used within an AuthProvider");
-    }
-    return context;
-};
-
-const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const value = {
-      user: null,
-      authLoading: false,
-      isAuthenticated: true, // Always authenticated
-      isBypassed: true,
-      logout: async () => {}, // Dummy function
-    };
-    
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
-    );
-};
-
 const AppContent = () => {
-    const { isAuthenticated, authLoading, logout } = useAuth();
     const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
     const [activeTabId, setActiveTabId] = useState<string>('dashboard-overview');
     const [isSidebarActive, setIsSidebarActive] = useState(false);
@@ -107,42 +73,23 @@ const AppContent = () => {
       const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
       if (dashboardTab) {
           setOpenTabs([dashboardTab]);
+          navigate('/dashboard-overview');
       }
-    }, []);
+    }, [navigate]);
 
     useEffect(() => {
         const currentPathId = location.pathname.substring(1);
         if (currentPathId && currentPathId !== activeTabId) {
-            setActiveTabId(currentPathId);
-        }
-    }, [location.pathname, activeTabId]);
-
-    useEffect(() => {
-        const handleGlobalKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Enter') {
-                const activeElement = document.activeElement;
-                if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT')) {
-                    event.preventDefault();
-                    const form = (activeElement as HTMLElement).closest('form');
-                    const focusable = form 
-                        ? Array.from(form.querySelectorAll('input, select, button, textarea'))
-                        : Array.from(document.querySelectorAll('input, select, button, textarea'));
-
-                    const index = focusable.indexOf(activeElement);
-                    
-                    const nextElement = focusable[index + 1] as HTMLElement;
-                    if (nextElement) {
-                        nextElement.focus();
-                    }
-                }
+            // Find the menu item to ensure it's a valid page
+            const menuItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === currentPathId);
+            if(menuItem) {
+                 setActiveTabId(currentPathId);
+                 if (!openTabs.some(tab => tab.id === currentPathId)) {
+                     setOpenTabs(prev => [...prev, menuItem]);
+                 }
             }
-        };
-
-        document.addEventListener('keydown', handleGlobalKeyDown);
-        return () => {
-            document.removeEventListener('keydown', handleGlobalKeyDown);
-        };
-    }, []);
+        }
+    }, [location.pathname]);
     
     const handleTabSelect = (tabId: string) => {
         setActiveTabId(tabId);
@@ -162,6 +109,14 @@ const AppContent = () => {
             if (newActiveTab) {
                 setActiveTabId(newActiveTab.id);
                 navigate(`/${newActiveTab.id}`);
+            } else {
+                 // Fallback if all tabs are closed
+                const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
+                if (dashboardTab) {
+                    setOpenTabs([dashboardTab]);
+                    setActiveTabId(dashboardTab.id);
+                    navigate(`/${dashboardTab.id}`);
+                }
             }
         }
     };
@@ -178,25 +133,13 @@ const AppContent = () => {
     const toggleSidebar = () => {
         setIsSidebarActive(prev => !prev);
     };
-
-    if (authLoading) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-    
-    if (!isAuthenticated) {
-       return <LoginPage />;
-    }
     
     return (
-       <CustomSidebar onSignOut={logout} onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
+       <CustomSidebar onSignOut={() => {}} onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
               <div className="sticky top-0 z-30 flex-shrink-0">
                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
-                <Header onSignOut={logout} toggleSidebar={toggleSidebar} />
+                <Header onSignOut={() => {}} toggleSidebar={toggleSidebar} />
               </div>
               <ScrollArea className="flex-grow">
                 <main className="p-4 sm:p-6">
@@ -222,8 +165,6 @@ const router = createMemoryRouter([
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
-        <AuthProvider>
-            <RouterProvider router={router}/>
-        </AuthProvider>
+       <RouterProvider router={router}/>
     );
 }
