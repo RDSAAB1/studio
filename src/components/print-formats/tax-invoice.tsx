@@ -109,7 +109,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         color: #000 !important; 
                         border-color: #ccc !important;
                     }
-                    .print-table thead tr {
+                    .print-table thead tr, .print-bg-gray-800 {
                         background-color: #f2f2f2 !important;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
@@ -159,17 +159,17 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     </div>
                 </div>
                 
-                <div className="border border-gray-200 rounded-lg">
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-left print-table text-base">
-                        <thead className="bg-gray-100">
+                        <thead>
                             <tr className="uppercase text-xs text-gray-600">
-                                <th className="p-3 font-semibold text-center">#</th>
-                                <th className="p-3 font-semibold">Item &amp; Description</th>
-                                <th className="p-3 font-semibold text-center">HSN/SAC</th>
-                                <th className="p-3 font-semibold text-center">UOM</th>
-                                <th className="p-3 font-semibold text-center">Qty (Qtl)</th>
-                                <th className="p-3 font-semibold text-right">Rate</th>
-                                <th className="p-3 font-semibold text-right">Total</th>
+                                <th className="p-3 font-semibold text-center w-[5%]">#</th>
+                                <th className="p-3 font-semibold w-[35%]">Item & Description</th>
+                                <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
+                                <th className="p-3 font-semibold text-center w-[10%]">UOM</th>
+                                <th className="p-3 font-semibold text-center w-[15%]">Qty (Qtl)</th>
+                                <th className="p-3 font-semibold text-right w-[10%]">Rate</th>
+                                <th className="p-3 font-semibold text-right w-[15%]">Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -207,12 +207,21 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </div>
                         <div className="border border-gray-200 rounded-lg p-3">
                             <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
-                            <div className="text-xs space-y-0.5">
-                                <p><span className="font-semibold">Bank:</span> {settings.defaultBank?.bankName || ''}</p>
-                                <p><span className="font-semibold">A/C No:</span> {settings.defaultBank?.accountNumber || ''}</p>
-                                <p><span className="font-semibold">Branch:</span> {settings.defaultBank?.branchName || ''}</p>
-                                <p><span className="font-semibold">IFSC:</span> {settings.defaultBank?.ifscCode || ''}</p>
-                            </div>
+                            {settings.defaultBank ? (
+                                <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
+                                    <p><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
+                                    <p><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName}</p>
+                                    <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
+                                </div>
+                            ) : (
+                                <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span> </p>
+                                    <p><span className="font-semibold">A/C No:</span> </p>
+                                    <p><span className="font-semibold">Branch:</span> </p>
+                                    <p><span className="font-semibold">IFSC:</span> </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
@@ -220,7 +229,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(cgstAmount)}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(sgstAmount)}</span></div>
                          {invoiceDetails.totalAdvance > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(invoiceDetails.totalAdvance)}</span></div>}
-                        <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl">
+                        <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl print-bg-gray-800">
                             <span>Balance Due:</span><span>{formatCurrency(totalInvoiceValue)}</span>
                         </div>
                     </div>
