@@ -258,10 +258,11 @@ export type BankAccount = {
     id: string;
     accountHolderName: string;
     bankName: string;
+    branchName?: string;
     accountNumber: string;
     ifscCode: string;
     accountType?: 'Savings' | 'Current' | 'Loan' | 'Limit' | 'Other';
-}
+};
 
 export type Order = {
   id: string;
@@ -367,7 +368,11 @@ export type ReceiptSettings = {
     address2: string;
     contactNo: string;
     email: string;
+    companyGstin?: string;
+    companyStateName?: string;
+    companyStateCode?: string;
     fields: ReceiptFieldSettings;
+    defaultBankAccountId?: string;
 };
 
 export type ConsolidatedReceiptData = {

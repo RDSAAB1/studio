@@ -2,13 +2,13 @@
 "use client";
 
 import React from 'react';
-import { Customer, ReceiptSettings } from '@/lib/definitions';
-import { formatCurrency, toTitleCase } from '@/lib/utils';
+import { Customer, ReceiptSettings, BankAccount } from '@/lib/definitions';
+import { toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface TaxInvoiceProps {
     customer: Customer;
-    settings: ReceiptSettings;
+    settings: ReceiptSettings & { defaultBank?: BankAccount };
     invoiceDetails: {
         companyGstin: string;
         companyStateName: string;
@@ -21,8 +21,42 @@ interface TaxInvoiceProps {
         grNo: string;
         grDate: string;
         transport: string;
+        totalAdvance: number;
     };
 }
+
+const numberToWords = (num: number): string => {
+    const a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
+    const b = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
+    const number = Math.round(num); // Use rounded number for words
+    
+    if (number === 0) return "Zero";
+
+    const inWords = (n: number): string => {
+        let str = '';
+        if (n < 20) {
+            str = a[n];
+        } else if (n < 100) {
+            str = b[Math.floor(n / 10)] + a[n % 10];
+        } else if (n < 1000) {
+            str = inWords(Math.floor(n / 100)) + 'hundred ' + inWords(n % 100);
+        } else if (n < 100000) {
+            str = inWords(Math.floor(n / 1000)) + 'thousand ' + inWords(n % 1000);
+        } else if (n < 10000000) {
+            str = inWords(Math.floor(n / 100000)) + 'lakh ' + inWords(n % 100000);
+        } else {
+            str = inWords(Math.floor(n / 10000000)) + 'crore ' + inWords(n % 10000000);
+        }
+        return str;
+    };
+    
+    return toTitleCase(inWords(number).trim()) + " Only";
+};
+
+const formatCurrency = (amount: number): string => {
+  if (isNaN(amount)) amount = 0;
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+};
 
 export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invoiceDetails }) => {
     const taxRate = Number(invoiceDetails.taxRate) || 0;
@@ -32,43 +66,16 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     let totalInvoiceValue: number;
     let rate = Number(customer.rate) || 0;
     const netWeight = Number(customer.netWeight) || 0;
-
-    if (isGstIncluded) {
-        const baseRate = rate / (1 + (taxRate / 100));
-        taxableAmount = netWeight * baseRate;
-    } else {
-        taxableAmount = netWeight * rate;
-    }
-
-    const totalTaxAmount = taxableAmount * (taxRate / 100);
-    totalInvoiceValue = taxableAmount + totalTaxAmount;
     
-    const cgstAmount = totalTaxAmount / 2;
-    const sgstAmount = totalTaxAmount / 2;
+    taxableAmount = Math.round(netWeight * rate);
+
+    const totalTaxAmount = Math.round(taxableAmount * (taxRate / 100));
+    totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
+    
+    const cgstAmount = Math.round(totalTaxAmount / 2);
+    const sgstAmount = Math.round(totalTaxAmount / 2);
     
     const hsnCode = invoiceDetails.hsnCode || "N/A";
-
-    const numberToWords = (num: number): string => {
-        const a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
-        const b = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
-        const number = Math.round(num); // Use rounded number for words
-        if (number === 0) return "Zero";
-        let str = '';
-        if (number < 20) {
-            str = a[number];
-        } else if (number < 100) {
-            str = b[Math.floor(number/10)] + a[number%10];
-        } else if (number < 1000) {
-            str = a[Math.floor(number/100)] + 'hundred ' + numberToWords(number % 100);
-        } else if (number < 100000) {
-            str = numberToWords(Math.floor(number/1000)) + 'thousand ' + numberToWords(number % 1000);
-        } else if (number < 10000000) {
-            str = numberToWords(Math.floor(number/100000)) + 'lakh ' + numberToWords(number % 100000);
-        } else {
-            str = 'Number too large';
-        }
-        return toTitleCase(str.trim()) + " Only";
-    };
 
     const billToDetails = {
         name: toTitleCase(customer.name),
@@ -176,16 +183,26 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
             <div className="flex-grow-0">
                 <div className="flex justify-between mb-6">
-                    <div className="w-3/5 pr-4">
+                    <div className="w-3/5 pr-4 space-y-2">
                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                             <p className="font-bold mb-1 uppercase text-gray-500 text-xs">Amount in Words:</p>
                             <p className="font-semibold text-gray-800 text-base">{numberToWords(totalInvoiceValue)}</p>
                         </div>
+                        {settings.defaultBank && (
+                             <div className="border border-gray-200 rounded-lg p-3">
+                                <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
+                                <p className="text-xs"><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
+                                <p className="text-xs"><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
+                                <p className="text-xs"><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || 'N/A'}</p>
+                                <p className="text-xs"><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
+                            </div>
+                        )}
                     </div>
                     <div className="w-2/5 text-base">
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Taxable Amount:</span><span className="font-semibold">{formatCurrency(taxableAmount)}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(cgstAmount)}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(sgstAmount)}</span></div>
+                         {invoiceDetails.totalAdvance > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(invoiceDetails.totalAdvance)}</span></div>}
                         <div className="flex justify-between p-3 mt-1 print-bg-gray-800 bg-gray-800 text-black font-bold rounded-lg text-xl">
                             <span>Balance Due:</span><span>{formatCurrency(totalInvoiceValue)}</span>
                         </div>

@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Customer, ReceiptSettings } from '@/lib/definitions';
-import { formatCurrency, toTitleCase } from '@/lib/utils';
+import { toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface BillOfSupplyProps {
@@ -18,31 +18,43 @@ interface BillOfSupplyProps {
     };
 }
 
+const numberToWords = (num: number): string => {
+    const a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
+    const b = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
+    const number = Math.round(num); // Use rounded number for words
+    
+    if (number === 0) return "Zero";
+
+    const inWords = (n: number): string => {
+        let str = '';
+        if (n < 20) {
+            str = a[n];
+        } else if (n < 100) {
+            str = b[Math.floor(n / 10)] + a[n % 10];
+        } else if (n < 1000) {
+            str = inWords(Math.floor(n / 100)) + 'hundred ' + inWords(n % 100);
+        } else if (n < 100000) {
+            str = inWords(Math.floor(n / 1000)) + 'thousand ' + inWords(n % 1000);
+        } else if (n < 10000000) {
+            str = inWords(Math.floor(n / 100000)) + 'lakh ' + inWords(n % 100000);
+        } else {
+            str = inWords(Math.floor(n / 10000000)) + 'crore ' + inWords(n % 10000000);
+        }
+        return str;
+    };
+    
+    return toTitleCase(inWords(number).trim()) + " Only";
+};
+
+const formatCurrency = (amount: number): string => {
+  if (isNaN(amount)) amount = 0;
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+};
+
+
 export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, invoiceDetails }) => {
     
-    const numberToWords = (num: number): string => {
-        const a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
-        const b = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
-        const number = Math.round(num);
-        if (number === 0) return "Zero";
-        let str = '';
-        if (number < 20) {
-            str = a[number];
-        } else if (number < 100) {
-            str = b[Math.floor(number/10)] + a[number%10];
-        } else if (number < 1000) {
-            str = a[Math.floor(number/100)] + 'hundred ' + numberToWords(number % 100);
-        } else if (number < 100000) {
-            str = numberToWords(Math.floor(number/1000)) + 'thousand ' + numberToWords(number % 1000);
-        } else if (number < 10000000) {
-            str = numberToWords(Math.floor(number/100000)) + 'lakh ' + numberToWords(number % 100000);
-        } else {
-            str = 'Number too large';
-        }
-        return toTitleCase(str.trim()) + " Only";
-    };
-
-    const totalAmount = Number(customer.netWeight) * Number(customer.rate);
+    const totalAmount = Math.round(Number(customer.netWeight) * Number(customer.rate));
 
     return (
         <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">

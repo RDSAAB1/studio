@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Customer, ReceiptSettings } from '@/lib/definitions';
-import { toTitleCase, formatCurrency } from '@/lib/utils';
+import { toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface ChallanProps {
@@ -18,8 +18,13 @@ interface ChallanProps {
     };
 }
 
+const formatCurrency = (amount: number): string => {
+  if (isNaN(amount)) amount = 0;
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+};
+
 export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDetails }) => {
-    const totalAmount = Number(customer.netWeight) * Number(customer.rate);
+    const totalAmount = Math.round(Number(customer.netWeight) * Number(customer.rate));
     
     return (
         <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
