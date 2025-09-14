@@ -141,14 +141,14 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     </div>
                 </div>
                 
-                <table className="w-full text-left mb-6 print-table text-base">
+                <table className="w-full text-left mb-2 print-table text-base">
                     <thead>
                         <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
                             <th className="p-3 font-semibold text-center w-[5%]">#</th>
                             <th className="p-3 font-semibold w-[35%]">Item & Description</th>
                             <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
                             <th className="p-3 font-semibold text-center w-[10%]">UOM</th>
-                            <th className="p-3 font-semibold text-center w-[10%]">Qty (Qtl)</th>
+                            <th className="p-3 font-semibold text-center w-[10%]">QTY (QTL)</th>
                             <th className="p-3 font-semibold text-right w-[15%]">Rate</th>
                             <th className="p-3 font-semibold text-right w-[15%]">Total</th>
                         </tr>
@@ -158,7 +158,6 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                             <td className="p-3 text-center border-x border-gray-200">1</td>
                             <td className="p-3 border-x border-gray-200">
                                 <p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p>
-                                {!billToDetails.companyName && <p className="text-xs text-gray-600">Attn: {billToDetails.name}</p>}
                             </td>
                             <td className="p-3 text-center border-x border-gray-200">{hsnCode}</td>
                             <td className="p-3 text-center border-x border-gray-200">{customer.bags || 'N/A'} Bags</td>
@@ -239,5 +238,3 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
         </div>
     );
 }
-
-    

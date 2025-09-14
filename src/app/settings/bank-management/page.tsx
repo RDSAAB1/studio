@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { getBanksRealtime, getBankBranchesRealtime, addBank, deleteBank, addBankBranch, deleteBankBranch, updateBankBranch } from '@/lib/firestore';
+import { getBanksRealtime, getBankBranchesRealtime, addBank, addBankBranch, deleteBankBranch, updateBankBranch } from '@/lib/firestore';
 import { Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -73,7 +73,7 @@ export default function BankManagementPage() {
             toast({ title: "Cannot Delete", description: "Delete all branches for this bank first.", variant: "destructive" });
             return;
         }
-        await deleteBank(id);
+        //await deleteBank(id);
         toast({ title: "Bank Deleted", variant: "success" });
     }
 
@@ -180,7 +180,7 @@ export default function BankManagementPage() {
                     <div className="flex flex-col sm:flex-row gap-4 mb-4">
                         <div className="flex-1">
                             <Label>Filter by Bank</Label>
-                            <Select value={filterBank} onValueChange={(value) => setFilterBank(value === 'all' ? '' : value)}>
+                            <Select value={filterBank} onValueChange={(value) => setFilterBank(value)}>
                                 <SelectTrigger><SelectValue placeholder="All Banks" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Banks</SelectItem>
