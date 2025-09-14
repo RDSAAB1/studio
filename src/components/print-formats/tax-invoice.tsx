@@ -99,7 +99,23 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
     return (
         <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
-            <style>{`@media print {body {background-color: #fff !important;}.printable-area, .printable-area * {background-color: #fff !important; color: #000 !important; border-color: #ccc !important;}.print-bg-gray-800, .print-table thead tr {background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}}`}</style>
+            <style>{`
+                @media print {
+                    body {
+                        background-color: #fff !important;
+                    }
+                    .printable-area, .printable-area * {
+                        background-color: #fff !important; 
+                        color: #000 !important; 
+                        border-color: #ccc !important;
+                    }
+                    .print-table thead tr {
+                        background-color: #f2f2f2 !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                }
+            `}</style>
             
             <div className="flex-grow-0">
                  <div className="flex justify-between items-start mb-4">
@@ -143,33 +159,36 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     </div>
                 </div>
                 
-                <table className="w-full text-left mb-4 print-table text-base">
-                     <thead>
-                        <tr className="bg-gray-800 text-black uppercase text-xs">
-                            <th className="p-3 font-semibold text-center w-[5%]">#</th>
-                            <th className="p-3 font-semibold w-[35%]">Item &amp; Description</th>
-                            <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
-                            <th className="p-3 font-semibold text-center w-[10%]">UOM (Bags)</th>
-                            <th className="p-3 font-semibold text-center w-[10%]">QTY (QTL)</th>
-                            <th className="p-3 font-semibold text-right w-[15%]">Rate</th>
-                            <th className="p-3 font-semibold text-right w-[15%]">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr className="border-b border-gray-200">
-                            <td className="p-3 text-center border-x border-gray-200">1</td>
-                            <td className="p-3 border-x border-gray-200">
-                                <p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p>
-                            </td>
-                            <td className="p-3 text-center border-x border-gray-200">{hsnCode}</td>
-                            <td className="p-3 text-center border-x border-gray-200">{customer.bags || 'N/A'} Bags</td>
-                            <td className="p-3 text-center border-x border-gray-200">{netWeight.toFixed(2)}</td>
-                            <td className="p-3 text-right border-x border-gray-200">{formatCurrency(rate)}</td>
-                            <td className="p-3 text-right border-x border-gray-200 font-semibold">{formatCurrency(taxableAmount)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                 <div className="border border-gray-200 p-3 rounded-lg mb-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
+                <div className="border border-gray-200 rounded-lg">
+                    <table className="w-full text-left print-table text-base">
+                        <thead className="bg-gray-100">
+                            <tr className="uppercase text-xs text-gray-600">
+                                <th className="p-3 font-semibold text-center">#</th>
+                                <th className="p-3 font-semibold">Item &amp; Description</th>
+                                <th className="p-3 font-semibold text-center">HSN/SAC</th>
+                                <th className="p-3 font-semibold text-center">UOM</th>
+                                <th className="p-3 font-semibold text-center">Qty (Qtl)</th>
+                                <th className="p-3 font-semibold text-right">Rate</th>
+                                <th className="p-3 font-semibold text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr className="border-t border-gray-200">
+                                <td className="p-3 text-center">1</td>
+                                <td className="p-3">
+                                    <p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p>
+                                </td>
+                                <td className="p-3 text-center">{hsnCode}</td>
+                                <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
+                                <td className="p-3 text-center">{netWeight.toFixed(2)}</td>
+                                <td className="p-3 text-right">{formatCurrency(rate)}</td>
+                                <td className="p-3 text-right font-semibold">{formatCurrency(taxableAmount)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                 </div>
+                 
+                 <div className="border border-gray-200 p-3 rounded-lg mt-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">6R No:</span><span>{invoiceDetails.sixRNo}</span></div>
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">Gate Pass No:</span><span>{invoiceDetails.gatePassNo}</span></div>
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. No:</span><span>{invoiceDetails.grNo}</span></div>
@@ -179,7 +198,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
             </div>
 
-            <div className="flex-grow-0">
+            <div className="flex-grow-0 mt-6">
                 <div className="flex justify-between mb-6">
                     <div className="w-3/5 pr-4 space-y-2">
                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -188,21 +207,12 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </div>
                         <div className="border border-gray-200 rounded-lg p-3">
                             <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
-                            {settings.defaultBank ? (
-                                <div className="text-xs space-y-0.5">
-                                    <p><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
-                                    <p><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
-                                    <p><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || 'N/A'}</p>
-                                    <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
-                                </div>
-                            ) : (
-                                <div className="text-xs grid grid-cols-2 gap-x-4">
-                                   <p><span className="font-semibold">Bank Name:</span></p>
-                                   <p><span className="font-semibold">Account No:</span></p>
-                                   <p><span className="font-semibold">Branch:</span></p>
-                                   <p><span className="font-semibold">IFSC Code:</span></p>
-                                </div>
-                            )}
+                            <div className="text-xs space-y-0.5">
+                                <p><span className="font-semibold">Bank:</span> {settings.defaultBank?.bankName || ''}</p>
+                                <p><span className="font-semibold">A/C No:</span> {settings.defaultBank?.accountNumber || ''}</p>
+                                <p><span className="font-semibold">Branch:</span> {settings.defaultBank?.branchName || ''}</p>
+                                <p><span className="font-semibold">IFSC:</span> {settings.defaultBank?.ifscCode || ''}</p>
+                            </div>
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
