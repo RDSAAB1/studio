@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -62,22 +63,19 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     const isGstIncluded = invoiceDetails.isGstIncluded;
     const rate = Number(customer.rate) || 0;
     const netWeight = Number(customer.netWeight) || 0;
-
-    const baseAmount = netWeight * rate;
     
+    const tableTotalAmount = netWeight * rate;
+
     let taxableAmount: number;
     let totalTaxAmount: number;
     let totalInvoiceValue: number;
 
     if (isGstIncluded) {
-        // The table total is the taxable amount, and tax is considered included (i.e., 0 for calculation purposes)
-        // The final value is just the base amount.
-        taxableAmount = baseAmount;
-        totalTaxAmount = 0;
-        totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
+        taxableAmount = tableTotalAmount / (1 + (taxRate / 100));
+        totalTaxAmount = tableTotalAmount - taxableAmount;
+        totalInvoiceValue = tableTotalAmount + (invoiceDetails.totalAdvance || 0);
     } else {
-        // The table total is the taxable amount, and tax is added on top.
-        taxableAmount = baseAmount;
+        taxableAmount = tableTotalAmount;
         totalTaxAmount = taxableAmount * (taxRate / 100);
         totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
     }
@@ -168,9 +166,9 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     </div>
                 </div>
                 
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-left print-table text-base">
-                        <thead className="print-bg-gray-800">
+                       <thead className="print-bg-gray-800">
                              <tr className="uppercase text-xs text-gray-600">
                                 <th className="p-3 font-semibold text-center w-[5%]">#</th>
                                 <th className="p-3 font-semibold w-[35%]">Item & Description</th>
@@ -191,7 +189,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                                 <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
                                 <td className="p-3 text-center">{netWeight.toFixed(2)}</td>
                                 <td className="p-3 text-right">{formatCurrency(rate)}</td>
-                                <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(baseAmount))}</td>
+                                <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(tableTotalAmount))}</td>
                             </tr>
                         </tbody>
                     </table>
