@@ -28,6 +28,7 @@ import ProjectManagementPage from "@/app/projects/management/page";
 import TasksPage from "@/app/projects/tasks/page";
 import CollaborationPage from "@/app/projects/collaboration/page";
 import DataCapturePage from "@/app/data-capture/page";
+import BankManagementPage from "@/app/settings/bank-management/page";
 import PrinterSettingsPage from "@/app/settings/printer/page";
 import SettingsPage from "@/app/settings/page";
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
@@ -57,7 +58,8 @@ const pageComponents: { [key: string]: React.FC<any> } = {
     "/tasks": TasksPage,
     "/collaboration": CollaborationPage,
     "/data-capture": DataCapturePage,
-    "/printer-settings": PrinterSettingsPage,
+    "/settings/bank-management": BankManagementPage,
+    "/settings/printer": PrinterSettingsPage,
     "/settings": SettingsPage,
 };
 
@@ -155,7 +157,6 @@ const AppContent = () => {
        </CustomSidebar>
     );
 };
-
 
 const router = createMemoryRouter([
     { path: "*", Component: AppContent }

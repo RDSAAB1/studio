@@ -125,14 +125,14 @@ export const allMenuItems: MenuItem[] = [
     name: "Data Capture",
     icon: Upload,
   },
-   {
-    id: "printer-settings",
-    name: "Printer Settings",
-    icon: Printer,
-  },
   { 
     id: "settings", 
     name: "Settings", 
-    icon: Settings, 
+    icon: Settings,
+    subMenus: [
+        { id: "settings", name: "General Settings", icon: Settings },
+        { id: "settings/bank-management", name: "Bank Management", icon: Landmark },
+        { id: "settings/printer", name: "Printer Settings", icon: Printer },
+    ]
   },
 ];

@@ -214,14 +214,32 @@ export function getBankBranchesRealtime(callback: (branches: BankBranch[]) => vo
 }
 
 export async function addBank(bankName: string): Promise<Bank> {
-  const docRef = await addDoc(banksCollection, { name: bankName });
+  const docRef = doc(db, 'banks', bankName);
+  await setDoc(docRef, { name: bankName });
   return { id: docRef.id, name: bankName };
 }
 
+export async function deleteBank(id: string): Promise<void> {
+    const docRef = doc(db, "banks", id);
+    await deleteDoc(docRef);
+}
+
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
-    const docRef = await addDoc(bankBranchesCollection, branchData);
+    const docRef = doc(db, 'bankBranches', branchData.ifscCode);
+    await setDoc(docRef, branchData);
     return { id: docRef.id, ...branchData };
 }
+
+export async function updateBankBranch(id: string, branchData: Partial<BankBranch>): Promise<void> {
+    const docRef = doc(db, "bankBranches", id);
+    await updateDoc(docRef, branchData);
+}
+
+export async function deleteBankBranch(id: string): Promise<void> {
+    const docRef = doc(db, "bankBranches", id);
+    await deleteDoc(docRef);
+}
+
 
 // --- Bank Account Functions ---
 export function getBankAccountsRealtime(callback: (accounts: BankAccount[]) => void, onError: (error: Error) => void): () => void {
