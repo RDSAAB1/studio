@@ -89,7 +89,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
     const shipToDetails = {
         name: toTitleCase(customer.shippingName || customer.name),
-        companyName: customer.shippingCompanyName || '',
+        companyName: toTitleCase(customer.shippingCompanyName || customer.companyName || ''),
         address: toTitleCase(customer.shippingAddress || customer.address),
         contact: customer.shippingContact || customer.contact,
         gstin: customer.shippingGstin || customer.gstin || 'N/A',
@@ -126,8 +126,8 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 <div className="grid grid-cols-2 gap-4 mt-8 mb-6">
                     <div className="border border-gray-200 p-4 rounded-lg">
                         <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Bill To</h3>
-                        <p className="font-bold text-lg">{billToDetails.name}</p>
-                        {billToDetails.companyName && <p className="text-base">{billToDetails.companyName}</p>}
+                        <p className="font-bold text-lg">{billToDetails.companyName || billToDetails.name}</p>
+                        {billToDetails.companyName && <p className="text-sm text-gray-600">Attn: {billToDetails.name}</p>}
                         <p className="text-base">{billToDetails.address}</p>
                         <p className="text-base">State: {billToDetails.stateName} (Code: {billToDetails.stateCode})</p>
                         <p className="text-base">Phone: {billToDetails.contact}</p>
@@ -135,22 +135,14 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     </div>
                      <div className="border border-gray-200 p-4 rounded-lg">
                          <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Ship To</h3>
-                        <p className="font-bold text-lg">{shipToDetails.name}</p>
-                        {shipToDetails.companyName && <p className="text-base">{shipToDetails.companyName}</p>}
+                        <p className="font-bold text-lg">{shipToDetails.companyName || shipToDetails.name}</p>
+                        {shipToDetails.companyName && <p className="text-sm text-gray-600">Attn: {shipToDetails.name}</p>}
                         <p className="text-base">{shipToDetails.address}</p>
                         <p className="text-base">State: {shipToDetails.stateName} (Code: {shipToDetails.stateCode})</p>
                         <p className="text-base">Phone: {shipToDetails.contact}</p>
                         <p className="text-base">GSTIN: {shipToDetails.gstin}</p>
                     </div>
                 </div>
-
-                 <div className="border border-gray-200 p-3 rounded-lg mb-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">6R No:</span><span>{invoiceDetails.sixRNo}</span></div>
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">Gate Pass No:</span><span>{invoiceDetails.gatePassNo}</span></div>
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. No:</span><span>{invoiceDetails.grNo}</span></div>
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. Date:</span><span>{invoiceDetails.grDate}</span></div>
-                    <div className="flex gap-2 col-span-2"><span className="font-semibold text-gray-600">Transport:</span><span>{invoiceDetails.transport}</span></div>
-                 </div>
                 
                 <table className="w-full text-left mb-6 print-table text-base">
                     <thead>
@@ -174,11 +166,17 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                             <td className="p-3 text-right border-x border-gray-200">{formatCurrency(rate)}</td>
                             <td className="p-3 text-right border-x border-gray-200 font-semibold">{formatCurrency(taxableAmount)}</td>
                         </tr>
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <tr key={i} className="border-b border-gray-200"><td className="p-3 h-8 border-x border-gray-200" colSpan={7}></td></tr>
-                        ))}
                     </tbody>
                 </table>
+
+                 <div className="border border-gray-200 p-3 rounded-lg mb-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
+                    <div className="flex gap-2"><span className="font-semibold text-gray-600">6R No:</span><span>{invoiceDetails.sixRNo}</span></div>
+                    <div className="flex gap-2"><span className="font-semibold text-gray-600">Gate Pass No:</span><span>{invoiceDetails.gatePassNo}</span></div>
+                    <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. No:</span><span>{invoiceDetails.grNo}</span></div>
+                    <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. Date:</span><span>{invoiceDetails.grDate}</span></div>
+                    <div className="flex gap-2 col-span-2"><span className="font-semibold text-gray-600">Transport:</span><span>{invoiceDetails.transport}</span></div>
+                 </div>
+
             </div>
 
             <div className="flex-grow-0">
@@ -190,10 +188,21 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         </div>
                         <div className="border border-gray-200 rounded-lg p-3">
                             <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
-                            <p className="text-xs"><span className="font-semibold">Bank:</span> {settings.defaultBank?.bankName || ''}</p>
-                            <p className="text-xs"><span className="font-semibold">A/C No:</span> {settings.defaultBank?.accountNumber || ''}</p>
-                            <p className="text-xs"><span className="font-semibold">Branch:</span> {settings.defaultBank?.branchName || ''}</p>
-                            <p className="text-xs"><span className="font-semibold">IFSC:</span> {settings.defaultBank?.ifscCode || ''}</p>
+                            {settings.defaultBank ? (
+                                <>
+                                    <p className="text-xs"><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
+                                    <p className="text-xs"><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
+                                    <p className="text-xs"><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || ''}</p>
+                                    <p className="text-xs"><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
+                                </>
+                            ) : (
+                                <div className="text-xs text-gray-500">
+                                   <p><span className="font-semibold">Bank Name:</span> <span></span></p>
+                                   <p><span className="font-semibold">Account No:</span> <span></span></p>
+                                   <p><span className="font-semibold">Branch:</span> <span></span></p>
+                                   <p><span className="font-semibold">IFSC Code:</span> <span></span></p>
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
