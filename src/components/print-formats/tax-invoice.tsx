@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -64,21 +63,21 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     const rate = Number(customer.rate) || 0;
     const netWeight = Number(customer.netWeight) || 0;
 
+    const baseAmount = netWeight * rate;
+    
     let taxableAmount: number;
     let totalTaxAmount: number;
     let totalInvoiceValue: number;
 
     if (isGstIncluded) {
-        // Amount = Taxable Amount + (Taxable Amount * Tax Rate)
-        // Amount = Taxable Amount * (1 + Tax Rate)
-        // Taxable Amount = Amount / (1 + Tax Rate)
-        const totalValue = netWeight * rate;
-        taxableAmount = totalValue / (1 + (taxRate / 100));
-        totalTaxAmount = totalValue - taxableAmount;
-        totalInvoiceValue = totalValue + (invoiceDetails.totalAdvance || 0);
+        // The table total is the taxable amount, and tax is considered included (i.e., 0 for calculation purposes)
+        // The final value is just the base amount.
+        taxableAmount = baseAmount;
+        totalTaxAmount = 0;
+        totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
     } else {
-        // Amount is the taxable amount
-        taxableAmount = netWeight * rate;
+        // The table total is the taxable amount, and tax is added on top.
+        taxableAmount = baseAmount;
         totalTaxAmount = taxableAmount * (taxRate / 100);
         totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
     }
@@ -153,7 +152,6 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     <div className="border border-gray-200 p-4 rounded-lg">
                         <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Bill To</h3>
                         <p className="font-bold text-lg">{billToDetails.companyName || billToDetails.name}</p>
-                        
                         <p className="text-base">{billToDetails.address}</p>
                         <p className="text-base">State: {billToDetails.stateName} (Code: {billToDetails.stateCode})</p>
                         <p className="text-base">Phone: {billToDetails.contact}</p>
@@ -172,8 +170,8 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-left print-table text-base">
-                        <thead>
-                             <tr className="uppercase text-xs text-gray-600 print-bg-gray-800">
+                        <thead className="print-bg-gray-800">
+                             <tr className="uppercase text-xs text-gray-600">
                                 <th className="p-3 font-semibold text-center w-[5%]">#</th>
                                 <th className="p-3 font-semibold w-[35%]">Item & Description</th>
                                 <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
@@ -193,7 +191,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                                 <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
                                 <td className="p-3 text-center">{netWeight.toFixed(2)}</td>
                                 <td className="p-3 text-right">{formatCurrency(rate)}</td>
-                                <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(taxableAmount))}</td>
+                                <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(baseAmount))}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -226,11 +224,11 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                                     <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
                                 </div>
                             ) : (
-                                <div className="text-xs space-y-0.5">
-                                    <p><span className="font-semibold">Bank:</span> </p>
-                                    <p><span className="font-semibold">A/C No:</span> </p>
-                                    <p><span className="font-semibold">Branch:</span> </p>
-                                    <p><span className="font-semibold">IFSC:</span> </p>
+                               <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span></p>
+                                    <p><span className="font-semibold">A/C No:</span></p>
+                                    <p><span className="font-semibold">Branch:</span></p>
+                                    <p><span className="font-semibold">IFSC:</span></p>
                                 </div>
                             )}
                         </div>
