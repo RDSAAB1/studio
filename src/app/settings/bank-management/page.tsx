@@ -31,7 +31,7 @@ export default function BankManagementPage() {
     const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
     const [currentBranch, setCurrentBranch] = useState<Partial<BankBranch>>({});
     
-    const [filterBank, setFilterBank] = useState<string>('');
+    const [filterBank, setFilterBank] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
@@ -48,7 +48,7 @@ export default function BankManagementPage() {
 
     const filteredBranches = useMemo(() => {
         return branches.filter(branch => {
-            const bankMatch = !filterBank || branch.bankName === filterBank;
+            const bankMatch = !filterBank || filterBank === 'all' || branch.bankName === filterBank;
             const searchMatch = !searchTerm || 
                 branch.branchName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                 branch.ifscCode.toLowerCase().includes(searchTerm.toLowerCase());
@@ -180,10 +180,10 @@ export default function BankManagementPage() {
                     <div className="flex flex-col sm:flex-row gap-4 mb-4">
                         <div className="flex-1">
                             <Label>Filter by Bank</Label>
-                            <Select value={filterBank} onValueChange={setFilterBank}>
+                            <Select value={filterBank} onValueChange={(value) => setFilterBank(value === 'all' ? '' : value)}>
                                 <SelectTrigger><SelectValue placeholder="All Banks" /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Banks</SelectItem>
+                                    <SelectItem value="all">All Banks</SelectItem>
                                     {banks.map(bank => (
                                         <SelectItem key={bank.id} value={bank.name}>{bank.name}</SelectItem>
                                     ))}
@@ -270,5 +270,3 @@ export default function BankManagementPage() {
         </div>
     );
 }
-
-    
