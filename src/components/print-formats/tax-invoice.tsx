@@ -99,7 +99,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
 
     return (
         <div className="p-6 bg-white text-black font-sans text-sm leading-normal flex flex-col justify-between min-h-[29.7cm] printable-area">
-            <style>{`@media print {body {background-color: #fff !important;}.printable-area, .printable-area * {background-color: #fff !important; color: #000 !important; border-color: #ccc !important;}.print-bg-gray-800 {background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}}`}</style>
+            <style>{`@media print {body {background-color: #fff !important;}.printable-area, .printable-area * {background-color: #fff !important; color: #000 !important; border-color: #ccc !important;}.print-bg-gray-800, .print-table thead tr {background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;}}`}</style>
             
             <div className="flex-grow-0">
                  <div className="flex justify-between items-start mb-4">
@@ -126,6 +126,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     <div className="border border-gray-200 p-4 rounded-lg">
                         <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Bill To</h3>
                         <p className="font-bold text-lg">{billToDetails.companyName || billToDetails.name}</p>
+                        {billToDetails.companyName && <p className="text-sm">Attn: {billToDetails.name}</p>}
                         <p className="text-base">{billToDetails.address}</p>
                         <p className="text-base">State: {billToDetails.stateName} (Code: {billToDetails.stateCode})</p>
                         <p className="text-base">Phone: {billToDetails.contact}</p>
@@ -134,6 +135,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                      <div className="border border-gray-200 p-4 rounded-lg">
                          <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-xs">Ship To</h3>
                         <p className="font-bold text-lg">{shipToDetails.companyName || shipToDetails.name}</p>
+                        {shipToDetails.companyName && <p className="text-sm">Attn: {shipToDetails.name}</p>}
                         <p className="text-base">{shipToDetails.address}</p>
                         <p className="text-base">State: {shipToDetails.stateName} (Code: {shipToDetails.stateCode})</p>
                         <p className="text-base">Phone: {shipToDetails.contact}</p>
@@ -142,13 +144,13 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                 </div>
                 
                 <table className="w-full text-left mb-4 print-table text-base">
-                    <thead>
-                        <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
+                     <thead>
+                        <tr className="bg-gray-800 text-black uppercase text-xs">
                             <th className="p-3 font-semibold text-center w-[5%]">#</th>
                             <th className="p-3 font-semibold w-[35%]">Item & Description</th>
                             <th className="p-3 font-semibold text-center w-[10%]">HSN/SAC</th>
-                            <th className="p-3 font-semibold text-center w-[10%] whitespace-nowrap">UOM (Bags)</th>
-                            <th className="p-3 font-semibold text-center w-[10%] whitespace-nowrap">QTY (QTL)</th>
+                            <th className="p-3 font-semibold text-center w-[10%]">UOM (Bags)</th>
+                            <th className="p-3 font-semibold text-center w-[10%]">QTY (QTL)</th>
                             <th className="p-3 font-semibold text-right w-[15%]">Rate</th>
                             <th className="p-3 font-semibold text-right w-[15%]">Total</th>
                         </tr>
