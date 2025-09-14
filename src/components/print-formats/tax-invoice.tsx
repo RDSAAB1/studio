@@ -116,7 +116,6 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                             <div className="grid grid-cols-2 text-left">
                                 <span className="font-bold pr-2">Invoice #:</span><span>{customer.srNo}</span>
                                 <span className="font-bold pr-2">Date:</span><span>{format(new Date(customer.date), "dd MMM, yyyy")}</span>
-                                <span className="font-bold pr-2">Due Date:</span><span>{format(new Date(customer.dueDate), "dd MMM, yyyy")}</span>
                                 <span className="font-bold pr-2">Vehicle No:</span><span>{customer.vehicleNo.toUpperCase()}</span>
                             </div>
                         </div>
@@ -157,7 +156,10 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                     <tbody>
                         <tr className="border-b border-gray-200">
                             <td className="p-3 text-center border-x border-gray-200">1</td>
-                            <td className="p-3 border-x border-gray-200"><p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p></td>
+                            <td className="p-3 border-x border-gray-200">
+                                <p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p>
+                                {!billToDetails.companyName && <p className="text-xs text-gray-600">Attn: {billToDetails.name}</p>}
+                            </td>
                             <td className="p-3 text-center border-x border-gray-200">{hsnCode}</td>
                             <td className="p-3 text-center border-x border-gray-200">{customer.bags || 'N/A'} Bags</td>
                             <td className="p-3 text-center border-x border-gray-200">{netWeight.toFixed(2)}</td>
@@ -237,3 +239,5 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
         </div>
     );
 }
+
+    
