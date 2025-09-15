@@ -19,13 +19,24 @@ export default function LoginPage() {
     useEffect(() => {
         const auth = getFirebaseAuth();
         
+        // This handles the redirect result from Google Sign-In
         getRedirectResult(auth)
             .then((result) => {
                 if (result?.user) {
                     toast({ title: "Signed in successfully!", variant: 'success' });
-                    // The AuthChecker component will handle redirection.
+                    // After successful login, immediately redirect to the setup or dashboard page.
+                    // The AuthChecker will handle the final destination.
+                    router.push('/setup/connect-gmail'); // Or a generic loading page
+                } else {
+                    // If there's no result, check if the user is already signed in
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            router.push('/dashboard-overview'); // Already logged in, go to dashboard
+                        } else {
+                            setLoading(false); // Not logged in, show login page
+                        }
+                    });
                 }
-                 setLoading(false); // Stop loading after checking redirect result
             })
             .catch((error: any) => {
                 console.error("Google Sign-In Redirect Error:", error);
@@ -38,7 +49,7 @@ export default function LoginPage() {
                 }
                 setLoading(false);
             });
-    }, [toast]);
+    }, [router, toast]);
 
 
     const handleGoogleSignIn = async () => {

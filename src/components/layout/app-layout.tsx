@@ -173,20 +173,22 @@ const AuthChecker = () => {
         const auth = getFirebaseAuth();
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
-            setLoading(false);
+            if (currentUser) {
+                getCompanySettings(currentUser.uid)
+                    .then(settings => {
+                        setSetupComplete(!!(settings && settings.appPassword));
+                        setLoading(false);
+                    })
+                    .catch(() => {
+                        setSetupComplete(false);
+                        setLoading(false);
+                    });
+            } else {
+                setLoading(false);
+            }
         });
         return () => unsubscribe();
     }, []);
-
-    useEffect(() => {
-        if (!user || loading) return;
-
-        getCompanySettings(user.uid)
-            .then(settings => {
-                setSetupComplete(!!(settings && settings.appPassword));
-            })
-            .catch(() => setSetupComplete(false));
-    }, [user, loading]);
 
     useEffect(() => {
         if (loading) return;
@@ -195,11 +197,11 @@ const AuthChecker = () => {
         const isSetupPage = location.pathname.startsWith('/setup');
 
         if (user) {
-            if (setupComplete === true) {
+            if (setupComplete) {
                 if (isAuthPage || isSetupPage) {
                     navigate('/dashboard-overview');
                 }
-            } else if (setupComplete === false) {
+            } else {
                 if (!isSetupPage) {
                     navigate('/setup/connect-gmail');
                 }
@@ -211,7 +213,7 @@ const AuthChecker = () => {
         }
     }, [user, loading, setupComplete, location.pathname, navigate]);
 
-    if (loading || (user && setupComplete === null)) {
+    if (loading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -219,24 +221,25 @@ const AuthChecker = () => {
         );
     }
     
-    if (user && setupComplete) {
-        return <AppContent />;
-    }
-    
-    const PageComponent = pageComponents[location.pathname];
-    if (PageComponent) {
-        return <PageComponent />;
-    }
-    
-    // Fallback for initial load or during redirects
-    if (user && setupComplete === null) {
+    // Determine which component to render based on auth and setup state
+    if (user) {
+        if (setupComplete) {
+            return <AppContent />;
+        }
+        // If setup is not complete, the useEffect above will navigate to the setup page.
+        // We can render a loader while that navigation happens.
+         const SetupComponent = pageComponents[location.pathname];
+         if (SetupComponent) {
+             return <SetupComponent />;
+         }
         return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
+             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
 
+    // If no user, render the login page
     return <LoginPage />;
 };
 
