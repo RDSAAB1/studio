@@ -167,47 +167,41 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         const auth = getFirebaseAuth();
 
+        const processUser = async (currentUser: User | null) => {
+            setUser(currentUser);
+            if (currentUser) {
+                const settings = await getCompanySettings(currentUser.uid);
+                const isSetupDone = !!(settings && settings.appPassword);
+                setSetupComplete(isSetupDone);
+            } else {
+                setSetupComplete(false);
+            }
+            setLoading(false);
+            setAuthChecked(true);
+        };
+
+        // First, check for redirect result
         getRedirectResult(auth)
-            .then((result) => {
+            .then(async (result) => {
                 if (result) {
-                    const loggedInUser = result.user;
-                    setUser(loggedInUser);
-                    getCompanySettings(loggedInUser.uid).then(settings => {
-                        const isSetupDone = !!(settings && settings.appPassword);
-                        setSetupComplete(isSetupDone);
-                        if (!isSetupDone) {
-                            navigate('/setup/connect-gmail');
-                        } else {
-                            navigate('/dashboard-overview');
-                        }
-                        setLoading(false);
-                        setAuthChecked(true);
-                    });
+                    await processUser(result.user);
                 } else {
-                    // No redirect result, now check with onAuthStateChanged
+                    // If no redirect, use onAuthStateChanged for persistent login
                     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                        setUser(currentUser);
-                        if (currentUser) {
-                            const settings = await getCompanySettings(currentUser.uid);
-                            setSetupComplete(!!(settings && settings.appPassword));
-                        } else {
-                            setSetupComplete(false);
-                        }
-                        setLoading(false);
-                        setAuthChecked(true);
-                        unsubscribe(); // Unsubscribe after the first check
+                        await processUser(currentUser);
+                        unsubscribe();
                     });
                 }
             })
-            .catch((error) => {
+            .catch(async (error) => {
                 console.error("Authentication Error:", error);
-                setLoading(false);
-                setAuthChecked(true);
+                await processUser(null);
             });
-    }, [navigate]);
+
+    }, []);
 
     useEffect(() => {
-        if (!authChecked || loading) return;
+        if (loading) return;
 
         const isLoginPage = location.pathname === '/login';
         const isSetupPage = location.pathname.startsWith('/setup');
@@ -227,10 +221,9 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
                 }
             }
         }
-    }, [user, loading, authChecked, setupComplete, navigate, location.pathname]);
+    }, [user, loading, setupComplete, navigate, location.pathname]);
 
-
-    if (loading || !authChecked) {
+    if (loading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

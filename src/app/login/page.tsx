@@ -2,16 +2,18 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
+import { getFirebaseAuth, getGoogleProvider, getRedirectResult } from '@/lib/firebase';
 import { signInWithRedirect, type User } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogIn, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const router = useRouter();
 
     const handleGoogleSignIn = async () => {
         const auth = getFirebaseAuth();
@@ -19,7 +21,6 @@ export default function LoginPage() {
         setLoading(true);
         try {
           await signInWithRedirect(auth, provider);
-          // Redirect will happen, user won't see loading state much
         } catch (error) {
            console.error("Sign-in initiation failed", error);
            setLoading(false);
