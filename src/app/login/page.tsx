@@ -1,19 +1,18 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import { getFirebaseAuth, getGoogleProvider, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from '@/lib/firebase';
-import type { User } from 'firebase/auth';
+import { useState } from 'react';
+import { getFirebaseAuth, getGoogleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, LogIn, Sparkles, Mail, KeyRound, UserPlus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { signInWithRedirect } from 'firebase/auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -26,7 +25,6 @@ export default function LoginPage() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const [mode, setMode] = useState<'login' | 'signup' | 'forgotPassword'>('login');
-    const router = useRouter();
 
     const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
         resolver: zodResolver(loginSchema),
@@ -39,11 +37,11 @@ export default function LoginPage() {
         try {
           // signInWithRedirect is better for handling complex login flows
           // and avoids issues with pop-up blockers.
-          await getRedirectResult(auth); // Check if we are coming from a redirect
+          await signInWithRedirect(auth, provider);
         } catch (error) {
-           console.error("Sign-in with redirect result failed", error);
+           console.error("Sign-in with redirect failed", error);
            setLoading(false);
-           toast({ title: "Sign-in Failed", description: "Could not complete the sign-in process.", variant: "destructive" });
+           toast({ title: "Sign-in Failed", description: "Could not start the sign-in process.", variant: "destructive" });
         }
     };
     

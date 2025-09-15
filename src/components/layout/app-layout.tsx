@@ -160,42 +160,39 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
-    const [authChecked, setAuthChecked] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
         const auth = getFirebaseAuth();
 
-        const processUser = async (currentUser: User | null) => {
-            setUser(currentUser);
-            if (currentUser) {
-                const settings = await getCompanySettings(currentUser.uid);
-                const isSetupDone = !!(settings && settings.appPassword);
-                setSetupComplete(isSetupDone);
-            } else {
-                setSetupComplete(false);
-            }
-            setLoading(false);
-            setAuthChecked(true);
-        };
-
-        // First, check for redirect result
+        // 1. Handle redirect result first
         getRedirectResult(auth)
-            .then(async (result) => {
+            .then((result) => {
                 if (result) {
-                    await processUser(result.user);
-                } else {
-                    // If no redirect, use onAuthStateChanged for persistent login
-                    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                        await processUser(currentUser);
-                        unsubscribe();
-                    });
+                    // User signed in via redirect.
+                    // onAuthStateChanged will handle the rest.
                 }
             })
-            .catch(async (error) => {
-                console.error("Authentication Error:", error);
-                await processUser(null);
+            .catch((error) => {
+                console.error("Error processing redirect result:", error);
+            })
+            .finally(() => {
+                 // 2. Set up the state change listener
+                const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+                    setUser(currentUser);
+                    if (currentUser) {
+                        // User is logged in, check if setup is complete
+                        const settings = await getCompanySettings(currentUser.uid);
+                        const isSetupDone = !!(settings && settings.appPassword);
+                        setSetupComplete(isSetupDone);
+                    } else {
+                        // User is logged out
+                        setSetupComplete(false);
+                    }
+                    setLoading(false);
+                });
+                return () => unsubscribe(); // Cleanup listener on unmount
             });
 
     }, []);
@@ -207,21 +204,26 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
         const isSetupPage = location.pathname.startsWith('/setup');
 
         if (!user) {
+            // No user, should be on login page
             if (!isLoginPage) {
                 navigate('/login');
             }
         } else {
+            // User is logged in
             if (setupComplete === false) {
+                // Setup is not complete, redirect to setup
                 if (!isSetupPage) {
                     navigate('/setup/connect-gmail');
                 }
             } else if (setupComplete === true) {
+                // Setup is complete, should not be on login or setup
                 if (isLoginPage || isSetupPage || location.pathname === '/') {
                     navigate('/dashboard-overview');
                 }
             }
         }
     }, [user, loading, setupComplete, navigate, location.pathname]);
+
 
     if (loading) {
         return (
