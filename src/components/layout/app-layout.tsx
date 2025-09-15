@@ -79,24 +79,24 @@ const AppContent = () => {
     const location = useLocation();
 
     useEffect(() => {
-      const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
-      if (dashboardTab) {
-          setOpenTabs([dashboardTab]);
-          if(location.pathname === '/login' || location.pathname === '/'){
-            navigate('/dashboard-overview');
-          }
-      }
-    }, [navigate, location.pathname]);
+        const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
+        if (dashboardTab && openTabs.length === 0) {
+            setOpenTabs([dashboardTab]);
+             if(location.pathname === '/login' || location.pathname === '/'){
+               navigate('/dashboard-overview');
+             }
+        }
+    }, [navigate, location.pathname, openTabs]);
 
     useEffect(() => {
         const currentPathId = location.pathname.substring(1);
         if (currentPathId && currentPathId !== activeTabId) {
             const menuItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === currentPathId);
             if(menuItem) {
-                 setActiveTabId(currentPathId);
                  if (!openTabs.some(tab => tab.id === currentPathId)) {
                      setOpenTabs(prev => [...prev, menuItem]);
                  }
+                 setActiveTabId(currentPathId);
             }
         }
     }, [location.pathname, openTabs, activeTabId]);
@@ -143,6 +143,8 @@ const AppContent = () => {
         setIsSidebarActive(prev => !prev);
     };
     
+    const PageComponent = pageComponents[location.pathname];
+
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
@@ -152,14 +154,7 @@ const AppContent = () => {
               </div>
               <ScrollArea className="flex-grow">
                 <main className="p-4 sm:p-6">
-                    {openTabs.map(tab => {
-                        const PageComponent = pageComponents[`/${tab.id}`];
-                        return (
-                            <div key={tab.id} style={{ display: tab.id === activeTabId ? 'block' : 'none' }}>
-                                {PageComponent && <PageComponent />}
-                            </div>
-                        )
-                    })}
+                    {PageComponent ? <PageComponent /> : <div>Page not found</div>}
                 </main>
               </ScrollArea>
           </div>
@@ -216,17 +211,18 @@ const AuthChecker = () => {
     }
     
     const isAuthPage = location.pathname === '/login' || location.pathname.startsWith('/setup');
-    const PageComponent = pageComponents[location.pathname];
     
-    if (user && setupComplete && !isAuthPage) {
+    if (user && setupComplete) {
         return <AppContent />;
-    } else if (isAuthPage && PageComponent) {
-        return <PageComponent />;
-    } else if (user && !setupComplete && location.pathname.startsWith('/setup')) {
-        return <PageComponent />;
     }
     
-    return null; // Or a fallback component
+    if (isAuthPage) {
+        const PageComponent = pageComponents[location.pathname];
+        if (PageComponent) return <PageComponent />;
+    }
+    
+    // Fallback or redirect if no other condition is met
+    return null; 
 };
 
 
