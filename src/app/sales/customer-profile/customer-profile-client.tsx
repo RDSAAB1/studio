@@ -274,7 +274,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             date: p.date,
             particulars: `Payment (ID# ${p.paymentId})`,
             debit: 0,
-            credit: p.amount, // Customer payments don't have cdAmount in the same way
+            credit: p.amount + (p.cdAmount || 0),
         }));
 
         const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -759,3 +759,5 @@ export default function CustomerProfilePage() {
     </div>
   );
 }
+
+    
