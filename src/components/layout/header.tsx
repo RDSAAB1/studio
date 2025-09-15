@@ -16,6 +16,7 @@ import { formatCurrency } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
+import { useRouter } from "next/navigation";
 
 
 interface HeaderProps {
@@ -26,7 +27,7 @@ const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
-    const navigate = useNavigate();
+    const router = useRouter();
 
     useEffect(() => {
         const unsubscribe = getLoansRealtime(setLoans, console.error);
@@ -51,7 +52,7 @@ const NotificationBell = () => {
             payee: loan.lenderName || loan.productName || 'Loan Payment',
             description: `EMI for ${loan.loanName}`
         }).toString();
-        navigate(`/income-expense?${params}`);
+        router.push(`/expense-tracker?${params}`);
     };
 
     return (
@@ -176,7 +177,7 @@ const DraggableCalculator = () => {
 };
 
 export function Header({ toggleSidebar }: HeaderProps) {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   return (
     <header className="sticky top-0 z-30 flex h-10 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
@@ -197,7 +198,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <NotificationBell />
           <DraggableCalculator />
-          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
+          <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
           </Button>

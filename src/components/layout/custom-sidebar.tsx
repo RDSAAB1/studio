@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { usePathname } from 'next/navigation';
 import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu } from 'lucide-react';
@@ -19,8 +19,7 @@ interface CustomSidebarProps {
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, isSidebarActive, toggleSidebar }) => {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('BizSuite DataFlow'); // Default name
-  const location = useLocation();
-  const activePath = location.pathname;
+  const activePath = usePathname();
 
   useEffect(() => {
     // Fetch company name from settings
