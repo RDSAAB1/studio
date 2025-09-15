@@ -6,7 +6,6 @@ import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 're
 import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
-import LoginPage from "@/app/login/page";
 import DashboardOverviewPage from "@/app/dashboard-overview/page";
 import SupplierEntryPage from "@/app/sales/supplier-entry/page";
 import SupplierPaymentsPage from "@/app/sales/supplier-payments/page";

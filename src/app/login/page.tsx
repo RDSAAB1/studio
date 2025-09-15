@@ -1,186 +1,33 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import type { Auth } from 'firebase/auth';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, BarChart3, Database, Users, Loader2, AlertTriangle, KeyRound } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    
-    const [auth, setAuth] = useState<Auth | null>(null);
-    const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
-    const [authError, setAuthError] = useState<string | null>(null);
-    const [isBypassDialogOpen, setIsBypassDialogOpen] = useState(false);
-    const [bypassCode, setBypassCode] = useState('');
-    const [signInLoading, setSignInLoading] = useState(false);
 
     useEffect(() => {
-        const authInstance = getFirebaseAuth();
-        setAuth(authInstance);
-        setGoogleProvider(getGoogleProvider());
-    }, []);
+        // Automatically bypass login
+        toast({
+            title: "Bypass Successful",
+            description: "Accessing the application directly.",
+            variant: "success",
+        });
+        sessionStorage.setItem('bypass', 'true');
+        // Redirect to the dashboard
+        router.replace('/dashboard-overview');
+    }, [router, toast]);
 
-
-    const handleSignIn = async () => {
-        if (!auth || !googleProvider) {
-            toast({
-                title: "Authentication not ready",
-                description: "Please wait a moment and try again.",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        setSignInLoading(true);
-        setAuthError(null);
-        try {
-            await signInWithPopup(auth, googleProvider);
-            // Let the LayoutController handle the redirect after auth state changes.
-            window.location.href = '/dashboard-overview';
-        } catch (error: any) {
-            console.error("Error signing in with Google: ", error);
-            let errorMessage = "An unknown error occurred. Please try again.";
-            if (error.code === 'auth/popup-closed-by-user') {
-                errorMessage = "Login cancelled. If the pop-up closes automatically, please ensure the current URL is an authorized domain in your Firebase project settings (Authentication > Settings > Authorized domains).";
-            } else if (error.code === 'auth/network-request-failed') {
-                errorMessage = "Network error. Please check your internet connection.";
-            } else if (error.code) {
-                 errorMessage = `An error occurred: ${error.message} (Code: ${error.code})`;
-            }
-            setAuthError(errorMessage);
-            toast({
-                title: "Login Failed",
-                description: errorMessage,
-                variant: "destructive"
-            });
-        } finally {
-            setSignInLoading(false);
-        }
-    };
-
-    const handleBypass = () => {
-        if (bypassCode === '7880') {
-            toast({
-                title: "Bypass Successful",
-                description: "Accessing the application directly.",
-                variant: "success",
-            });
-            sessionStorage.setItem('bypass', 'true');
-            // Let the LayoutController handle the redirect after state changes.
-            window.location.href = '/dashboard-overview';
-        } else {
-            toast({
-                title: "Invalid Code",
-                description: "The bypass code is incorrect.",
-                variant: "destructive",
-            });
-        }
-        setIsBypassDialogOpen(false);
-        setBypassCode('');
-    };
-    
-    const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) => (
-        <div className="flex items-start gap-4">
-            <div className="bg-primary/10 text-primary p-2 rounded-lg">{icon}</div>
-            <div>
-                <h3 className="font-semibold">{title}</h3>
-                <p className="text-sm text-muted-foreground">{description}</p>
-            </div>
-        </div>
-    );
-    
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 overflow-hidden shadow-2xl">
-                <div className="p-8 flex flex-col justify-center">
-                    <CardHeader className="p-0 mb-6">
-                        <div className="flex items-center gap-3 mb-2">
-                             <Sparkles className="h-8 w-8 text-primary" />
-                             <h1 className="text-3xl font-bold">BizSuite DataFlow</h1>
-                        </div>
-                        <CardDescription>Your all-in-one business management solution. Sign in to continue.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0 space-y-4">
-                         <div className="space-y-6 mb-8">
-                             <FeatureCard icon={<Users className="h-5 w-5"/>} title="Unified Management" description="Handle suppliers, customers, and finances all in one place." />
-                             <FeatureCard icon={<BarChart3 className="h-5 w-5"/>} title="Insightful Reports" description="Generate RTGS, sales, and financial reports with a single click." />
-                             <FeatureCard icon={<Database className="h-5 w-5"/>} title="Secure & Reliable" description="Your data is safe and always accessible with our robust backend." />
-                         </div>
-                        {authError && (
-                            <Alert variant="destructive" className="mb-4">
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertTitle>Authentication Error</AlertTitle>
-                                <AlertDescription>
-                                    {authError}
-                                </AlertDescription>
-                            </Alert>
-                        )}
-                        <Button onClick={handleSignIn} className="w-full font-semibold" disabled={signInLoading}>
-                             {signInLoading ? (
-                                <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Please wait...
-                                </>
-                             ) : (
-                                <>
-                                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 21.2 177.2 56.4l-63.1 61.9C338.4 99.4 300.9 88 248 88c-77.2 0-140.1 63.8-140.1 142.3s62.9 142.3 140.1 142.3c85.3 0 121.7-64.8 125.1-97.9H248v-69.8h239.5c1.4 9.3 2.5 19.1 2.5 29.5z"></path></svg>
-                                Sign in with Google
-                                </>
-                             )}
-                        </Button>
-                    </CardContent>
-                     <CardFooter className="p-0 pt-4">
-                        <Button variant="link" className="text-muted-foreground" onClick={() => setIsBypassDialogOpen(true)}>
-                            <KeyRound className="mr-2 h-4 w-4"/>
-                            Bypass Login
-                        </Button>
-                    </CardFooter>
-                </div>
-                 <div className="hidden md:block bg-muted/40 p-8">
-                    <div className="flex flex-col justify-center h-full">
-                        <img src="https://picsum.photos/800/600" data-ai-hint="business data" alt="BizSuite Illustration" className="rounded-lg shadow-lg" />
-                    </div>
-                </div>
-            </Card>
-
-             <Dialog open={isBypassDialogOpen} onOpenChange={setIsBypassDialogOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Login Bypass</DialogTitle>
-                        <DialogDescription>
-                            Enter the bypass code to access the application without signing in. This is for emergency access only.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="bypass-code">Bypass Code</Label>
-                            <Input
-                                id="bypass-code"
-                                type="password"
-                                value={bypassCode}
-                                onChange={(e) => setBypassCode(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleBypass()}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsBypassDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleBypass}>Enter</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <div className="flex flex-col items-center gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground">Redirecting to dashboard...</p>
+            </div>
         </div>
     );
 }
