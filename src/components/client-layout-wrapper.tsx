@@ -2,7 +2,7 @@
 "use client";
 
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
-import AppLayout from '@/components/layout/app-layout';
+import AppLayoutWrapper from '@/components/layout/app-layout';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,7 +29,7 @@ export default function ClientLayoutWrapper({
 }) {
   return (
     <div className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
-      <AppLayout>{children}</AppLayout>
+      <AppLayoutWrapper>{children}</AppLayoutWrapper>
     </div>
   );
 }

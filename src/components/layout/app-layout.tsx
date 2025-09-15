@@ -176,6 +176,52 @@ const router = createMemoryRouter([
     { path: '*', Component: AppContent }
 ]);
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-    return <RouterProvider router={router} />;
+const AppLayout = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    useEffect(() => {
+        const auth = getFirebaseAuth();
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+    
+    useEffect(() => {
+        if (loading) return;
+        const isAuthPage = location.pathname === '/login' || location.pathname.startsWith('/setup');
+        if (!user && !isAuthPage) {
+            navigate('/login');
+        } else if (user && isAuthPage) {
+            // If user is logged in and on an auth page, redirect to dashboard
+            // This logic can be refined based on setup completion status
+            navigate('/dashboard-overview');
+        }
+    }, [user, loading, location.pathname, navigate]);
+
+
+    if (loading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    // The RouterProvider is now inside AppLayoutWrapper, and AppLayout is a child.
+    // So this component doesn't render the router, it IS rendered BY the router.
+    return <AppContent />;
+}
+
+export default function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
+    // MemoryRouter provides the context for AppLayout and its children.
+    return (
+        <MemoryRouter>
+            <AppLayout />
+        </MemoryRouter>
+    )
 }
