@@ -14,7 +14,7 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 
 
@@ -138,7 +138,7 @@ const DraggableCalculator = () => {
     }, [isDragging]);
     
     return (
-        <Dialog>
+        <Dialog modal={false}>
             <DialogTrigger asChild>
                 <Button variant="ghost" size="icon">
                     <Calculator className="h-5 w-5" />
@@ -149,19 +149,25 @@ const DraggableCalculator = () => {
                 ref={dialogRef}
                 className="p-0 border-0 max-w-sm" 
                 style={{
-                    transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px)`,
+                    transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
                 }}
-                onInteractOutside={(e) => {
+                 onInteractOutside={(e) => {
                     if (isDragging) {
                         e.preventDefault();
                     }
                 }}
             >
+                <DialogHeader className="p-0 sr-only">
+                    <DialogTitle>Advanced Calculator</DialogTitle>
+                </DialogHeader>
                 <div 
                     onMouseDown={handleMouseDown} 
                     className="cursor-grab active:cursor-grabbing w-full h-8 flex items-center justify-center bg-muted/50 rounded-t-lg"
                 >
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
+                     <DialogClose className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-background">
+                        <X className="h-3 w-3" />
+                     </DialogClose>
                 </div>
                  <AdvancedCalculator />
             </DialogContent>
