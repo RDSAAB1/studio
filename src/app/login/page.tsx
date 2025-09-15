@@ -2,32 +2,33 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
-import { signInWithRedirect, getRedirectResult, type User } from 'firebase/auth';
+import { getFirebaseAuth, getGoogleProvider, getRedirectResult, onAuthStateChanged } from '@/lib/firebase';
+import { signInWithRedirect, type User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogIn, Sparkles } from 'lucide-react';
+import { getCompanySettings } from '@/lib/firestore';
 
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // Start with loading true
 
+    // This effect handles both the initial auth state and the redirect result.
     useEffect(() => {
+        const auth = getFirebaseAuth();
+        
         const processRedirect = async () => {
             try {
-                setLoading(true);
-                const auth = getFirebaseAuth();
                 const result = await getRedirectResult(auth);
                 if (result?.user) {
-                    // User is signed in via redirect.
-                    // The onAuthStateChanged listener in AppLayout will handle the routing.
                     toast({ title: "Signed in successfully!", variant: 'success' });
+                    // No need to navigate here, onAuthStateChanged will handle it.
                 }
             } catch (error: any) {
-                console.error("Google Sign-In Redirect Error:", error);
+                 console.error("Google Sign-In Redirect Error:", error);
                 if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
                     toast({
                         title: "Login Failed",
@@ -36,12 +37,28 @@ export default function LoginPage() {
                     });
                 }
             } finally {
+                // Only set loading to false after redirect processing is attempted.
                 setLoading(false);
             }
         };
 
-        processRedirect();
-    }, [toast, router]);
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in. Check if setup is complete.
+                const settings = await getCompanySettings(user.uid);
+                if (!settings?.appPassword) {
+                    router.push('/setup/connect-gmail');
+                } else {
+                    router.push('/dashboard-overview');
+                }
+            } else {
+                // No user is signed in. Process any pending redirect.
+                processRedirect();
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router, toast]);
 
 
     const handleGoogleSignIn = async () => {

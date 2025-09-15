@@ -37,9 +37,13 @@ import TabBar from './tab-bar';
 import { ScrollArea } from "../ui/scroll-area";
 import LoginPage from "@/app/login/page";
 import { getCompanySettings } from "@/lib/firestore";
-
+import ConnectGmailPage from "@/app/setup/connect-gmail/page";
+import CompanyDetailsPage from "@/app/setup/company-details/page";
 
 const pageComponents: { [key: string]: React.FC<any> } = {
+    "/login": LoginPage,
+    "/setup/connect-gmail": ConnectGmailPage,
+    "/setup/company-details": CompanyDetailsPage,
     "/dashboard-overview": DashboardOverviewPage,
     "/supplier-entry": SupplierEntryPage,
     "/supplier-payments": SupplierPaymentsPage,
@@ -136,6 +140,14 @@ const AppContent = () => {
         setIsSidebarActive(prev => !prev);
     };
     
+    const currentPath = location.pathname;
+    const isAuthPage = currentPath === '/login' || currentPath.startsWith('/setup');
+    
+    if (isAuthPage) {
+        const PageComponent = pageComponents[currentPath];
+        return PageComponent ? <PageComponent /> : <div>Page not found</div>;
+    }
+
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
@@ -160,58 +172,10 @@ const AppContent = () => {
     );
 };
 
-
-const AppLayoutContent = () => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
-    const location = useLocation();
-
-    useEffect(() => {
-        const auth = getFirebaseAuth();
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
-            if (currentUser) {
-                // If user is logged in, check for setup completion
-                const settings = await getCompanySettings(currentUser.uid);
-                if (!settings?.appPassword) {
-                    if(location.pathname !== '/setup/connect-gmail') navigate('/setup/connect-gmail');
-                } else {
-                     if(location.pathname === '/login' || location.pathname === '/' || location.pathname.startsWith('/setup')) {
-                        navigate('/dashboard-overview');
-                     }
-                }
-            } else {
-                // If user is not logged in, redirect to login page
-                if (location.pathname !== '/login') {
-                    navigate('/login');
-                }
-            }
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [navigate, location.pathname]);
-    
-    if (loading) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-    
-    if (!user) {
-        return <LoginPage />;
-    }
-
-    return <AppContent />;
-}
+const router = createMemoryRouter([
+    { path: '*', Component: AppContent }
+]);
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-    return (
-      <MemoryRouter>
-          <AppLayoutContent/>
-      </MemoryRouter>
-    )
+    return <RouterProvider router={router} />;
 }
