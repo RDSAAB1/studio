@@ -155,11 +155,7 @@ const ScientificCalculator = () => {
             } else if (key === '/') {
                 handleOperator('÷');
             } else if (key === '=') {
-                handleOperator('+');
-            } else if (key === '[') {
-                handleOperator('×');
-            } else if (key === ']') {
-                handleOperator('÷');
+                handleEquals();
             } else if (key === 'Enter') {
                 handleEquals();
             } else if (key === 'Backspace') {
@@ -189,7 +185,7 @@ const ScientificCalculator = () => {
                     <p className="font-mono">Enter → = | [ → × | ] → ÷ | = → + | Del/Esc → AC</p>
                 </CardContent>
             </Card>
-            <Input type="text" readOnly value={input} className="h-16 text-2xl text-right font-mono" />
+            <Input type="text" readOnly value={input} className="h-12 text-2xl text-right font-mono" />
             <div className="grid grid-cols-5 gap-2">
                 <CalculatorButton onClick={() => handleFunction('sin')}>sin</CalculatorButton>
                 <CalculatorButton onClick={() => handleFunction('cos')}>cos</CalculatorButton>
@@ -287,7 +283,7 @@ const UnitConverter = () => {
     const units = Object.keys(unitConfig[category]);
 
     return (
-        <div className="p-4 space-y-4 min-h-[350px]">
+        <div className="p-4 space-y-4">
              <div className="space-y-1">
                 <Label>Category</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as any)}>
@@ -362,7 +358,7 @@ const GSTCalculator = () => {
     }, [amount, gstRate, calculationType]);
 
     return (
-        <div className="p-4 space-y-4 min-h-[350px]">
+        <div className="p-4 space-y-4">
             <div className="space-y-1">
                 <Label htmlFor="gst-amount">Amount</Label>
                 <Input id="gst-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8"/>
@@ -424,7 +420,7 @@ const DateCalculator = () => {
     }, [calcDate, addValue, addUnit]);
 
     return (
-         <div className="p-4 space-y-6 min-h-[350px]">
+         <div className="p-4 space-y-6">
             <Card>
                 <CardContent className="p-4 space-y-3">
                      <h3 className="text-sm font-semibold">Calculate Difference</h3>
@@ -488,7 +484,7 @@ const InterestCalculator = () => {
 
 
     return (
-        <div className="p-4 space-y-4 min-h-[350px]">
+        <div className="p-4 space-y-4">
              <Select value={interestType} onValueChange={setInterestType}>
                 <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="simple">Simple Interest</SelectItem><SelectItem value="compound">Compound Interest</SelectItem></SelectContent>
@@ -549,7 +545,7 @@ const PercentageCalculator = () => {
     }
 
     return (
-        <div className="p-4 space-y-4 min-h-[350px]">
+        <div className="p-4 space-y-4">
             <Select value={calcType} onValueChange={setCalcType}>
                 <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -593,24 +589,26 @@ export const AdvancedCalculator = () => {
                         <TabsTrigger value="date" className="h-full">Date</TabsTrigger>
                         <TabsTrigger value="interest" className="h-full">Interest</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="calculator">
-                        <ScientificCalculator />
-                    </TabsContent>
-                    <TabsContent value="converter">
-                        <UnitConverter />
-                    </TabsContent>
-                    <TabsContent value="gst">
-                        <GSTCalculator />
-                    </TabsContent>
-                    <TabsContent value="percentage">
-                        <PercentageCalculator />
-                    </TabsContent>
-                    <TabsContent value="date">
-                        <DateCalculator />
-                    </TabsContent>
-                     <TabsContent value="interest">
-                        <InterestCalculator />
-                    </TabsContent>
+                    <div className="min-h-[420px]">
+                        <TabsContent value="calculator">
+                            <ScientificCalculator />
+                        </TabsContent>
+                        <TabsContent value="converter">
+                            <UnitConverter />
+                        </TabsContent>
+                        <TabsContent value="gst">
+                            <GSTCalculator />
+                        </TabsContent>
+                        <TabsContent value="percentage">
+                            <PercentageCalculator />
+                        </TabsContent>
+                        <TabsContent value="date">
+                            <DateCalculator />
+                        </TabsContent>
+                        <TabsContent value="interest">
+                            <InterestCalculator />
+                        </TabsContent>
+                    </div>
                 </Tabs>
             </CardContent>
         </Card>
