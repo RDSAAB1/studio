@@ -702,5 +702,10 @@ export async function saveFormatSettings(settings: FormatSettings): Promise<void
     await setDoc(docRef, settings, { merge: true });
 }
 
-
+export async function addTransaction(transactionData: Omit<Transaction, 'id'|'transactionId'>) {
+    const { transactionType } = transactionData;
+    const collectionRef = transactionType === 'Income' ? incomesCollection : expensesCollection;
+    return addDoc(collectionRef, transactionData);
+}
     
+

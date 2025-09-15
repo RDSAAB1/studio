@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
+import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
 import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -310,6 +310,12 @@ export default function SettingsPage() {
         }
     };
     
+    const handleSetDefaultBankAccount = async (accountId: string) => {
+        await updateRtgsSettings({ defaultBankAccountId: accountId });
+        setReceiptSettings(prev => prev ? { ...prev, defaultBankAccountId: accountId } : null);
+        toast({ title: 'Default bank account updated.', variant: 'success' });
+    };
+
     const handleBankAccountSave = async () => {
         if (!currentBankAccount || !currentBankAccount.bankName || !currentBankAccount.accountNumber || !currentBankAccount.accountHolderName) {
             toast({ title: "Please fill all required bank account fields", variant: "destructive" });
@@ -526,13 +532,19 @@ export default function SettingsPage() {
                         </Button>
                      }>
                         <ScrollArea className="h-80 border rounded-md">
-                            {bankAccounts.map(account => (
-                                <div key={account.id} className="flex items-center justify-between p-3 border-b">
+                            {bankAccounts.map(account => {
+                                const isDefault = receiptSettings?.defaultBankAccountId === account.id;
+                                return (
+                                <div key={account.id} className={cn("flex items-center justify-between p-3 border-b", isDefault && "bg-primary/10")}>
                                     <div>
-                                        <p className="font-semibold">{account.accountHolderName} {account.accountType && <span className="text-xs text-muted-foreground">({account.accountType})</span>}</p>
+                                        <p className="font-semibold flex items-center gap-2">
+                                            {account.accountHolderName}
+                                            {isDefault && <span className="text-xs font-normal text-primary/80 flex items-center gap-1">(<CheckCheck className="h-3 w-3"/>Default)</span>}
+                                        </p>
                                         <p className="text-sm text-muted-foreground">{account.bankName} - ...{account.accountNumber.slice(-4)}</p>
                                     </div>
                                     <div className="flex gap-1">
+                                        {!isDefault && <Button variant="outline" size="sm" className="h-7" onClick={() => handleSetDefaultBankAccount(account.id)}>Set as Default</Button>}
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBankAccount(account); setIsBankAccountDialogOpen(true); }}><Pen className="h-4 w-4" /></Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
@@ -543,7 +555,8 @@ export default function SettingsPage() {
                                         </AlertDialog>
                                     </div>
                                 </div>
-                            ))}
+                                )
+                            })}
                         </ScrollArea>
                     </SettingsCard>
                 </TabsContent>
