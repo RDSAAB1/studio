@@ -129,6 +129,7 @@ export default function CustomerEntryClient() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       ...getInitialFormState(lastVariety, lastPaymentType),
+      advanceFreight: 0,
     },
     shouldFocusError: false,
   });
@@ -376,8 +377,8 @@ export default function CustomerEntryClient() {
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
-        shippingStateName: formValues.shippingStateName,
-        shippingStateCode: formValues.shippingStateCode,
+        shippingStateName: formValues.shippingStateName || '',
+        shippingStateCode: formValues.shippingStateCode || '',
         advanceFreight: formValues.advanceFreight || 0,
         so: '',
         kartaPercentage: 0,
@@ -695,5 +696,7 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+
+    
 
     

@@ -124,8 +124,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 finalDataToSave.shippingAddress = editableInvoiceDetails.address;
                 finalDataToSave.shippingContact = editableInvoiceDetails.contact;
                 finalDataToSave.shippingGstin = editableInvoiceDetails.gstin;
-                finalDataToSave.shippingStateName = editableInvoiceDetails.stateName;
-                finalDataToSave.shippingStateCode = editableInvoiceDetails.stateCode;
+                finalDataToSave.shippingStateName = editableInvoiceDetails.stateName || '';
+                finalDataToSave.shippingStateCode = editableInvoiceDetails.stateCode || '';
             }
 
             await updateCustomer(customer.id, { 
@@ -355,3 +355,4 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     );
 };
 
+    
