@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { createMemoryRouter, RouterProvider, useLocation, useNavigate, MemoryRouter } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider, useLocation, useNavigate, MemoryRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
 import type { User } from "firebase/auth";
 import { Loader2 } from 'lucide-react';
@@ -154,7 +154,7 @@ const AppContent = () => {
               </div>
               <ScrollArea className="flex-grow">
                 <main className="p-4 sm:p-6">
-                    {PageComponent ? <PageComponent /> : <div>Page not found</div>}
+                    <Outlet/>
                 </main>
               </ScrollArea>
           </div>
@@ -162,56 +162,54 @@ const AppContent = () => {
     );
 };
 
-const AuthChecker = () => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+
+const ProtectedRoute = ({ user, setupComplete }: { user: User | null, setupComplete: boolean | null }) => {
     const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
+        if (user === null) {
+            navigate('/login');
+            return;
+        }
+        if (setupComplete === false) {
+            navigate('/setup/connect-gmail');
+            return;
+        }
+        if (location.pathname === '/login' || location.pathname === '/') {
+             navigate('/dashboard-overview');
+        }
+    }, [user, setupComplete, navigate, location.pathname]);
+
+    if (user && setupComplete) {
+        return <AppContent />;
+    }
+    
+    // Render nothing or a loader while redirecting
+    return null;
+}
+
+const AppRoutes = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+
+     useEffect(() => {
         const auth = getFirebaseAuth();
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                getCompanySettings(currentUser.uid)
-                    .then(settings => {
-                        setSetupComplete(!!(settings && settings.appPassword));
-                        setLoading(false);
-                    })
-                    .catch(() => {
-                        setSetupComplete(false);
-                        setLoading(false);
-                    });
-            } else {
-                setLoading(false);
+                try {
+                    const settings = await getCompanySettings(currentUser.uid);
+                    setSetupComplete(!!(settings && settings.appPassword));
+                } catch {
+                    setSetupComplete(false);
+                }
             }
+            setLoading(false);
         });
         return () => unsubscribe();
     }, []);
-
-    useEffect(() => {
-        if (loading) return;
-
-        const isAuthPage = location.pathname === '/login';
-        const isSetupPage = location.pathname.startsWith('/setup');
-
-        if (user) {
-            if (setupComplete) {
-                if (isAuthPage || isSetupPage) {
-                    navigate('/dashboard-overview');
-                }
-            } else {
-                if (!isSetupPage) {
-                    navigate('/setup/connect-gmail');
-                }
-            }
-        } else {
-            if (!isAuthPage) {
-                navigate('/login');
-            }
-        }
-    }, [user, loading, setupComplete, location.pathname, navigate]);
 
     if (loading) {
         return (
@@ -221,35 +219,28 @@ const AuthChecker = () => {
         );
     }
     
-    // Determine which component to render based on auth and setup state
-    if (user) {
-        if (setupComplete) {
-            return <AppContent />;
-        }
-        // If setup is not complete, the useEffect above will navigate to the setup page.
-        // We can render a loader while that navigation happens.
-         const SetupComponent = pageComponents[location.pathname];
-         if (SetupComponent) {
-             return <SetupComponent />;
-         }
-        return (
-             <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    // If no user, render the login page
-    return <LoginPage />;
+    return (
+        <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/setup/connect-gmail" element={<ConnectGmailPage />} />
+            <Route path="/setup/company-details" element={<CompanyDetailsPage />} />
+            <Route element={<ProtectedRoute user={user} setupComplete={setupComplete} />}>
+                {Object.keys(pageComponents).filter(path => !path.startsWith('/login') && !path.startsWith('/setup')).map(path => {
+                    const Component = pageComponents[path];
+                    return <Route key={path} path={path} element={<Component />} />
+                })}
+            </Route>
+        </Routes>
+    )
 };
 
 
-const router = createMemoryRouter([
-    { path: '*', Component: AuthChecker }
-], { initialEntries: ['/'] });
-
 const AppLayout = () => {
-  return <RouterProvider router={router} />;
+  return (
+    <MemoryRouter initialEntries={['/']}>
+      <AppRoutes/>
+    </MemoryRouter>
+  );
 }
 
 export default function AppLayoutWrapper() {

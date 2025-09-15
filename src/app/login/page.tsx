@@ -19,34 +19,38 @@ export default function LoginPage() {
     useEffect(() => {
         const auth = getFirebaseAuth();
         
-        // This handles the redirect result from Google Sign-In
         getRedirectResult(auth)
             .then((result) => {
                 if (result?.user) {
                     toast({ title: "Signed in successfully!", variant: 'success' });
-                    // After successful login, immediately redirect to the setup or dashboard page.
-                    // The AuthChecker will handle the final destination.
-                    router.push('/setup/connect-gmail'); // Or a generic loading page
+                    // Immediately redirect to the first setup step after sign-in.
+                    router.push('/setup/connect-gmail');
                 } else {
-                    // If there's no result, check if the user is already signed in
+                    // No redirect result, check current auth state
                     onAuthStateChanged(auth, (user) => {
                         if (user) {
-                            router.push('/dashboard-overview'); // Already logged in, go to dashboard
+                            // Already logged in, check setup status
+                            getCompanySettings(user.uid).then(settings => {
+                                if (settings && settings.appPassword) {
+                                    router.push('/dashboard-overview');
+                                } else {
+                                    router.push('/setup/connect-gmail');
+                                }
+                            });
                         } else {
-                            setLoading(false); // Not logged in, show login page
+                            // No user, show the login page
+                            setLoading(false);
                         }
                     });
                 }
             })
             .catch((error: any) => {
-                console.error("Google Sign-In Redirect Error:", error);
-                if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'cancelled-popup-request') {
-                    toast({
-                        title: "Login Failed",
-                        description: "Could not sign in with Google. Please try again.",
-                        variant: "destructive",
-                    });
-                }
+                console.error("Authentication Error:", error);
+                toast({
+                    title: "Login Failed",
+                    description: "Could not sign in with Google. Please try again.",
+                    variant: "destructive",
+                });
                 setLoading(false);
             });
     }, [router, toast]);
