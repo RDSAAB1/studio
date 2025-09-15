@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -66,53 +67,64 @@ export default function RtgsReportClient() {
     useEffect(() => {
         setLoading(true);
         let currentSettings: RtgsSettings | null = null;
+        let unsubscribePayments: (() => void) | undefined;
 
-        const fetchSettings = async () => {
-            const savedSettings = await getRtgsSettings();
-            if (savedSettings) {
-                currentSettings = savedSettings;
-                setSettings(savedSettings);
+        const fetchSettingsAndData = async () => {
+            try {
+                const savedSettings = await getRtgsSettings();
+                if (savedSettings) {
+                    currentSettings = savedSettings;
+                    setSettings(savedSettings);
+
+                    // Now that settings are loaded, subscribe to payments
+                    unsubscribePayments = getPaymentsRealtime((payments) => {
+                        const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
+                        const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
+                            const srNo = p.rtgsSrNo || p.paymentId || '';
+                            return {
+                                paymentId: p.paymentId,
+                                date: p.date,
+                                checkNo: p.checkNo || '',
+                                type: p.type || (currentSettings?.type || 'SB'),
+                                srNo: srNo,
+                                supplierName: toTitleCase(p.supplierName || ''),
+                                fatherName: toTitleCase(p.supplierFatherName || ''),
+                                contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
+                                acNo: p.bankAcNo || '',
+                                ifscCode: p.bankIfsc || '',
+                                branch: toTitleCase(p.bankBranch || ''),
+                                bank: p.bankName || '',
+                                amount: p.rtgsAmount || p.amount || 0,
+                                rate: p.rate || 0,
+                                weight: p.quantity || 0,
+                                sixRNo: p.sixRNo || '',
+                                sixRDate: p.sixRDate || '',
+                                parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
+                            };
+                        });
+                        newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                        setReportRows(newReportRows);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error("Error fetching RTGS reports: ", error);
+                        setLoading(false);
+                    });
+                } else {
+                    setLoading(false); // Stop loading if settings fail
+                }
+            } catch (error) {
+                console.error("Error fetching initial settings: ", error);
+                setLoading(false);
             }
         };
-        
-        fetchSettings().then(() => {
-            const unsubscribe = getPaymentsRealtime((payments) => {
-                const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
-                const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
-                    const srNo = p.rtgsSrNo || p.paymentId || '';
-                    return {
-                        paymentId: p.paymentId,
-                        date: p.date,
-                        checkNo: p.checkNo || '',
-                        type: p.type || (currentSettings?.type || 'SB'),
-                        srNo: srNo,
-                        supplierName: toTitleCase(p.supplierName || ''),
-                        fatherName: toTitleCase(p.supplierFatherName || ''),
-                        contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
-                        acNo: p.bankAcNo || '',
-                        ifscCode: p.bankIfsc || '',
-                        branch: toTitleCase(p.bankBranch || ''),
-                        bank: p.bankName || '',
-                        amount: p.rtgsAmount || p.amount || 0,
-                        rate: p.rate || 0,
-                        weight: p.quantity || 0,
-                        sixRNo: p.sixRNo || '',
-                        sixRDate: p.sixRDate || '',
-                        parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
-                    };
-                });
 
-                newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setReportRows(newReportRows);
-                setLoading(false);
-            }, (error) => {
-                console.error("Error fetching RTGS reports: ", error);
-                setLoading(false);
-            });
+        fetchSettingsAndData();
 
-            return () => unsubscribe();
-        });
-
+        return () => {
+            if (unsubscribePayments) {
+                unsubscribePayments();
+            }
+        };
     }, []);
 
     const filteredReportRows = useMemo(() => {
@@ -148,67 +160,65 @@ export default function RtgsReportClient() {
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
-    const handlePrint = () => {
-        const node = tablePrintRef.current;
+    const handlePrint = (printRef: React.RefObject<HTMLDivElement>) => {
+        const node = printRef.current;
         if (!node || !settings) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
             return;
         }
-    
-        const newWindow = window.open('', '_blank', 'height=800,width=1200');
-        if (newWindow) {
-            newWindow.document.open();
-            newWindow.document.write(`
-                <html>
-                    <head>
-                        <title>RTGS Payment Report</title>
-                        <style>
-                            @page { 
-                                size: landscape; 
-                                margin: 10mm; 
-                            }
-                            body { 
-                                font-family: sans-serif;
-                                -webkit-print-color-adjust: exact;
-                                print-color-adjust: exact;
-                            }
-                            table {
-                                font-size: 8pt;
-                                border-collapse: collapse;
-                                width: 100%;
-                            }
-                            th, td {
-                                padding: 4px 6px;
-                                border: 1px solid #ccc;
-                                white-space: nowrap;
-                                text-align: left;
-                            }
-                            thead {
-                                background-color: #f2f2f2;
-                            }
-                            .print-header {
-                                margin-bottom: 1rem;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="print-header">
-                          <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
-                          <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
-                        </div>
-                        ${node.outerHTML}
-                    </body>
-                </html>
-            `);
-            newWindow.document.close();
-            newWindow.focus();
-            setTimeout(() => {
-                newWindow.print();
-                newWindow.close();
-            }, 250);
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not open print window. Please disable pop-up blockers.' });
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
+            document.body.removeChild(iframe);
+            return;
         }
+
+        iframeDoc.open();
+        iframeDoc.write('<html><head><title>RTGS Payment Report</title>');
+
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                const style = iframeDoc.createElement('style');
+                style.appendChild(iframeDoc.createTextNode(cssText));
+                style.appendChild(iframeDoc.createTextNode(`
+                    @page { size: landscape; margin: 10mm; }
+                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .print-header { margin-bottom: 1rem; text-align: center; }
+                    thead { background-color: #f2f2f2 !important; }
+                `));
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn("Could not copy stylesheet:", e);
+            }
+        });
+        
+        iframeDoc.write('</head><body></body></html>');
+        
+        const printContent = `
+            <div class="print-header">
+                <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
+                <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+            </div>
+            ${node.outerHTML}
+        `;
+        
+        iframeDoc.body.innerHTML = printContent;
+        iframeDoc.close();
+        
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+        }, 500);
     };
     
     const handleDownloadExcel = () => {
@@ -333,7 +343,7 @@ export default function RtgsReportClient() {
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-auto h-[60vh] border rounded-md">
-                        <Table ref={tablePrintRef}>
+                        <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date / SR No.</TableHead>
@@ -484,6 +494,7 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+
 
 
 

@@ -136,18 +136,19 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         iframe.style.width = '0';
         iframe.style.height = '0';
         iframe.style.border = '0';
-
         document.body.appendChild(iframe);
         
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
             toast({ title: "Print Error", description: "Could not create print window.", variant: "destructive" });
+            document.body.removeChild(iframe);
             return;
         }
 
         iframeDoc.open();
         iframeDoc.write('<html><head><title>Print Document</title>');
 
+        // Copy all stylesheets from the main document to the iframe
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
@@ -168,7 +169,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500);
+        }, 500); // A short delay to ensure content is fully rendered
     };
     
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));

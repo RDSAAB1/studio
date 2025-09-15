@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useRef } from 'react';
@@ -35,6 +36,7 @@ export const ReceiptPrintDialog = ({ receipts, settings, onOpenChange, isCustome
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
              toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            document.body.removeChild(iframe);
             return;
         }
 
@@ -133,6 +135,7 @@ export const ConsolidatedReceiptPrintDialog = ({ data, settings, onOpenChange, i
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
              toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            document.body.removeChild(iframe);
             return;
         }
 

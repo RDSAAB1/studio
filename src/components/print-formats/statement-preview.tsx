@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useRef } from 'react';
@@ -56,64 +57,86 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             return;
         }
 
-        const newWindow = window.open('', '', 'height=800,width=1200');
-        if (newWindow) {
-            const document = newWindow.document;
-            document.write(`
-                <html>
-                    <head>
-                        <title>Print Statement</title>
-                        <style>
-                            /* Include basic styles for printing */
-                            body { font-family: 'Inter', sans-serif; margin: 20px; font-size: 14px; }
-                            table { width: 100%; border-collapse: collapse; }
-                            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            .no-print { display: none; }
-                             @media print {
-                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                .printable-area { background-color: #fff !important; color: #000 !important; }
-                                .printable-area * { color: #000 !important; border-color: #ccc !important; }
-                                .print-bg-gray-800 {
-                                    background-color: #f2f2f2 !important; /* Light gray for print */
-                                    color: #000 !important;
-                                    -webkit-print-color-adjust: exact;
-                                    print-color-adjust: exact;
-                                }
-                             }
-                        </style>
-                    </head>
-                    <body>
-                    </body>
-                </html>
-            `);
-
-            // Use a more robust method to clone and append styles
-            Array.from(window.document.styleSheets).forEach(styleSheet => {
-                try {
-                    const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                    const styleElement = document.createElement('style');
-                    styleElement.appendChild(document.createTextNode(css));
-                    newWindow.document.head.appendChild(styleElement);
-                } catch (e) {
-                    console.warn('Could not copy stylesheet:', e);
-                }
-            });
-
-            document.body.innerHTML = node.innerHTML;
-            
-            setTimeout(() => {
-                newWindow.focus();
-                newWindow.print();
-                newWindow.close();
-            }, 500);
-        } else {
-            toast({ title: 'Print Error', description: 'Please allow pop-ups for this site to print.', variant: 'destructive'});
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) {
+            toast({ title: 'Print Error', description: 'Could not open print window.', variant: 'destructive'});
+            document.body.removeChild(iframe);
+            return;
         }
+
+        iframeDoc.open();
+        iframeDoc.write('<html><head><title>Print Statement</title>');
+
+        Array.from(window.document.styleSheets).forEach(styleSheet => {
+            try {
+                const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                const styleElement = iframeDoc.createElement('style');
+                styleElement.appendChild(iframeDoc.createTextNode(css));
+                iframeDoc.head.appendChild(styleElement);
+            } catch (e) {
+                console.warn('Could not copy stylesheet:', e);
+            }
+        });
+        
+        iframeDoc.write(`
+            <style>
+                @media print {
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .printable-area { background-color: #fff !important; color: #000 !important; }
+                    .printable-area * { color: #000 !important; border-color: #ccc !important; }
+                    .summary-grid-container { display: flex !important; flex-wrap: nowrap !important; }
+                    .summary-grid-container > div { flex: 1; }
+                    .print-table tbody tr { background-color: transparent !important; }
+                    .print-bg-gray-800 {
+                        background-color: #f2f2f2 !important; /* Light gray for print */
+                        color: #000 !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                }
+            </style>
+        </head><body></body></html>`);
+
+        iframeDoc.body.innerHTML = node.innerHTML;
+        iframeDoc.close();
+        
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+        }, 500);
     };
     
     return (
     <>
+        <style>
+        {`
+            @media print {
+            .summary-grid-container {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                gap: 1rem !important;
+            }
+            .summary-grid-container > div {
+                flex: 1;
+                padding: 8px;
+            }
+            .print-table tbody tr {
+                background-color: transparent !important;
+            }
+            .print-table th, .print-table td {
+                padding: 4px 6px;
+            }
+            }
+        `}
+        </style>
         <DialogHeader className="p-4 sm:p-6 pb-0 no-print">
              <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">
