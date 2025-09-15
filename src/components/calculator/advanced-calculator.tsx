@@ -102,6 +102,43 @@ const ScientificCalculator = () => {
         }
     }
 
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            event.preventDefault();
+            const { key } = event;
+
+            if (/[0-9]/.test(key)) {
+                handleInput(key);
+            } else if (key === '.') {
+                handleInput('.');
+            } else if (key === '+') {
+                handleOperator('+');
+            } else if (key === '-') {
+                handleOperator('-');
+            } else if (key === '*') {
+                handleOperator('×');
+            } else if (key === '/') {
+                handleOperator('÷');
+            } else if (key === 'Enter' || key === '=') {
+                handleEquals();
+            } else if (key === 'Backspace') {
+                handleBackspace();
+            } else if (key === 'Escape' || key === 'Delete') {
+                handleClear();
+            } else if (key === '(') {
+                handleInput('(');
+            } else if (key === ')') {
+                handleInput(')');
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [input, isResult]);
+
 
     return (
         <div className="p-4 space-y-2">
