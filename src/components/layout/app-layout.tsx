@@ -165,64 +165,53 @@ const AppContent = () => {
 const AuthChecker = () => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [setupComplete, setSetupComplete] = useState<boolean | null>(null); // Use null for initial state
+    const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
     const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
-            if (currentUser) {
-                try {
-                    const settings = await getCompanySettings(currentUser.uid);
-                    if (settings && settings.appPassword) {
-                        setSetupComplete(true);
-                    } else {
-                        setSetupComplete(false);
-                    }
-                } catch(e) {
-                    console.error("Setup check failed", e);
-                    setSetupComplete(false);
-                }
-            } else {
-                setSetupComplete(null); // No user, no setup status
-            }
             setLoading(false);
         });
-
         return () => unsubscribe();
     }, []);
 
-     useEffect(() => {
-        if (loading) return; // Wait until auth state is confirmed
+    useEffect(() => {
+        if (!user || loading) return;
+
+        getCompanySettings(user.uid)
+            .then(settings => {
+                setSetupComplete(!!(settings && settings.appPassword));
+            })
+            .catch(() => setSetupComplete(false));
+    }, [user, loading]);
+
+    useEffect(() => {
+        if (loading) return;
 
         const isAuthPage = location.pathname === '/login';
         const isSetupPage = location.pathname.startsWith('/setup');
 
         if (user) {
             if (setupComplete === true) {
-                // If user is logged in and setup is complete, they should not be on login or setup pages
                 if (isAuthPage || isSetupPage) {
                     navigate('/dashboard-overview');
                 }
             } else if (setupComplete === false) {
-                // If user is logged in but setup is not complete, redirect to setup
                 if (!isSetupPage) {
-                     navigate('/setup/connect-gmail');
+                    navigate('/setup/connect-gmail');
                 }
             }
-            // If setupComplete is null, we are still checking, so we wait.
         } else {
-            // If no user, redirect to login unless already there
             if (!isAuthPage) {
                 navigate('/login');
             }
         }
     }, [user, loading, setupComplete, location.pathname, navigate]);
 
-
-    if (loading || setupComplete === null && user) {
+    if (loading || (user && setupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -239,12 +228,16 @@ const AuthChecker = () => {
         return <PageComponent />;
     }
     
-    // Fallback if no route matches (e.g., during redirects)
-    return (
-        <div className="flex h-screen w-screen items-center justify-center bg-background">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-    );
+    // Fallback for initial load or during redirects
+    if (user && setupComplete === null) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    return <LoginPage />;
 };
 
 
