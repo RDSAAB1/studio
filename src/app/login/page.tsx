@@ -14,43 +14,16 @@ import { getCompanySettings } from '@/lib/firestore';
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const auth = getFirebaseAuth();
         
-        const processUser = async (user: User | null) => {
-            if (user) {
-                // User is signed in, check if setup is complete.
-                try {
-                    const settings = await getCompanySettings(user.uid);
-                    if (settings && settings.appPassword) {
-                        router.push('/dashboard-overview');
-                    } else {
-                        router.push('/setup/connect-gmail');
-                    }
-                } catch (e) {
-                     console.error("Error fetching company settings:", e);
-                     toast({ title: "Setup Check Failed", description: "Could not verify your setup status. Please try again.", variant: "destructive" });
-                     setLoading(false);
-                }
-            } else {
-                // No user is signed in, ready for login.
-                setLoading(false);
-            }
-        };
-
-        const unsubscribe = onAuthStateChanged(auth, processUser);
-
-        // Handle the redirect result separately
         getRedirectResult(auth)
             .then((result) => {
                 if (result?.user) {
-                    // This will trigger onAuthStateChanged, so we don't need to do anything here.
                     toast({ title: "Signed in successfully!", variant: 'success' });
-                } else {
-                    // If there's no result, it means the user just landed on the page without a redirect.
-                    // The onAuthStateChanged will handle if they are already logged in from a previous session.
+                    // The AuthChecker component will handle redirection.
                 }
             })
             .catch((error: any) => {
@@ -62,26 +35,23 @@ export default function LoginPage() {
                         variant: "destructive",
                     });
                 }
+                setLoading(false);
             });
-
-        return () => unsubscribe();
-    }, [router, toast]);
+    }, [toast]);
 
 
     const handleGoogleSignIn = async () => {
         const auth = getFirebaseAuth();
         const provider = getGoogleProvider();
         setLoading(true);
-        await signInWithRedirect(auth, provider);
+        try {
+          await signInWithRedirect(auth, provider);
+        } catch (error) {
+           console.error("Sign-in initiation failed", error);
+           setLoading(false);
+           toast({ title: "Sign-in Failed", description: "Could not start the sign-in process.", variant: "destructive" });
+        }
     };
-    
-    if (loading) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">

@@ -82,9 +82,11 @@ const AppContent = () => {
       const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
       if (dashboardTab) {
           setOpenTabs([dashboardTab]);
-          navigate('/dashboard-overview');
+          if(location.pathname === '/login' || location.pathname === '/'){
+            navigate('/dashboard-overview');
+          }
       }
-    }, [navigate]);
+    }, [navigate, location.pathname]);
 
     useEffect(() => {
         const currentPathId = location.pathname.substring(1);
@@ -141,15 +143,6 @@ const AppContent = () => {
         setIsSidebarActive(prev => !prev);
     };
     
-    const currentPath = location.pathname;
-    const PageComponent = pageComponents[currentPath];
-    
-    const isAuthPage = currentPath === '/login' || currentPath.startsWith('/setup');
-    
-    if (isAuthPage) {
-        return PageComponent ? <PageComponent /> : <div>Page not found</div>;
-    }
-
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
@@ -174,9 +167,72 @@ const AppContent = () => {
     );
 };
 
+const AuthChecker = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [setupComplete, setSetupComplete] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    useEffect(() => {
+        const auth = getFirebaseAuth();
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
+            if (currentUser) {
+                try {
+                    const settings = await getCompanySettings(currentUser.uid);
+                    if (settings && settings.appPassword) {
+                        setSetupComplete(true);
+                        if (location.pathname.startsWith('/setup') || location.pathname === '/login') {
+                            navigate('/dashboard-overview');
+                        }
+                    } else {
+                        setSetupComplete(false);
+                         if (!location.pathname.startsWith('/setup/connect-gmail')) {
+                            navigate('/setup/connect-gmail');
+                        }
+                    }
+                } catch(e) {
+                    console.error("Setup check failed", e);
+                    navigate('/login'); // Fallback to login on error
+                }
+            } else {
+                if (!location.pathname.startsWith('/login')) {
+                    navigate('/login');
+                }
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [navigate, location.pathname]);
+
+    if (loading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    const isAuthPage = location.pathname === '/login' || location.pathname.startsWith('/setup');
+    const PageComponent = pageComponents[location.pathname];
+    
+    if (user && setupComplete && !isAuthPage) {
+        return <AppContent />;
+    } else if (isAuthPage && PageComponent) {
+        return <PageComponent />;
+    } else if (user && !setupComplete && location.pathname.startsWith('/setup')) {
+        return <PageComponent />;
+    }
+    
+    return null; // Or a fallback component
+};
+
+
 const router = createMemoryRouter([
-    { path: '*', Component: AppContent }
-], { initialEntries: ['/login'] });
+    { path: '*', Component: AuthChecker }
+], { initialEntries: ['/'] });
 
 const AppLayout = () => {
   return <RouterProvider router={router} />;
