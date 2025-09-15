@@ -585,7 +585,7 @@ export default function CustomerProfilePage() {
     filteredCustomers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
-        data.totalOriginalAmount += s.originalNetAmount || 0;
+        data.totalOriginalAmount += Number(s.originalNetAmount) || 0;
         data.totalAmount += s.amount || 0;
         data.totalKanta! += s.kanta || 0;
         data.totalGrossWeight! += s.grossWeight || 0;
