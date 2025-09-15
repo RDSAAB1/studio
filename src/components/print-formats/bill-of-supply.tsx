@@ -2,17 +2,20 @@
 "use client";
 
 import React from 'react';
-import { Customer, ReceiptSettings } from '@/lib/definitions';
+import { Customer, ReceiptSettings, BankAccount } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface BillOfSupplyProps {
     customer: Customer;
-    settings: ReceiptSettings;
-     invoiceDetails: {
+    settings: ReceiptSettings & { defaultBank?: BankAccount };
+    invoiceDetails: {
         companyGstin: string;
         companyStateName: string;
         companyStateCode: string;
+        hsnCode: string;
+        taxRate: number;
+        isGstIncluded: boolean;
         sixRNo: string;
         gatePassNo: string;
         grNo: string;
@@ -57,8 +60,9 @@ const formatCurrency = (amount: number): string => {
 
 
 export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, invoiceDetails }) => {
-    
     const totalAmount = Math.round(Number(customer.netWeight) * Number(customer.rate));
+    const advanceFreight = invoiceDetails.totalAdvance || 0;
+    const finalAmount = totalAmount + advanceFreight;
 
     const billToDetails = {
         name: toTitleCase(customer.name),
@@ -145,7 +149,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                                 <td className="p-3">
                                     <p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p>
                                 </td>
-                                <td className="p-3 text-center">1006</td>
+                                <td className="p-3 text-center">{invoiceDetails.hsnCode}</td>
                                 <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
                                 <td className="p-3 text-center">{Number(customer.netWeight).toFixed(2)}</td>
                                 <td className="p-3 text-right">{formatCurrency(Number(customer.rate))}</td>
@@ -169,12 +173,14 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                     <div className="w-3/5 pr-4 space-y-2">
                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                             <p className="font-bold mb-1 uppercase text-gray-500 text-xs">Amount in Words:</p>
-                            <p className="font-semibold text-gray-800 text-base">{numberToWords(totalAmount)}</p>
+                            <p className="font-semibold text-gray-800 text-base">{numberToWords(finalAmount)}</p>
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
+                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Subtotal:</span><span className="font-semibold">{formatCurrency(totalAmount)}</span></div>
+                        {advanceFreight > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(advanceFreight)}</span></div>}
                         <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl print-bg-gray-800">
-                            <span>Balance Due:</span><span>{formatCurrency(totalAmount)}</span>
+                            <span>Balance Due:</span><span>{formatCurrency(finalAmount)}</span>
                         </div>
                     </div>
                 </div>

@@ -22,13 +22,7 @@ interface ChallanProps {
     };
 }
 
-const formatCurrency = (amount: number): string => {
-  if (isNaN(amount)) amount = 0;
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
-};
-
 export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDetails }) => {
-    const totalAmount = Math.round(Number(customer.netWeight) * Number(customer.rate));
     
     const billToDetails = {
         name: toTitleCase(customer.name),
@@ -104,7 +98,7 @@ export const Challan: React.FC<ChallanProps> = ({ customer, settings, invoiceDet
                             <tr className="border-t border-gray-200">
                                 <td className="p-3 text-center">1</td>
                                 <td className="p-3"><p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p></td>
-                                <td className="p-3 text-center">1006</td>
+                                <td className="p-3 text-center">{invoiceDetails.hsnCode}</td>
                                 <td className="p-3 text-center">{Number(customer.netWeight).toFixed(2)}</td>
                             </tr>
                         </tbody>
