@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { getFirebaseAuth, getGoogleProvider, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from '@/lib/firebase';
-import { type User } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,8 +63,8 @@ export default function LoginPage() {
             console.error(`${mode} error:`, error);
             const errorCode = error.code || '';
             let errorMessage = "An unexpected error occurred.";
-            if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password') {
-                errorMessage = "Invalid email or password.";
+            if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
+                errorMessage = "Invalid email or password. Please check your credentials or sign up.";
             } else if (errorCode === 'auth/email-already-in-use') {
                 errorMessage = "This email is already registered. Please log in.";
             }
