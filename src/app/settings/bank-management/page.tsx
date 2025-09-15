@@ -196,18 +196,18 @@ export default function BankManagementPage() {
                 <Table>
                     <TableHeader className="sticky top-0 bg-muted">
                         <TableRow>
-                            <TableHead>Bank Name</TableHead>
-                            <TableHead>Branch Name</TableHead>
-                            <TableHead>IFSC Code</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="w-[30%]">Bank Name</TableHead>
+                            <TableHead className="w-[30%]">Branch Name</TableHead>
+                            <TableHead className="w-[25%]">IFSC Code</TableHead>
+                            <TableHead className="text-right w-[15%]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {filteredBranches.map(branch => (
                             <TableRow key={branch.id}>
-                                <TableCell>{branch.bankName}</TableCell>
-                                <TableCell>{branch.branchName}</TableCell>
-                                <TableCell className="font-mono">{branch.ifscCode}</TableCell>
+                                <TableCell className="truncate">{branch.bankName}</TableCell>
+                                <TableCell className="truncate">{branch.branchName}</TableCell>
+                                <TableCell className="font-mono truncate">{branch.ifscCode}</TableCell>
                                 <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
                                     <AlertDialog>
