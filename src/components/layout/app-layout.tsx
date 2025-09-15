@@ -159,8 +159,7 @@ const AppContent = () => {
     );
 };
 
-
-const ProtectedRoute = ({ children }: { children: ReactNode }) => {
+const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
@@ -175,8 +174,9 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
                 try {
                     const settings = await getCompanySettings(currentUser.uid);
                     setSetupComplete(!!(settings && settings.appPassword));
-                } catch {
-                    setSetupComplete(false);
+                } catch (error) {
+                    console.error("Error fetching company settings:", error);
+                    setSetupComplete(false); // Assume setup is not complete on error
                 }
             } else {
                 setSetupComplete(false);
@@ -189,19 +189,25 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (loading) return;
 
+        const isLoginPage = location.pathname === '/login';
+        const isSetupPage = location.pathname.startsWith('/setup');
+
         if (!user) {
-            navigate('/login');
-        } else if (setupComplete === false) {
-             if (location.pathname !== '/setup/connect-gmail' && location.pathname !== '/setup/company-details') {
-                navigate('/setup/connect-gmail');
+            if (!isLoginPage) {
+                navigate('/login');
             }
-        } else if (setupComplete === true) {
-            if (location.pathname === '/' || location.pathname.startsWith('/login') || location.pathname.startsWith('/setup')) {
-                navigate('/dashboard-overview');
+        } else {
+            if (setupComplete === false) {
+                if (!isSetupPage) {
+                    navigate('/setup/connect-gmail');
+                }
+            } else if (setupComplete === true) {
+                if (isLoginPage || isSetupPage || location.pathname === '/') {
+                    navigate('/dashboard-overview');
+                }
             }
         }
     }, [user, loading, setupComplete, navigate, location.pathname]);
-
 
     if (loading || (user && setupComplete === null)) {
         return (
@@ -211,35 +217,32 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
         );
     }
     
-    if(!user && location.pathname !== '/login') return null;
-    if(user && !setupComplete && !location.pathname.startsWith('/setup')) return null;
-
     return <>{children}</>;
 };
 
 const AppRoutes = () => {
     return (
-        <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/setup/connect-gmail" element={<ConnectGmailPage />} />
-            <Route path="/setup/company-details" element={<CompanyDetailsPage />} />
-            <Route path="/" element={<AppContent />}>
-                {Object.keys(pageComponents).map(path => {
-                    const Component = pageComponents[path];
-                    return <Route key={path} path={path} element={<Component />} />
-                })}
-                 <Route path="/" element={<DashboardOverviewPage />} />
-            </Route>
-        </Routes>
+        <AuthWrapper>
+            <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/setup/connect-gmail" element={<ConnectGmailPage />} />
+                <Route path="/setup/company-details" element={<CompanyDetailsPage />} />
+                <Route path="/" element={<AppContent />}>
+                    {Object.keys(pageComponents).map(path => {
+                        const Component = pageComponents[path];
+                        return <Route key={path} path={path} element={<Component />} />
+                    })}
+                    <Route path="/" element={<DashboardOverviewPage />} />
+                </Route>
+            </Routes>
+        </AuthWrapper>
     );
 };
 
 const AppLayout = () => {
     return (
         <MemoryRouter>
-            <ProtectedRoute>
-                <AppRoutes />
-            </ProtectedRoute>
+            <AppRoutes />
         </MemoryRouter>
     );
 };
