@@ -287,7 +287,7 @@ const UnitConverter = () => {
     const units = Object.keys(unitConfig[category]);
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 min-h-[350px]">
              <div className="space-y-1">
                 <Label>Category</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as any)}>
@@ -362,7 +362,7 @@ const GSTCalculator = () => {
     }, [amount, gstRate, calculationType]);
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 min-h-[350px]">
             <div className="space-y-1">
                 <Label htmlFor="gst-amount">Amount</Label>
                 <Input id="gst-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8"/>
@@ -424,7 +424,7 @@ const DateCalculator = () => {
     }, [calcDate, addValue, addUnit]);
 
     return (
-         <div className="p-4 space-y-6">
+         <div className="p-4 space-y-6 min-h-[350px]">
             <Card>
                 <CardContent className="p-4 space-y-3">
                      <h3 className="text-sm font-semibold">Calculate Difference</h3>
@@ -488,7 +488,7 @@ const InterestCalculator = () => {
 
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 min-h-[350px]">
              <Select value={interestType} onValueChange={setInterestType}>
                 <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="simple">Simple Interest</SelectItem><SelectItem value="compound">Compound Interest</SelectItem></SelectContent>
@@ -549,7 +549,7 @@ const PercentageCalculator = () => {
     }
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 min-h-[350px]">
             <Select value={calcType} onValueChange={setCalcType}>
                 <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent>
