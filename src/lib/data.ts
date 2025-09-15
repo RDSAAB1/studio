@@ -91,3 +91,51 @@ export const bankBranches: Omit<BankBranch, 'id'>[] = [
   { bankName: "State Bank of India", branchName: "JARWAL ROAD", ifscCode: "SBIN0010878" },
   { bankName: "Union Bank of India", branchName: "SHAHJAHANPUR", ifscCode: "UBIN0538817" },
 ];
+
+export const statesAndCodes = [
+  { name: 'Jammu and Kashmir', code: '01', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Himachal Pradesh', code: '02', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Punjab', code: '03', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Chandigarh', code: '04', gstCondition: 'Intra-state: CGST + UTGST<br>Inter-state: IGST' },
+  { name: 'Uttarakhand', code: '05', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Haryana', code: '06', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Delhi', code: '07', gstCondition: 'Intra-state: CGST + UTGST<br>Inter-state: IGST' },
+  { name: 'Rajasthan', code: '08', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Uttar Pradesh', code: '09', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Bihar', code: '10', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Sikkim', code: '11', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Arunachal Pradesh', code: '12', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Nagaland', code: '13', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Manipur', code: '14', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Mizoram', code: '15', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Tripura', code: '16', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Meghalaya', code: '17', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Assam', code: '18', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'West Bengal', code: '19', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Jharkhand', code: '20', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Odisha', code: '21', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Chhattisgarh', code: '22', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Madhya Pradesh', code: '23', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Gujarat', code: '24', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Dadra and Nagar Haveli and Daman and Diu', code: '26', gstCondition: 'Intra-state: CGST + UTGST<br>Inter-state: IGST' },
+  { name: 'Maharashtra', code: '27', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Andhra Pradesh', code: '28', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Karnataka', code: '29', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Goa', code: '30', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Lakshadweep', code: '31', gstCondition: 'Intra-state: CGST + UTGST<br>Inter-state: IGST' },
+  { name: 'Kerala', code: '32', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Tamil Nadu', code: '33', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Puducherry', code: '34', gstCondition: 'Intra-state: CGST + UTGST<br>Inter-state: IGST' },
+  { name: 'Telangana', code: '36', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+  { name: 'Andaman and Nicobar Islands', code: '37', gstCondition: 'Intra-state: CGST + UTGST<br>Inter-state: IGST' },
+  { name: 'Ladakh', code: '38', gstCondition: 'Intra-state: CGST + UTGST<br>Inter-state: IGST' },
+  { name: 'Other Territory', code: '97', gstCondition: 'Intra-state: CGST + SGST<br>Inter-state: IGST' },
+];
+
+export const findStateByCode = (code: string) => {
+    return statesAndCodes.find(state => state.code === code);
+};
+
+export const findStateByName = (name: string) => {
+    return statesAndCodes.find(state => state.name === name);
+};
