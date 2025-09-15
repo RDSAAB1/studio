@@ -75,6 +75,8 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         form.setValue('address', toTitleCase(customer.address));
         form.setValue('contact', customer.contact);
         form.setValue('gstin', customer.gstin || '');
+        form.setValue('stateName', customer.stateName || '');
+        form.setValue('stateCode', customer.stateCode || '');
         setIsNamePopoverOpen(false);
     };
 
@@ -119,7 +121,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
     };
 
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
-    const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: `${s.code} - ${s.name}` }));
+    const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
 
     return (
         <>

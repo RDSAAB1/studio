@@ -36,6 +36,8 @@ export const formSchema = z.object({
       .length(10, "Contact number must be exactly 10 digits.")
       .regex(/^\d+$/, "Contact number must only contain digits."),
     gstin: z.string().optional(),
+    stateName: z.string().optional(),
+    stateCode: z.string().optional(),
     vehicleNo: z.string(),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.coerce.number().min(0),
@@ -53,6 +55,8 @@ export const formSchema = z.object({
     shippingAddress: z.string().optional(),
     shippingContact: z.string().optional(),
     shippingGstin: z.string().optional(),
+    shippingStateName: z.string().optional(),
+    shippingStateCode: z.string().optional(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -64,7 +68,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
   return {
     id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
-    name: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    name: '', companyName: '', address: '', contact: '', gstin: '', stateName: '', stateCode: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
     kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
@@ -208,14 +212,14 @@ export default function CustomerEntryClient() {
     }
   }
 
-  const performCalculations = useCallback((data: Partial<CustomerFormValues>) => {
+  const performCalculations = useCallback((data: Partial<FormValues>) => {
     const calculatedState = calculateCustomerEntry(data, paymentHistory);
     setCurrentCustomer(prev => ({...prev, ...calculatedState}));
   }, [paymentHistory]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
-        performCalculations(value as Partial<CustomerFormValues>);
+        performCalculations(value as Partial<FormValues>);
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
@@ -248,6 +252,10 @@ export default function CustomerEntryClient() {
       shippingAddress: customerState.shippingAddress || '',
       shippingContact: customerState.shippingContact || '',
       shippingGstin: customerState.shippingGstin || '',
+      stateName: customerState.stateName || '',
+      stateCode: customerState.stateCode || '',
+      shippingStateName: customerState.shippingStateName || '',
+      shippingStateCode: customerState.shippingStateCode || '',
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -297,6 +305,8 @@ export default function CustomerEntryClient() {
         form.setValue('companyName', foundCustomer.companyName || '');
         form.setValue('address', foundCustomer.address);
         form.setValue('gstin', foundCustomer.gstin || '');
+        form.setValue('stateName', foundCustomer.stateName || '');
+        form.setValue('stateCode', foundCustomer.stateCode || '');
         toast({ title: "Customer Found: Details auto-filled." });
       }
     }
@@ -334,6 +344,8 @@ export default function CustomerEntryClient() {
         address: toTitleCase(formValues.address),
         contact: formValues.contact,
         gstin: formValues.gstin,
+        stateName: formValues.stateName,
+        stateCode: formValues.stateCode,
         vehicleNo: toTitleCase(formValues.vehicleNo),
         variety: toTitleCase(formValues.variety),
         paymentType: formValues.paymentType,
@@ -351,6 +363,8 @@ export default function CustomerEntryClient() {
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
+        shippingStateName: formValues.shippingStateName,
+        shippingStateCode: formValues.shippingStateCode,
         so: '',
         kartaPercentage: 0,
         kartaWeight: 0,

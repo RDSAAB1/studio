@@ -55,6 +55,8 @@ export const formSchema = z.object({
     shippingAddress: z.string().optional(),
     shippingContact: z.string().optional(),
     shippingGstin: z.string().optional(),
+    shippingStateName: z.string().optional(),
+    shippingStateCode: z.string().optional(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -252,6 +254,8 @@ export default function CustomerEntryClient() {
       shippingGstin: customerState.shippingGstin || '',
       stateName: customerState.stateName || '',
       stateCode: customerState.stateCode || '',
+      shippingStateName: customerState.shippingStateName || '',
+      shippingStateCode: customerState.shippingStateCode || '',
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -359,6 +363,8 @@ export default function CustomerEntryClient() {
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
         shippingContact: formValues.shippingContact,
         shippingGstin: formValues.shippingGstin,
+        shippingStateName: formValues.shippingStateName,
+        shippingStateCode: formValues.shippingStateCode,
         so: '',
         kartaPercentage: 0,
         kartaWeight: 0,
