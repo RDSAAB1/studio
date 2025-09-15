@@ -3,7 +3,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, type Auth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, getRedirectResult, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -58,4 +58,4 @@ const getGoogleProvider = (): GoogleAuthProvider => {
     return provider;
 };
 
-export { app, db, storage, getFirebaseAuth, getGoogleProvider, onAuthStateChanged };
+export { app, db, storage, getFirebaseAuth, getGoogleProvider, onAuthStateChanged, getRedirectResult };

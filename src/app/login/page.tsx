@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { getFirebaseAuth, getGoogleProvider, onAuthStateChanged } from '@/lib/firebase';
-import { signInWithPopup, type User } from 'firebase/auth';
+import { signInWithRedirect, type User, getRedirectResult } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -23,41 +23,42 @@ export default function LoginPage() {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
-                // User is signed in, check if they need to go to setup or dashboard
                 getCompanySettings(currentUser.uid).then(settings => {
                     if (settings?.appPassword) {
                          router.replace('/dashboard-overview');
                     } else {
-                        // If there are no app password settings, maybe go to a setup page
                         router.replace('/setup/connect-gmail');
                     }
                 }).catch(() => {
-                     router.replace('/dashboard-overview'); // fallback to dashboard
+                     router.replace('/dashboard-overview');
                 });
             } else {
                 setUser(null);
                 setLoading(false);
             }
         });
+        
+        // Handle redirect result
+        getRedirectResult(auth).catch((error) => {
+            console.error("Google Sign-In Redirect Error:", error);
+            if (error.code !== 'auth/popup-closed-by-user') { // Ignore user closing the popup
+                toast({
+                    title: "Login Failed",
+                    description: "Could not sign in with Google. Please try again.",
+                    variant: "destructive",
+                });
+            }
+            setLoading(false);
+        });
+
         return () => unsubscribe();
-    }, [router]);
+    }, [router, toast]);
 
     const handleGoogleSignIn = async () => {
         const auth = getFirebaseAuth();
         const provider = getGoogleProvider();
         setLoading(true);
-        try {
-            await signInWithPopup(auth, provider);
-            // onAuthStateChanged will handle the redirect
-        } catch (error) {
-            console.error("Google Sign-In Error:", error);
-            toast({
-                title: "Login Failed",
-                description: "Could not sign in with Google. Please try again.",
-                variant: "destructive",
-            });
-            setLoading(false);
-        }
+        await signInWithRedirect(auth, provider);
     };
     
     if (loading || user) {
