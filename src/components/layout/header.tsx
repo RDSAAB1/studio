@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import dynamic from 'next/dynamic';
 import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -15,6 +16,11 @@ import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter } from "next/navigation";
+
+const DynamicIslandToaster = dynamic(
+  () => import('../ui/dynamic-island-toaster').then(mod => mod.DynamicIslandToaster),
+  { ssr: false }
+);
 
 
 interface HeaderProps {
@@ -185,6 +191,13 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle Sidebar</span>
             </Button>
+        </div>
+        
+        {/* Center: Dynamic Island Toaster */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100]">
+            <Suspense>
+                <DynamicIslandToaster />
+            </Suspense>
         </div>
 
         {/* Right Aligned Icons */}

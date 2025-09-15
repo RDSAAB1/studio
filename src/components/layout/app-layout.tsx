@@ -16,11 +16,6 @@ import ConnectGmailPage from "@/app/setup/connect-gmail/page";
 import CompanyDetailsPage from "@/app/setup/company-details/page";
 import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
 
-const DynamicIslandToaster = dynamic(
-  () => import('../ui/dynamic-island-toaster').then(mod => mod.DynamicIslandToaster),
-  { ssr: false }
-);
-
 const AppContent = ({ children }: { children: ReactNode }) => {
     const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
     const [activeTabId, setActiveTabId] = useState<string>('dashboard-overview');
@@ -96,11 +91,6 @@ const AppContent = ({ children }: { children: ReactNode }) => {
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100]">
-                  <Suspense>
-                    <DynamicIslandToaster />
-                  </Suspense>
-              </div>
               <div className="sticky top-0 z-30 flex-shrink-0">
                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
                 <Header toggleSidebar={toggleSidebar} />
