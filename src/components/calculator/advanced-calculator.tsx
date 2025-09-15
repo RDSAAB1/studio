@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, Info, Plus, Minus, X, Divide, Sigma } from 'lucide-react';
 import { format, differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears, addDays, addMonths, addYears } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
 
@@ -190,6 +190,10 @@ const ScientificCalculator = () => {
                     <DialogHeader>
                         <DialogTitle>Calculator Keyboard Shortcuts</DialogTitle>
                         <DialogDescription>Use these keyboard shortcuts for faster and easier calculations.</DialogDescription>
+                         <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+                            <X className="h-4 w-4" />
+                            <span className="sr-only">Close</span>
+                        </DialogClose>
                     </DialogHeader>
                      <ScrollArea className="max-h-[60vh]">
                          <div className="text-sm">
