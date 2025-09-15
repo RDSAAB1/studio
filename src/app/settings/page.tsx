@@ -664,6 +664,10 @@ export default function SettingsPage() {
                             />
                         </div>
                         <div className="space-y-1">
+                            <Label htmlFor="branchName">Branch Name</Label>
+                            <Input id="branchName" name="branchName" value={currentBankAccount.branchName || ''} onChange={handleBankAccountInputChange} />
+                        </div>
+                        <div className="space-y-1">
                             <Label htmlFor="accountNumber">Account Number</Label>
                             <Input id="accountNumber" name="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={e => setCurrentBankAccount(prev => ({...prev, accountNumber: e.target.value}))}/>
                         </div>
@@ -702,3 +706,4 @@ export default function SettingsPage() {
     
 
     
+
