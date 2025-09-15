@@ -119,7 +119,13 @@ const ScientificCalculator = () => {
                 handleOperator('×');
             } else if (key === '/') {
                 handleOperator('÷');
-            } else if (key === 'Enter' || key === '=') {
+            } else if (key === '=') {
+                handleOperator('+');
+            } else if (key === '[') {
+                handleOperator('×');
+            } else if (key === ']') {
+                handleOperator('÷');
+            } else if (key === 'Enter') {
                 handleEquals();
             } else if (key === 'Backspace') {
                 handleBackspace();
