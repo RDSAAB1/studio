@@ -64,16 +64,16 @@ const ScientificCalculator = () => {
             
             // Very basic security check for allowed characters
             if (/[^0-9\s.()+\-*/%MathPIEsqrtpowcossintanlog10]/.test(evalString)) {
-                return 'Error';
+                return null;
             }
 
             const result = new Function('return ' + evalString)();
             if (isNaN(result) || !isFinite(result)) {
-                return 'Error';
+                return null;
             }
             return String(result);
         } catch (error) {
-            return null; // Return null on error to distinguish from a valid 'Error' string result
+            return null; // Return null on error
         }
     };
 
@@ -83,8 +83,8 @@ const ScientificCalculator = () => {
             setInput(result);
             setIsResult(true);
         } else {
-            setInput('Error');
-            setIsResult(true);
+            // If there's an error, do nothing or show a subtle sign
+            // For now, we just won't update the input
         }
     };
     
@@ -110,8 +110,7 @@ const ScientificCalculator = () => {
                 setInput(String(result));
                 setIsResult(true);
             } catch {
-                setInput("Error");
-                setIsResult(true);
+                // Do nothing on error
             }
             return;
         } else {
