@@ -1,8 +1,14 @@
-import SupplierProfileClient from "./supplier-profile-client";
-import type { PageProps } from '@/app/types';
+// src/app/sales/supplier-profile/page.tsx
 
-export default function SupplierProfilePage({ params, searchParams }: PageProps) {
+import { SupplierProfileClient } from './supplier-profile-client';
+
+export default function SupplierProfilePage() {
   return (
-    <SupplierProfileClient />
+    <div className="p-4 md:p-8">
+      {/* This is the main page. It's a Server Component that renders your
+        interactive Client Component below.
+      */}
+      <SupplierProfileClient />
+    </div>
   );
 }

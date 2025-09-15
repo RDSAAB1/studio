@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -26,6 +25,7 @@ import { Calendar } from '@/components/ui/calendar';
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
+// --- Sub-component 1: Customer Profile View ---
 const CustomerProfileView = ({
     selectedSupplierData,
     isMillSelected,
@@ -60,7 +60,7 @@ const CustomerProfileView = ({
         return selectedChart === 'financial' ? financialPieChartData : varietyPieChartData;
     }, [selectedChart, financialPieChartData, varietyPieChartData]);
 
-    const currentPaymentHistory = useMemo(() => {
+    const currentPaymentHistory = useMemo<(Payment | CustomerPayment)[]>(() => {
         if (!selectedSupplierData) return [];
         if (isMillSelected) {
             return selectedSupplierData.allPayments || [];
@@ -98,10 +98,11 @@ const CustomerProfileView = ({
                              <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} Qtl`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} Qtl`}</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} Qtl`}</span></div>
-                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} Qtl`}</span></div>
+                            {/* --- FIX APPLIED HERE --- */}
+                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalGrossWeight)) || 0).toFixed(2)} Qtl`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalTeirWeight)) || 0).toFixed(2)} Qtl`}</span></div>
+                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalFinalWeight)) || 0).toFixed(2)} Qtl`}</span></div>
+                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(parseFloat(String(selectedSupplierData.totalNetWeight)) || 0).toFixed(2)} Qtl`}</span></div>
                             <Separator className="my-2"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
                             <Separator className="my-2"/>
@@ -252,8 +253,8 @@ const CustomerProfileView = ({
     );
 };
 
-
-export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+// --- Sub-component 2: Statement Preview ---
+const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const { toast } = useToast();
     const statementRef = React.useRef<HTMLDivElement>(null);
 
@@ -404,10 +405,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                  <Card className="bg-white border-gray-200">
                     <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3></CardHeader>
                     <CardContent className="p-2 pt-1 text-xs space-y-0.5">
-                        <div className="flex justify-between"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                        <div className="flex justify-between font-bold border-t border-gray-200 pt-1"><span className="text-black">Final Wt</span><span className="font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
-                        <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1"><span>Net Wt</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                        {/* --- FIX APPLIED HERE --- */}
+                        <div className="flex justify-between"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(parseFloat(String(data.totalGrossWeight)) || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(parseFloat(String(data.totalTeirWeight)) || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold border-t border-gray-200 pt-1"><span className="text-black">Final Wt</span><span className="font-semibold text-black">{`${(parseFloat(String(data.totalFinalWeight)) || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1"><span>Net Wt</span><span>{`${(parseFloat(String(data.totalNetWeight)) || 0).toFixed(2)} kg`}</span></div>
                     </CardContent>
                 </Card>
                  <Card className="bg-white border-gray-200">
@@ -487,7 +489,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
     );
 };
 
-
+// --- Main Page Component ---
 export default function CustomerProfilePage() {
   const [customers, setCustomers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
@@ -495,7 +497,7 @@ export default function CustomerProfilePage() {
   const [openCombobox, setOpenCombobox] = useState(false);
 
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
-  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
@@ -759,7 +761,3 @@ export default function CustomerProfilePage() {
     </div>
   );
 }
-
-    
-
-    
