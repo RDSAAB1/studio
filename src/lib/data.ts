@@ -1,4 +1,5 @@
 
+
 import type { Customer, Transaction, FundTransaction, BankBranch, Bank } from "./definitions";
 
 export const initialCustomers: Customer[] = [
@@ -55,11 +56,11 @@ export const bankNames: string[] = [
     "UCO - UCO Bank", "BoM - Bank of Maharashtra", "P&S - Punjab & Sind Bank", "AB - Allahabad Bank",
     "HDFC - HDFC Bank", "ICICI - ICICI Bank", "Axis - Axis Bank", "Kotak - Kotak Mahindra Bank",
     "IndusInd - IndusInd Bank", "Yes - Yes Bank", "IDFC - IDFC First Bank", "Federal - Federal Bank",
-    "SIB - South Indian Bank", "RBL - RBL Bank", "APGVB - Andhra Pradesh Grameena Vikas Bank",
+    "SIB - South Indian Bank", "RBL - RBL Bank",
     "KGB - Kerala Gramin Bank", "MPGB - Madhya Pradesh Gramin Bank", "BUPGB - Baroda Uttar Pradesh Gramin Bank",
     "UPGB - Uttar Pradesh Gramin Bank", "Saraswat - Saraswat Co-operative Bank",
     "BCCB - Bassein Catholic Co-operative Bank", "Cosmos - Cosmos Cooperative Bank",
-    "TJSB - TJSB Sahakari Bank", "Jila - Jila Sahakari Bank", "ARYAVRAT BANK"
+    "TJSB - TJSB Sahakari Bank", "Jila - Jila Sahakari Bank"
 ];
 
 export const bankBranches: Omit<BankBranch, 'id'>[] = [
@@ -139,3 +140,4 @@ export const findStateByCode = (code: string) => {
 export const findStateByName = (name: string) => {
     return statesAndCodes.find(state => state.name === name);
 };
+
