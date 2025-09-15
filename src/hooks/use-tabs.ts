@@ -56,9 +56,9 @@ export const allMenuItems: MenuItem[] = [
     name: "Supplier",
     icon: Truck,
     subMenus: [
-      { id: "supplier-entry", name: "Supplier Entry", icon: UserPlus },
-      { id: "supplier-payments", name: "Supplier Payments", icon: Wallet },
-      { id: "supplier-profile", name: "Supplier Profile", icon: UserCircle },
+      { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
+      { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
+      { id: "sales/supplier-profile", name: "Supplier Profile", icon: UserCircle },
     ],
   },
     {
@@ -66,9 +66,9 @@ export const allMenuItems: MenuItem[] = [
     name: "Customer",
     icon: Users,
     subMenus: [
-      { id: "customer-entry", name: "Customer Entry", icon: UserPlus },
-      { id: "customer-payments", name: "Customer Payments", icon: Wallet },
-      { id: "customer-profile", name: "Customer Profile", icon: UserCircle },
+      { id: "sales/customer-entry", name: "Customer Entry", icon: UserPlus },
+      { id: "sales/customer-payments", name: "Customer Payments", icon: Wallet },
+      { id: "sales/customer-profile", name: "Customer Profile", icon: UserCircle },
     ],
   },
   {
@@ -77,7 +77,7 @@ export const allMenuItems: MenuItem[] = [
     icon: Landmark,
   },
   { 
-    id: "income-expense", 
+    id: "expense-tracker", 
     name: "Income & Expense", 
     icon: Scale, 
   },
@@ -86,8 +86,8 @@ export const allMenuItems: MenuItem[] = [
     name: "Reports",
     icon: FileText,
     subMenus: [
-        { id: "rtgs-report", name: "RTGS Report", icon: FileText },
-        { id: "daily-supplier-report", name: "Daily Supplier Report", icon: FileText },
+        { id: "sales/rtgs-report", name: "RTGS Report", icon: FileText },
+        { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: FileText },
     ]
   },
   {
@@ -95,9 +95,9 @@ export const allMenuItems: MenuItem[] = [
     name: "HR Management",
     icon: Users2,
     subMenus: [
-      { id: "employee-db", name: "Employee Database", icon: Database },
-      { id: "payroll", name: "Payroll Management", icon: Calculator },
-      { id: "attendance", name: "Attendance Tracking", icon: CalendarCheck },
+      { id: "hr/employee-database", name: "Employee Database", icon: Database },
+      { id: "hr/payroll-management", name: "Payroll Management", icon: Calculator },
+      { id: "hr/attendance-tracking", name: "Attendance Tracking", icon: CalendarCheck },
     ],
   },
   {
@@ -105,8 +105,8 @@ export const allMenuItems: MenuItem[] = [
     name: "Inventory",
     icon: PackageIcon,
     subMenus: [
-      { id: "inventory-mgmt", name: "Inventory", icon: Boxes },
-      { id: "purchase-orders", name: "Purchase Orders", icon: ShoppingCart },
+      { id: "inventory/inventory-management", name: "Inventory", icon: Boxes },
+      { id: "inventory/purchase-orders", name: "Purchase Orders", icon: ShoppingCart },
     ],
   },
   {
@@ -114,10 +114,10 @@ export const allMenuItems: MenuItem[] = [
     name: "Projects",
     icon: Briefcase,
     subMenus: [
-        { id: "project-dashboard", name: "Dashboard", icon: LayoutDashboard },
-        { id: "project-management", name: "Management", icon: List },
-        { id: "tasks", name: "Tasks", icon: ClipboardCheck },
-        { id: "collaboration", name: "Collaboration", icon: Users },
+        { id: "projects/dashboard", name: "Dashboard", icon: LayoutDashboard },
+        { id: "projects/management", name: "Management", icon: List },
+        { id: "projects/tasks", name: "Tasks", icon: ClipboardCheck },
+        { id: "projects/collaboration", name: "Collaboration", icon: Users },
     ]
   },
   {
