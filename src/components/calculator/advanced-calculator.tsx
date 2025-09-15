@@ -82,9 +82,6 @@ const ScientificCalculator = () => {
         if (result !== null) {
             setInput(result);
             setIsResult(true);
-        } else {
-            // If there's an error, do nothing or show a subtle sign
-            // For now, we just won't update the input
         }
     };
     
@@ -195,27 +192,31 @@ const ScientificCalculator = () => {
                         How to use calculator fast? (Keyboard Shortcuts)
                     </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-xl">
                     <DialogHeader>
                         <DialogTitle>Calculator Keyboard Shortcuts</DialogTitle>
                         <DialogDescription>Use these shortcuts for faster calculations.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-2 gap-6 text-sm">
                         <div>
-                            <h4 className="font-semibold mb-2">English</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>**Arrow Keys**: `↑` (Add), `↓` (Subtract), `←` (Multiply), `→` (Divide)</li>
-                                <li>**Operators**: `*` or `[` (Multiply), `/` or `]` (Divide), `+` or `=` (Add), `-` (Subtract)</li>
-                                <li>**Actions**: `Enter` (Equals), `Delete` or `Escape` (Clear All)</li>
-                            </ul>
+                             <h4 className="font-semibold mb-2">English</h4>
+                             <table className="w-full text-left text-xs">
+                                <tbody>
+                                    <tr className="border-b"><td className="py-1.5 font-medium">Arrow Keys</td><td className="py-1.5">`↑` (Add), `↓` (Sub), `←` (Mul), `→` (Div)</td></tr>
+                                    <tr className="border-b"><td className="py-1.5 font-medium">Operators</td><td className="py-1.5">`*`, `[` (Multiply), `/`, `]` (Divide), `+`, `=` (Add)</td></tr>
+                                    <tr className="border-b"><td className="py-1.5 font-medium">Actions</td><td className="py-1.5">`Enter` (Equals), `Delete`, `Esc` (Clear All)</td></tr>
+                                </tbody>
+                             </table>
                         </div>
                         <div>
-                            <h4 className="font-semibold mb-2">हिन्दी</h4>
-                             <ul className="list-disc pl-5 space-y-1">
-                                <li>**एरो कीज़**: `↑` (जोड़ें), `↓` (घटाएं), `←` (गुणा करें), `→` (भाग दें)</li>
-                                <li>**ऑपरेटर्स**: `*` या `[` (गुणा), `/` या `]` (भाग), `+` या `=` (जोड़), `-` (घटाव)</li>
-                                <li>**एक्शन**: `एंटर` (बराबर), `डिलीट` या `एस्केप` (सब साफ़ करें)</li>
-                            </ul>
+                             <h4 className="font-semibold mb-2">हिन्दी</h4>
+                            <table className="w-full text-left text-xs">
+                                <tbody>
+                                    <tr className="border-b"><td className="py-1.5 font-medium">एरो कीज़</td><td className="py-1.5">`↑` (जोड़), `↓` (घटा), `←` (गुणा), `→` (भाग)</td></tr>
+                                    <tr className="border-b"><td className="py-1.5 font-medium">ऑपरेटर्स</td><td className="py-1.5">`*`, `[` (गुणा), `/`, `]` (भाग), `+`, `=` (जोड़)</td></tr>
+                                    <tr className="border-b"><td className="py-1.5 font-medium">एक्शन</td><td className="py-1.5">`एंटर` (बराबर), `डिलीट`, `एस्केप` (सब साफ़)</td></tr>
+                                </tbody>
+                             </table>
                         </div>
                     </div>
                 </DialogContent>
@@ -629,7 +630,7 @@ export const AdvancedCalculator = () => {
                     </TabsList>
                     <div className="min-h-[350px]">
                         <TabsContent value="calculator">
-                            <ScientificCalculator />
+                           <div className="min-h-[350px]"> <ScientificCalculator /></div>
                         </TabsContent>
                         <TabsContent value="converter">
                            <div className="min-h-[350px]"> <UnitConverter /></div>
