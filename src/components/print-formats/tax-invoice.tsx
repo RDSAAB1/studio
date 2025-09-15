@@ -63,6 +63,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     const isGstIncluded = invoiceDetails.isGstIncluded;
     const rate = Number(customer.rate) || 0;
     const netWeight = Number(customer.netWeight) || 0;
+    const advanceFreight = Number(customer.advanceFreight) || 0;
     
     const tableTotalAmount = netWeight * rate;
 
@@ -73,11 +74,11 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
     if (isGstIncluded) {
         taxableAmount = tableTotalAmount / (1 + (taxRate / 100));
         totalTaxAmount = tableTotalAmount - taxableAmount;
-        totalInvoiceValue = tableTotalAmount + (invoiceDetails.totalAdvance || 0);
+        totalInvoiceValue = tableTotalAmount + advanceFreight;
     } else {
         taxableAmount = tableTotalAmount;
         totalTaxAmount = taxableAmount * (taxRate / 100);
-        totalInvoiceValue = taxableAmount + totalTaxAmount + (invoiceDetails.totalAdvance || 0);
+        totalInvoiceValue = taxableAmount + totalTaxAmount + advanceFreight;
     }
 
     const cgstAmount = totalTaxAmount / 2;
@@ -235,7 +236,7 @@ export const TaxInvoice: React.FC<TaxInvoiceProps> = ({ customer, settings, invo
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Taxable Amount:</span><span className="font-semibold">{formatCurrency(Math.round(taxableAmount))}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(cgstAmount))}</span></div>
                         <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(sgstAmount))}</span></div>
-                         {invoiceDetails.totalAdvance > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(invoiceDetails.totalAdvance)}</span></div>}
+                         {advanceFreight > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(advanceFreight)}</span></div>}
                         <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl print-bg-gray-800">
                             <span>Balance Due:</span><span>{formatCurrency(Math.round(totalInvoiceValue))}</span>
                         </div>

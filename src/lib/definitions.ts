@@ -74,6 +74,7 @@ export type Customer = {
 
   // New field
   otherCharges?: number;
+  advanceFreight?: number;
 };
 
 export type Transaction = {

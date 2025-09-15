@@ -55,9 +55,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         grDate: '',
         transport: '',
     });
-    const [advancePayments, setAdvancePayments] = useState<AdvancePayment[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-
+    
     useEffect(() => {
         if (customer) {
             setEditableInvoiceDetails(customer);
@@ -74,53 +72,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 companyStateCode: receiptSettings.companyStateCode || prev.companyStateCode,
             }));
         }
-        const unsub = getBankAccountsRealtime(setBankAccounts, console.error);
-        return () => unsub();
     }, [customer, receiptSettings]);
     
-    const handleAddAdvancePayment = () => {
-        setAdvancePayments(prev => [...prev, { id: Date.now(), amount: 0, accountId: 'CashInHand' }]);
-    };
-
-    const handleAdvancePaymentChange = (id: number, field: 'amount' | 'accountId', value: string | number) => {
-        setAdvancePayments(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
-    };
-
-    const handleRemoveAdvancePayment = (id: number) => {
-        setAdvancePayments(prev => prev.filter(p => p.id !== id));
-    };
-    
-    const handleSaveAdvancePayments = async () => {
-        if (!customer) return;
-        try {
-            for (const payment of advancePayments) {
-                if (payment.amount > 0) {
-                     const expenseData: Partial<Expense> = {
-                        date: new Date().toISOString().split('T')[0],
-                        transactionType: 'Expense',
-                        category: 'Freight & Advance',
-                        subCategory: 'Advance to Customer',
-                        amount: payment.amount,
-                        payee: customer.name,
-                        description: `Advance for SR# ${customer.srNo} via ${bankAccounts.find(b => b.id === payment.accountId)?.accountHolderName || 'Cash'}`,
-                        paymentMethod: payment.accountId === 'CashInHand' ? 'Cash' : 'Online',
-                        status: 'Paid',
-                        isRecurring: false,
-                    };
-                    if (payment.accountId !== 'CashInHand') {
-                        expenseData.bankAccountId = payment.accountId;
-                    }
-                    await addExpense(expenseData as Omit<Expense, 'id'>);
-                }
-            }
-            toast({ title: "Success", description: "Advance payments recorded as expenses." });
-            setAdvancePayments([]);
-        } catch (error) {
-            console.error("Failed to save advance payments:", error);
-            toast({ title: "Error", description: "Could not save advance payments.", variant: "destructive" });
-        }
-    };
-
 
     const handleEditableDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -191,8 +144,6 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             document.body.removeChild(iframe);
         }, 500);
     };
-
-    const totalAdvance = advancePayments.reduce((sum, p) => sum + p.amount, 0);
     
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
     const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
@@ -216,7 +167,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             finalCustomerData.shippingStateCode = finalCustomerData.stateCode;
         }
 
-        const enrichedInvoiceDetails = { ...invoiceDetails, totalAdvance };
+        const enrichedInvoiceDetails = { ...invoiceDetails, totalAdvance: customer.advanceFreight || 0 };
 
         switch(documentType) {
             case 'tax-invoice':
@@ -348,19 +299,6 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         </div>
                                     </CardContent>
                                 )}
-                            </Card>
-                             <Card>
-                                <CardHeader className="p-3 flex items-center justify-between"><CardTitle className="text-base">Freight / Advance</CardTitle><Button size="sm" variant="outline" className="h-7" onClick={handleAddAdvancePayment}><Plus className="h-4 w-4 mr-2" />Add</Button></CardHeader>
-                                <CardContent className="p-3 space-y-2">
-                                    {advancePayments.map((payment, index) => (
-                                        <div key={payment.id} className="flex items-center gap-2">
-                                            <Input type="number" placeholder="Amount" value={payment.amount} onChange={(e) => handleAdvancePaymentChange(payment.id, 'amount', Number(e.target.value))} className="h-8 text-xs" />
-                                            <div className="w-48"><CustomDropdown options={[{value: 'CashInHand', label: 'Cash In Hand'}, ...bankAccounts.map(acc => ({value: acc.id, label: acc.accountHolderName}))]} value={payment.accountId} onChange={(val) => handleAdvancePaymentChange(payment.id, 'accountId', val || '')} /></div>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveAdvancePayment(payment.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                        </div>
-                                    ))}
-                                    {advancePayments.length > 0 && <Button size="sm" className="w-full mt-2" onClick={handleSaveAdvancePayments}>Save Advance Payments</Button>}
-                                </CardContent>
                             </Card>
                         </div>
                     </ScrollArea>

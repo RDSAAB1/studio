@@ -28,6 +28,7 @@ interface CustomerFormValues {
     kanta?: number;
     bagRate?: number;
     isBrokerageIncluded?: boolean;
+    advanceFreight?: number;
 }
 
 
@@ -144,7 +145,9 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const bagRate = Number(values.bagRate) || 0;
     const bagAmount = Math.round(bags * bagRate);
 
-    let originalNetAmount = Math.round(amount + kanta + bagAmount - cdAmount);
+    const advanceFreight = Number(values.advanceFreight) || 0;
+
+    let originalNetAmount = Math.round(amount + kanta + bagAmount - cdAmount + advanceFreight);
     if (!values.isBrokerageIncluded) {
         originalNetAmount -= brokerageAmount;
     }
@@ -173,6 +176,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         cdRate: cdPercentage,
         kanta: kanta,
         bagAmount: bagAmount,
+        advanceFreight: advanceFreight,
         originalNetAmount: originalNetAmount,
         netAmount: netAmount,
     }
