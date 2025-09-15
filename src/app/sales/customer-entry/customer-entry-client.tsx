@@ -36,6 +36,8 @@ export const formSchema = z.object({
       .length(10, "Contact number must be exactly 10 digits.")
       .regex(/^\d+$/, "Contact number must only contain digits."),
     gstin: z.string().optional(),
+    stateName: z.string().optional(),
+    stateCode: z.string().optional(),
     vehicleNo: z.string(),
     variety: z.string().min(1, "Variety is required."),
     grossWeight: z.coerce.number().min(0),
@@ -64,12 +66,11 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
   return {
     id: "", srNo: 'C----', date: dateStr, term: '0', dueDate: dateStr, 
-    name: '', companyName: '', address: '', contact: '', gstin: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
+    name: '', companyName: '', address: '', contact: '', gstin: '', stateName: '', stateCode: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, rate: 0, amount: 0, bags: 0, bagWeightKg: 0, bagRate: 0, bagAmount: 0,
     kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
-    // Fields that should not be here
     so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
   };
 };
@@ -249,6 +250,8 @@ export default function CustomerEntryClient() {
       shippingAddress: customerState.shippingAddress || '',
       shippingContact: customerState.shippingContact || '',
       shippingGstin: customerState.shippingGstin || '',
+      stateName: customerState.stateName || '',
+      stateCode: customerState.stateCode || '',
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -298,6 +301,8 @@ export default function CustomerEntryClient() {
         form.setValue('companyName', foundCustomer.companyName || '');
         form.setValue('address', foundCustomer.address);
         form.setValue('gstin', foundCustomer.gstin || '');
+        form.setValue('stateName', foundCustomer.stateName || '');
+        form.setValue('stateCode', foundCustomer.stateCode || '');
         toast({ title: "Customer Found: Details auto-filled." });
       }
     }
@@ -335,6 +340,8 @@ export default function CustomerEntryClient() {
         address: toTitleCase(formValues.address),
         contact: formValues.contact,
         gstin: formValues.gstin,
+        stateName: formValues.stateName,
+        stateCode: formValues.stateCode,
         vehicleNo: toTitleCase(formValues.vehicleNo),
         variety: toTitleCase(formValues.variety),
         paymentType: formValues.paymentType,
@@ -525,7 +532,7 @@ export default function CustomerEntryClient() {
                         isBrokerageIncluded: item.isBrokerageIncluded === 'TRUE' || item.isBrokerageIncluded === true,
                         paymentType: item.paymentType || 'Full',
                     };
-                    const calculated = calculateCustomerEntry(customerData as CustomerFormValues, paymentHistory);
+                    const calculated = calculateCustomerEntry(customerData, paymentHistory);
                     await addCustomer({ ...customerData, ...calculated } as Omit<Customer, 'id'>);
                 }
                 toast({title: "Import Successful", description: `${json.length} customer entries have been imported.`});
@@ -535,28 +542,6 @@ export default function CustomerEntryClient() {
             }
         };
         reader.readAsBinaryString(file);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-        if (e.key === 'Enter') {
-            const activeElement = document.activeElement as HTMLElement;
-            if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-                return;
-            }
-            e.preventDefault(); // Prevent form submission
-            const formEl = e.currentTarget;
-            const formElements = Array.from(formEl.elements).filter(el => 
-                (el instanceof HTMLInputElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement) && 
-                !el.hasAttribute('disabled') && 
-                (el as HTMLElement).offsetParent !== null
-            ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-
-            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-            
-            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-                formElements[currentElementIndex + 1].focus();
-            }
-        }
     };
 
   const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
@@ -606,7 +591,7 @@ export default function CustomerEntryClient() {
   return (
     <div className="space-y-4">
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(() => onSubmit())} onKeyDown={handleKeyDown} className="space-y-4">
+        <form onSubmit={form.handleSubmit(() => onSubmit())} className="space-y-4">
             <CustomerForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
@@ -644,7 +629,6 @@ export default function CustomerEntryClient() {
         onPrint={handlePrint}
         selectedIds={selectedCustomerIds}
         onSelectionChange={setSelectedCustomerIds}
-        onSearch={setSearchTerm}
         entryType="Customer"
         onPrintRow={(entry: Customer) => handlePrint([entry])}
       />

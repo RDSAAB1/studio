@@ -6,6 +6,8 @@ import { Controller } from "react-hook-form";
 import { format } from "date-fns";
 import { cn, toTitleCase } from "@/lib/utils";
 import type { Customer, OptionItem } from "@/lib/definitions";
+import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
+
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,6 +101,25 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
             form.setValue('contact', value);
         }
     }
+    
+    const handleStateNameChange = (value: string | null) => {
+        form.setValue('stateName', value || '');
+        const state = findStateByName(value || '');
+        if (state) {
+            form.setValue('stateCode', state.code);
+        }
+    };
+
+    const handleStateCodeChange = (value: string | null) => {
+        form.setValue('stateCode', value || '');
+        const state = findStateByCode(value || '');
+        if (state) {
+            form.setValue('stateName', state.name);
+        }
+    };
+
+    const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
+    const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: `${s.code} - ${s.name}` }));
 
     return (
         <>
@@ -149,7 +170,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
 
                  <Separator className="my-2" />
 
-                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="contact" className="text-xs">Contact</Label>
                         <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
@@ -177,11 +198,25 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                             <Controller name="companyName" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} className="h-8 text-sm pl-10" /> )}/>
                         </InputWithIcon>
                     </div>
-                     <div className="space-y-1 lg:col-span-2">
+                     <div className="space-y-1">
                         <Label htmlFor="address" className="text-xs">Address</Label>
                         <InputWithIcon icon={<Home className="h-4 w-4 text-muted-foreground" />}>
                         <Controller name="address" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} className="h-8 text-sm pl-10" /> )}/>
                         </InputWithIcon>
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor="gstin" className="text-xs">GSTIN</Label>
+                        <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                            <Controller name="gstin" control={form.control} render={({ field }) => ( <Input {...field} className="h-8 text-sm pl-10 uppercase" /> )}/>
+                        </InputWithIcon>
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="stateName" className="text-xs">State Name</Label>
+                        <CustomDropdown options={stateNameOptions} value={form.watch('stateName')} onChange={handleStateNameChange} placeholder="Select State"/>
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor="stateCode" className="text-xs">State Code</Label>
+                        <CustomDropdown options={stateCodeOptions} value={form.watch('stateCode')} onChange={handleStateCodeChange} placeholder="Select Code" />
                     </div>
                 </div>
                 
