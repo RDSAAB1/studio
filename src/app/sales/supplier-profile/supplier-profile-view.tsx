@@ -171,7 +171,7 @@ export const SupplierProfileView = ({
                         <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Visual Overview</CardTitle>
                         <div className="w-48">
-                            <Select value={selectedChart} onValueChange={(val: ChartType) => setSelectedChart(val)}>
+                            <Select value={selectedChart} onValueChange={(val: 'financial' | 'variety') => setSelectedChart(val)}>
                                 <SelectTrigger className="h-8 text-xs">
                                     <SelectValue placeholder="Select chart" />
                                 </SelectTrigger>
@@ -183,7 +183,7 @@ export const SupplierProfileView = ({
                         </div>
                     </CardHeader>
                     <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                             <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number, name: string) => selectedChart === 'financial' ? `${formatCurrency(value)}` : value} />
                             <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
@@ -281,5 +281,6 @@ export const SupplierProfileView = ({
             </div>
         </div>
     );
+};
 
     
