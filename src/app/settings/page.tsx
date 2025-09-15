@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -399,7 +398,7 @@ export default function SettingsPage() {
     
     const allBankOptions = [...bankNames, ...banks.map((b: any) => b.name)].sort().map(name => ({ value: name, label: name }));
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
-    const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: `${s.code} - ${s.name}` }));
+    const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
 
 
     if (loading) {
