@@ -41,9 +41,6 @@ import ConnectGmailPage from "@/app/setup/connect-gmail/page";
 import CompanyDetailsPage from "@/app/setup/company-details/page";
 
 const pageComponents: { [key: string]: React.FC<any> } = {
-    "/login": LoginPage,
-    "/setup/connect-gmail": ConnectGmailPage,
-    "/setup/company-details": CompanyDetailsPage,
     "/dashboard-overview": DashboardOverviewPage,
     "/supplier-entry": SupplierEntryPage,
     "/supplier-payments": SupplierPaymentsPage,
@@ -82,7 +79,7 @@ const AppContent = () => {
         const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
         if (dashboardTab && openTabs.length === 0) {
             setOpenTabs([dashboardTab]);
-             if(location.pathname === '/login' || location.pathname === '/'){
+             if(location.pathname === '/'){
                navigate('/dashboard-overview');
              }
         }
@@ -163,38 +160,14 @@ const AppContent = () => {
 };
 
 
-const ProtectedRoute = ({ user, setupComplete }: { user: User | null, setupComplete: boolean | null }) => {
+const ProtectedRoute = ({ children }: { children: ReactNode }) => {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
     const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
-        if (user === null) {
-            navigate('/login');
-            return;
-        }
-        if (setupComplete === false) {
-            navigate('/setup/connect-gmail');
-            return;
-        }
-        if (location.pathname === '/login' || location.pathname === '/') {
-             navigate('/dashboard-overview');
-        }
-    }, [user, setupComplete, navigate, location.pathname]);
-
-    if (user && setupComplete) {
-        return <AppContent />;
-    }
-    
-    // Render nothing or a loader while redirecting
-    return null;
-}
-
-const AppRoutes = () => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
-
-     useEffect(() => {
         const auth = getFirebaseAuth();
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
@@ -205,13 +178,32 @@ const AppRoutes = () => {
                 } catch {
                     setSetupComplete(false);
                 }
+            } else {
+                setSetupComplete(false);
             }
             setLoading(false);
         });
         return () => unsubscribe();
     }, []);
 
-    if (loading) {
+    useEffect(() => {
+        if (loading) return;
+
+        if (!user) {
+            navigate('/login');
+        } else if (setupComplete === false) {
+             if (location.pathname !== '/setup/connect-gmail' && location.pathname !== '/setup/company-details') {
+                navigate('/setup/connect-gmail');
+            }
+        } else if (setupComplete === true) {
+            if (location.pathname === '/' || location.pathname.startsWith('/login') || location.pathname.startsWith('/setup')) {
+                navigate('/dashboard-overview');
+            }
+        }
+    }, [user, loading, setupComplete, navigate, location.pathname]);
+
+
+    if (loading || (user && setupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -219,29 +211,38 @@ const AppRoutes = () => {
         );
     }
     
+    if(!user && location.pathname !== '/login') return null;
+    if(user && !setupComplete && !location.pathname.startsWith('/setup')) return null;
+
+    return <>{children}</>;
+};
+
+const AppRoutes = () => {
     return (
         <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/setup/connect-gmail" element={<ConnectGmailPage />} />
             <Route path="/setup/company-details" element={<CompanyDetailsPage />} />
-            <Route element={<ProtectedRoute user={user} setupComplete={setupComplete} />}>
-                {Object.keys(pageComponents).filter(path => !path.startsWith('/login') && !path.startsWith('/setup')).map(path => {
+            <Route path="/" element={<AppContent />}>
+                {Object.keys(pageComponents).map(path => {
                     const Component = pageComponents[path];
                     return <Route key={path} path={path} element={<Component />} />
                 })}
+                 <Route path="/" element={<DashboardOverviewPage />} />
             </Route>
         </Routes>
-    )
+    );
 };
 
-
 const AppLayout = () => {
-  return (
-    <MemoryRouter initialEntries={['/']}>
-      <AppRoutes/>
-    </MemoryRouter>
-  );
-}
+    return (
+        <MemoryRouter>
+            <ProtectedRoute>
+                <AppRoutes />
+            </ProtectedRoute>
+        </MemoryRouter>
+    );
+};
 
 export default function AppLayoutWrapper() {
     return <AppLayout />;
