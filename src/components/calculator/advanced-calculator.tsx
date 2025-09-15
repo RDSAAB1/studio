@@ -13,10 +13,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, Info } from 'lucide-react';
 import { format, differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears, addDays, addMonths, addYears } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 
 
 const CalculatorButton = ({ onClick, children, className }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
-    <Button variant="outline" className={`h-9 text-base ${className}`} onClick={onClick}>{children}</Button>
+    <Button variant="outline" className={`h-8 text-base ${className}`} onClick={onClick}>{children}</Button>
 );
 
 const ScientificCalculator = () => {
@@ -127,7 +128,7 @@ const ScientificCalculator = () => {
         }
     }
 
-    const displayValue = useMemo(() => {
+     const displayValue = useMemo(() => {
         const currentResult = evaluateExpression(input);
         if (currentResult !== null && currentResult !== input) {
             const numResult = parseFloat(currentResult);
@@ -136,7 +137,7 @@ const ScientificCalculator = () => {
             }
             return currentResult;
         }
-        return input;
+        return '...';
     }, [input]);
 
     useEffect(() => {
@@ -148,13 +149,21 @@ const ScientificCalculator = () => {
                 handleInput(key);
             } else if (key === '.') {
                 handleInput('.');
-            } else if (key === '+' || key === '=' || key === 'ArrowUp') {
+            } else if (key === '+' || key === '=') {
                 handleOperator('+');
-            } else if (key === '-' || key === 'ArrowDown') {
+            } else if (key === '-') {
                 handleOperator('-');
-            } else if (key === '*' || key === '[' || key === 'ArrowLeft') {
+            } else if (key === '*' || key === '[') {
                 handleOperator('×');
-            } else if (key === '/' || key === ']' || key === 'ArrowRight') {
+            } else if (key === '/' || key === ']') {
+                handleOperator('÷');
+            } else if (key === 'ArrowUp') {
+                 handleOperator('+');
+            } else if (key === 'ArrowDown') {
+                handleOperator('-');
+            } else if (key === 'ArrowLeft') {
+                handleOperator('×');
+            } else if (key === 'ArrowRight') {
                 handleOperator('÷');
             } else if (key === 'Enter') {
                 handleEquals();
@@ -179,16 +188,42 @@ const ScientificCalculator = () => {
 
 
     return (
-        <div className="p-4 space-y-2">
-            <Card className="bg-muted/30 p-2 mb-2">
-                 <CardContent className="p-1 text-xs text-muted-foreground flex items-center justify-center gap-2">
-                    <Info size={16} className="flex-shrink-0" />
-                    <p className="font-mono">Shortcuts: ↑↓←→, [ ] = */ | Del/Esc: AC</p>
-                </CardContent>
-            </Card>
+        <div className="p-2 space-y-2">
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
+                        <Info size={14} className="mr-2"/>
+                        How to use calculator fast? (Keyboard Shortcuts)
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Calculator Keyboard Shortcuts</DialogTitle>
+                        <DialogDescription>Use these shortcuts for faster calculations.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <h4 className="font-semibold mb-2">English</h4>
+                            <ul className="list-disc pl-5 space-y-1">
+                                <li>**Arrow Keys**: `↑` (Add), `↓` (Subtract), `←` (Multiply), `→` (Divide)</li>
+                                <li>**Operators**: `*` or `[` (Multiply), `/` or `]` (Divide), `+` or `=` (Add), `-` (Subtract)</li>
+                                <li>**Actions**: `Enter` (Equals), `Delete` or `Escape` (Clear All)</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-2">हिन्दी</h4>
+                             <ul className="list-disc pl-5 space-y-1">
+                                <li>**एरो कीज़**: `↑` (जोड़ें), `↓` (घटाएं), `←` (गुणा करें), `→` (भाग दें)</li>
+                                <li>**ऑपरेटर्स**: `*` या `[` (गुणा), `/` या `]` (भाग), `+` या `=` (जोड़), `-` (घटाव)</li>
+                                <li>**एक्शन**: `एंटर` (बराबर), `डिलीट` या `एस्केप` (सब साफ़ करें)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
             <div className="relative h-16 w-full border rounded-lg bg-muted/50 p-2 text-right overflow-hidden">
-                <div className="absolute top-1 right-2 text-muted-foreground text-xs">{isResult ? '' : input}</div>
-                <div className="text-2xl font-mono text-foreground absolute bottom-1 right-2">{displayValue}</div>
+                <div className="absolute top-1 right-2 text-muted-foreground text-xs">{input}</div>
+                <div className="text-2xl font-mono text-foreground absolute bottom-1 right-2">{isResult ? input : displayValue}</div>
             </div>
             <div className="grid grid-cols-5 gap-2">
                 <CalculatorButton onClick={() => handleFunction('sin')}>sin</CalculatorButton>
@@ -593,24 +628,24 @@ export const AdvancedCalculator = () => {
                         <TabsTrigger value="date" className="h-full">Date</TabsTrigger>
                         <TabsTrigger value="interest" className="h-full">Interest</TabsTrigger>
                     </TabsList>
-                    <div className="min-h-[405px]">
+                    <div className="min-h-[350px]">
                         <TabsContent value="calculator">
                             <ScientificCalculator />
                         </TabsContent>
                         <TabsContent value="converter">
-                           <div className="min-h-[405px]"> <UnitConverter /></div>
+                           <div className="min-h-[350px]"> <UnitConverter /></div>
                         </TabsContent>
                         <TabsContent value="gst">
-                            <div className="min-h-[405px]"><GSTCalculator /></div>
+                            <div className="min-h-[350px]"><GSTCalculator /></div>
                         </TabsContent>
                          <TabsContent value="percentage">
-                            <div className="min-h-[405px]"><PercentageCalculator /></div>
+                            <div className="min-h-[350px]"><PercentageCalculator /></div>
                         </TabsContent>
                         <TabsContent value="date">
-                            <div className="min-h-[405px]"><DateCalculator /></div>
+                            <div className="min-h-[350px]"><DateCalculator /></div>
                         </TabsContent>
                          <TabsContent value="interest">
-                            <div className="min-h-[405px]"><InterestCalculator /></div>
+                            <div className="min-h-[350px]"><InterestCalculator /></div>
                         </TabsContent>
                     </div>
                 </Tabs>
@@ -618,5 +653,3 @@ export const AdvancedCalculator = () => {
         </Card>
     );
 };
-
-    
