@@ -9,9 +9,9 @@ import { z } from "zod";
 import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
 import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
-import { getFirebaseAuth } from '@/lib/firebase';
+import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithRedirect } from 'firebase/auth';
 import { toTitleCase, cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -224,7 +224,6 @@ export default function SettingsPage() {
             } else {
                 setUser(null);
                 setLoading(false);
-                router.push('/login');
             }
         });
         return () => unsubscribeAuth();
@@ -290,10 +289,24 @@ export default function SettingsPage() {
     const handleSignOut = async () => {
         try {
             await signOut(getFirebaseAuth());
+            setUser(null); // Update local state
             router.push('/login');
         } catch (error) {
             console.error("Error signing out: ", error);
             toast({ title: "Failed to sign out", variant: "destructive" });
+        }
+    };
+    
+    const handleSignIn = async () => {
+        setLoading(true);
+        try {
+            const auth = getFirebaseAuth();
+            const provider = getGoogleProvider();
+            await signInWithRedirect(auth, provider);
+        } catch (error) {
+            console.error("Sign-in error", error);
+            toast({ title: "Sign-in failed", variant: "destructive" });
+            setLoading(false);
         }
     };
     
@@ -594,7 +607,7 @@ export default function SettingsPage() {
                  </TabsContent>
                  <TabsContent value="account" className="mt-6">
                     <SettingsCard title="Account Information" description="Manage your account details and sign out.">
-                        {user && (
+                        {user ? (
                             <div className="space-y-4">
                                 <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
                                     <UserCircle className="h-10 w-10 text-muted-foreground" />
@@ -605,6 +618,14 @@ export default function SettingsPage() {
                                 </div>
                                 <Button variant="outline" onClick={handleSignOut}>
                                     <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                                </Button>
+                            </div>
+                        ) : (
+                             <div className="flex flex-col items-start gap-4">
+                                <p className="text-muted-foreground">You are not signed in.</p>
+                                <Button onClick={handleSignIn} disabled={loading}>
+                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+                                    Sign in with Google
                                 </Button>
                             </div>
                         )}
@@ -664,5 +685,7 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
 
     
