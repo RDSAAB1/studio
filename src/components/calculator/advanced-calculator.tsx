@@ -3,14 +3,14 @@
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Info } from 'lucide-react';
 import { format, differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears, addDays, addMonths, addYears } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 
@@ -148,6 +148,15 @@ const ScientificCalculator = () => {
 
     return (
         <div className="p-4 space-y-2">
+            <Card className="bg-muted/30 p-2 mb-2">
+                <CardContent className="p-1 text-xs text-muted-foreground flex items-start gap-2">
+                    <Info size={16} className="flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-semibold">Keyboard Shortcuts:</p>
+                        <p>`Enter` for =, `[` for ×, `]` for ÷, `Del` or `Esc` for AC.</p>
+                    </div>
+                </CardContent>
+            </Card>
             <Input type="text" readOnly value={input} className="h-20 text-3xl text-right font-mono" />
             <div className="grid grid-cols-5 gap-2">
                 <CalculatorButton onClick={() => handleFunction('sin')}>sin</CalculatorButton>
