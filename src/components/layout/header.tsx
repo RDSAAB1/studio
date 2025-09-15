@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
@@ -96,6 +96,79 @@ const NotificationBell = () => {
     )
 }
 
+const DraggableCalculator = () => {
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStartRef = useRef({ x: 0, y: 0 });
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        setIsDragging(true);
+        dragStartRef.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y,
+        };
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+        if (isDragging && dialogRef.current) {
+            const newX = e.clientX - dragStartRef.current.x;
+            const newY = e.clientY - dragStartRef.current.y;
+            setPosition({ x: newX, y: newY });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    useEffect(() => {
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        } else {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
+    
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                    <Calculator className="h-5 w-5" />
+                    <span className="sr-only">Calculator</span>
+                </Button>
+            </DialogTrigger>
+            <DialogContent 
+                ref={dialogRef}
+                className="p-0 border-0 max-w-sm" 
+                style={{
+                    transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px)`,
+                }}
+                onInteractOutside={(e) => {
+                    if (isDragging) {
+                        e.preventDefault();
+                    }
+                }}
+            >
+                <div 
+                    onMouseDown={handleMouseDown} 
+                    className="cursor-grab active:cursor-grabbing w-full h-8 flex items-center justify-center bg-muted/50 rounded-t-lg"
+                >
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                </div>
+                 <AdvancedCalculator />
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 export function Header({ toggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
 
@@ -117,20 +190,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <NotificationBell />
-           <Dialog>
-                <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                        <Calculator className="h-5 w-5" />
-                        <span className="sr-only">Calculator</span>
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="p-0 border-0 max-w-sm">
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>Advanced Calculator</DialogTitle>
-                    </DialogHeader>
-                    <AdvancedCalculator />
-                </DialogContent>
-            </Dialog>
+          <DraggableCalculator />
           <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
