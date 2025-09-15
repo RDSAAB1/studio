@@ -83,6 +83,8 @@ const ScientificCalculator = () => {
             setInput(prev => `Math.pow(${prev}, 2)`);
         } else if (func === 'x³') {
             setInput(prev => `Math.pow(${prev}, 3)`);
+        } else if (func === '%') {
+             setInput(prev => `(${prev} / 100)`);
         } else if (func === '!') { // Factorial
             try {
                 const num = parseInt(input);
@@ -188,7 +190,7 @@ const ScientificCalculator = () => {
                 
                 <CalculatorButton onClick={handleBackspace}>⌫</CalculatorButton>
                 <CalculatorButton onClick={() => handleInput('0')}>0</CalculatorButton>
-                <CalculatorButton onClick={() => handleInput('.')}>.</CalculatorButton>
+                <CalculatorButton onClick={() => handleFunction('%')}>%</CalculatorButton>
                 <CalculatorButton onClick={handleEquals} className="bg-primary text-primary-foreground">=</CalculatorButton>
                 <CalculatorButton onClick={() => handleOperator('+')}>+</CalculatorButton>
             </div>
