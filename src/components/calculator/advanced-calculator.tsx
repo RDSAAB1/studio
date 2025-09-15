@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, Info } from 'lucide-react';
+import { Calendar as CalendarIcon, Info, Plus, Minus, X, Divide, Sigma } from 'lucide-react';
 import { format, differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears, addDays, addMonths, addYears } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 
 const CalculatorButton = ({ onClick, children, className }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
@@ -195,29 +196,36 @@ const ScientificCalculator = () => {
                 <DialogContent className="max-w-xl">
                     <DialogHeader>
                         <DialogTitle>Calculator Keyboard Shortcuts</DialogTitle>
-                        <DialogDescription>Use these shortcuts for faster calculations.</DialogDescription>
+                        <DialogDescription>Use these keyboard shortcuts for faster and easier calculations.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-2 gap-6 text-sm">
-                        <div>
-                             <h4 className="font-semibold mb-2">English</h4>
-                             <table className="w-full text-left text-xs">
-                                <tbody>
-                                    <tr className="border-b"><td className="py-1.5 font-medium">Arrow Keys</td><td className="py-1.5">`↑` (Add), `↓` (Sub), `←` (Mul), `→` (Div)</td></tr>
-                                    <tr className="border-b"><td className="py-1.5 font-medium">Operators</td><td className="py-1.5">`*`, `[` (Multiply), `/`, `]` (Divide), `+`, `=` (Add)</td></tr>
-                                    <tr className="border-b"><td className="py-1.5 font-medium">Actions</td><td className="py-1.5">`Enter` (Equals), `Delete`, `Esc` (Clear All)</td></tr>
-                                </tbody>
-                             </table>
-                        </div>
-                        <div>
-                             <h4 className="font-semibold mb-2">हिन्दी</h4>
-                            <table className="w-full text-left text-xs">
-                                <tbody>
-                                    <tr className="border-b"><td className="py-1.5 font-medium">एरो कीज़</td><td className="py-1.5">`↑` (जोड़), `↓` (घटा), `←` (गुणा), `→` (भाग)</td></tr>
-                                    <tr className="border-b"><td className="py-1.5 font-medium">ऑपरेटर्स</td><td className="py-1.5">`*`, `[` (गुणा), `/`, `]` (भाग), `+`, `=` (जोड़)</td></tr>
-                                    <tr className="border-b"><td className="py-1.5 font-medium">एक्शन</td><td className="py-1.5">`एंटर` (बराबर), `डिलीट`, `एस्केप` (सब साफ़)</td></tr>
-                                </tbody>
-                             </table>
-                        </div>
+                    <div className="text-sm">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Key(s)</TableHead>
+                                    <TableHead>Action (English)</TableHead>
+                                    <TableHead>एक्शन (हिन्दी)</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow><TableCell colSpan={3} className="font-bold text-primary text-xs p-1">BASIC OPERATIONS</TableCell></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`+`, `=`</TableCell><td><Plus size={14} className="inline mr-2"/>Addition</td><td><Plus size={14} className="inline mr-2"/>जोड़</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`-`</TableCell><td><Minus size={14} className="inline mr-2"/>Subtraction</td><td><Minus size={14} className="inline mr-2"/>घटाव</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`*`, `[`</TableCell><td><X size={14} className="inline mr-2"/>Multiplication</td><td><X size={14} className="inline mr-2"/>गुणा</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`/`, `]`</TableCell><td><Divide size={14} className="inline mr-2"/>Division</td><td><Divide size={14} className="inline mr-2"/>भाग</td></TableRow>
+                                
+                                <TableRow><TableCell colSpan={3} className="font-bold text-primary text-xs p-1">NAVIGATION</TableCell></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`↑` (Arrow Up)</TableCell><td><Plus size={14} className="inline mr-2"/>Addition</td><td><Plus size={14} className="inline mr-2"/>जोड़</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`↓` (Arrow Down)</TableCell><td><Minus size={14} className="inline mr-2"/>Subtraction</td><td><Minus size={14} className="inline mr-2"/>घटाव</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`←` (Arrow Left)</TableCell><td><X size={14} className="inline mr-2"/>Multiplication</td><td><X size={14} className="inline mr-2"/>गुणा</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`→` (Arrow Right)</TableCell><td><Divide size={14} className="inline mr-2"/>Division</td><td><Divide size={14} className="inline mr-2"/>भाग</td></TableRow>
+
+                                <TableRow><TableCell colSpan={3} className="font-bold text-primary text-xs p-1">ACTIONS</TableCell></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`Enter`</TableCell><td><Sigma size={14} className="inline mr-2"/>Equals (Calculate)</td><td><Sigma size={14} className="inline mr-2"/>बराबर (गणना करें)</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`Delete`, `Esc`</TableCell><td>Clear All (AC)</td><td>सब कुछ साफ़ करें (AC)</td></TableRow>
+                                <TableRow><TableCell className="font-mono font-medium">`Backspace`</TableCell><td>Clear Last Entry</td><td>पिछली एंट्री साफ़ करें</td></TableRow>
+                            </TableBody>
+                        </Table>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -322,7 +330,7 @@ const UnitConverter = () => {
     const units = Object.keys(unitConfig[category]);
 
     return (
-        <div className="p-4 space-y-4">
+         <div className="min-h-[350px] p-4 space-y-4">
              <div className="space-y-1">
                 <Label>Category</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as any)}>
@@ -397,7 +405,7 @@ const GSTCalculator = () => {
     }, [amount, gstRate, calculationType]);
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="min-h-[350px] p-4 space-y-4">
             <div className="space-y-1">
                 <Label htmlFor="gst-amount">Amount</Label>
                 <Input id="gst-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8"/>
@@ -459,7 +467,7 @@ const DateCalculator = () => {
     }, [calcDate, addValue, addUnit]);
 
     return (
-         <div className="p-4 space-y-4">
+         <div className="min-h-[350px] p-4 space-y-4">
             <Card>
                 <CardContent className="p-4 space-y-3">
                      <h3 className="text-sm font-semibold">Calculate Difference</h3>
@@ -523,7 +531,7 @@ const InterestCalculator = () => {
 
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="min-h-[350px] p-4 space-y-4">
              <Select value={interestType} onValueChange={setInterestType}>
                 <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="simple">Simple Interest</SelectItem><SelectItem value="compound">Compound Interest</SelectItem></SelectContent>
@@ -584,7 +592,7 @@ const PercentageCalculator = () => {
     }
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="min-h-[350px] p-4 space-y-4">
             <Select value={calcType} onValueChange={setCalcType}>
                 <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent>
