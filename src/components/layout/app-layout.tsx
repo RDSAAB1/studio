@@ -67,7 +67,7 @@ const pageComponents: { [key: string]: React.FC<any> } = {
 };
 
 
-const AppContent = () => {
+const AppContent = ({ children }: { children: ReactNode }) => {
     const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
     const [activeTabId, setActiveTabId] = useState<string>('dashboard-overview');
     const [isSidebarActive, setIsSidebarActive] = useState(false);
@@ -149,7 +149,7 @@ const AppContent = () => {
               <ScrollArea className="flex-grow">
                 <main className="p-4 sm:p-6">
                     <React.Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                        <Outlet/>
+                        {children}
                     </React.Suspense>
                 </main>
               </ScrollArea>
@@ -231,36 +231,25 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     return <>{children}</>;
 };
 
-const AppRoutes = () => {
+const AppRoutes = ({ children }: { children: ReactNode }) => {
     return (
         <AuthWrapper>
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/setup/connect-gmail" element={<ConnectGmailPage />} />
                 <Route path="/setup/company-details" element={<CompanyDetailsPage />} />
-                <Route path="/" element={<AppContent />}>
-                    {Object.keys(pageComponents).map(path => {
-                        const Component = pageComponents[path];
-                        if (!Component) return null;
-                        return <Route key={path} path={path} element={<Component />} />
-                    })}
-                    <Route path="/" element={<DashboardOverviewPage />} />
-                </Route>
+                <Route path="/" element={<AppContent>{children}</AppContent>} />
             </Routes>
         </AuthWrapper>
     );
 };
 
-const AppLayout = () => {
+export default function AppLayoutWrapper({ children }: { children: ReactNode }) {
     return (
         <MemoryRouter>
-            <AppRoutes />
+            <AppRoutes>
+                {children}
+            </AppRoutes>
         </MemoryRouter>
     );
-};
-
-export default function AppLayoutWrapper() {
-    return <AppLayout />;
 }
-
-    

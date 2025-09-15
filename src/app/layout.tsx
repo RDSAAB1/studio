@@ -1,9 +1,28 @@
 
 "use client";
-import ClientLayoutWrapper from '@/components/client-layout-wrapper';
+import AppLayoutWrapper from '@/components/layout/app-layout';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { DynamicIslandToaster } from '@/components/ui/dynamic-island-toaster';
+import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-space-grotesk',
+});
+
+const sourceCodePro = Source_Code_Pro({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-source-code-pro',
+});
+
 
 export default function RootLayout({
   children,
@@ -12,10 +31,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <ClientLayoutWrapper>
+       <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
+        <AppLayoutWrapper>
           {children}
-        </ClientLayoutWrapper>
+        </AppLayoutWrapper>
       </body>
     </html>
   );
