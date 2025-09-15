@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, type ReactNode, Suspense } from "react";
 import { usePathname, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
@@ -14,6 +15,11 @@ import LoginPage from "@/app/login/page";
 import ConnectGmailPage from "@/app/setup/connect-gmail/page";
 import CompanyDetailsPage from "@/app/setup/company-details/page";
 import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
+
+const DynamicIslandToaster = dynamic(
+  () => import('../ui/dynamic-island-toaster').then(mod => mod.DynamicIslandToaster),
+  { ssr: false }
+);
 
 const AppContent = ({ children }: { children: ReactNode }) => {
     const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
@@ -90,6 +96,11 @@ const AppContent = ({ children }: { children: ReactNode }) => {
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100]">
+                  <Suspense>
+                    <DynamicIslandToaster />
+                  </Suspense>
+              </div>
               <div className="sticky top-0 z-30 flex-shrink-0">
                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
                 <Header toggleSidebar={toggleSidebar} />
@@ -137,7 +148,7 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
                     setSetupState('complete'); // Fallback to complete to avoid setup loop on error
                 }
             } else {
-                setSetupState('loading');
+                setSetupState('loading'); // No user, so no setup state to check
             }
             setAuthChecked(true); // Mark auth check as complete
         });
@@ -201,14 +212,11 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
 export default function AppLayoutWrapper({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const isSpecialPage = pathname === '/login' || pathname.startsWith('/setup');
-
-    // If it's a special page, render it directly without the main app layout
-    // but still inside the AuthWrapper to handle redirects if user is already logged in/set up.
+    
     if (isSpecialPage) {
         return <AuthWrapper>{children}</AuthWrapper>;
     }
     
-    // Otherwise, wrap the children with the AuthWrapper which contains the main layout
     return (
         <AuthWrapper>
             {children}

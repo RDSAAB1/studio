@@ -7,13 +7,11 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
-import { useNavigate } from "react-router-dom";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
-import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter } from "next/navigation";
@@ -187,11 +185,6 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle Sidebar</span>
             </Button>
-        </div>
-
-        {/* Center Aligned Dynamic Island */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-             <DynamicIslandToaster />
         </div>
 
         {/* Right Aligned Icons */}
