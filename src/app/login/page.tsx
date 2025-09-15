@@ -14,7 +14,7 @@ import { getCompanySettings } from '@/lib/firestore';
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // Set initial loading to true
 
     useEffect(() => {
         const auth = getFirebaseAuth();
@@ -25,10 +25,11 @@ export default function LoginPage() {
                     toast({ title: "Signed in successfully!", variant: 'success' });
                     // The AuthChecker component will handle redirection.
                 }
+                 setLoading(false); // Stop loading after checking redirect result
             })
             .catch((error: any) => {
                 console.error("Google Sign-In Redirect Error:", error);
-                if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+                if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'cancelled-popup-request') {
                     toast({
                         title: "Login Failed",
                         description: "Could not sign in with Google. Please try again.",
@@ -52,6 +53,14 @@ export default function LoginPage() {
            toast({ title: "Sign-in Failed", description: "Could not start the sign-in process.", variant: "destructive" });
         }
     };
+    
+    if (loading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">

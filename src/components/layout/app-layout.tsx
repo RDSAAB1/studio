@@ -165,7 +165,7 @@ const AppContent = () => {
 const AuthChecker = () => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [setupComplete, setSetupComplete] = useState(false);
+    const [setupComplete, setSetupComplete] = useState<boolean | null>(null); // Use null for initial state
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -178,31 +178,51 @@ const AuthChecker = () => {
                     const settings = await getCompanySettings(currentUser.uid);
                     if (settings && settings.appPassword) {
                         setSetupComplete(true);
-                        if (location.pathname.startsWith('/setup') || location.pathname === '/login') {
-                            navigate('/dashboard-overview');
-                        }
                     } else {
                         setSetupComplete(false);
-                         if (!location.pathname.startsWith('/setup/connect-gmail')) {
-                            navigate('/setup/connect-gmail');
-                        }
                     }
                 } catch(e) {
                     console.error("Setup check failed", e);
-                    navigate('/login'); // Fallback to login on error
+                    setSetupComplete(false);
                 }
             } else {
-                if (!location.pathname.startsWith('/login')) {
-                    navigate('/login');
-                }
+                setSetupComplete(null); // No user, no setup status
             }
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [navigate, location.pathname]);
+    }, []);
 
-    if (loading) {
+     useEffect(() => {
+        if (loading) return; // Wait until auth state is confirmed
+
+        const isAuthPage = location.pathname === '/login';
+        const isSetupPage = location.pathname.startsWith('/setup');
+
+        if (user) {
+            if (setupComplete === true) {
+                // If user is logged in and setup is complete, they should not be on login or setup pages
+                if (isAuthPage || isSetupPage) {
+                    navigate('/dashboard-overview');
+                }
+            } else if (setupComplete === false) {
+                // If user is logged in but setup is not complete, redirect to setup
+                if (!isSetupPage) {
+                     navigate('/setup/connect-gmail');
+                }
+            }
+            // If setupComplete is null, we are still checking, so we wait.
+        } else {
+            // If no user, redirect to login unless already there
+            if (!isAuthPage) {
+                navigate('/login');
+            }
+        }
+    }, [user, loading, setupComplete, location.pathname, navigate]);
+
+
+    if (loading || setupComplete === null && user) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -210,19 +230,21 @@ const AuthChecker = () => {
         );
     }
     
-    const isAuthPage = location.pathname === '/login' || location.pathname.startsWith('/setup');
-    
     if (user && setupComplete) {
         return <AppContent />;
     }
     
-    if (isAuthPage) {
-        const PageComponent = pageComponents[location.pathname];
-        if (PageComponent) return <PageComponent />;
+    const PageComponent = pageComponents[location.pathname];
+    if (PageComponent) {
+        return <PageComponent />;
     }
     
-    // Fallback or redirect if no other condition is met
-    return null; 
+    // Fallback if no route matches (e.g., during redirects)
+    return (
+        <div className="flex h-screen w-screen items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
 };
 
 
