@@ -886,7 +886,7 @@ export default function SupplierPaymentsClient() {
                             suppliers={suppliers}
                             onShowDetails={setDetailsSupplierEntry}
                         />
-                    </div>
+                     </div>
                 </TabsContent>
             </Card>
         </Tabs>
@@ -929,12 +929,12 @@ export default function SupplierPaymentsClient() {
        />
 
        <Dialog open={isBankSettingsOpen} onOpenChange={setIsBankSettingsOpen}>
-            <DialogContent className="max-w-5xl h-[80vh] flex flex-col">
-                 <DialogHeader>
+            <DialogContent className="max-w-5xl h-[80vh] flex flex-col p-0">
+                 <DialogHeader className="p-4 border-b">
                     <DialogTitle>Bank & Branch Management</DialogTitle>
                     <DialogDescription>Add, edit, or manage banks and their branches here.</DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow min-h-0">
+                <div className="flex-grow min-h-0 overflow-y-auto p-6">
                     <BankManagementPage />
                 </div>
             </DialogContent>
@@ -942,3 +942,4 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+

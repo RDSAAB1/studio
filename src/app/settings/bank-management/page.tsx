@@ -196,10 +196,10 @@ export default function BankManagementPage() {
                 <Table>
                     <TableHeader className="sticky top-0 bg-muted">
                         <TableRow>
-                            <TableHead className="w-[30%]">Bank Name</TableHead>
+                            <TableHead className="w-[40%]">Bank Name</TableHead>
                             <TableHead className="w-[30%]">Branch Name</TableHead>
-                            <TableHead className="w-[25%]">IFSC Code</TableHead>
-                            <TableHead className="text-right w-[15%]">Actions</TableHead>
+                            <TableHead className="w-[20%]">IFSC Code</TableHead>
+                            <TableHead className="text-right w-[10%]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
