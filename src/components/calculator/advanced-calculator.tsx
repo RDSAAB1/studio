@@ -128,15 +128,6 @@ const ScientificCalculator = () => {
     }
 
     const displayValue = useMemo(() => {
-        if (isResult) {
-            // Check if the result is a long float and format it
-            const numResult = parseFloat(input);
-            if (!isNaN(numResult) && input.includes('.') && input.split('.')[1].length > 8) {
-                return numResult.toPrecision(8);
-            }
-            return input;
-        }
-
         const currentResult = evaluateExpression(input);
         if (currentResult !== null && currentResult !== input) {
             const numResult = parseFloat(currentResult);
@@ -146,7 +137,7 @@ const ScientificCalculator = () => {
             return currentResult;
         }
         return input;
-    }, [input, isResult]);
+    }, [input]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -159,13 +150,19 @@ const ScientificCalculator = () => {
                 handleInput('.');
             } else if (key === '+') {
                 handleOperator('+');
+            } else if (key === '=') {
+                handleOperator('+');
             } else if (key === '-') {
                 handleOperator('-');
             } else if (key === '*') {
                 handleOperator('×');
+            } else if (key === '[') {
+                handleOperator('×');
             } else if (key === '/') {
                 handleOperator('÷');
-            } else if (key === '=' || key === 'Enter') {
+            } else if (key === ']') {
+                handleOperator('÷');
+            } else if (key === 'Enter') {
                 handleEquals();
             } else if (key === 'Backspace') {
                 handleBackspace();
@@ -190,12 +187,12 @@ const ScientificCalculator = () => {
     return (
         <div className="p-4 space-y-2">
             <Card className="bg-muted/30 p-2 mb-2">
-                <CardContent className="p-1 text-xs text-muted-foreground flex items-center justify-center gap-2">
+                 <CardContent className="p-1 text-xs text-muted-foreground flex items-center justify-center gap-2">
                     <Info size={16} className="flex-shrink-0" />
                     <p className="font-mono">Enter → = | [ → × | ] → ÷ | = → + | Del/Esc → AC</p>
                 </CardContent>
             </Card>
-            <div className="relative h-12 w-full border rounded-lg bg-muted/50 p-2 text-right">
+            <div className="relative h-16 w-full border rounded-lg bg-muted/50 p-2 text-right overflow-hidden">
                 <div className="absolute top-1 right-2 text-muted-foreground text-xs">{isResult ? '' : input}</div>
                 <div className="text-2xl font-mono text-foreground absolute bottom-1 right-2">{displayValue}</div>
             </div>
@@ -607,19 +604,19 @@ export const AdvancedCalculator = () => {
                             <ScientificCalculator />
                         </TabsContent>
                         <TabsContent value="converter">
-                            <UnitConverter />
+                           <div className="min-h-[350px]"> <UnitConverter /></div>
                         </TabsContent>
                         <TabsContent value="gst">
-                            <GSTCalculator />
+                            <div className="min-h-[350px]"><GSTCalculator /></div>
                         </TabsContent>
                          <TabsContent value="percentage">
-                            <PercentageCalculator />
+                            <div className="min-h-[350px]"><PercentageCalculator /></div>
                         </TabsContent>
                         <TabsContent value="date">
-                            <DateCalculator />
+                            <div className="min-h-[350px]"><DateCalculator /></div>
                         </TabsContent>
                          <TabsContent value="interest">
-                            <InterestCalculator />
+                            <div className="min-h-[350px]"><InterestCalculator /></div>
                         </TabsContent>
                     </div>
                 </Tabs>
