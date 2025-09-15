@@ -331,23 +331,6 @@ export type Campaign = {
   endDate: string;
 };
 
-export type RtgsSettings = {
-    companyName: string;
-    companyAddress1: string;
-    companyAddress2: string;
-    companyGstin?: string;
-    panNo?: string;
-    companyStateName?: string;
-    companyStateCode?: string;
-    bankName: string;
-    ifscCode: string;
-    branchName: string;
-    accountNo: string;
-    contactNo: string;
-    gmail: string;
-    type: string;
-};
-
 export type ReceiptFieldSettings = {
     date: boolean;
     name: boolean;
@@ -368,11 +351,22 @@ export type ReceiptFieldSettings = {
     netWeight: boolean;
 };
 
-export type ReceiptSettings = RtgsSettings & {
+export type ReceiptSettings = {
+    companyName: string;
+    companyAddress1: string;
+    companyAddress2: string;
+    companyGstin?: string;
+    panNo?: string;
+    companyStateName?: string;
+    companyStateCode?: string;
+    contactNo: string;
+    gmail: string;
     fields: ReceiptFieldSettings;
     defaultBankAccountId?: string;
     defaultBank?: BankAccount;
 };
+
+export type RtgsSettings = ReceiptSettings;
 
 export type ConsolidatedReceiptData = {
     supplier: {

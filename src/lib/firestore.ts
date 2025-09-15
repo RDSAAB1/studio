@@ -124,20 +124,22 @@ export async function getRtgsSettings(): Promise<RtgsSettings> {
     const docRef = doc(settingsCollection, "companyDetails");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-        return docSnap.data() as RtgsSettings;
+        const data = docSnap.data() as RtgsSettings;
+        if (data.defaultBankAccountId) {
+            const bankDoc = await getDoc(doc(bankAccountsCollection, data.defaultBankAccountId));
+            if (bankDoc.exists()) {
+                data.defaultBank = bankDoc.data() as BankAccount;
+            }
+        }
+        return data;
     }
     return {
         companyName: "BizSuite DataFlow",
         companyAddress1: "123 Business Rd",
         companyAddress2: "Suite 100, BizCity",
-        bankName: "Default Bank",
-        ifscCode: "DFLT0000001",
-        branchName: "Main Branch",
-        accountNo: "000000000000",
         contactNo: "9876543210",
         gmail: "contact@bizsuite.com",
-        type: "SB"
-    };
+    } as RtgsSettings;
 }
 
 export async function updateRtgsSettings(settings: Partial<RtgsSettings>): Promise<void> {
@@ -168,31 +170,43 @@ const defaultReceiptFields: ReceiptFieldSettings = {
 
 // --- Receipt Settings Functions ---
 export async function getReceiptSettings(): Promise<ReceiptSettings | null> {
-    const docRef = doc(settingsCollection, "receiptDetails");
+    const docRef = doc(settingsCollection, "companyDetails"); // Use companyDetails as the source
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
         const data = docSnap.data() as Partial<ReceiptSettings>;
+        if (data.defaultBankAccountId) {
+            const bankDoc = await getDoc(doc(bankAccountsCollection, data.defaultBankAccountId));
+            if (bankDoc.exists()) {
+                data.defaultBank = bankDoc.data() as BankAccount;
+            }
+        }
         return {
             companyName: data.companyName || "JAGDAMBE RICE MILL",
-            address1: data.address1 || "Devkali Road, Banda, Shajahanpur",
-            address2: data.address2 || "Near Devkali, Uttar Pradesh",
+            companyAddress1: data.companyAddress1 || "Devkali Road, Banda, Shajahanpur",
+            companyAddress2: data.companyAddress2 || "Near Devkali, Uttar Pradesh",
             contactNo: data.contactNo || "9555130735",
-            email: data.email || "JRMDofficial@gmail.com",
-            fields: { ...defaultReceiptFields, ...data.fields }
+            gmail: data.gmail || "JRMDofficial@gmail.com",
+            fields: { ...defaultReceiptFields, ...(data.fields || {}) },
+            defaultBankAccountId: data.defaultBankAccountId,
+            defaultBank: data.defaultBank,
+            companyGstin: data.companyGstin,
+            companyStateName: data.companyStateName,
+            companyStateCode: data.companyStateCode,
+            panNo: data.panNo
         };
     }
     return {
         companyName: "JAGDAMBE RICE MILL",
-        address1: "Devkali Road, Banda, Shajahanpur",
-        address2: "Near Devkali, Uttar Pradesh",
+        companyAddress1: "Devkali Road, Banda, Shajahanpur",
+        companyAddress2: "Near Devkali, Uttar Pradesh",
         contactNo: "9555130735",
-        email: "JRMDofficial@gmail.com",
+        gmail: "JRMDofficial@gmail.com",
         fields: defaultReceiptFields,
     };
 }
 
-export async function updateReceiptSettings(settings: ReceiptSettings): Promise<void> {
-    const docRef = doc(settingsCollection, "receiptDetails");
+export async function updateReceiptSettings(settings: Partial<ReceiptSettings>): Promise<void> {
+    const docRef = doc(settingsCollection, "companyDetails");
     await setDoc(docRef, settings, { merge: true });
 }
 
