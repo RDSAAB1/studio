@@ -58,7 +58,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         totalAdvance: 0,
     });
     
-    useEffect(() => {
+     useEffect(() => {
         if (customer) {
             setEditableInvoiceDetails(customer);
              setIsSameAsBilling(
@@ -85,7 +85,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 companyStateCode: receiptSettings.companyStateCode || prev.companyStateCode,
             }));
         }
-    }, [customer, receiptSettings]);
+    }, [customer, receiptSettings, isOpen]);
     
 
     const handleEditableDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,16 +116,27 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
      const handleActualPrint = async (id: string) => {
         if (customer) {
-            const finalDataToSave = { 
-                ...editableInvoiceDetails, 
+            const finalDataToSave: Partial<Customer> = { ...editableInvoiceDetails };
+            
+            if(isSameAsBilling) {
+                finalDataToSave.shippingName = editableInvoiceDetails.name;
+                finalDataToSave.shippingCompanyName = editableInvoiceDetails.companyName;
+                finalDataToSave.shippingAddress = editableInvoiceDetails.address;
+                finalDataToSave.shippingContact = editableInvoiceDetails.contact;
+                finalDataToSave.shippingGstin = editableInvoiceDetails.gstin;
+                finalDataToSave.shippingStateName = editableInvoiceDetails.stateName;
+                finalDataToSave.shippingStateCode = editableInvoiceDetails.stateCode;
+            }
+
+            await updateCustomer(customer.id, { 
+                ...finalDataToSave, 
                 sixRNo: invoiceDetails.sixRNo,
                 gatePassNo: invoiceDetails.gatePassNo,
                 grNo: invoiceDetails.grNo,
                 grDate: invoiceDetails.grDate,
                 transport: invoiceDetails.transport,
                 advanceFreight: invoiceDetails.totalAdvance,
-             };
-            await updateCustomer(customer.id, finalDataToSave);
+             });
         }
 
         const receiptNode = document.getElementById(id);
@@ -343,3 +354,4 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
+
