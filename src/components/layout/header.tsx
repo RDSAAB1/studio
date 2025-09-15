@@ -162,7 +162,7 @@ const DraggableCalculator = () => {
                 </DialogHeader>
                 <div 
                     onMouseDown={handleMouseDown} 
-                    className="cursor-grab active:cursor-grabbing w-full h-8 flex items-center justify-center bg-muted/50 rounded-t-lg"
+                    className="relative cursor-grab active:cursor-grabbing w-full h-8 flex items-center justify-center bg-muted/50 rounded-t-lg"
                 >
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                      <DialogClose className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-background">
