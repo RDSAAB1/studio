@@ -12,6 +12,7 @@
     "netlify-build": "npm run build"
   },
   "dependencies": {
+    "@firebase/auth": "^1.7.0",
     "@headlessui/react": "^2.1.2",
     "@hookform/resolvers": "^4.1.3",
     "@radix-ui/react-accordion": "^1.2.3",
