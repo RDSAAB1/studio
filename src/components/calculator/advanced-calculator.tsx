@@ -475,16 +475,88 @@ const InterestCalculator = () => {
     );
 };
 
+const PercentageCalculator = () => {
+    const [calcType, setCalcType] = useState('percentOf');
+    const [valueA, setValueA] = useState('');
+    const [valueB, setValueB] = useState('');
+    const [result, setResult] = useState<string | null>(null);
+
+    useEffect(() => {
+        const numA = parseFloat(valueA);
+        const numB = parseFloat(valueB);
+
+        if (isNaN(numA) || isNaN(numB)) {
+            setResult(null);
+            return;
+        }
+
+        let res = 0;
+        if (calcType === 'percentOf') {
+            res = (numA / 100) * numB;
+            setResult(res.toLocaleString());
+        } else if (calcType === 'isWhatPercent') {
+            if (numB === 0) { setResult('N/A'); return; }
+            res = (numA / numB) * 100;
+            setResult(`${res.toFixed(2)}%`);
+        } else if (calcType === 'percentChange') {
+            if (numA === 0) { setResult('N/A'); return; }
+            res = ((numB - numA) / numA) * 100;
+            const changeType = res > 0 ? 'increase' : 'decrease';
+            setResult(`${Math.abs(res).toFixed(2)}% ${changeType}`);
+        }
+    }, [valueA, valueB, calcType]);
+    
+    const getLabels = () => {
+        switch(calcType) {
+            case 'percentOf': return { labelA: 'Percentage (%)', labelB: 'Of Number' };
+            case 'isWhatPercent': return { labelA: 'Value (x)', labelB: 'Is what % of (y)' };
+            case 'percentChange': return { labelA: 'From (Old Value)', labelB: 'To (New Value)' };
+            default: return { labelA: 'Value A', labelB: 'Value B' };
+        }
+    }
+
+    return (
+        <div className="p-4 space-y-4">
+            <Select value={calcType} onValueChange={setCalcType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="percentOf">What is x% of y?</SelectItem>
+                    <SelectItem value="isWhatPercent">x is what % of y?</SelectItem>
+                    <SelectItem value="percentChange">% change from x to y</SelectItem>
+                </SelectContent>
+            </Select>
+             <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                    <Label>{getLabels().labelA}</Label>
+                    <Input type="number" value={valueA} onChange={(e) => setValueA(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                    <Label>{getLabels().labelB}</Label>
+                    <Input type="number" value={valueB} onChange={(e) => setValueB(e.target.value)} />
+                </div>
+            </div>
+             <Card className="bg-muted/50 p-4 mt-4 h-20 flex items-center justify-center">
+                {result !== null ? (
+                    <p className="text-2xl font-bold text-primary">{result}</p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">Result will appear here</p>
+                )}
+            </Card>
+        </div>
+    );
+};
+
 
 export const AdvancedCalculator = () => {
     return (
         <Card className="border-0 shadow-none rounded-2xl">
             <CardContent className="p-0">
                 <Tabs defaultValue="calculator" className="w-full">
-                    <TabsList className="grid w-full grid-cols-5">
+                    <TabsList className="grid w-full grid-cols-6">
                         <TabsTrigger value="calculator">Scientific</TabsTrigger>
                         <TabsTrigger value="converter">Converter</TabsTrigger>
                         <TabsTrigger value="gst">GST</TabsTrigger>
+                        <TabsTrigger value="percentage">Percentage</TabsTrigger>
                         <TabsTrigger value="date">Date</TabsTrigger>
                         <TabsTrigger value="interest">Interest</TabsTrigger>
                     </TabsList>
@@ -497,6 +569,9 @@ export const AdvancedCalculator = () => {
                     <TabsContent value="gst">
                         <GSTCalculator />
                     </TabsContent>
+                    <TabsContent value="percentage">
+                        <PercentageCalculator />
+                    </TabsContent>
                     <TabsContent value="date">
                         <DateCalculator />
                     </TabsContent>
@@ -508,3 +583,5 @@ export const AdvancedCalculator = () => {
         </Card>
     );
 };
+
+    
