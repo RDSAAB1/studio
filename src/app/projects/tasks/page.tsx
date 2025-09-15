@@ -41,8 +41,8 @@ export default function TasksPage() {
           name: data.name,
           description: data.description,
           status: data.status,
-          createdAt: data.createdAt.toDate(), // Convert Timestamp to Date
-          updatedAt: data.updatedAt.toDate(), // Convert Timestamp to Date
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
         });
       });
       setTasks(tasksData);
