@@ -2,43 +2,42 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { createMemoryRouter, RouterProvider, useLocation, useNavigate, MemoryRouter, Routes, Route, Outlet } from 'react-router-dom';
-import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
-import type { User } from "firebase/auth";
+import { MemoryRouter, Routes, Route, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
-import DashboardOverviewPage from "@/app/dashboard-overview/page";
-import SupplierEntryPage from "@/app/sales/supplier-entry/page";
-import SupplierPaymentsPage from "@/app/sales/supplier-payments/page";
-import SupplierProfilePage from "@/app/sales/supplier-profile/page";
-import CustomerEntryPage from "@/app/sales/customer-entry/page";
-import CustomerPaymentsPage from "@/app/sales/customer-payments/page";
-import CustomerProfilePage from "@/app/sales/customer-profile/page";
-import CashBankPage from "@/app/cash-bank/page";
-import ExpenseTrackerPage from "@/app/expense-tracker/page";
-import RtgsReportPage from "@/app/sales/rtgs-report/page";
-import DailySupplierReportPage from "@/app/sales/daily-supplier-report/page";
-import EmployeeDatabasePage from "@/app/hr/employee-database/page";
-import PayrollManagementPage from "@/app/hr/payroll-management/page";
-import AttendanceTrackingPage from "@/app/hr/attendance-tracking/page";
-import InventoryManagementPage from "@/app/inventory/inventory-management/page";
-import PurchaseOrdersPage from "@/app/inventory/purchase-orders/page";
-import ProjectDashboardPage from "@/app/projects/dashboard/page";
-import ProjectManagementPage from "@/app/projects/management/page";
-import TasksPage from "@/app/projects/tasks/page";
-import CollaborationPage from "@/app/projects/collaboration/page";
-import DataCapturePage from "@/app/data-capture/page";
-import BankManagementPage from "@/app/settings/bank-management/page";
-import PrinterSettingsPage from "@/app/settings/printer/page";
-import SettingsPage from "@/app/settings/page";
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import TabBar from './tab-bar';
 import { ScrollArea } from "../ui/scroll-area";
 import LoginPage from "@/app/login/page";
-import { getCompanySettings } from "@/lib/firestore";
 import ConnectGmailPage from "@/app/setup/connect-gmail/page";
 import CompanyDetailsPage from "@/app/setup/company-details/page";
+import { getCompanySettings } from "@/lib/firestore";
+
+// Dynamically import pages to avoid server-side rendering issues
+const DashboardOverviewPage = React.lazy(() => import('@/app/dashboard-overview/page'));
+const SupplierEntryPage = React.lazy(() => import('@/app/sales/supplier-entry/page'));
+const SupplierPaymentsPage = React.lazy(() => import('@/app/sales/supplier-payments/page'));
+const SupplierProfilePage = React.lazy(() => import('@/app/sales/supplier-profile/page'));
+const CustomerEntryPage = React.lazy(() => import('@/app/sales/customer-entry/page'));
+const CustomerPaymentsPage = React.lazy(() => import('@/app/sales/customer-payments/page'));
+const CustomerProfilePage = React.lazy(() => import('@/app/sales/customer-profile/page'));
+const CashBankPage = React.lazy(() => import('@/app/cash-bank/page'));
+const ExpenseTrackerPage = React.lazy(() => import('@/app/expense-tracker/page'));
+const RtgsReportPage = React.lazy(() => import('@/app/sales/rtgs-report/page'));
+const DailySupplierReportPage = React.lazy(() => import('@/app/sales/daily-supplier-report/page'));
+const EmployeeDatabasePage = React.lazy(() => import('@/app/hr/employee-database/page'));
+const PayrollManagementPage = React.lazy(() => import('@/app/hr/payroll-management/page'));
+const AttendanceTrackingPage = React.lazy(() => import('@/app/hr/attendance-tracking/page'));
+const InventoryManagementPage = React.lazy(() => import('@/app/inventory/inventory-management/page'));
+const PurchaseOrdersPage = React.lazy(() => import('@/app/inventory/purchase-orders/page'));
+const ProjectDashboardPage = React.lazy(() => import('@/app/projects/dashboard/page'));
+const ProjectManagementPage = React.lazy(() => import('@/app/projects/management/page'));
+const TasksPage = React.lazy(() => import('@/app/projects/tasks/page'));
+const CollaborationPage = React.lazy(() => import('@/app/projects/collaboration/page'));
+const DataCapturePage = React.lazy(() => import('@/app/data-capture/page'));
+const SettingsPage = React.lazy(() => import('@/app/settings/page'));
 
 const pageComponents: { [key: string]: React.FC<any> } = {
     "/dashboard-overview": DashboardOverviewPage,
@@ -62,8 +61,6 @@ const pageComponents: { [key: string]: React.FC<any> } = {
     "/tasks": TasksPage,
     "/collaboration": CollaborationPage,
     "/data-capture": DataCapturePage,
-    "/settings/bank-management": BankManagementPage,
-    "/settings/printer": PrinterSettingsPage,
     "/settings": SettingsPage,
 };
 
@@ -139,8 +136,6 @@ const AppContent = () => {
     const toggleSidebar = () => {
         setIsSidebarActive(prev => !prev);
     };
-    
-    const PageComponent = pageComponents[location.pathname];
 
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
@@ -151,7 +146,9 @@ const AppContent = () => {
               </div>
               <ScrollArea className="flex-grow">
                 <main className="p-4 sm:p-6">
-                    <Outlet/>
+                    <React.Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                        <Outlet/>
+                    </React.Suspense>
                 </main>
               </ScrollArea>
           </div>
@@ -163,31 +160,54 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+    const [authChecked, setAuthChecked] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
-            if (currentUser) {
-                try {
-                    const settings = await getCompanySettings(currentUser.uid);
-                    setSetupComplete(!!(settings && settings.appPassword));
-                } catch (error) {
-                    console.error("Error fetching company settings:", error);
-                    setSetupComplete(false); // Assume setup is not complete on error
+
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result) {
+                    const loggedInUser = result.user;
+                    setUser(loggedInUser);
+                    getCompanySettings(loggedInUser.uid).then(settings => {
+                        const isSetupDone = !!(settings && settings.appPassword);
+                        setSetupComplete(isSetupDone);
+                        if (!isSetupDone) {
+                            navigate('/setup/connect-gmail');
+                        } else {
+                            navigate('/dashboard-overview');
+                        }
+                        setLoading(false);
+                        setAuthChecked(true);
+                    });
+                } else {
+                    // No redirect result, now check with onAuthStateChanged
+                    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+                        setUser(currentUser);
+                        if (currentUser) {
+                            const settings = await getCompanySettings(currentUser.uid);
+                            setSetupComplete(!!(settings && settings.appPassword));
+                        } else {
+                            setSetupComplete(false);
+                        }
+                        setLoading(false);
+                        setAuthChecked(true);
+                        unsubscribe(); // Unsubscribe after the first check
+                    });
                 }
-            } else {
-                setSetupComplete(false);
-            }
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+            })
+            .catch((error) => {
+                console.error("Authentication Error:", error);
+                setLoading(false);
+                setAuthChecked(true);
+            });
+    }, [navigate]);
 
     useEffect(() => {
-        if (loading) return;
+        if (!authChecked || loading) return;
 
         const isLoginPage = location.pathname === '/login';
         const isSetupPage = location.pathname.startsWith('/setup');
@@ -207,9 +227,10 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
                 }
             }
         }
-    }, [user, loading, setupComplete, navigate, location.pathname]);
+    }, [user, loading, authChecked, setupComplete, navigate, location.pathname]);
 
-    if (loading || (user && setupComplete === null)) {
+
+    if (loading || !authChecked) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

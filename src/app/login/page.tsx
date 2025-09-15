@@ -2,59 +2,16 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getFirebaseAuth, getGoogleProvider, getRedirectResult, onAuthStateChanged } from '@/lib/firebase';
+import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import { signInWithRedirect, type User } from 'firebase/auth';
-import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogIn, Sparkles } from 'lucide-react';
-import { getCompanySettings } from '@/lib/firestore';
 
 export default function LoginPage() {
     const { toast } = useToast();
-    const router = useRouter();
-    const [loading, setLoading] = useState(true); // Set initial loading to true
-
-    useEffect(() => {
-        const auth = getFirebaseAuth();
-        
-        getRedirectResult(auth)
-            .then((result) => {
-                if (result?.user) {
-                    toast({ title: "Signed in successfully!", variant: 'success' });
-                    // Immediately redirect to the first setup step after sign-in.
-                    router.push('/setup/connect-gmail');
-                } else {
-                    // No redirect result, check current auth state
-                    onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            // Already logged in, check setup status
-                            getCompanySettings(user.uid).then(settings => {
-                                if (settings && settings.appPassword) {
-                                    router.push('/dashboard-overview');
-                                } else {
-                                    router.push('/setup/connect-gmail');
-                                }
-                            });
-                        } else {
-                            // No user, show the login page
-                            setLoading(false);
-                        }
-                    });
-                }
-            })
-            .catch((error: any) => {
-                console.error("Authentication Error:", error);
-                toast({
-                    title: "Login Failed",
-                    description: "Could not sign in with Google. Please try again.",
-                    variant: "destructive",
-                });
-                setLoading(false);
-            });
-    }, [router, toast]);
-
+    const [loading, setLoading] = useState(false);
 
     const handleGoogleSignIn = async () => {
         const auth = getFirebaseAuth();
@@ -62,6 +19,7 @@ export default function LoginPage() {
         setLoading(true);
         try {
           await signInWithRedirect(auth, provider);
+          // Redirect will happen, user won't see loading state much
         } catch (error) {
            console.error("Sign-in initiation failed", error);
            setLoading(false);
@@ -69,14 +27,6 @@ export default function LoginPage() {
         }
     };
     
-    if (loading) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
     return (
         <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
             <Card className="w-full max-w-md">
