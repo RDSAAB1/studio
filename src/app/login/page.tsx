@@ -14,21 +14,47 @@ import { getCompanySettings } from '@/lib/firestore';
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const [loading, setLoading] = useState(true); // Start with loading true
+    const [loading, setLoading] = useState(true);
 
-    // This effect handles both the initial auth state and the redirect result.
     useEffect(() => {
         const auth = getFirebaseAuth();
         
-        const processRedirect = async () => {
-            try {
-                const result = await getRedirectResult(auth);
-                if (result?.user) {
-                    toast({ title: "Signed in successfully!", variant: 'success' });
-                    // No need to navigate here, onAuthStateChanged will handle it.
+        const processUser = async (user: User | null) => {
+            if (user) {
+                // User is signed in, check if setup is complete.
+                try {
+                    const settings = await getCompanySettings(user.uid);
+                    if (settings && settings.appPassword) {
+                        router.push('/dashboard-overview');
+                    } else {
+                        router.push('/setup/connect-gmail');
+                    }
+                } catch (e) {
+                     console.error("Error fetching company settings:", e);
+                     toast({ title: "Setup Check Failed", description: "Could not verify your setup status. Please try again.", variant: "destructive" });
+                     setLoading(false);
                 }
-            } catch (error: any) {
-                 console.error("Google Sign-In Redirect Error:", error);
+            } else {
+                // No user is signed in, ready for login.
+                setLoading(false);
+            }
+        };
+
+        const unsubscribe = onAuthStateChanged(auth, processUser);
+
+        // Handle the redirect result separately
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result?.user) {
+                    // This will trigger onAuthStateChanged, so we don't need to do anything here.
+                    toast({ title: "Signed in successfully!", variant: 'success' });
+                } else {
+                    // If there's no result, it means the user just landed on the page without a redirect.
+                    // The onAuthStateChanged will handle if they are already logged in from a previous session.
+                }
+            })
+            .catch((error: any) => {
+                console.error("Google Sign-In Redirect Error:", error);
                 if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
                     toast({
                         title: "Login Failed",
@@ -36,26 +62,7 @@ export default function LoginPage() {
                         variant: "destructive",
                     });
                 }
-            } finally {
-                // Only set loading to false after redirect processing is attempted.
-                setLoading(false);
-            }
-        };
-
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                // User is signed in. Check if setup is complete.
-                const settings = await getCompanySettings(user.uid);
-                if (!settings?.appPassword) {
-                    router.push('/setup/connect-gmail');
-                } else {
-                    router.push('/dashboard-overview');
-                }
-            } else {
-                // No user is signed in. Process any pending redirect.
-                processRedirect();
-            }
-        });
+            });
 
         return () => unsubscribe();
     }, [router, toast]);
@@ -65,7 +72,6 @@ export default function LoginPage() {
         const auth = getFirebaseAuth();
         const provider = getGoogleProvider();
         setLoading(true);
-        // We use signInWithRedirect which is more robust in different environments
         await signInWithRedirect(auth, provider);
     };
     

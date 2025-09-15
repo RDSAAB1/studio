@@ -29,7 +29,7 @@ export default function ClientLayoutWrapper({
 }) {
   return (
     <div className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
-      <AppLayoutWrapper>{children}</AppLayoutWrapper>
+      <AppLayoutWrapper/>
     </div>
   );
 }
