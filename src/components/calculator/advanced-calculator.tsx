@@ -16,7 +16,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 
 
 const CalculatorButton = ({ onClick, children, className }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
-    <Button variant="outline" className={`h-8 text-base ${className}`} onClick={onClick}>{children}</Button>
+    <Button variant="outline" className={`h-9 text-base ${className}`} onClick={onClick}>{children}</Button>
 );
 
 const ScientificCalculator = () => {
@@ -148,13 +148,13 @@ const ScientificCalculator = () => {
                 handleInput(key);
             } else if (key === '.') {
                 handleInput('.');
-            } else if (key === 'ArrowUp') {
+            } else if (key === '+' || key === '=' || key === 'ArrowUp') {
                 handleOperator('+');
-            } else if (key === 'ArrowDown') {
+            } else if (key === '-' || key === 'ArrowDown') {
                 handleOperator('-');
-            } else if (key === 'ArrowLeft') {
+            } else if (key === '*' || key === '[' || key === 'ArrowLeft') {
                 handleOperator('×');
-            } else if (key === 'ArrowRight') {
+            } else if (key === '/' || key === ']' || key === 'ArrowRight') {
                 handleOperator('÷');
             } else if (key === 'Enter') {
                 handleEquals();
@@ -183,7 +183,7 @@ const ScientificCalculator = () => {
             <Card className="bg-muted/30 p-2 mb-2">
                  <CardContent className="p-1 text-xs text-muted-foreground flex items-center justify-center gap-2">
                     <Info size={16} className="flex-shrink-0" />
-                    <p className="font-mono">↑: +, ↓: -, ←: ×, →: ÷ | Del/Esc → AC</p>
+                    <p className="font-mono">Shortcuts: ↑↓←→, [ ] = */ | Del/Esc: AC</p>
                 </CardContent>
             </Card>
             <div className="relative h-16 w-full border rounded-lg bg-muted/50 p-2 text-right overflow-hidden">
@@ -593,24 +593,24 @@ export const AdvancedCalculator = () => {
                         <TabsTrigger value="date" className="h-full">Date</TabsTrigger>
                         <TabsTrigger value="interest" className="h-full">Interest</TabsTrigger>
                     </TabsList>
-                    <div className="min-h-[350px]">
+                    <div className="min-h-[405px]">
                         <TabsContent value="calculator">
                             <ScientificCalculator />
                         </TabsContent>
                         <TabsContent value="converter">
-                           <div className="min-h-[350px]"> <UnitConverter /></div>
+                           <div className="min-h-[405px]"> <UnitConverter /></div>
                         </TabsContent>
                         <TabsContent value="gst">
-                            <div className="min-h-[350px]"><GSTCalculator /></div>
+                            <div className="min-h-[405px]"><GSTCalculator /></div>
                         </TabsContent>
                          <TabsContent value="percentage">
-                            <div className="min-h-[350px]"><PercentageCalculator /></div>
+                            <div className="min-h-[405px]"><PercentageCalculator /></div>
                         </TabsContent>
                         <TabsContent value="date">
-                            <div className="min-h-[350px]"><DateCalculator /></div>
+                            <div className="min-h-[405px]"><DateCalculator /></div>
                         </TabsContent>
                          <TabsContent value="interest">
-                            <div className="min-h-[350px]"><InterestCalculator /></div>
+                            <div className="min-h-[405px]"><InterestCalculator /></div>
                         </TabsContent>
                     </div>
                 </Tabs>
