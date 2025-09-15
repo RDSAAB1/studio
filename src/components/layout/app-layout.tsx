@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom';
+import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
+import type { User } from "firebase/auth";
 import { Loader2 } from 'lucide-react';
 import CustomSidebar from './custom-sidebar';
 import { Header } from "./header";
@@ -33,6 +35,7 @@ import SettingsPage from "@/app/settings/page";
 import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import TabBar from './tab-bar';
 import { ScrollArea } from "../ui/scroll-area";
+import LoginPage from "@/app/login/page";
 
 
 const pageComponents: { [key: string]: React.FC<any> } = {
@@ -158,11 +161,45 @@ const AppContent = () => {
 };
 
 const router = createMemoryRouter([
-    { path: "*", Component: AppContent }
+    { path: "*", Component: AppLayoutContent }
 ]);
 
+function AppLayoutContent() {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const location = useLocation();
+
+    useEffect(() => {
+        const auth = getFirebaseAuth();
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    if (!user && location.pathname !== '/login') {
+         return <LoginPage />;
+    }
+
+    if (user && location.pathname === '/login') {
+        const navigate = useNavigate();
+        useEffect(() => { navigate('/dashboard-overview'); }, [navigate]);
+        return null;
+    }
+    
+    return <AppContent/>;
+}
+
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-    return (
-       <RouterProvider router={router}/>
-    );
+    return <RouterProvider router={router}/>;
 }
