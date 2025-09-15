@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getBankAccountsRealtime, addExpense } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { formatCurrency } from "@/lib/utils";
+import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
 
 
 interface DocumentPreviewDialogProps {
@@ -125,6 +126,27 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         const { name, value } = e.target;
         setEditableInvoiceDetails(prev => ({...prev, [name]: value}));
     };
+    
+    const handleStateChange = (type: 'billing' | 'shipping', field: 'name' | 'code', value: string | null) => {
+        if (type === 'billing') {
+            if (field === 'name') {
+                const state = findStateByName(value || '');
+                setEditableInvoiceDetails(prev => ({ ...prev, stateName: value || '', stateCode: state?.code || '' }));
+            } else {
+                const state = findStateByCode(value || '');
+                setEditableInvoiceDetails(prev => ({ ...prev, stateCode: value || '', stateName: state?.name || '' }));
+            }
+        } else { // shipping
+             if (field === 'name') {
+                const state = findStateByName(value || '');
+                setEditableInvoiceDetails(prev => ({ ...prev, shippingStateName: value || '', shippingStateCode: state?.code || '' }));
+            } else {
+                const state = findStateByCode(value || '');
+                setEditableInvoiceDetails(prev => ({ ...prev, shippingStateCode: value || '', shippingStateName: state?.name || '' }));
+            }
+        }
+    };
+
 
      const handleActualPrint = (id: string) => {
         const receiptNode = document.getElementById(id);
@@ -171,6 +193,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     };
 
     const totalAdvance = advancePayments.reduce((sum, p) => sum + p.amount, 0);
+    
+    const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
+    const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
+
 
     const renderDocument = () => {
         if (!customer || !receiptSettings) return null;
@@ -290,8 +316,14 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                     <div className="space-y-1"><Label className="text-xs">Address</Label><Input name="address" value={editableInvoiceDetails.address || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">GSTIN</Label><Input name="gstin" value={editableInvoiceDetails.gstin || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1"><Label className="text-xs">State Name</Label><Input name="stateName" value={editableInvoiceDetails.stateName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
-                                        <div className="space-y-1"><Label className="text-xs">State Code</Label><Input name="stateCode" value={editableInvoiceDetails.stateCode || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">State Name</Label>
+                                            <CustomDropdown options={stateNameOptions} value={editableInvoiceDetails.stateName || ''} onChange={(value) => handleStateChange('billing', 'name', value)} placeholder="State"/>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">State Code</Label>
+                                            <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.stateCode || ''} onChange={(value) => handleStateChange('billing', 'code', value)} placeholder="Code"/>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -305,9 +337,15 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                         <div className="space-y-1"><Label className="text-xs">Address</Label><Input name="shippingAddress" value={editableInvoiceDetails.shippingAddress || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                         <div className="space-y-1"><Label className="text-xs">GSTIN</Label><Input name="shippingGstin" value={editableInvoiceDetails.shippingGstin || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
                                         <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1"><Label className="text-xs">State Name</Label><Input name="shippingStateName" value={editableInvoiceDetails.shippingStateName || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
-                                        <div className="space-y-1"><Label className="text-xs">State Code</Label><Input name="shippingStateCode" value={editableInvoiceDetails.shippingStateCode || ''} onChange={handleEditableDetailsChange} className="h-8 text-xs" /></div>
-                                    </div>
+                                             <div className="space-y-1">
+                                                <Label className="text-xs">State Name</Label>
+                                                <CustomDropdown options={stateNameOptions} value={editableInvoiceDetails.shippingStateName || ''} onChange={(value) => handleStateChange('shipping', 'name', value)} placeholder="State"/>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">State Code</Label>
+                                                <CustomDropdown options={stateCodeOptions} value={editableInvoiceDetails.shippingStateCode || ''} onChange={(value) => handleStateChange('shipping', 'code', value)} placeholder="Code"/>
+                                            </div>
+                                        </div>
                                     </CardContent>
                                 )}
                             </Card>
@@ -335,5 +373,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
+
+    
 
     
