@@ -14,10 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Loader2, Plus, Edit, Trash2, Upload, Download, Filter } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { CustomDropdown } from '@/components/ui/custom-dropdown';
+
 
 export default function BankManagementPage() {
     const { toast } = useToast();
@@ -31,7 +32,7 @@ export default function BankManagementPage() {
     const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
     const [currentBranch, setCurrentBranch] = useState<Partial<BankBranch>>({});
     
-    const [filterBank, setFilterBank] = useState<string>('all');
+    const [filterBank, setFilterBank] = useState<string | null>('all');
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
@@ -45,6 +46,11 @@ export default function BankManagementPage() {
         });
         return () => { unsubBanks(); unsubBranches(); };
     }, [toast]);
+
+    const bankOptions = useMemo(() => [
+        { value: 'all', label: 'All Banks' },
+        ...banks.map(bank => ({ value: bank.name, label: bank.name }))
+    ], [banks]);
 
     const filteredBranches = useMemo(() => {
         return branches.filter(branch => {
@@ -180,15 +186,12 @@ export default function BankManagementPage() {
                     <div className="flex flex-col sm:flex-row gap-4 mb-4">
                         <div className="flex-1">
                             <Label>Filter by Bank</Label>
-                            <Select value={filterBank} onValueChange={(value) => setFilterBank(value)}>
-                                <SelectTrigger><SelectValue placeholder="All Banks" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Banks</SelectItem>
-                                    {banks.map(bank => (
-                                        <SelectItem key={bank.id} value={bank.name}>{bank.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <CustomDropdown 
+                                options={bankOptions}
+                                value={filterBank}
+                                onChange={(value) => setFilterBank(value || 'all')}
+                                placeholder="Filter by bank..."
+                            />
                         </div>
                         <div className="flex-1">
                              <Label>Search Branch / IFSC</Label>
@@ -246,14 +249,12 @@ export default function BankManagementPage() {
                      <div className="py-4 space-y-4">
                         <div className="space-y-1">
                             <Label>Bank</Label>
-                             <Select value={currentBranch.bankName || ''} onValueChange={(value) => setCurrentBranch(prev => ({...prev, bankName: value}))}>
-                                <SelectTrigger><SelectValue placeholder="Select a bank" /></SelectTrigger>
-                                <SelectContent>
-                                    {banks.map(bank => (
-                                        <SelectItem key={bank.id} value={bank.name}>{bank.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                             <CustomDropdown
+                                options={banks.map(bank => ({ value: bank.name, label: bank.name }))}
+                                value={currentBranch.bankName || null}
+                                onChange={(value) => setCurrentBranch(prev => ({...prev, bankName: value || ''}))}
+                                placeholder="Select a bank"
+                            />
                         </div>
                         <div className="space-y-1">
                             <Label>Branch Name</Label>
