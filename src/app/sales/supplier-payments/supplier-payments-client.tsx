@@ -929,7 +929,7 @@ export default function SupplierPaymentsClient() {
        />
 
        <Dialog open={isBankSettingsOpen} onOpenChange={setIsBankSettingsOpen}>
-            <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+            <DialogContent className="max-w-5xl h-[80vh] flex flex-col">
                  <DialogHeader>
                     <DialogTitle>Bank & Branch Management</DialogTitle>
                     <DialogDescription>Add, edit, or manage banks and their branches here.</DialogDescription>

@@ -165,72 +165,69 @@ export default function BankManagementPage() {
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
 
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle>Bank Management</CardTitle>
-                        <CardDescription>Manage all banks and their branches here.</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                         <Button asChild variant="outline">
-                            <label htmlFor="import-file" className="cursor-pointer"><Upload className="mr-2 h-4 w-4"/> Import</label>
-                         </Button>
-                         <Input id="import-file" type="file" className="hidden" onChange={handleImport} accept=".xlsx, .xls" />
-                        <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export All</Button>
-                        <Button onClick={() => setIsBankDialogOpen(true)}><Plus className="mr-2 h-4 w-4"/> Add Bank</Button>
-                        <Button onClick={() => { setCurrentBranch({}); setIsBranchDialogOpen(true); }}><Plus className="mr-2 h-4 w-4"/> Add Branch</Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                        <div className="flex-1">
-                            <Label>Filter by Bank</Label>
-                            <CustomDropdown 
-                                options={bankOptions}
-                                value={filterBank}
-                                onChange={(value) => setFilterBank(value || 'all')}
-                                placeholder="Filter by bank..."
-                            />
-                        </div>
-                        <div className="flex-1">
-                             <Label>Search Branch / IFSC</Label>
-                             <Input placeholder="Type to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        </div>
-                    </div>
-                    <ScrollArea className="h-[60vh] border rounded-md">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-muted">
-                                <TableRow>
-                                    <TableHead>Bank Name</TableHead>
-                                    <TableHead>Branch Name</TableHead>
-                                    <TableHead>IFSC Code</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredBranches.map(branch => (
-                                    <TableRow key={branch.id}>
-                                        <TableCell>{branch.bankName}</TableCell>
-                                        <TableCell>{branch.branchName}</TableCell>
-                                        <TableCell className="font-mono">{branch.ifscCode}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Delete Branch?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {branch.branchName} branch?</AlertDialogDescription></AlertDialogHeader>
-                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBranch(branch.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+        <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-semibold">Bank Management</h2>
+                    <p className="text-sm text-muted-foreground">Manage all banks and their branches here.</p>
+                </div>
+                <div className="flex gap-2">
+                     <Button asChild variant="outline" size="sm">
+                        <label htmlFor="import-file" className="cursor-pointer"><Upload className="mr-2 h-4 w-4"/> Import</label>
+                     </Button>
+                     <Input id="import-file" type="file" className="hidden" onChange={handleImport} accept=".xlsx, .xls" />
+                    <Button variant="outline" size="sm" onClick={handleExport}><Download className="mr-2 h-4 w-4"/> Export All</Button>
+                    <Button size="sm" onClick={() => setIsBankDialogOpen(true)}><Plus className="mr-2 h-4 w-4"/> Add Bank</Button>
+                    <Button size="sm" onClick={() => { setCurrentBranch({}); setIsBranchDialogOpen(true); }}><Plus className="mr-2 h-4 w-4"/> Add Branch</Button>
+                </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                    <Label>Filter by Bank</Label>
+                    <CustomDropdown 
+                        options={bankOptions}
+                        value={filterBank}
+                        onChange={(value) => setFilterBank(value || 'all')}
+                        placeholder="Filter by bank..."
+                    />
+                </div>
+                <div className="flex-1">
+                     <Label>Search Branch / IFSC</Label>
+                     <Input placeholder="Type to search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+            </div>
+            <ScrollArea className="h-[55vh] border rounded-md">
+                <Table>
+                    <TableHeader className="sticky top-0 bg-muted">
+                        <TableRow>
+                            <TableHead>Bank Name</TableHead>
+                            <TableHead>Branch Name</TableHead>
+                            <TableHead>IFSC Code</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredBranches.map(branch => (
+                            <TableRow key={branch.id}>
+                                <TableCell>{branch.bankName}</TableCell>
+                                <TableCell>{branch.branchName}</TableCell>
+                                <TableCell className="font-mono">{branch.ifscCode}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setCurrentBranch(branch); setIsBranchDialogOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader><AlertDialogTitle>Delete Branch?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {branch.branchName} branch?</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBranch(branch.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
 
             <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
                 <DialogContent>
