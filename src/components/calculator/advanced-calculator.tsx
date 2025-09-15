@@ -8,6 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { format, differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears, addDays, addMonths, addYears } from 'date-fns';
+import { formatCurrency, cn } from '@/lib/utils';
+
 
 const CalculatorButton = ({ onClick, children, className }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
     <Button variant="outline" className={`h-12 text-lg ${className}`} onClick={onClick}>{children}</Button>
@@ -300,16 +306,136 @@ const GSTCalculator = () => {
     );
 };
 
+const DateCalculator = () => {
+    const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
+    const [toDate, setToDate] = useState<Date | undefined>(new Date());
+    const [diff, setDiff] = useState({ years: 0, months: 0, weeks: 0, days: 0 });
+
+    const [calcDate, setCalcDate] = useState<Date | undefined>(new Date());
+    const [addValue, setAddValue] = useState('0');
+    const [addUnit, setAddUnit] = useState<'days' | 'months' | 'years'>('days');
+    const [resultDate, setResultDate] = useState<string>('');
+
+    useEffect(() => {
+        if (fromDate && toDate) {
+            setDiff({
+                years: differenceInYears(toDate, fromDate),
+                months: differenceInMonths(toDate, fromDate),
+                weeks: differenceInWeeks(toDate, fromDate),
+                days: differenceInDays(toDate, fromDate),
+            });
+        }
+    }, [fromDate, toDate]);
+
+    useEffect(() => {
+        if (calcDate) {
+            const value = parseInt(addValue, 10);
+            if (isNaN(value)) return;
+            let newDate;
+            if (addUnit === 'days') newDate = addDays(calcDate, value);
+            else if (addUnit === 'months') newDate = addMonths(calcDate, value);
+            else newDate = addYears(calcDate, value);
+            setResultDate(format(newDate, 'PPP'));
+        }
+    }, [calcDate, addValue, addUnit]);
+
+    return (
+         <div className="p-4 space-y-6">
+            <Card>
+                <CardContent className="p-4 space-y-3">
+                     <h3 className="text-sm font-semibold">Calculate Difference</h3>
+                     <div className="flex items-center gap-2">
+                        <Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-9 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{fromDate ? format(fromDate, "PPP") : "Start Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus /></PopoverContent></Popover>
+                        <Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-9 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{toDate ? format(toDate, "PPP") : "End Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={toDate} onSelect={setToDate} initialFocus /></PopoverContent></Popover>
+                    </div>
+                     <div className="grid grid-cols-2 gap-2 text-center text-sm">
+                        <div className="p-2 bg-muted/50 rounded-lg"><p className="font-bold">{diff.days}</p><p className="text-xs text-muted-foreground">Days</p></div>
+                        <div className="p-2 bg-muted/50 rounded-lg"><p className="font-bold">{diff.weeks}</p><p className="text-xs text-muted-foreground">Weeks</p></div>
+                        <div className="p-2 bg-muted/50 rounded-lg"><p className="font-bold">{diff.months}</p><p className="text-xs text-muted-foreground">Months</p></div>
+                        <div className="p-2 bg-muted/50 rounded-lg"><p className="font-bold">{diff.years}</p><p className="text-xs text-muted-foreground">Years</p></div>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+                 <CardContent className="p-4 space-y-3">
+                    <h3 className="text-sm font-semibold">Add/Subtract from Date</h3>
+                     <div className="space-y-1"><Label className="text-xs">Start Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-9 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{calcDate ? format(calcDate, "PPP") : "Select Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calcDate} onSelect={setCalcDate} initialFocus /></PopoverContent></Popover></div>
+                     <div className="flex items-center gap-2">
+                        <Input type="number" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="h-9 text-sm" />
+                        <Select value={addUnit} onValueChange={(v) => setAddUnit(v as any)}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="days">Days</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select>
+                    </div>
+                    <div className="pt-2"><p className="text-sm">Result: <span className="font-bold">{resultDate}</span></p></div>
+                </CardContent>
+            </Card>
+        </div>
+    )
+};
+
+const InterestCalculator = () => {
+    const [principal, setPrincipal] = useState('10000');
+    const [rate, setRate] = useState('5');
+    const [time, setTime] = useState('2');
+    const [timeUnit, setTimeUnit] = useState<'years' | 'months' | 'days'>('years');
+    const [compoundFrequency, setCompoundFrequency] = useState(1);
+    const [interestType, setInterestType] = useState('simple');
+    const [result, setResult] = useState({ interest: '0', total: '0' });
+
+    useEffect(() => {
+        const p = parseFloat(principal);
+        const r = parseFloat(rate) / 100;
+        let t = parseFloat(time);
+
+        if (isNaN(p) || isNaN(r) || isNaN(t)) return;
+        
+        if (timeUnit === 'months') t = t / 12;
+        if (timeUnit === 'days') t = t / 365;
+
+        if (interestType === 'simple') {
+            const interest = p * r * t;
+            const total = p + interest;
+            setResult({ interest: interest.toFixed(2), total: total.toFixed(2) });
+        } else { // compound
+            const n = compoundFrequency;
+            const total = p * Math.pow(1 + r / n, n * t);
+            const interest = total - p;
+            setResult({ interest: interest.toFixed(2), total: total.toFixed(2) });
+        }
+    }, [principal, rate, time, timeUnit, compoundFrequency, interestType]);
+
+
+    return (
+        <div className="p-4 space-y-4">
+             <Select value={interestType} onValueChange={setInterestType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="simple">Simple Interest</SelectItem><SelectItem value="compound">Compound Interest</SelectItem></SelectContent>
+            </Select>
+            <div className="space-y-1"><Label>Principal Amount</Label><Input type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Annual Interest Rate (%)</Label><Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} /></div>
+            <div className="flex gap-2">
+                <div className="flex-1 space-y-1"><Label>Time</Label><Input type="number" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+                <div className="flex-1 space-y-1"><Label>Unit</Label><Select value={timeUnit} onValueChange={(v) => setTimeUnit(v as any)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="years">Years</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="days">Days</SelectItem></SelectContent></Select></div>
+            </div>
+            {interestType === 'compound' && (<div className="space-y-1"><Label>Compound Frequency</Label><Select value={String(compoundFrequency)} onValueChange={(v) => setCompoundFrequency(Number(v))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="1">Annually</SelectItem><SelectItem value="2">Semi-Annually</SelectItem><SelectItem value="4">Quarterly</SelectItem><SelectItem value="12">Monthly</SelectItem></SelectContent></Select></div>)}
+            <Card className="bg-muted/50 p-4 space-y-2 mt-4">
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Interest:</span><span className="font-semibold">{formatCurrency(parseFloat(result.interest))}</span></div>
+                <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2"><span className="text-foreground">Total Amount:</span><span className="text-primary">{formatCurrency(parseFloat(result.total))}</span></div>
+            </Card>
+        </div>
+    );
+};
+
 
 export const AdvancedCalculator = () => {
     return (
         <Card className="border-0 shadow-none rounded-2xl">
             <CardContent className="p-0">
                 <Tabs defaultValue="calculator" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="calculator">Scientific</TabsTrigger>
-                        <TabsTrigger value="converter">Unit Converter</TabsTrigger>
+                        <TabsTrigger value="converter">Converter</TabsTrigger>
                         <TabsTrigger value="gst">GST</TabsTrigger>
+                        <TabsTrigger value="date">Date</TabsTrigger>
+                        <TabsTrigger value="interest">Interest</TabsTrigger>
                     </TabsList>
                     <TabsContent value="calculator">
                         <ScientificCalculator />
@@ -319,6 +445,12 @@ export const AdvancedCalculator = () => {
                     </TabsContent>
                     <TabsContent value="gst">
                         <GSTCalculator />
+                    </TabsContent>
+                    <TabsContent value="date">
+                        <DateCalculator />
+                    </TabsContent>
+                     <TabsContent value="interest">
+                        <InterestCalculator />
                     </TabsContent>
                 </Tabs>
             </CardContent>
