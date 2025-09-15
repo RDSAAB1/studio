@@ -35,6 +35,7 @@ export default function RootLayout({
         <AppLayoutWrapper>
           {children}
         </AppLayoutWrapper>
+        <Toaster />
       </body>
     </html>
   );
