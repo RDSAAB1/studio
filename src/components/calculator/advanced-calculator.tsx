@@ -149,12 +149,9 @@ const ScientificCalculator = () => {
     return (
         <div className="p-4 space-y-2">
             <Card className="bg-muted/30 p-2 mb-2">
-                <CardContent className="p-1 text-xs text-muted-foreground flex items-start gap-2">
-                    <Info size={16} className="flex-shrink-0 mt-0.5" />
-                    <div>
-                        <p className="font-semibold">Keyboard Shortcuts:</p>
-                        <p>`Enter` for =, `[` for ×, `]` for ÷, `Del` or `Esc` for AC.</p>
-                    </div>
+                <CardContent className="p-1 text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <Info size={16} className="flex-shrink-0" />
+                    <p className="font-mono">`Enter` → =, `[` → ×, `]` → ÷, `=` → +, `Del`/`Esc` → AC</p>
                 </CardContent>
             </Card>
             <Input type="text" readOnly value={input} className="h-20 text-3xl text-right font-mono" />
