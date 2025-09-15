@@ -74,9 +74,15 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
         <div className="border border-gray-200 p-3 rounded-lg mb-4">
             <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-sm">Our Bank Details</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-base">
-                <div><span className="font-semibold">Bank:</span> <span>{settings.bankName}, {settings.branchName}</span></div>
-                <div><span className="font-semibold">A/C No:</span> <span>{settings.accountNo}</span></div>
-                <div><span className="font-semibold">IFSC:</span> <span>{settings.ifscCode}</span></div>
+                {settings.defaultBank ? (
+                    <>
+                        <div><span className="font-semibold">Bank:</span> <span>{settings.defaultBank.bankName}, {settings.defaultBank.branchName}</span></div>
+                        <div><span className="font-semibold">A/C No:</span> <span>{settings.defaultBank.accountNumber}</span></div>
+                        <div><span className="font-semibold">IFSC:</span> <span>{settings.defaultBank.ifscCode}</span></div>
+                    </>
+                ) : (
+                    <p>Default bank not set.</p>
+                )}
             </div>
         </div>
     </div>
