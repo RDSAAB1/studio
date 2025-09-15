@@ -43,7 +43,7 @@ export const PaymentForm = ({
     bankDetails, setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
     rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
     cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
-    setSetSixRDate, parchiNo, setParchiNo, checkNo, setCheckNo,
+    setSixRDate, parchiNo, setParchiNo, checkNo, setCheckNo,
     rtgsQuantity, setRtgsQuantity,
     rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, resetPaymentForm,
     editingPayment, setIsBankSettingsOpen,
