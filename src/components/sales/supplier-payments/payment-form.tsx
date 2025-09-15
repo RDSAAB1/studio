@@ -117,7 +117,7 @@ export const PaymentForm = ({
                         <div className="space-y-1">
                             <Label className="text-xs">Payment From</Label>
                             <CustomDropdown
-                                options={[{ value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` }, ...bankAccounts.map((acc: any) => ({ value: acc.id, label: `${acc.accountHolderName} (${formatCurrency(financialState.balances.get(acc.id) || 0)})` }))]}
+                                options={[{ value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` }, ...bankAccounts.map((acc: any) => ({ value: acc.id, label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (${formatCurrency(financialState.balances.get(acc.id) || 0)})` }))]}
                                 value={selectedAccountId}
                                 onChange={setSelectedAccountId}
                                 placeholder="Select Account"

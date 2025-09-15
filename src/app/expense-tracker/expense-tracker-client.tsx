@@ -666,15 +666,16 @@ export default function IncomeExpenseClient() {
                                     <CustomDropdown
                                         options={[
                                             { value: "Cash", label: "Cash" },
-                                            ...bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }))
+                                            ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})` }))
                                         ]}
-                                        value={selectedPaymentMethod === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === selectedPaymentMethod)?.id}
+                                        value={selectedPaymentMethod === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === watch('bankAccountId'))?.id}
                                         onChange={(value) => {
                                             if (value === 'Cash') {
                                                 setValue('paymentMethod', 'Cash');
                                                 setValue('bankAccountId', undefined);
                                             } else {
-                                                setValue('paymentMethod', bankAccounts.find(acc => acc.id === value)?.accountHolderName || '');
+                                                const account = bankAccounts.find(acc => acc.id === value);
+                                                setValue('paymentMethod', account?.bankName || '');
                                                 setValue('bankAccountId', value);
                                             }
                                         }}
