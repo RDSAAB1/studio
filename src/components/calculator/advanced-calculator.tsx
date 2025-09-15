@@ -16,7 +16,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 
 
 const CalculatorButton = ({ onClick, children, className }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
-    <Button variant="outline" className={`h-9 text-base ${className}`} onClick={onClick}>{children}</Button>
+    <Button variant="outline" className={`h-8 text-base ${className}`} onClick={onClick}>{children}</Button>
 );
 
 const ScientificCalculator = () => {
@@ -150,13 +150,13 @@ const ScientificCalculator = () => {
 
     return (
         <div className="p-4 space-y-2">
-             <Card className="bg-muted/30 p-2 mb-2">
+            <Card className="bg-muted/30 p-2 mb-2">
                 <CardContent className="p-1 text-xs text-muted-foreground flex items-center justify-center gap-2">
                     <Info size={16} className="flex-shrink-0" />
-                    <p className="font-mono">`Enter` → =, `[` → ×, `]` → ÷, `=` → +, `Del`/`Esc` → AC</p>
+                    <p className="font-mono">Enter → = | [ → × | ] → ÷ | = → + | Del/Esc → AC</p>
                 </CardContent>
             </Card>
-            <Input type="text" readOnly value={input} className="h-16 text-3xl text-right font-mono" />
+            <Input type="text" readOnly value={input} className="h-12 text-3xl text-right font-mono" />
             <div className="grid grid-cols-5 gap-2">
                 <CalculatorButton onClick={() => handleFunction('sin')}>sin</CalculatorButton>
                 <CalculatorButton onClick={() => handleFunction('cos')}>cos</CalculatorButton>
@@ -258,7 +258,7 @@ const UnitConverter = () => {
              <div className="space-y-1">
                 <Label>Category</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as any)}>
-                    <SelectTrigger className="h-9"><SelectValue/></SelectTrigger>
+                    <SelectTrigger className="h-8"><SelectValue/></SelectTrigger>
                     <SelectContent>
                         {Object.keys(unitConfig).map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                     </SelectContent>
@@ -267,9 +267,9 @@ const UnitConverter = () => {
             <div className="flex items-center gap-2">
                  <div className="flex-1 space-y-1">
                     <Label>From</Label>
-                    <Input type="number" value={fromValue} onChange={(e) => setFromValue(e.target.value)} className="h-9" />
+                    <Input type="number" value={fromValue} onChange={(e) => setFromValue(e.target.value)} className="h-8" />
                     <Select value={fromUnit} onValueChange={setFromUnit}>
-                         <SelectTrigger className="h-9"><SelectValue/></SelectTrigger>
+                         <SelectTrigger className="h-8"><SelectValue/></SelectTrigger>
                         <SelectContent>
                             {units.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                         </SelectContent>
@@ -277,9 +277,9 @@ const UnitConverter = () => {
                 </div>
                  <div className="flex-1 space-y-1">
                     <Label>To</Label>
-                    <Input type="text" readOnly value={toValue} className="h-9" />
+                    <Input type="text" readOnly value={toValue} className="h-8" />
                     <Select value={toUnit} onValueChange={setToUnit}>
-                         <SelectTrigger className="h-9"><SelectValue/></SelectTrigger>
+                         <SelectTrigger className="h-8"><SelectValue/></SelectTrigger>
                         <SelectContent>
                            {units.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                         </SelectContent>
@@ -332,16 +332,16 @@ const GSTCalculator = () => {
         <div className="p-4 space-y-4">
             <div className="space-y-1">
                 <Label htmlFor="gst-amount">Amount</Label>
-                <Input id="gst-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9"/>
+                <Input id="gst-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8"/>
             </div>
             <div className="space-y-1">
                 <Label htmlFor="gst-rate">GST Rate (%)</Label>
-                <Input id="gst-rate" type="number" value={gstRate} onChange={(e) => setGstRate(e.target.value)} className="h-9"/>
+                <Input id="gst-rate" type="number" value={gstRate} onChange={(e) => setGstRate(e.target.value)} className="h-8"/>
             </div>
             <div className="space-y-2">
                 <Label>Calculation Type</Label>
                 <Select value={calculationType} onValueChange={(v) => setCalculationType(v as any)}>
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="add">Add GST</SelectItem>
                         <SelectItem value="remove">Remove GST</SelectItem>
@@ -396,8 +396,8 @@ const DateCalculator = () => {
                 <CardContent className="p-4 space-y-3">
                      <h3 className="text-sm font-semibold">Calculate Difference</h3>
                      <div className="flex items-center gap-2">
-                        <Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-9 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{fromDate ? format(fromDate, "PPP") : "Start Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus /></PopoverContent></Popover>
-                        <Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-9 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{toDate ? format(toDate, "PPP") : "End Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={toDate} onSelect={setToDate} initialFocus /></PopoverContent></Popover>
+                        <Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-8 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{fromDate ? format(fromDate, "PPP") : "Start Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus /></PopoverContent></Popover>
+                        <Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-8 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{toDate ? format(toDate, "PPP") : "End Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={toDate} onSelect={setToDate} initialFocus /></PopoverContent></Popover>
                     </div>
                      <div className="grid grid-cols-2 gap-2 text-center text-sm">
                         <div className="p-2 bg-muted/50 rounded-lg"><p className="font-bold">{diff.days}</p><p className="text-xs text-muted-foreground">Days</p></div>
@@ -410,10 +410,10 @@ const DateCalculator = () => {
             <Card>
                  <CardContent className="p-4 space-y-3">
                     <h3 className="text-sm font-semibold">Add/Subtract from Date</h3>
-                     <div className="space-y-1"><Label className="text-xs">Start Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-9 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{calcDate ? format(calcDate, "PPP") : "Select Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calcDate} onSelect={setCalcDate} initialFocus /></PopoverContent></Popover></div>
+                     <div className="space-y-1"><Label className="text-xs">Start Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full h-8 text-xs"><CalendarIcon className="mr-2 h-4 w-4"/>{calcDate ? format(calcDate, "PPP") : "Select Date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calcDate} onSelect={setCalcDate} initialFocus /></PopoverContent></Popover></div>
                      <div className="flex items-center gap-2">
-                        <Input type="number" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="h-9 text-sm" />
-                        <Select value={addUnit} onValueChange={(v) => setAddUnit(v as any)}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="days">Days</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select>
+                        <Input type="number" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="h-8 text-sm" />
+                        <Select value={addUnit} onValueChange={(v) => setAddUnit(v as any)}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="days">Days</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select>
                     </div>
                     <div className="pt-2"><p className="text-sm">Result: <span className="font-bold">{resultDate}</span></p></div>
                 </CardContent>
@@ -457,16 +457,16 @@ const InterestCalculator = () => {
     return (
         <div className="p-4 space-y-4">
              <Select value={interestType} onValueChange={setInterestType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="simple">Simple Interest</SelectItem><SelectItem value="compound">Compound Interest</SelectItem></SelectContent>
             </Select>
-            <div className="space-y-1"><Label>Principal Amount</Label><Input type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} className="h-9" /></div>
-            <div className="space-y-1"><Label>Annual Interest Rate (%)</Label><Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} className="h-9" /></div>
+            <div className="space-y-1"><Label>Principal Amount</Label><Input type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} className="h-8" /></div>
+            <div className="space-y-1"><Label>Annual Interest Rate (%)</Label><Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} className="h-8" /></div>
             <div className="flex gap-2">
-                <div className="flex-1 space-y-1"><Label>Time</Label><Input type="number" value={time} onChange={(e) => setTime(e.target.value)} className="h-9"/></div>
-                <div className="flex-1 space-y-1"><Label>Unit</Label><Select value={timeUnit} onValueChange={(v) => setTimeUnit(v as any)}><SelectTrigger className="h-9"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="years">Years</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="days">Days</SelectItem></SelectContent></Select></div>
+                <div className="flex-1 space-y-1"><Label>Time</Label><Input type="number" value={time} onChange={(e) => setTime(e.target.value)} className="h-8"/></div>
+                <div className="flex-1 space-y-1"><Label>Unit</Label><Select value={timeUnit} onValueChange={(v) => setTimeUnit(v as any)}><SelectTrigger className="h-8"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="years">Years</SelectItem><SelectItem value="months">Months</SelectItem><SelectItem value="days">Days</SelectItem></SelectContent></Select></div>
             </div>
-            {interestType === 'compound' && (<div className="space-y-1"><Label>Compound Frequency</Label><Select value={String(compoundFrequency)} onValueChange={(v) => setCompoundFrequency(Number(v))}><SelectTrigger className="h-9"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="1">Annually</SelectItem><SelectItem value="2">Semi-Annually</SelectItem><SelectItem value="4">Quarterly</SelectItem><SelectItem value="12">Monthly</SelectItem></SelectContent></Select></div>)}
+            {interestType === 'compound' && (<div className="space-y-1"><Label>Compound Frequency</Label><Select value={String(compoundFrequency)} onValueChange={(v) => setCompoundFrequency(Number(v))}><SelectTrigger className="h-8"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="1">Annually</SelectItem><SelectItem value="2">Semi-Annually</SelectItem><SelectItem value="4">Quarterly</SelectItem><SelectItem value="12">Monthly</SelectItem></SelectContent></Select></div>)}
             <Card className="bg-muted/50 p-4 space-y-2 mt-4">
                 <div className="flex justify-between text-sm"><span className="text-muted-foreground">Interest:</span><span className="font-semibold">{formatCurrency(parseFloat(result.interest))}</span></div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2"><span className="text-foreground">Total Amount:</span><span className="text-primary">{formatCurrency(parseFloat(result.total))}</span></div>
@@ -518,7 +518,7 @@ const PercentageCalculator = () => {
     return (
         <div className="p-4 space-y-4">
             <Select value={calcType} onValueChange={setCalcType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                 <SelectContent>
                     <SelectItem value="percentOf">What is x% of y?</SelectItem>
                     <SelectItem value="isWhatPercent">x is what % of y?</SelectItem>
@@ -528,11 +528,11 @@ const PercentageCalculator = () => {
              <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                     <Label>{getLabels().labelA}</Label>
-                    <Input type="number" value={valueA} onChange={(e) => setValueA(e.target.value)} className="h-9" />
+                    <Input type="number" value={valueA} onChange={(e) => setValueA(e.target.value)} className="h-8" />
                 </div>
                 <div className="space-y-1">
                     <Label>{getLabels().labelB}</Label>
-                    <Input type="number" value={valueB} onChange={(e) => setValueB(e.target.value)} className="h-9" />
+                    <Input type="number" value={valueB} onChange={(e) => setValueB(e.target.value)} className="h-8" />
                 </div>
             </div>
              <Card className="bg-muted/50 p-4 mt-4 h-20 flex items-center justify-center">
@@ -549,7 +549,7 @@ const PercentageCalculator = () => {
 
 export const AdvancedCalculator = () => {
     return (
-        <Card className="border-0 shadow-none rounded-2xl">
+        <Card className="shadow-none rounded-2xl">
             <CardContent className="p-0">
                 <Tabs defaultValue="calculator" className="w-full">
                     <TabsList className="grid w-full grid-cols-6 h-9">
