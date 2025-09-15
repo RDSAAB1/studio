@@ -147,7 +147,7 @@ const DraggableCalculator = () => {
             </DialogTrigger>
             <DialogContent 
                 ref={dialogRef}
-                className="p-0 max-w-md" 
+                className="p-0 max-w-lg" 
                 style={{
                     transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
                 }}

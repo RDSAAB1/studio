@@ -49,27 +49,39 @@ const ScientificCalculator = () => {
         }
         setInput(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
     }
-
-    const handleEquals = () => {
+    
+    const evaluateExpression = (expr: string) => {
         try {
-            // Replace math symbols for evaluation
-            let evalString = input
+            let evalString = expr
                 .replace(/×/g, '*')
                 .replace(/÷/g, '/')
                 .replace(/π/g, 'Math.PI')
                 .replace(/e/g, 'Math.E');
 
-            // This is a simplified evaluation and has security risks if used with arbitrary user input.
-            // For this controlled environment, it's acceptable.
-            const result = new Function('return ' + evalString)();
+            // Avoid octal literals
+            evalString = evalString.replace(/\b0+(?![.eE])/g, '');
             
-            if (isNaN(result) || !isFinite(result)) {
-                setInput('Error');
-            } else {
-                setInput(String(result));
+            // Very basic security check for allowed characters
+            if (/[^0-9\s.()+\-*/%MathPIEsqrtpowcossintanlog10]/.test(evalString)) {
+                return 'Error';
             }
-            setIsResult(true);
+
+            const result = new Function('return ' + evalString)();
+            if (isNaN(result) || !isFinite(result)) {
+                return 'Error';
+            }
+            return String(result);
         } catch (error) {
+            return null; // Return null on error to distinguish from a valid 'Error' string result
+        }
+    };
+
+    const handleEquals = () => {
+        const result = evaluateExpression(input);
+        if (result !== null) {
+            setInput(result);
+            setIsResult(true);
+        } else {
             setInput('Error');
             setIsResult(true);
         }
@@ -77,14 +89,15 @@ const ScientificCalculator = () => {
     
     const handleFunction = (func: string) => {
         setIsResult(false);
+        let expression;
         if (func === '√') {
-            setInput(prev => `Math.sqrt(${prev})`);
+            expression = `Math.sqrt(${input})`;
         } else if (func === 'x²') {
-            setInput(prev => `Math.pow(${prev}, 2)`);
+            expression = `Math.pow(${input}, 2)`;
         } else if (func === 'x³') {
-            setInput(prev => `Math.pow(${prev}, 3)`);
+            expression = `Math.pow(${input}, 3)`;
         } else if (func === '%') {
-             setInput(prev => `(${prev} / 100)`);
+             expression = `(${input} / 100)`;
         } else if (func === '!') { // Factorial
             try {
                 const num = parseInt(input);
@@ -99,10 +112,30 @@ const ScientificCalculator = () => {
                 setInput("Error");
                 setIsResult(true);
             }
+            return;
         } else {
-            setInput(prev => `Math.${func}(${prev})`);
+            expression = `Math.${func}(${input})`;
+        }
+        
+        const result = evaluateExpression(expression);
+        if (result !== null) {
+            setInput(result);
+            setIsResult(true);
+        } else {
+             // If function fails, just wrap the input in the function call
+            setInput(expression.replace(/\b\d+\b/, input));
         }
     }
+
+    const displayValue = useMemo(() => {
+        if (isResult) return input;
+        
+        const result = evaluateExpression(input);
+        if (result !== null && result !== input) {
+            return result;
+        }
+        return input;
+    }, [input, isResult]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -156,7 +189,7 @@ const ScientificCalculator = () => {
                     <p className="font-mono">Enter → = | [ → × | ] → ÷ | = → + | Del/Esc → AC</p>
                 </CardContent>
             </Card>
-            <Input type="text" readOnly value={input} className="h-12 text-3xl text-right font-mono" />
+            <Input type="text" readOnly value={input} className="h-16 text-2xl text-right font-mono" />
             <div className="grid grid-cols-5 gap-2">
                 <CalculatorButton onClick={() => handleFunction('sin')}>sin</CalculatorButton>
                 <CalculatorButton onClick={() => handleFunction('cos')}>cos</CalculatorButton>
