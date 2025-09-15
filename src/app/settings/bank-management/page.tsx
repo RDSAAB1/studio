@@ -9,13 +9,12 @@ import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Loader2, Plus, Edit, Trash2, Upload, Download, Filter } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 
@@ -167,10 +166,6 @@ export default function BankManagementPage() {
     return (
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-semibold">Bank Management</h2>
-                    <p className="text-sm text-muted-foreground">Manage all banks and their branches here.</p>
-                </div>
                 <div className="flex gap-2">
                      <Button asChild variant="outline" size="sm">
                         <label htmlFor="import-file" className="cursor-pointer"><Upload className="mr-2 h-4 w-4"/> Import</label>
