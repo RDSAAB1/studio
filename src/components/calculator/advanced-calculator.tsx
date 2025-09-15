@@ -128,11 +128,22 @@ const ScientificCalculator = () => {
     }
 
     const displayValue = useMemo(() => {
-        if (isResult) return input;
-        
-        const result = evaluateExpression(input);
-        if (result !== null && result !== input) {
-            return result;
+        if (isResult) {
+            // Check if the result is a long float and format it
+            const numResult = parseFloat(input);
+            if (!isNaN(numResult) && input.includes('.') && input.split('.')[1].length > 8) {
+                return numResult.toPrecision(8);
+            }
+            return input;
+        }
+
+        const currentResult = evaluateExpression(input);
+        if (currentResult !== null && currentResult !== input) {
+            const numResult = parseFloat(currentResult);
+            if (!isNaN(numResult) && currentResult.includes('.') && currentResult.split('.')[1].length > 8) {
+                return numResult.toPrecision(8);
+            }
+            return currentResult;
         }
         return input;
     }, [input, isResult]);
@@ -154,9 +165,7 @@ const ScientificCalculator = () => {
                 handleOperator('×');
             } else if (key === '/') {
                 handleOperator('÷');
-            } else if (key === '=') {
-                handleEquals();
-            } else if (key === 'Enter') {
+            } else if (key === '=' || key === 'Enter') {
                 handleEquals();
             } else if (key === 'Backspace') {
                 handleBackspace();
@@ -169,10 +178,11 @@ const ScientificCalculator = () => {
             }
         };
         
-        window.addEventListener('keydown', handleKeyDown);
+        const target = window;
+        target.addEventListener('keydown', handleKeyDown);
         
         return () => {
-            window.removeEventListener('keydown', handleKeyDown);
+            target.removeEventListener('keydown', handleKeyDown);
         };
     }, [input, isResult]);
 
@@ -185,7 +195,10 @@ const ScientificCalculator = () => {
                     <p className="font-mono">Enter → = | [ → × | ] → ÷ | = → + | Del/Esc → AC</p>
                 </CardContent>
             </Card>
-            <Input type="text" readOnly value={input} className="h-12 text-2xl text-right font-mono" />
+            <div className="relative h-12 w-full border rounded-lg bg-muted/50 p-2 text-right">
+                <div className="absolute top-1 right-2 text-muted-foreground text-xs">{isResult ? '' : input}</div>
+                <div className="text-2xl font-mono text-foreground absolute bottom-1 right-2">{displayValue}</div>
+            </div>
             <div className="grid grid-cols-5 gap-2">
                 <CalculatorButton onClick={() => handleFunction('sin')}>sin</CalculatorButton>
                 <CalculatorButton onClick={() => handleFunction('cos')}>cos</CalculatorButton>
@@ -420,7 +433,7 @@ const DateCalculator = () => {
     }, [calcDate, addValue, addUnit]);
 
     return (
-         <div className="p-4 space-y-6">
+         <div className="p-4 space-y-4">
             <Card>
                 <CardContent className="p-4 space-y-3">
                      <h3 className="text-sm font-semibold">Calculate Difference</h3>
@@ -578,7 +591,7 @@ const PercentageCalculator = () => {
 
 export const AdvancedCalculator = () => {
     return (
-        <Card className="shadow-none rounded-2xl">
+        <Card className="shadow-none rounded-lg">
             <CardContent className="p-0">
                 <Tabs defaultValue="calculator" className="w-full">
                     <TabsList className="grid w-full grid-cols-6 h-9">
@@ -589,7 +602,7 @@ export const AdvancedCalculator = () => {
                         <TabsTrigger value="date" className="h-full">Date</TabsTrigger>
                         <TabsTrigger value="interest" className="h-full">Interest</TabsTrigger>
                     </TabsList>
-                    <div className="min-h-[420px]">
+                    <div className="min-h-[350px]">
                         <TabsContent value="calculator">
                             <ScientificCalculator />
                         </TabsContent>
@@ -599,13 +612,13 @@ export const AdvancedCalculator = () => {
                         <TabsContent value="gst">
                             <GSTCalculator />
                         </TabsContent>
-                        <TabsContent value="percentage">
+                         <TabsContent value="percentage">
                             <PercentageCalculator />
                         </TabsContent>
                         <TabsContent value="date">
                             <DateCalculator />
                         </TabsContent>
-                        <TabsContent value="interest">
+                         <TabsContent value="interest">
                             <InterestCalculator />
                         </TabsContent>
                     </div>
