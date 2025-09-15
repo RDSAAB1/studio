@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, UserCircle, Search, Menu, X, LogOut, Bell } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
+import { Dialog, DialogContent, DialogTrigger } from "../ui/dialog";
+import { AdvancedCalculator } from "../calculator/advanced-calculator";
 
 
 interface HeaderProps {
@@ -115,6 +117,17 @@ export function Header({ toggleSidebar }: HeaderProps) {
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <NotificationBell />
+           <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                        <Calculator className="h-5 w-5" />
+                        <span className="sr-only">Calculator</span>
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="p-0 border-0 max-w-sm">
+                    <AdvancedCalculator />
+                </DialogContent>
+            </Dialog>
           <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
