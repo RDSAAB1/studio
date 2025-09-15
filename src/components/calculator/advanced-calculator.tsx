@@ -15,6 +15,7 @@ import { format, differenceInDays, differenceInWeeks, differenceInMonths, differ
 import { formatCurrency, cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { ScrollArea } from '../ui/scroll-area';
 
 
 const CalculatorButton = ({ onClick, children, className }: { onClick: () => void, children: React.ReactNode, className?: string }) => (
@@ -190,54 +191,56 @@ const ScientificCalculator = () => {
                         <DialogTitle>Calculator Keyboard Shortcuts</DialogTitle>
                         <DialogDescription>Use these keyboard shortcuts for faster and easier calculations.</DialogDescription>
                     </DialogHeader>
-                     <div className="text-sm">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Action (English)</TableHead>
-                                    <TableHead>एक्शन (हिन्दी)</TableHead>
-                                    <TableHead>Key(s) / कुंजी</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell><Plus size={14} className="inline mr-2"/>Addition</TableCell>
-                                    <TableCell><Plus size={14} className="inline mr-2"/>जोड़</TableCell>
-                                    <TableCell className="font-mono font-medium">`+`, `=`, `↑`</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell><Minus size={14} className="inline mr-2"/>Subtraction</TableCell>
-                                    <TableCell><Minus size={14} className="inline mr-2"/>घटाव</TableCell>
-                                    <TableCell className="font-mono font-medium">`-`, `↓`</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell><X size={14} className="inline mr-2"/>Multiplication</TableCell>
-                                    <TableCell><X size={14} className="inline mr-2"/>गुणा</TableCell>
-                                    <TableCell className="font-mono font-medium">`*`, `[`, `←`</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell><Divide size={14} className="inline mr-2"/>Division</TableCell>
-                                    <TableCell><Divide size={14} className="inline mr-2"/>भाग</TableCell>
-                                    <TableCell className="font-mono font-medium">`/`, `]`, `→`</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell><Sigma size={14} className="inline mr-2"/>Equals (Calculate)</TableCell>
-                                    <TableCell><Sigma size={14} className="inline mr-2"/>बराबर (गणना करें)</TableCell>
-                                    <TableCell className="font-mono font-medium">`Enter`</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>Clear All (AC)</TableCell>
-                                    <TableCell>सब कुछ साफ़ करें (AC)</TableCell>
-                                    <TableCell className="font-mono font-medium">`Delete`, `Esc`</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>Clear Last Entry</TableCell>
-                                    <TableCell>पिछली एंट्री साफ़ करें</TableCell>
-                                    <TableCell className="font-mono font-medium">`Backspace`</TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </div>
+                     <ScrollArea className="max-h-[60vh]">
+                         <div className="text-sm">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Action (English)</TableHead>
+                                        <TableHead>एक्शन (हिन्दी)</TableHead>
+                                        <TableHead>Key(s) / कुंजी</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableRow>
+                                        <TableCell><Plus size={14} className="inline mr-2"/>Addition</TableCell>
+                                        <TableCell><Plus size={14} className="inline mr-2"/>जोड़</TableCell>
+                                        <TableCell className="font-mono font-medium">`+`, `=`, `↑`</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell><Minus size={14} className="inline mr-2"/>Subtraction</TableCell>
+                                        <TableCell><Minus size={14} className="inline mr-2"/>घटाव</TableCell>
+                                        <TableCell className="font-mono font-medium">`-`, `↓`</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell><X size={14} className="inline mr-2"/>Multiplication</TableCell>
+                                        <TableCell><X size={14} className="inline mr-2"/>गुणा</TableCell>
+                                        <TableCell className="font-mono font-medium">`*`, `[`, `←`</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell><Divide size={14} className="inline mr-2"/>Division</TableCell>
+                                        <TableCell><Divide size={14} className="inline mr-2"/>भाग</TableCell>
+                                        <TableCell className="font-mono font-medium">`/`, `]`, `→`</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell><Sigma size={14} className="inline mr-2"/>Equals (Calculate)</TableCell>
+                                        <TableCell><Sigma size={14} className="inline mr-2"/>बराबर (गणना करें)</TableCell>
+                                        <TableCell className="font-mono font-medium">`Enter`</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell>Clear All (AC)</TableCell>
+                                        <TableCell>सब कुछ साफ़ करें (AC)</TableCell>
+                                        <TableCell className="font-mono font-medium">`Delete`, `Esc`</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell>Clear Last Entry</TableCell>
+                                        <TableCell>पिछली एंट्री साफ़ करें</TableCell>
+                                        <TableCell className="font-mono font-medium">`Backspace`</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </div>
+                     </ScrollArea>
                 </DialogContent>
             </Dialog>
             <div className="relative h-16 w-full border rounded-lg bg-muted/50 p-2 text-right overflow-hidden">
