@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -113,9 +113,9 @@ const UnitConverter = () => {
         setToValue(result.toString());
     };
 
-    useState(() => {
+    useEffect(() => {
        convert();
-    });
+    }, []);
     
     useEffect(() => {
         const units = Object.keys(unitConfig[category]);
