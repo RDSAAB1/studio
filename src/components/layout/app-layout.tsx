@@ -107,43 +107,46 @@ const AppContent = ({ children }: { children: ReactNode }) => {
 };
 
 const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<User | null | undefined>(undefined);
+    const [user, setUser] = useState<User | null>(null);
+    const [authChecked, setAuthChecked] = useState(false);
     const [setupState, setSetupState] = useState<'loading' | 'gmail' | 'company' | 'complete'>('loading');
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-
-        // Handle the redirect result from Google sign-in
-        getRedirectResult(auth).catch(error => {
-            console.error("Error processing redirect result:", error);
-        });
+        getRedirectResult(auth).catch(console.error);
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                const gmailSettings = await getCompanySettings(currentUser.uid);
-                if (!gmailSettings?.appPassword) {
-                    setSetupState('gmail');
-                } else {
-                    const companySettings = await getRtgsSettings();
-                    if (!companySettings?.companyName || !companySettings.bankName) {
-                        setSetupState('company');
+                try {
+                    const gmailSettings = await getCompanySettings(currentUser.uid);
+                    if (!gmailSettings?.appPassword) {
+                        setSetupState('gmail');
                     } else {
-                        setSetupState('complete');
+                        const companySettings = await getRtgsSettings();
+                        if (!companySettings?.companyName || !companySettings.bankName) {
+                            setSetupState('company');
+                        } else {
+                            setSetupState('complete');
+                        }
                     }
+                } catch (error) {
+                    console.error("Error checking setup status:", error);
+                    setSetupState('complete'); // Fallback to complete to avoid setup loop on error
                 }
             } else {
                 setSetupState('loading');
             }
+            setAuthChecked(true); // Mark auth check as complete
         });
 
         return () => unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (user === undefined) return; // Still waiting for initial auth state
+        if (!authChecked) return;
 
         const isLoginPage = pathname === '/login';
         const isSetupPage = pathname.startsWith('/setup');
@@ -161,9 +164,9 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
                  router.replace('/dashboard-overview');
             }
         }
-    }, [user, setupState, pathname, router]);
+    }, [user, authChecked, setupState, pathname, router]);
 
-    if (user === undefined || (user && setupState === 'loading')) {
+    if (!authChecked || (user && setupState === 'loading')) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -200,8 +203,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     const isSpecialPage = pathname === '/login' || pathname.startsWith('/setup');
 
     // If it's a special page, render it directly without the main app layout
+    // but still inside the AuthWrapper to handle redirects if user is already logged in/set up.
     if (isSpecialPage) {
-        return <>{children}</>;
+        return <AuthWrapper>{children}</AuthWrapper>;
     }
     
     // Otherwise, wrap the children with the AuthWrapper which contains the main layout
