@@ -17,7 +17,7 @@ import { BillOfSupply } from "@/components/print-formats/bill-of-supply";
 import { Challan } from "@/components/print-formats/challan";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getBankAccountsRealtime, addExpense } from "@/lib/firestore";
+import { getBankAccountsRealtime, addExpense, updateCustomer } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { formatCurrency } from "@/lib/utils";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
@@ -54,6 +54,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         grNo: '',
         grDate: '',
         transport: '',
+        totalAdvance: 0,
     });
     
     useEffect(() => {
@@ -63,6 +64,15 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 !customer.shippingName && !customer.shippingAddress &&
                 !customer.shippingContact && !customer.shippingGstin
             );
+             setInvoiceDetails(prev => ({
+                ...prev,
+                sixRNo: customer.sixRNo || '',
+                gatePassNo: customer.gatePassNo || '',
+                grNo: customer.grNo || '',
+                grDate: customer.grDate || '',
+                transport: customer.transport || '',
+                totalAdvance: customer.advanceFreight || 0,
+            }));
         }
         if (receiptSettings) {
             setInvoiceDetails(prev => ({
@@ -101,7 +111,20 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     };
 
 
-     const handleActualPrint = (id: string) => {
+     const handleActualPrint = async (id: string) => {
+        if (customer) {
+            const finalDataToSave = { 
+                ...editableInvoiceDetails, 
+                sixRNo: invoiceDetails.sixRNo,
+                gatePassNo: invoiceDetails.gatePassNo,
+                grNo: invoiceDetails.grNo,
+                grDate: invoiceDetails.grDate,
+                transport: invoiceDetails.transport,
+                advanceFreight: invoiceDetails.totalAdvance,
+             };
+            await updateCustomer(customer.id, finalDataToSave);
+        }
+
         const receiptNode = document.getElementById(id);
         if (!receiptNode) return;
 
@@ -166,16 +189,19 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             finalCustomerData.shippingStateName = finalCustomerData.stateName;
             finalCustomerData.shippingStateCode = finalCustomerData.stateCode;
         }
-
-        const enrichedInvoiceDetails = { ...invoiceDetails, totalAdvance: customer.advanceFreight || 0 };
+        
+        const finalInvoiceDetails = {
+            ...invoiceDetails,
+            totalAdvance: invoiceDetails.totalAdvance,
+        };
 
         switch(documentType) {
             case 'tax-invoice':
-                return <TaxInvoice customer={finalCustomerData} settings={receiptSettings} invoiceDetails={enrichedInvoiceDetails} />;
+                return <TaxInvoice customer={finalCustomerData} settings={receiptSettings} invoiceDetails={finalInvoiceDetails} />;
             case 'bill-of-supply':
-                return <BillOfSupply customer={finalCustomerData} settings={receiptSettings} invoiceDetails={enrichedInvoiceDetails} />;
+                return <BillOfSupply customer={finalCustomerData} settings={receiptSettings} invoiceDetails={finalInvoiceDetails} />;
             case 'challan':
-                return <Challan customer={finalCustomerData} settings={receiptSettings} invoiceDetails={enrichedInvoiceDetails} />;
+                return <Challan customer={finalCustomerData} settings={receiptSettings} invoiceDetails={finalInvoiceDetails} />;
             default:
                 return null;
         }
@@ -256,6 +282,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                     <div className="space-y-1"><Label className="text-xs">G.R. No.</Label><Input value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">G.R. Date</Label><Input type="date" value={invoiceDetails.grDate} onChange={(e) => setInvoiceDetails({...invoiceDetails, grDate: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1 col-span-2"><Label className="text-xs">Transport</Label><Input value={invoiceDetails.transport} onChange={(e) => setInvoiceDetails({...invoiceDetails, transport: e.target.value})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1 col-span-2"><Label className="text-xs">Advance/Freight</Label><Input type="number" value={invoiceDetails.totalAdvance} onChange={(e) => setInvoiceDetails({...invoiceDetails, totalAdvance: Number(e.target.value)})} className="h-8 text-xs" /></div>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -311,7 +338,3 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
-
-    
-
-    

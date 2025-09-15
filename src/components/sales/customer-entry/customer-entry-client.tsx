@@ -307,6 +307,13 @@ export default function CustomerEntryClient() {
         form.setValue('gstin', foundCustomer.gstin || '');
         form.setValue('stateName', foundCustomer.stateName || '');
         form.setValue('stateCode', foundCustomer.stateCode || '');
+        form.setValue('shippingName', foundCustomer.shippingName || foundCustomer.name);
+        form.setValue('shippingCompanyName', foundCustomer.shippingCompanyName || '');
+        form.setValue('shippingAddress', foundCustomer.shippingAddress || foundCustomer.address);
+        form.setValue('shippingContact', foundCustomer.shippingContact || foundCustomer.contact);
+        form.setValue('shippingGstin', foundCustomer.shippingGstin || foundCustomer.gstin || '');
+        form.setValue('shippingStateName', foundCustomer.shippingStateName || foundCustomer.stateName || '');
+        form.setValue('shippingStateCode', foundCustomer.shippingStateCode || foundCustomer.stateCode || '');
         toast({ title: "Customer Found: Details auto-filled." });
       }
     }
