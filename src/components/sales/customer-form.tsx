@@ -225,7 +225,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 
                 <Separator className="my-2"/>
 
-                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                     <div className="space-y-1">
                         <Label htmlFor="rate" className="text-xs">Rate</Label>
                         <InputWithIcon icon={<Banknote className="h-4 w-4 text-muted-foreground" />}>
@@ -279,6 +279,12 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
                             <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                         </InputWithIcon>
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="advanceFreight" className="text-xs">Advance/Freight</Label>
+                         <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
+                             <Controller name="advanceFreight" control={form.control} render={({ field }) => (<Input id="advanceFreight" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                         </InputWithIcon>
                     </div>
                 </div>
 

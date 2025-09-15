@@ -116,7 +116,15 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
      const handleActualPrint = async (id: string) => {
         if (customer) {
-            const finalDataToSave: Partial<Customer> = { ...editableInvoiceDetails };
+            const finalDataToSave: Partial<Customer> = { 
+                ...editableInvoiceDetails,
+                sixRNo: invoiceDetails.sixRNo,
+                gatePassNo: invoiceDetails.gatePassNo,
+                grNo: invoiceDetails.grNo,
+                grDate: invoiceDetails.grDate,
+                transport: invoiceDetails.transport,
+                advanceFreight: invoiceDetails.totalAdvance,
+             };
             
             if(isSameAsBilling) {
                 finalDataToSave.shippingName = editableInvoiceDetails.name;
@@ -128,15 +136,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 finalDataToSave.shippingStateCode = editableInvoiceDetails.stateCode || '';
             }
 
-            await updateCustomer(customer.id, { 
-                ...finalDataToSave, 
-                sixRNo: invoiceDetails.sixRNo,
-                gatePassNo: invoiceDetails.gatePassNo,
-                grNo: invoiceDetails.grNo,
-                grDate: invoiceDetails.grDate,
-                transport: invoiceDetails.transport,
-                advanceFreight: invoiceDetails.totalAdvance,
-             });
+            await updateCustomer(customer.id, finalDataToSave);
         }
 
         const receiptNode = document.getElementById(id);
@@ -354,5 +354,3 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
-
-    
