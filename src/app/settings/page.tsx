@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -14,12 +15,13 @@ import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { toTitleCase, cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -44,6 +46,10 @@ const companySchema = z.object({
   companyAddress2: z.string().optional(),
   contactNo: z.string().min(1, "Contact number is required."),
   gmail: z.string().email("Invalid email address."),
+  companyGstin: z.string().length(15, "GSTIN must be 15 characters").optional().or(z.literal('')),
+  panNo: z.string().optional(),
+  companyStateName: z.string().optional(),
+  companyStateCode: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -138,10 +144,44 @@ export default function SettingsPage() {
     const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
 
     // Form Hooks
-    const companyForm = useForm<CompanyFormValues>();
+    const companyForm = useForm<CompanyFormValues>({
+        resolver: zodResolver(companySchema),
+    });
     const emailForm = useForm<EmailFormValues>();
     
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+    
+    const gstinValue = companyForm.watch("companyGstin");
+
+    useEffect(() => {
+        if (gstinValue && gstinValue.length === 15) {
+            const pan = gstinValue.substring(2, 12);
+            companyForm.setValue("panNo", pan);
+            const stateCode = gstinValue.substring(0, 2);
+            const state = findStateByCode(stateCode);
+            if(state) {
+                companyForm.setValue("companyStateCode", state.code);
+                companyForm.setValue("companyStateName", state.name);
+            }
+        }
+    }, [gstinValue, companyForm]);
+
+    const handleStateNameChange = (value: string | null) => {
+        companyForm.setValue('companyStateName', value || '');
+        const state = findStateByName(value || '');
+        if (state) {
+            companyForm.setValue('companyStateCode', state.code);
+        }
+    };
+
+    const handleStateCodeChange = (value: string | null) => {
+        companyForm.setValue('companyStateCode', value || '');
+        const state = findStateByCode(value || '');
+        if (state) {
+            companyForm.setValue('companyStateName', state.name);
+        }
+    };
+
 
     useEffect(() => {
         const auth = getFirebaseAuth();
@@ -358,6 +398,9 @@ export default function SettingsPage() {
     };
     
     const allBankOptions = [...bankNames, ...banks.map((b: any) => b.name)].sort().map(name => ({ value: name, label: name }));
+    const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
+    const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: `${s.code} - ${s.name}` }));
+
 
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -384,6 +427,23 @@ export default function SettingsPage() {
                                    <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
                                    <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} onChange={handleCapitalizeOnChange} /></div>
                                    <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} onChange={handleCapitalizeOnChange}/></div>
+                                   <div className="space-y-1">
+                                        <Label htmlFor="companyGstin">GSTIN</Label>
+                                        <Input {...companyForm.register("companyGstin")} className="uppercase" />
+                                        {companyForm.formState.errors.companyGstin && <p className="text-xs text-destructive">{companyForm.formState.errors.companyGstin.message}</p>}
+                                   </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="panNo">PAN</Label>
+                                        <Input {...companyForm.register("panNo")} readOnly disabled className="bg-muted"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>State Name</Label>
+                                        <CustomDropdown options={stateNameOptions} value={companyForm.watch('companyStateName')} onChange={handleStateNameChange} placeholder="Select State"/>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>State Code</Label>
+                                        <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode')} onChange={handleStateCodeChange} placeholder="Select Code"/>
+                                    </div>
                                </div>
                             </SettingsCard>
                         </form>

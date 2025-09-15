@@ -331,6 +331,7 @@ export type RtgsSettings = {
     companyAddress1: string;
     companyAddress2: string;
     companyGstin?: string;
+    panNo?: string;
     companyStateName?: string;
     companyStateCode?: string;
     bankName: string;
