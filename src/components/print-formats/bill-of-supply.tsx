@@ -60,9 +60,32 @@ const formatCurrency = (amount: number): string => {
 
 
 export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, invoiceDetails }) => {
-    const totalAmount = Math.round(Number(customer.netWeight) * Number(customer.rate));
-    const advanceFreight = invoiceDetails.totalAdvance || 0;
-    const finalAmount = totalAmount + advanceFreight;
+    const taxRate = Number(invoiceDetails.taxRate) || 0;
+    const isGstIncluded = invoiceDetails.isGstIncluded;
+    const rate = Number(customer.rate) || 0;
+    const netWeight = Number(customer.netWeight) || 0;
+    const advanceFreight = Number(customer.advanceFreight) || 0;
+    
+    const tableTotalAmount = netWeight * rate;
+
+    let taxableAmount: number;
+    let totalTaxAmount: number;
+    let totalInvoiceValue: number;
+
+    if (isGstIncluded) {
+        taxableAmount = tableTotalAmount / (1 + (taxRate / 100));
+        totalTaxAmount = tableTotalAmount - taxableAmount;
+        totalInvoiceValue = tableTotalAmount + advanceFreight;
+    } else {
+        taxableAmount = tableTotalAmount;
+        totalTaxAmount = taxableAmount * (taxRate / 100);
+        totalInvoiceValue = taxableAmount + totalTaxAmount + advanceFreight;
+    }
+
+    const cgstAmount = totalTaxAmount / 2;
+    const sgstAmount = totalTaxAmount / 2;
+    
+    const hsnCode = invoiceDetails.hsnCode || "N/A";
 
     const billToDetails = {
         name: toTitleCase(customer.name),
@@ -99,10 +122,9 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                     </div>
                      <div className="text-right">
                         <h1 className="text-4xl font-bold text-gray-800 uppercase mb-1">BILL OF SUPPLY</h1>
-                        <p className="text-center text-xs mb-2">(Not a Tax Invoice)</p>
                         <div className="text-base text-gray-700">
                             <div className="grid grid-cols-2 text-left">
-                                <span className="font-bold pr-2">Bill #:</span><span>{customer.srNo}</span>
+                                <span className="font-bold pr-2">Invoice #:</span><span>{customer.srNo}</span>
                                 <span className="font-bold pr-2">Date:</span><span>{format(new Date(customer.date), "dd MMM, yyyy")}</span>
                                 <span className="font-bold pr-2">Vehicle No:</span><span>{customer.vehicleNo.toUpperCase()}</span>
                             </div>
@@ -129,7 +151,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                         <p className="text-base">GSTIN: {shipToDetails.gstin}</p>
                     </div>
                 </div>
-                 
+                
                  <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-left print-table text-base">
                        <thead className="print-bg-gray-800">
@@ -149,16 +171,16 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                                 <td className="p-3">
                                     <p className="font-semibold text-lg">{toTitleCase(customer.variety)}</p>
                                 </td>
-                                <td className="p-3 text-center">{invoiceDetails.hsnCode}</td>
+                                <td className="p-3 text-center">{hsnCode}</td>
                                 <td className="p-3 text-center">{customer.bags || 'N/A'} Bags</td>
-                                <td className="p-3 text-center">{Number(customer.netWeight).toFixed(2)}</td>
-                                <td className="p-3 text-right">{formatCurrency(Number(customer.rate))}</td>
-                                <td className="p-3 text-right font-semibold">{formatCurrency(totalAmount)}</td>
+                                <td className="p-3 text-center">{netWeight.toFixed(2)}</td>
+                                <td className="p-3 text-right">{formatCurrency(rate)}</td>
+                                <td className="p-3 text-right font-semibold">{formatCurrency(Math.round(tableTotalAmount))}</td>
                             </tr>
                         </tbody>
                     </table>
                  </div>
-
+                 
                  <div className="border border-gray-200 p-3 rounded-lg mt-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">6R No:</span><span>{invoiceDetails.sixRNo}</span></div>
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">Gate Pass No:</span><span>{invoiceDetails.gatePassNo}</span></div>
@@ -166,6 +188,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. Date:</span><span>{invoiceDetails.grDate}</span></div>
                     <div className="flex gap-2 col-span-2"><span className="font-semibold text-gray-600">Transport:</span><span>{invoiceDetails.transport}</span></div>
                  </div>
+
             </div>
 
             <div className="flex-grow-0 mt-6">
@@ -173,14 +196,34 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                     <div className="w-3/5 pr-4 space-y-2">
                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                             <p className="font-bold mb-1 uppercase text-gray-500 text-xs">Amount in Words:</p>
-                            <p className="font-semibold text-gray-800 text-base">{numberToWords(finalAmount)}</p>
+                            <p className="font-semibold text-gray-800 text-base">{numberToWords(totalInvoiceValue)}</p>
+                        </div>
+                        <div className="border border-gray-200 rounded-lg p-3">
+                            <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Bank Details</h4>
+                            {settings.defaultBank?.bankName ? (
+                                <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span> {settings.defaultBank.bankName}</p>
+                                    <p><span className="font-semibold">A/C No:</span> {settings.defaultBank.accountNumber}</p>
+                                    <p><span className="font-semibold">Branch:</span> {settings.defaultBank.branchName || ''}</p>
+                                    <p><span className="font-semibold">IFSC:</span> {settings.defaultBank.ifscCode}</p>
+                                </div>
+                            ) : (
+                               <div className="text-xs space-y-0.5">
+                                    <p><span className="font-semibold">Bank:</span></p>
+                                    <p><span className="font-semibold">A/C No:</span></p>
+                                    <p><span className="font-semibold">Branch:</span></p>
+                                    <p><span className="font-semibold">IFSC:</span></p>
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="w-2/5 text-base">
-                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Subtotal:</span><span className="font-semibold">{formatCurrency(totalAmount)}</span></div>
-                        {advanceFreight > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(advanceFreight)}</span></div>}
+                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Taxable Amount:</span><span className="font-semibold">{formatCurrency(Math.round(taxableAmount))}</span></div>
+                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">CGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(cgstAmount))}</span></div>
+                        <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">SGST ({taxRate/2}%):</span><span>{formatCurrency(Math.round(sgstAmount))}</span></div>
+                         {advanceFreight > 0 && <div className="flex justify-between p-2 border-b border-gray-200"><span className="font-semibold text-gray-600">Freight/Advance:</span><span>{formatCurrency(advanceFreight)}</span></div>}
                         <div className="flex justify-between p-3 mt-1 bg-gray-800 text-white font-bold rounded-lg text-xl print-bg-gray-800">
-                            <span>Balance Due:</span><span>{formatCurrency(finalAmount)}</span>
+                            <span>Balance Due:</span><span>{formatCurrency(Math.round(totalInvoiceValue))}</span>
                         </div>
                     </div>
                 </div>
@@ -190,7 +233,9 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                             <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Terms &amp; Conditions</h4>
                             <ul className="list-disc list-inside text-gray-600 space-y-1 text-sm">
                                 <li>Goods once sold will not be taken back or exchanged.</li>
+                                <li>Interest @18% p.a. will be charged on all overdue payments.</li>
                                 <li>All disputes are subject to Shahjahanpur jurisdiction only.</li>
+                                <li>Please check the goods on delivery. No claims will be entertained later.</li>
                             </ul>
                         </div>
                         <div className="w-2/5 text-center">

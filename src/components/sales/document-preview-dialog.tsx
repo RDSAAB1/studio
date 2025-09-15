@@ -60,9 +60,11 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     useEffect(() => {
         if (customer) {
             setEditableInvoiceDetails(customer);
-            setIsSameAsBilling(
-                !customer.shippingName && !customer.shippingAddress &&
-                !customer.shippingContact && !customer.shippingGstin
+             setIsSameAsBilling(
+                (!customer.shippingName || customer.shippingName === customer.name) &&
+                (!customer.shippingAddress || customer.shippingAddress === customer.address) &&
+                (!customer.shippingContact || customer.shippingContact === customer.contact) &&
+                (!customer.shippingGstin || customer.shippingGstin === customer.gstin)
             );
              setInvoiceDetails(prev => ({
                 ...prev,
@@ -178,6 +180,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         const finalCustomerData: Customer = {
             ...customer,
             ...editableInvoiceDetails,
+            advanceFreight: invoiceDetails.totalAdvance,
         };
 
         if (isSameAsBilling) {
