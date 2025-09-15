@@ -12,8 +12,6 @@ import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import TabBar from './tab-bar';
 import { ScrollArea } from "../ui/scroll-area";
 import LoginPage from "@/app/login/page";
-import ConnectGmailPage from "@/app/setup/connect-gmail/page";
-import CompanyDetailsPage from "@/app/setup/company-details/page";
 import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
 
 const AppContent = ({ children }: { children: ReactNode }) => {
@@ -23,7 +21,7 @@ const AppContent = ({ children }: { children: ReactNode }) => {
     const router = useRouter();
     const pathname = usePathname();
 
-    useEffect(() => {
+     useEffect(() => {
         const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
         if (dashboardTab && openTabs.length === 0) {
             setOpenTabs([dashboardTab]);
@@ -91,10 +89,12 @@ const AppContent = ({ children }: { children: ReactNode }) => {
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0">
+            <Suspense>
               <div className="sticky top-0 z-30 flex-shrink-0">
                 <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
                 <Header toggleSidebar={toggleSidebar} />
               </div>
+            </Suspense>
               <ScrollArea className="flex-grow">
                 <main className="p-4 sm:p-6">
                     <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
@@ -110,7 +110,7 @@ const AppContent = ({ children }: { children: ReactNode }) => {
 const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
-    const [setupState, setSetupState] = useState<'loading' | 'gmail' | 'company' | 'complete'>('loading');
+    const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
     const router = useRouter();
     const pathname = usePathname();
 
@@ -121,24 +121,15 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                try {
-                    const gmailSettings = await getCompanySettings(currentUser.uid);
-                    if (!gmailSettings?.appPassword) {
-                        setSetupState('gmail');
-                    } else {
-                        const companySettings = await getRtgsSettings();
-                        if (!companySettings?.companyName || !companySettings.bankName) {
-                            setSetupState('company');
-                        } else {
-                            setSetupState('complete');
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error checking setup status:", error);
-                    setSetupState('complete'); // Fallback to complete to avoid setup loop on error
+                // Check global setup status, not per-user
+                const companySettings = await getRtgsSettings();
+                if (!companySettings?.companyName || !companySettings.bankName || !companySettings.gmail) {
+                    setIsSetupComplete(false);
+                } else {
+                    setIsSetupComplete(true);
                 }
             } else {
-                setSetupState('loading'); // No user, so no setup state to check
+                setIsSetupComplete(null); // No user, no setup status
             }
             setAuthChecked(true); // Mark auth check as complete
         });
@@ -150,24 +141,32 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
         if (!authChecked) return;
 
         const isLoginPage = pathname === '/login';
-        const isSetupPage = pathname.startsWith('/setup');
+        const isSettingsPage = pathname === '/settings';
 
         if (!user) {
+            // If no user is logged in, redirect to the login page
             if (!isLoginPage) {
                 router.replace('/login');
             }
         } else {
-            if (setupState === 'gmail' && pathname !== '/setup/connect-gmail') {
-                router.replace('/setup/connect-gmail');
-            } else if (setupState === 'company' && pathname !== '/setup/company-details') {
-                router.replace('/setup/company-details');
-            } else if (setupState === 'complete' && (isLoginPage || isSetupPage)) {
-                 router.replace('/dashboard-overview');
+            // If user is logged in
+            if (isSetupComplete === false) {
+                 // If setup is not complete, force redirect to settings page
+                if (!isSettingsPage) {
+                    router.replace('/settings');
+                }
+            } else if (isSetupComplete === true) {
+                // If setup is complete and user is on login page, redirect to dashboard
+                if (isLoginPage) {
+                    router.replace('/dashboard-overview');
+                }
             }
+            // If setup status is still loading, do nothing and wait.
         }
-    }, [user, authChecked, setupState, pathname, router]);
+    }, [user, authChecked, isSetupComplete, pathname, router]);
 
-    if (!authChecked || (user && setupState === 'loading')) {
+    // Show a global loader while auth state or setup state is being determined
+    if (!authChecked || isSetupComplete === null && user) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -175,19 +174,18 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
         );
     }
     
+    // If not logged in, render the login page
     if (!user) {
         return <LoginPage />;
     }
 
-    if (setupState === 'gmail') {
-        return <ConnectGmailPage />;
+    // If setup is incomplete, render the settings page for the initial admin to fill it out
+    if (isSetupComplete === false) {
+        return <AppContent>{children}</AppContent>; // Allow rendering settings page
     }
 
-    if (setupState === 'company') {
-        return <CompanyDetailsPage />;
-    }
-
-    if (setupState === 'complete') {
+    // If setup is complete, render the full app
+    if (isSetupComplete === true) {
         return <AppContent>{children}</AppContent>;
     }
 
@@ -199,11 +197,12 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
+
 export default function AppLayoutWrapper({ children }: { children: ReactNode }) {
     const pathname = usePathname();
-    const isSpecialPage = pathname === '/login' || pathname.startsWith('/setup');
+    const isLoginPage = pathname === '/login';
     
-    if (isSpecialPage) {
+    if (isLoginPage) {
         return <AuthWrapper>{children}</AuthWrapper>;
     }
     

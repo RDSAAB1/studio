@@ -35,8 +35,6 @@ export default function LoginPage() {
         const provider = getGoogleProvider();
         setLoading(true);
         try {
-          // signInWithRedirect is better for handling complex login flows
-          // and avoids issues with pop-up blockers.
           await signInWithRedirect(auth, provider);
         } catch (error) {
            console.error("Sign-in with redirect failed", error);
@@ -52,7 +50,6 @@ export default function LoginPage() {
             if (mode === 'login') {
                 await signInWithEmailAndPassword(auth, data.email, data.password);
                 toast({ title: "Login Successful", variant: "success" });
-                // The onAuthStateChanged listener in AppLayout will handle the redirect
             } else if (mode === 'signup') {
                 await createUserWithEmailAndPassword(auth, data.email, data.password);
                 toast({ title: "Signup Successful", description: "You are now logged in.", variant: "success" });
