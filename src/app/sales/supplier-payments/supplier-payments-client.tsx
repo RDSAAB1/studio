@@ -23,8 +23,9 @@ import { TransactionTable } from '@/components/sales/supplier-payments/transacti
 import { DetailsDialog } from '@/components/sales/supplier-payments/details-dialog';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
-import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
+import BankManagementPage from '@/app/settings/bank-management/page';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 
 const suppliersCollection = collection(db, "suppliers");
@@ -927,13 +928,17 @@ export default function SupplierPaymentsClient() {
             onOpenChange={() => setRtgsReceiptData(null)}
        />
 
-      <BankSettingsDialog
-        isOpen={isBankSettingsOpen}
-        onOpenChange={setIsBankSettingsOpen}
-        banks={banks}
-        onAddBank={async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }}
-        onAddBranch={async (branch: any) => { await addBankBranch(branch); toast({title: 'Branch Added', variant: 'success'}); }}
-      />
+       <Dialog open={isBankSettingsOpen} onOpenChange={setIsBankSettingsOpen}>
+            <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                 <DialogHeader>
+                    <DialogTitle>Bank & Branch Management</DialogTitle>
+                    <DialogDescription>Add, edit, or manage banks and their branches here.</DialogDescription>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                    <BankManagementPage />
+                </div>
+            </DialogContent>
+       </Dialog>
     </div>
   );
 }
