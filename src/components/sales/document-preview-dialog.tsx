@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -43,9 +44,9 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     const [editableInvoiceDetails, setEditableInvoiceDetails] = useState<Partial<Customer>>({});
     const [isSameAsBilling, setIsSameAsBilling] = useState(true);
     const [invoiceDetails, setInvoiceDetails] = useState({
-        companyGstin: 'YOUR_GSTIN_HERE',
-        companyStateName: 'YOUR_STATE',
-        companyStateCode: '00',
+        companyGstin: '',
+        companyStateName: '',
+        companyStateCode: '',
         hsnCode: '1006',
         taxRate: 5,
         isGstIncluded: false,

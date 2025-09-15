@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -115,10 +116,10 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                  <div className="flex justify-between items-start mb-4">
                     <div className="w-1/2">
                          <h2 className="font-bold text-3xl mb-1">{settings.companyName}</h2>
-                         <p className="text-gray-600 text-sm">{settings.address1}, {settings.address2}</p>
-                         <p className="text-gray-600 text-sm">State: {invoiceDetails.companyStateName} (Code: {invoiceDetails.companyStateCode})</p>
-                         <p className="text-gray-600 text-sm">GSTIN: {invoiceDetails.companyGstin}</p>
-                         <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.email}</p>
+                         <p className="text-gray-600 text-sm">{settings.companyAddress1}, {settings.companyAddress2}</p>
+                         <p className="text-gray-600 text-sm">State: {settings.companyStateName} (Code: {settings.companyStateCode})</p>
+                         <p className="text-gray-600 text-sm">GSTIN: {settings.companyGstin}</p>
+                         <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
                     </div>
                      <div className="text-right">
                         <h1 className="text-4xl font-bold text-gray-800 uppercase mb-1">BILL OF SUPPLY</h1>
@@ -209,10 +210,10 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                                 </div>
                             ) : (
                                <div className="text-xs space-y-0.5">
-                                    <p><span className="font-semibold">Bank:</span></p>
-                                    <p><span className="font-semibold">A/C No:</span></p>
-                                    <p><span className="font-semibold">Branch:</span></p>
-                                    <p><span className="font-semibold">IFSC:</span></p>
+                                    <p><span className="font-semibold">Bank:</span> {settings.bankName}</p>
+                                    <p><span className="font-semibold">A/C No:</span> {settings.accountNo}</p>
+                                    <p><span className="font-semibold">Branch:</span> {settings.branchName}</p>
+                                    <p><span className="font-semibold">IFSC:</span> {settings.ifscCode}</p>
                                 </div>
                             )}
                         </div>
@@ -230,7 +231,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                 <div className="border-t border-gray-300 pt-6 mt-6">
                     <div className="flex justify-between items-end">
                         <div className="w-3/5">
-                            <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Terms &amp; Conditions</h4>
+                            <h4 className="font-bold mb-2 text-gray-600 uppercase text-xs">Terms & Conditions</h4>
                             <ul className="list-disc list-inside text-gray-600 space-y-1 text-sm">
                                 <li>Goods once sold will not be taken back or exchanged.</li>
                                 <li>Interest @18% p.a. will be charged on all overdue payments.</li>

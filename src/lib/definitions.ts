@@ -368,15 +368,7 @@ export type ReceiptFieldSettings = {
     netWeight: boolean;
 };
 
-export type ReceiptSettings = {
-    companyName: string;
-    address1: string;
-    address2: string;
-    contactNo: string;
-    email: string;
-    companyGstin?: string;
-    companyStateName?: string;
-    companyStateCode?: string;
+export type ReceiptSettings = RtgsSettings & {
     fields: ReceiptFieldSettings;
     defaultBankAccountId?: string;
     defaultBank?: BankAccount;
