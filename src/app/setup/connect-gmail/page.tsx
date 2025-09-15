@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase';
-import { saveCompanySettings, getCompanySettings } from '@/lib/firestore';
+import { saveCompanySettings } from '@/lib/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -173,3 +173,5 @@ export default function ConnectGmailPage() {
         </div>
     );
 }
+
+    

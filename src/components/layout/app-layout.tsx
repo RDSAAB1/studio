@@ -13,7 +13,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import LoginPage from "@/app/login/page";
 import ConnectGmailPage from "@/app/setup/connect-gmail/page";
 import CompanyDetailsPage from "@/app/setup/company-details/page";
-import { getCompanySettings } from "@/lib/firestore";
+import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
 
 // Dynamically import pages to avoid server-side rendering issues
 const DashboardOverviewPage = React.lazy(() => import('@/app/dashboard-overview/page'));
@@ -62,6 +62,8 @@ const pageComponents: { [key: string]: React.FC<any> } = {
     "/collaboration": CollaborationPage,
     "/data-capture": DataCapturePage,
     "/settings": SettingsPage,
+    "/settings/bank-management": SettingsPage,
+    "/settings/printer": SettingsPage,
 };
 
 
@@ -157,75 +159,68 @@ const AppContent = () => {
 };
 
 const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+    const [user, setUser] = useState<User | null | undefined>(undefined);
+    const [setupState, setSetupState] = useState<'loading' | 'gmail' | 'company' | 'complete'>('loading');
     const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
         const auth = getFirebaseAuth();
 
-        // 1. Handle redirect result first
-        getRedirectResult(auth)
-            .then((result) => {
-                if (result) {
-                    // User signed in via redirect.
-                    // onAuthStateChanged will handle the rest.
-                }
-            })
-            .catch((error) => {
-                console.error("Error processing redirect result:", error);
-            })
-            .finally(() => {
-                 // 2. Set up the state change listener
-                const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                    setUser(currentUser);
-                    if (currentUser) {
-                        // User is logged in, check if setup is complete
-                        const settings = await getCompanySettings(currentUser.uid);
-                        const isSetupDone = !!(settings && settings.appPassword);
-                        setSetupComplete(isSetupDone);
-                    } else {
-                        // User is logged out
-                        setSetupComplete(false);
-                    }
-                    setLoading(false);
-                });
-                return () => unsubscribe(); // Cleanup listener on unmount
-            });
+        getRedirectResult(auth).catch(error => {
+            console.error("Error processing redirect result:", error);
+        });
 
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
+            if (currentUser) {
+                const gmailSettings = await getCompanySettings(currentUser.uid);
+                if (!gmailSettings?.appPassword) {
+                    setSetupState('gmail');
+                } else {
+                    const companySettings = await getRtgsSettings();
+                    if (!companySettings?.companyName || !companySettings.bankName) {
+                        setSetupState('company');
+                    } else {
+                        setSetupState('complete');
+                    }
+                }
+            } else {
+                setSetupState('loading'); // Reset state on logout
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (loading) return;
+        if (user === undefined) return; // Still waiting for initial auth state
 
         const isLoginPage = location.pathname === '/login';
         const isSetupPage = location.pathname.startsWith('/setup');
 
         if (!user) {
-            // No user, should be on login page
             if (!isLoginPage) {
                 navigate('/login');
             }
         } else {
-            // User is logged in
-            if (setupComplete === false) {
-                // Setup is not complete, redirect to setup
-                if (!isSetupPage) {
+            if (setupState === 'gmail') {
+                if (location.pathname !== '/setup/connect-gmail') {
                     navigate('/setup/connect-gmail');
                 }
-            } else if (setupComplete === true) {
-                // Setup is complete, should not be on login or setup
+            } else if (setupState === 'company') {
+                 if (location.pathname !== '/setup/company-details') {
+                    navigate('/setup/company-details');
+                }
+            } else if (setupState === 'complete') {
                 if (isLoginPage || isSetupPage || location.pathname === '/') {
                     navigate('/dashboard-overview');
                 }
             }
         }
-    }, [user, loading, setupComplete, navigate, location.pathname]);
+    }, [user, setupState, location.pathname, navigate]);
 
-
-    if (loading) {
+    if (user === undefined || (user && setupState === 'loading')) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -246,6 +241,7 @@ const AppRoutes = () => {
                 <Route path="/" element={<AppContent />}>
                     {Object.keys(pageComponents).map(path => {
                         const Component = pageComponents[path];
+                        if (!Component) return null;
                         return <Route key={path} path={path} element={<Component />} />
                     })}
                     <Route path="/" element={<DashboardOverviewPage />} />
@@ -266,3 +262,5 @@ const AppLayout = () => {
 export default function AppLayoutWrapper() {
     return <AppLayout />;
 }
+
+    
