@@ -148,19 +148,13 @@ const ScientificCalculator = () => {
                 handleInput(key);
             } else if (key === '.') {
                 handleInput('.');
-            } else if (key === '+') {
+            } else if (key === 'ArrowUp') {
                 handleOperator('+');
-            } else if (key === '=') {
-                handleOperator('+');
-            } else if (key === '-') {
+            } else if (key === 'ArrowDown') {
                 handleOperator('-');
-            } else if (key === '*') {
+            } else if (key === 'ArrowLeft') {
                 handleOperator('×');
-            } else if (key === '[') {
-                handleOperator('×');
-            } else if (key === '/') {
-                handleOperator('÷');
-            } else if (key === ']') {
+            } else if (key === 'ArrowRight') {
                 handleOperator('÷');
             } else if (key === 'Enter') {
                 handleEquals();
@@ -189,7 +183,7 @@ const ScientificCalculator = () => {
             <Card className="bg-muted/30 p-2 mb-2">
                  <CardContent className="p-1 text-xs text-muted-foreground flex items-center justify-center gap-2">
                     <Info size={16} className="flex-shrink-0" />
-                    <p className="font-mono">Enter → = | [ → × | ] → ÷ | = → + | Del/Esc → AC</p>
+                    <p className="font-mono">↑: +, ↓: -, ←: ×, →: ÷ | Del/Esc → AC</p>
                 </CardContent>
             </Card>
             <div className="relative h-16 w-full border rounded-lg bg-muted/50 p-2 text-right overflow-hidden">
@@ -624,3 +618,5 @@ export const AdvancedCalculator = () => {
         </Card>
     );
 };
+
+    
