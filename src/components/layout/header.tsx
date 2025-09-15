@@ -14,7 +14,7 @@ import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { DynamicIslandToaster } from "../ui/dynamic-island-toaster";
-import { Dialog, DialogContent, DialogTrigger } from "../ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 
 
@@ -125,6 +125,9 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="p-0 border-0 max-w-sm">
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>Advanced Calculator</DialogTitle>
+                    </DialogHeader>
                     <AdvancedCalculator />
                 </DialogContent>
             </Dialog>
