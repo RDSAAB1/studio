@@ -75,6 +75,10 @@ export type Customer = {
   // New field
   otherCharges?: number;
   advanceFreight?: number;
+  gatePassNo?: string;
+  grNo?: string;
+  grDate?: string;
+  transport?: string;
 };
 
 export type Transaction = {

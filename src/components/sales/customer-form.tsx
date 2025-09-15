@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -277,12 +278,6 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         <Label htmlFor="kanta" className="text-xs">Kanta</Label>
                         <InputWithIcon icon={<Landmark className="h-4 w-4 text-muted-foreground" />}>
                             <Controller name="kanta" control={form.control} render={({ field }) => (<Input id="kanta" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
-                        </InputWithIcon>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="advanceFreight" className="text-xs">Advance/Freight</Label>
-                        <InputWithIcon icon={<Truck className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="advanceFreight" control={form.control} render={({ field }) => (<Input id="advanceFreight" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                         </InputWithIcon>
                     </div>
                 </div>
