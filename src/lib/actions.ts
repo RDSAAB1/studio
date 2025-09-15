@@ -1,12 +1,9 @@
-// NOTE: Server actions are not supported with static export
-// This file has been disabled for Netlify deployment
-// To re-enable email functionality, consider using Netlify Functions or a third-party service
 
-/*
 'use server';
 
 import nodemailer from 'nodemailer';
 import { getCompanySettings } from './firestore';
+import { getFirebaseAuth } from './firebase'; // Not used here, but good practice if needed
 
 interface AttachmentData {
     filename: string;
@@ -37,7 +34,7 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
             return { success: false, error: "Email configuration mismatch. Please re-configure your email settings." };
         }
 
-        const transporter = nodemailer.createTransporter({
+        const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
                 user: companySettings.email,
@@ -72,10 +69,15 @@ export async function sendEmailWithAttachment(options: EmailOptions): Promise<{ 
         return { success: false, error: errorMessage };
     }
 }
-*/
 
-// Placeholder function for static export
-export async function sendEmailWithAttachment(options: any): Promise<{ success: boolean; error?: string }> {
-    console.warn('Email functionality is disabled for static export. Consider using Netlify Functions for email support.');
-    return { success: false, error: "Email functionality is not available in static export mode. Please use Netlify Functions or a third-party service." };
+export async function sendPasswordResetLink(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        // This action isn't strictly needed as Firebase client SDK handles it,
+        // but can be useful for server-side requests or more complex flows.
+        // For now, we'll keep the logic on the client for simplicity.
+        // This is a placeholder for potential future server-side email logic.
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 }
