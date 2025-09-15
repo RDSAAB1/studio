@@ -2,66 +2,57 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getFirebaseAuth, getGoogleProvider, onAuthStateChanged } from '@/lib/firebase';
-import { signInWithRedirect, type User, getRedirectResult } from 'firebase/auth';
+import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
+import { signInWithRedirect, getRedirectResult, type User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogIn, Sparkles } from 'lucide-react';
-import { getCompanySettings } from '@/lib/firestore';
-
 
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
-    const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const auth = getFirebaseAuth();
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                getCompanySettings(currentUser.uid).then(settings => {
-                    if (settings?.appPassword) {
-                         router.replace('/dashboard-overview');
-                    } else {
-                        router.replace('/setup/connect-gmail');
-                    }
-                }).catch(() => {
-                     router.replace('/dashboard-overview');
-                });
-            } else {
-                setUser(null);
+        const processRedirect = async () => {
+            try {
+                setLoading(true);
+                const auth = getFirebaseAuth();
+                const result = await getRedirectResult(auth);
+                if (result?.user) {
+                    // User is signed in via redirect.
+                    // The onAuthStateChanged listener in AppLayout will handle the routing.
+                    toast({ title: "Signed in successfully!", variant: 'success' });
+                }
+            } catch (error: any) {
+                console.error("Google Sign-In Redirect Error:", error);
+                if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+                    toast({
+                        title: "Login Failed",
+                        description: "Could not sign in with Google. Please try again.",
+                        variant: "destructive",
+                    });
+                }
+            } finally {
                 setLoading(false);
             }
-        });
-        
-        // Handle redirect result
-        getRedirectResult(auth).catch((error) => {
-            console.error("Google Sign-In Redirect Error:", error);
-            if (error.code !== 'auth/popup-closed-by-user') { // Ignore user closing the popup
-                toast({
-                    title: "Login Failed",
-                    description: "Could not sign in with Google. Please try again.",
-                    variant: "destructive",
-                });
-            }
-            setLoading(false);
-        });
+        };
 
-        return () => unsubscribe();
-    }, [router, toast]);
+        processRedirect();
+    }, [toast, router]);
+
 
     const handleGoogleSignIn = async () => {
         const auth = getFirebaseAuth();
         const provider = getGoogleProvider();
         setLoading(true);
+        // We use signInWithRedirect which is more robust in different environments
         await signInWithRedirect(auth, provider);
     };
     
-    if (loading || user) {
+    if (loading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

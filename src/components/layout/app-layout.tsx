@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, type ReactNode } from "react";
-import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider, useLocation, useNavigate, MemoryRouter } from 'react-router-dom';
 import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase';
 import type { User } from "firebase/auth";
 import { Loader2 } from 'lucide-react';
@@ -36,6 +36,7 @@ import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
 import TabBar from './tab-bar';
 import { ScrollArea } from "../ui/scroll-area";
 import LoginPage from "@/app/login/page";
+import { getCompanySettings } from "@/lib/firestore";
 
 
 const pageComponents: { [key: string]: React.FC<any> } = {
@@ -77,9 +78,8 @@ const AppContent = () => {
       const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
       if (dashboardTab) {
           setOpenTabs([dashboardTab]);
-          navigate('/dashboard-overview');
       }
-    }, [navigate]);
+    }, []);
 
     useEffect(() => {
         const currentPathId = location.pathname.substring(1);
@@ -160,24 +160,39 @@ const AppContent = () => {
     );
 };
 
-const router = createMemoryRouter([
-    { path: "*", Component: AppLayoutContent }
-]);
 
-function AppLayoutContent() {
+const AppLayoutContent = () => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
+            if (currentUser) {
+                // If user is logged in, check for setup completion
+                const settings = await getCompanySettings(currentUser.uid);
+                if (!settings?.appPassword) {
+                    if(location.pathname !== '/setup/connect-gmail') navigate('/setup/connect-gmail');
+                } else {
+                     if(location.pathname === '/login' || location.pathname === '/' || location.pathname.startsWith('/setup')) {
+                        navigate('/dashboard-overview');
+                     }
+                }
+            } else {
+                // If user is not logged in, redirect to login page
+                if (location.pathname !== '/login') {
+                    navigate('/login');
+                }
+            }
             setLoading(false);
         });
-        return () => unsubscribe();
-    }, []);
 
+        return () => unsubscribe();
+    }, [navigate, location.pathname]);
+    
     if (loading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -186,20 +201,17 @@ function AppLayoutContent() {
         );
     }
     
-    if (!user && location.pathname !== '/login') {
-         return <LoginPage />;
+    if (!user) {
+        return <LoginPage />;
     }
 
-    if (user && location.pathname === '/login') {
-        const navigate = useNavigate();
-        useEffect(() => { navigate('/dashboard-overview'); }, [navigate]);
-        return null;
-    }
-    
-    return <AppContent/>;
+    return <AppContent />;
 }
 
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-    return <RouterProvider router={router}/>;
+    return (
+      <MemoryRouter>
+          <AppLayoutContent/>
+      </MemoryRouter>
+    )
 }
