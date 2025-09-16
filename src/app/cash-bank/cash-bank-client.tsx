@@ -23,7 +23,7 @@ import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Sc
 import { format, addMonths, differenceInMonths, parseISO } from "date-fns";
 
 import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
-import { cashBankFormSchemas, type TransferValues } from "./formSchemas";
+import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 
@@ -603,4 +603,3 @@ export default function CashBankClient() {
         </div>
     );
 }
-
