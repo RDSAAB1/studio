@@ -428,7 +428,6 @@ export default function SettingsPage() {
         bankBranches
             .filter(branch => branch.bankName === currentBankAccount.bankName)
             .forEach(branch => {
-                // Use a unique key for each item, like the IFSC code, to prevent duplicate keys
                 if (!uniqueBranches.has(branch.ifscCode)) {
                     uniqueBranches.set(branch.ifscCode, { value: branch.ifscCode, label: branch.branchName });
                 }
@@ -742,5 +741,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    
