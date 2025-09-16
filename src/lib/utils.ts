@@ -87,7 +87,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     
     const netWeight = weight - kartaWeight;
     
-    const amount = Math.round(netWeight * rate); // Changed from weight to netWeight
+    const amount = Math.round(weight * rate); // Changed from netWeight to weight as per user request
 
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = Math.round(weight * labouryRate);
