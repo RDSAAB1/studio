@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose
 } from "@/components/ui/dialog";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { bankNames } from '@/lib/data';
@@ -572,7 +573,7 @@ export default function SettingsPage() {
                             <Plus className="mr-2 h-4 w-4"/> Add Bank Account
                         </Button>
                      }>
-                        <ScrollArea className="h-80 border rounded-md">
+                        <ScrollArea className="h-80 border rounded-md [&_[data-radix-scroll-area-thumb]]:bg-primary">
                             {bankAccounts.map(account => {
                                 const isDefault = receiptSettings?.defaultBankAccountId === account.id;
                                 return (
@@ -688,7 +689,7 @@ export default function SettingsPage() {
             </Tabs>
 
             <Dialog open={isBankAccountDialogOpen} onOpenChange={setIsBankAccountDialogOpen}>
-                <DialogContent className="sm:max-w-md p-0" onKeyDown={handleDialogKeyDown}>
+                <DialogContent className="max-w-md p-0 grid-rows-[auto_1fr_auto]" onKeyDown={handleDialogKeyDown}>
                     <DialogHeader className="p-6 pb-0">
                         <DialogTitle>{currentBankAccount.id ? 'Edit' : 'Add'} Bank Account</DialogTitle>
                     </DialogHeader>
@@ -741,3 +742,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
