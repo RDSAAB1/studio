@@ -31,6 +31,7 @@ interface CalculatedSummaryProps {
     onImport?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onExport?: () => void;
     onDeleteSelected?: () => void;
+    onDeleteAll?: () => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -67,6 +68,7 @@ export const CalculatedSummary = ({
     onImport,
     onExport,
     onDeleteSelected,
+    onDeleteAll
 }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
@@ -102,7 +104,7 @@ export const CalculatedSummary = ({
                             </InputWithIcon>
                          )}
                          {onImport && (
-                            <Button asChild size="sm" variant="outline" className="h-8 relative">
+                            <Button asChild size="sm" variant="outline" className="h-8 relative" type="button">
                                 <label htmlFor="import-file">
                                     <Upload className="mr-2 h-4 w-4"/> Import
                                     <input id="import-file" type="file" className="sr-only" onChange={onImport} accept=".xlsx, .xls"/>
@@ -110,14 +112,14 @@ export const CalculatedSummary = ({
                             </Button>
                          )}
                          {onExport && (
-                            <Button onClick={onExport} size="sm" variant="outline" className="h-8">
+                            <Button onClick={onExport} size="sm" variant="outline" className="h-8" type="button">
                             <Download className="mr-2 h-4 w-4"/> Export
                             </Button>
                          )}
                          {onDeleteSelected && selectedIdsCount > 0 && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="destructive" className="h-8">
+                                    <Button size="sm" variant="destructive" className="h-8" type="button">
                                         <Trash2 className="mr-2 h-4 w-4"/> Delete Selected ({selectedIdsCount})
                                     </Button>
                                 </AlertDialogTrigger>
@@ -135,6 +137,27 @@ export const CalculatedSummary = ({
                                 </AlertDialogContent>
                             </AlertDialog>
                          )}
+                         {onDeleteAll && (
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button size="sm" variant="destructive" className="h-8" type="button">
+                                        <Trash2 className="mr-2 h-4 w-4"/> Delete All
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>DELETE ALL ENTRIES?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action is irreversible. This will permanently delete ALL supplier entries and ALL payment history. Are you absolutely sure?
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={onDeleteAll}>Yes, Delete Everything</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                         )}
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -147,6 +170,7 @@ export const CalculatedSummary = ({
 
                         {onPrint && (
                              <Button
+                                type="button"
                                 onClick={onPrint}
                                 size="sm"
                                 className="h-8 rounded-md"
@@ -160,7 +184,7 @@ export const CalculatedSummary = ({
                        {onSaveAndPrint && isCustomerForm && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button size="sm" className="h-8 rounded-md" disabled={isLoading}>
+                                <Button size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
                                     <Save className="mr-2 h-4 w-4" /> Save & Print <ChevronsUpDown className="ml-2 h-4 w-4"/>
                                 </Button>
                             </DropdownMenuTrigger>
@@ -173,7 +197,7 @@ export const CalculatedSummary = ({
                        )}
 
                         {onSaveAndPrint && !isCustomerForm && (
-                            <Button onClick={() => onSaveAndPrint('receipt')} size="sm" className="h-8 rounded-md" disabled={isLoading}>
+                            <Button onClick={() => onSaveAndPrint('receipt')} size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
                                 <Save className="mr-2 h-4 w-4" /> Save & Print
                             </Button>
                         )}
@@ -181,7 +205,7 @@ export const CalculatedSummary = ({
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading}>
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                         </Button>
-                        <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading}>
+                        <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading} type="button">
                             <PlusCircle className="mr-2 h-4 w-4" /> New
                         </Button>
                     </div>
