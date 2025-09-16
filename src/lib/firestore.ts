@@ -1,6 +1,6 @@
 
 
-import { db } from "./firebase";
+import { db } from "./database";
 import {
   collection,
   getDocs,
@@ -20,32 +20,33 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
+import { db as firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
 
-const suppliersCollection = collection(db, "suppliers");
-const customersCollection = collection(db, "customers");
-const supplierPaymentsCollection = collection(db, "payments");
-const customerPaymentsCollection = collection(db, "customer_payments");
-const incomesCollection = collection(db, "incomes");
-const expensesCollection = collection(db, "expenses");
-const loansCollection = collection(db, "loans");
-const fundTransactionsCollection = collection(db, "fund_transactions");
-const banksCollection = collection(db, "banks");
-const bankBranchesCollection = collection(db, "bankBranches");
-const bankAccountsCollection = collection(db, "bankAccounts");
-const settingsCollection = collection(db, "settings");
-const optionsCollection = collection(db, "options");
-const usersCollection = collection(db, "users");
+const suppliersCollection = collection(firestoreDB, "suppliers");
+const customersCollection = collection(firestoreDB, "customers");
+const supplierPaymentsCollection = collection(firestoreDB, "payments");
+const customerPaymentsCollection = collection(firestoreDB, "customer_payments");
+const incomesCollection = collection(firestoreDB, "incomes");
+const expensesCollection = collection(firestoreDB, "expenses");
+const loansCollection = collection(firestoreDB, "loans");
+const fundTransactionsCollection = collection(firestoreDB, "fund_transactions");
+const banksCollection = collection(firestoreDB, "banks");
+const bankBranchesCollection = collection(firestoreDB, "bankBranches");
+const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
+const settingsCollection = collection(firestoreDB, "settings");
+const optionsCollection = collection(firestoreDB, "options");
+const usersCollection = collection(firestoreDB, "users");
 
 // --- User Refresh Token Functions ---
 export async function saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
-    const userDocRef = doc(db, "users", userId);
+    const userDocRef = doc(firestoreDB, "users", userId);
     await setDoc(userDocRef, { refreshToken: refreshToken }, { merge: true });
 }
 
 export async function getRefreshToken(userId: string): Promise<string | null> {
-    const userDocRef = doc(db, "users", userId);
+    const userDocRef = doc(firestoreDB, "users", userId);
     const docSnap = await getDoc(userDocRef);
     if (docSnap.exists() && docSnap.data().refreshToken) {
         return docSnap.data().refreshToken;
@@ -95,7 +96,7 @@ export async function deleteOption(collectionName: string, id: string, name: str
 
 export async function getCompanySettings(userId: string): Promise<{ email: string; appPassword: string } | null> {
     if (!userId) return null;
-    const docRef = doc(db, "users", userId);
+    const docRef = doc(firestoreDB, "users", userId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
         const data = docSnap.data();
@@ -108,12 +109,12 @@ export async function getCompanySettings(userId: string): Promise<{ email: strin
 }
 
 export async function saveCompanySettings(userId: string, settings: { email: string; appPassword: string }): Promise<void> {
-    const userDocRef = doc(db, "users", userId);
+    const userDocRef = doc(firestoreDB, "users", userId);
     await setDoc(userDocRef, settings, { merge: true });
 }
 
 export async function deleteCompanySettings(userId: string): Promise<void> {
-    const userDocRef = doc(db, "users", userId);
+    const userDocRef = doc(firestoreDB, "users", userId);
     await updateDoc(userDocRef, {
         appPassword: '' 
     });
@@ -228,29 +229,29 @@ export function getBankBranchesRealtime(callback: (branches: BankBranch[]) => vo
 }
 
 export async function addBank(bankName: string): Promise<Bank> {
-  const docRef = doc(db, 'banks', bankName);
+  const docRef = doc(firestoreDB, 'banks', bankName);
   await setDoc(docRef, { name: bankName });
   return { id: docRef.id, name: bankName };
 }
 
 export async function deleteBank(id: string): Promise<void> {
-    const docRef = doc(db, "banks", id);
+    const docRef = doc(firestoreDB, "banks", id);
     await deleteDoc(docRef);
 }
 
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
-    const docRef = doc(db, 'bankBranches', branchData.ifscCode);
+    const docRef = doc(firestoreDB, 'bankBranches', branchData.ifscCode);
     await setDoc(docRef, branchData);
     return { id: docRef.id, ...branchData };
 }
 
 export async function updateBankBranch(id: string, branchData: Partial<BankBranch>): Promise<void> {
-    const docRef = doc(db, "bankBranches", id);
+    const docRef = doc(firestoreDB, "bankBranches", id);
     await updateDoc(docRef, branchData);
 }
 
 export async function deleteBankBranch(id: string): Promise<void> {
-    const docRef = doc(db, "bankBranches", id);
+    const docRef = doc(firestoreDB, "bankBranches", id);
     await deleteDoc(docRef);
 }
 
@@ -285,17 +286,25 @@ export async function deleteBankAccount(id: string): Promise<void> {
 // --- Supplier Functions ---
 
 export function getSuppliersRealtime(callback: (suppliers: Customer[]) => void, onError: (error: Error) => void): () => void {
+  // First, get data from IndexedDB
+  db.mainDataStore.where('id').startsWith('S').toArray().then(callback);
+
+  // Then, listen for real-time updates from Firestore
   const q = query(suppliersCollection, orderBy("srNo", "asc"));
   return onSnapshot(q, (snapshot) => {
     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+    db.mainDataStore.bulkPut(data); // Update local DB
     callback(data);
   }, onError);
 }
 
 export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
-    const docRef = doc(db, 'suppliers', supplierData.srNo);
+    const docRef = doc(firestoreDB, 'suppliers', supplierData.srNo);
     const newSupplier = { ...supplierData, id: docRef.id };
-    await setDoc(docRef, newSupplier);
+
+    await db.mainDataStore.put(newSupplier);
+    await db.syncQueueStore.add({ action: 'create', payload: { collection: 'suppliers', data: newSupplier }, timestamp: Date.now() });
+
     return newSupplier;
 }
 
@@ -304,14 +313,10 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
     console.error("updateSupplier requires a valid ID.");
     return false;
   }
-  const supplierRef = doc(db, "suppliers", id);
-  const supplierDoc = await getDoc(supplierRef);
+  
+  await db.mainDataStore.update(id, supplierData);
+  await db.syncQueueStore.add({ action: 'update', payload: { collection: 'suppliers', id, changes: supplierData }, timestamp: Date.now() });
 
-  if (!supplierDoc.exists()) {
-    console.error(`FirebaseError: No document to update: suppliers/${id}`);
-    return false;
-  }
-  await updateDoc(supplierRef, supplierData);
   return true;
 }
 
@@ -320,15 +325,21 @@ export async function deleteSupplier(id: string): Promise<void> {
     console.error("deleteSupplier requires a valid ID.");
     return;
   }
-  await deleteDoc(doc(db, "suppliers", id));
+  await db.mainDataStore.delete(id);
+  await db.syncQueueStore.add({ action: 'delete', payload: { collection: 'suppliers', id }, timestamp: Date.now() });
 }
 
 // --- Customer Functions ---
 
 export function getCustomersRealtime(callback: (customers: Customer[]) => void, onError: (error: Error) => void): () => void {
+  // First, get data from IndexedDB
+  db.mainDataStore.where('id').startsWith('C').toArray().then(callback);
+  
+  // Then, listen for real-time updates from Firestore
   const q = query(customersCollection, orderBy("srNo", "asc"));
   return onSnapshot(q, (querySnapshot) => {
     const customers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+    db.mainDataStore.bulkPut(customers); // Update local DB
     callback(customers);
   }, (error) => {
       console.error("Error fetching customers in real-time:", error);
@@ -337,9 +348,12 @@ export function getCustomersRealtime(callback: (customers: Customer[]) => void, 
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {
-    const docRef = doc(db, 'customers', customerData.srNo);
+    const docRef = doc(firestoreDB, 'customers', customerData.srNo);
     const newCustomer = { ...customerData, id: docRef.id };
-    await setDoc(docRef, newCustomer);
+    
+    await db.mainDataStore.put(newCustomer);
+    await db.syncQueueStore.add({ action: 'create', payload: { collection: 'customers', data: newCustomer }, timestamp: Date.now() });
+
     return newCustomer;
 }
 
@@ -348,13 +362,8 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
         console.error("updateCustomer requires a valid ID.");
         return false;
     }
-    const customerRef = doc(db, "customers", id);
-    const customerDoc = await getDoc(customerRef);
-    if (!customerDoc.exists()) {
-        console.error(`FirebaseError: No document to update: customers/${id}`);
-        return false;
-    }
-    await updateDoc(customerRef, customerData as any);
+    await db.mainDataStore.update(id, customerData);
+    await db.syncQueueStore.add({ action: 'update', payload: { collection: 'customers', id, changes: customerData }, timestamp: Date.now() });
     return true;
 }
 
@@ -363,25 +372,38 @@ export async function deleteCustomer(id: string): Promise<void> {
       console.error("deleteCustomer requires a valid ID.");
       return;
     }
-    await deleteDoc(doc(db, "customers", id));
+    await db.mainDataStore.delete(id);
+    await db.syncQueueStore.add({ action: 'delete', payload: { collection: 'customers', id }, timestamp: Date.now() });
 }
 
 // --- Inventory Item Functions ---
 export function getInventoryItems(callback: (items: any[]) => void, onError: (error: Error) => void) {
-  const q = query(collection(db, "inventoryItems"), orderBy("createdAt", "desc"));
+  // First, get data from IndexedDB
+  db.mainDataStore.where('collection').equals('inventoryItems').toArray().then(callback);
+
+  const q = query(collection(firestoreDB, "inventoryItems"), orderBy("createdAt", "desc"));
   return onSnapshot(q, (snapshot) => {
-    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const items = snapshot.docs.map(doc => ({ id: doc.id, collection: 'inventoryItems', ...doc.data() }));
+    db.mainDataStore.bulkPut(items);
     callback(items);
   }, onError);
 }
 export async function addInventoryItem(item: any) {
-  return await addDoc(collection(db, "inventoryItems"), item);
+  const newId = doc(collection(firestoreDB, "inventoryItems")).id;
+  const newItem = { ...item, id: newId, collection: 'inventoryItems' };
+  
+  await db.mainDataStore.put(newItem);
+  await db.syncQueueStore.add({ action: 'create', payload: { collection: 'inventoryItems', data: newItem }, timestamp: Date.now() });
+  
+  return newItem;
 }
 export async function updateInventoryItem(id: string, item: any) {
-  return await updateDoc(doc(db, "inventoryItems", id), item);
+  await db.mainDataStore.update(id, item);
+  await db.syncQueueStore.add({ action: 'update', payload: { collection: 'inventoryItems', id, changes: item }, timestamp: Date.now() });
 }
 export async function deleteInventoryItem(id: string) {
-  return await deleteDoc(doc(db, "inventoryItems", id));
+  await db.mainDataStore.delete(id);
+  await db.syncQueueStore.add({ action: 'delete', payload: { collection: 'inventoryItems', id }, timestamp: Date.now() });
 }
 
 
@@ -411,7 +433,7 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   
   const paymentsSnapshot = await getDocs(query(supplierPaymentsCollection));
   
-  const batch = writeBatch(db);
+  const batch = writeBatch(firestoreDB);
   let paymentsDeleted = 0;
 
   paymentsSnapshot.forEach(paymentDoc => {
@@ -444,7 +466,7 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
   const q = query(customerPaymentsCollection, where("paidFor", "array-contains", { srNo }));
   const paymentsSnapshot = await getDocs(q);
   
-  const batch = writeBatch(db);
+  const batch = writeBatch(firestoreDB);
   paymentsSnapshot.forEach(doc => {
       batch.delete(doc.ref);
   });
@@ -486,7 +508,7 @@ export async function deleteFundTransaction(id: string): Promise<void> {
 // --- Income/Expense Category Functions ---
 
 export function getIncomeCategories(callback: (data: IncomeCategory[]) => void, onError: (error: Error) => void) {
-    const q = query(collection(db, "incomeCategories"), orderBy("name"));
+    const q = query(collection(firestoreDB, "incomeCategories"), orderBy("name"));
     return onSnapshot(q, (snapshot) => {
         const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncomeCategory));
         callback(categories);
@@ -494,7 +516,7 @@ export function getIncomeCategories(callback: (data: IncomeCategory[]) => void, 
 }
 
 export function getExpenseCategories(callback: (data: ExpenseCategory[]) => void, onError: (error: Error) => void) {
-    const q = query(collection(db, "expenseCategories"), orderBy("name"));
+    const q = query(collection(firestoreDB, "expenseCategories"), orderBy("name"));
     return onSnapshot(q, (snapshot) => {
         const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseCategory));
         callback(categories);
@@ -502,25 +524,25 @@ export function getExpenseCategories(callback: (data: ExpenseCategory[]) => void
 }
 
 export async function addCategory(collectionName: "incomeCategories" | "expenseCategories", category: { name: string; nature?: string }) {
-    await addDoc(collection(db, collectionName), { ...category, subCategories: [] });
+    await addDoc(collection(firestoreDB, collectionName), { ...category, subCategories: [] });
 }
 
 export async function updateCategoryName(collectionName: "incomeCategories" | "expenseCategories", id: string, name: string) {
-    await updateDoc(doc(db, collectionName, id), { name });
+    await updateDoc(doc(firestoreDB, collectionName, id), { name });
 }
 
 export async function deleteCategory(collectionName: "incomeCategories" | "expenseCategories", id: string) {
-    await deleteDoc(doc(db, collectionName, id));
+    await deleteDoc(doc(firestoreDB, collectionName, id));
 }
 
 export async function addSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
-    await updateDoc(doc(db, collectionName, categoryId), {
+    await updateDoc(doc(firestoreDB, collectionName, categoryId), {
         subCategories: arrayUnion(subCategoryName)
     });
 }
 
 export async function deleteSubCategory(collectionName: "incomeCategories" | "expenseCategories", categoryId: string, subCategoryName: string) {
-    await updateDoc(doc(db, collectionName, categoryId), {
+    await updateDoc(doc(firestoreDB, collectionName, categoryId), {
         subCategories: arrayRemove(subCategoryName)
     });
 }
@@ -532,7 +554,7 @@ export function getAttendanceForDateRealtime(
   callback: (records: AttendanceEntry[]) => void, 
   onError: (error: Error) => void
 ): () => void {
-    const q = query(collection(db, "attendance"), where("date", "==", date));
+    const q = query(collection(firestoreDB, "attendance"), where("date", "==", date));
     return onSnapshot(q, (snapshot) => {
         const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceEntry));
         callback(records);
@@ -540,12 +562,12 @@ export function getAttendanceForDateRealtime(
 }
 
 export async function setAttendance(entry: AttendanceEntry): Promise<void> {
-    const docRef = doc(db, "attendance", entry.id);
+    const docRef = doc(firestoreDB, "attendance", entry.id);
     await setDoc(docRef, entry, { merge: true });
 }
 
 // --- Project Functions ---
-const projectsCollection = collection(db, "projects");
+const projectsCollection = collection(firestoreDB, "projects");
 
 export function getProjectsRealtime(callback: (projects: Project[]) => void, onError: (error: Error) => void): () => void {
     const q = query(projectsCollection, orderBy("startDate", "desc"));
@@ -561,12 +583,12 @@ export async function addProject(projectData: Omit<Project, 'id'>): Promise<Proj
 }
 
 export async function updateProject(id: string, projectData: Partial<Project>): Promise<void> {
-    const projectRef = doc(db, "projects", id);
+    const projectRef = doc(firestoreDB, "projects", id);
     await updateDoc(projectRef, projectData);
 }
 
 export async function deleteProject(id: string): Promise<void> {
-    const projectRef = doc(db, "projects", id);
+    const projectRef = doc(firestoreDB, "projects", id);
     await deleteDoc(projectRef);
 }
 
@@ -581,8 +603,8 @@ export function getLoansRealtime(callback: (loans: Loan[]) => void, onError: (er
 }
 
 export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
-    return runTransaction(db, async (transaction) => {
-        const newLoanRef = doc(collection(db, "loans"));
+    return runTransaction(firestoreDB, async (transaction) => {
+        const newLoanRef = doc(collection(firestoreDB, "loans"));
         transaction.set(newLoanRef, { ...loanData, id: newLoanRef.id });
 
         if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
@@ -601,12 +623,12 @@ export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
 }
 
 export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<void> {
-    const loanRef = doc(db, "loans", id);
+    const loanRef = doc(firestoreDB, "loans", id);
     await updateDoc(loanRef, loanData);
 }
 
 export async function deleteLoan(id: string): Promise<void> {
-    const loanRef = doc(db, "loans", id);
+    const loanRef = doc(firestoreDB, "loans", id);
     await deleteDoc(loanRef);
 }
 
@@ -614,18 +636,18 @@ export async function deleteLoan(id: string): Promise<void> {
 // --- Customer Payment Functions ---
 
 export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'>): Promise<CustomerPayment> {
-    const docRef = doc(db, 'customer_payments', paymentData.paymentId);
+    const docRef = doc(firestoreDB, 'customer_payments', paymentData.paymentId);
     await setDoc(docRef, { ...paymentData, id: docRef.id });
     return { ...paymentData, id: docRef.id };
 }
 
 export async function deletePayment(id: string): Promise<void> {
-    const docRef = doc(db, "payments", id);
+    const docRef = doc(firestoreDB, "payments", id);
     await deleteDoc(docRef);
 }
 
 export async function deleteCustomerPayment(id: string): Promise<void> {
-    const docRef = doc(db, "customer_payments", id);
+    const docRef = doc(firestoreDB, "customer_payments", id);
     await deleteDoc(docRef);
 }
 
@@ -708,4 +730,5 @@ export async function addTransaction(transactionData: Omit<Transaction, 'id'|'tr
     return addDoc(collectionRef, transactionData);
 }
     
+
 
