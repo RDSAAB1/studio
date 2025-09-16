@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from 'next/dynamic';
-import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,9 @@ import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter } from "next/navigation";
+import { db, syncData } from "@/lib/database";
+import { useLiveQuery } from "dexie-react-hooks";
+import { useToast } from "@/hooks/use-toast";
 
 const DynamicIslandToaster = dynamic(
   () => import('../ui/dynamic-island-toaster').then(mod => mod.DynamicIslandToaster),
@@ -26,6 +29,39 @@ const DynamicIslandToaster = dynamic(
 interface HeaderProps {
   toggleSidebar: () => void;
 }
+
+const SyncButton = () => {
+    const { toast } = useToast();
+    const [isSyncing, setIsSyncing] = useState(false);
+    const pendingSyncs = useLiveQuery(() => db.syncQueueStore.count(), []);
+
+    const handleSync = async () => {
+        setIsSyncing(true);
+        const result = await syncData();
+        if (result.success) {
+            if (result.syncedCount > 0) {
+                toast({ title: "Sync Complete", description: `${result.syncedCount} item(s) synced with the server.`, variant: 'success' });
+            } else {
+                toast({ title: "Already Up-to-Date", description: "Your data is already synced with the server." });
+            }
+        } else {
+            toast({ title: "Sync Failed", description: result.error || "Could not sync with the server.", variant: "destructive" });
+        }
+        setIsSyncing(false);
+    };
+
+    return (
+        <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="relative">
+            <RefreshCw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
+            {pendingSyncs !== undefined && pendingSyncs > 0 && !isSyncing && (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px]">
+                    {pendingSyncs}
+                </span>
+            )}
+            <span className="sr-only">Sync Data</span>
+        </Button>
+    );
+};
 
 const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
@@ -202,6 +238,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
+          <SyncButton />
           <NotificationBell />
           <DraggableCalculator />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
