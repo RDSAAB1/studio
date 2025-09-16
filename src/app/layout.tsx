@@ -1,6 +1,6 @@
 
 "use client";
-import { useEffect } from 'react';
+
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -30,18 +30,6 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-          console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, err => {
-          console.log('ServiceWorker registration failed: ', err);
-        });
-      });
-    }
-  }, []);
 
   return (
     <html lang="en">
