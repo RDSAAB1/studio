@@ -1,13 +1,14 @@
+// sw.js
 
 const CACHE_NAME = 'bizsuite-dataflow-cache-v1';
-const PRECACHE_URLS = [
+const urlsToCache = [
   '/',
   '/dashboard-overview',
   '/sales/supplier-entry',
-  '/sales/supplier-payments',
-  '/sales/supplier-profile',
   '/sales/customer-entry',
+  '/sales/supplier-payments',
   '/sales/customer-payments',
+  '/sales/supplier-profile',
   '/sales/customer-profile',
   '/cash-bank',
   '/expense-tracker',
@@ -26,78 +27,108 @@ const PRECACHE_URLS = [
   '/settings',
   '/settings/bank-management',
   '/settings/printer',
+  '/manifest.json',
+  '/favicon.ico',
 ];
 
-// Install event: precache the app shell and other important assets.
 self.addEventListener('install', event => {
+  console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache and precaching URLs');
-        return cache.addAll(PRECACHE_URLS);
+        console.log('Service Worker: Caching app shell');
+        return cache.addAll(urlsToCache);
       })
       .then(() => {
-        // Force the waiting service worker to become the active service worker.
+        console.log('Service Worker: App shell cached successfully');
         return self.skipWaiting();
       })
   );
 });
 
-// Activate event: clean up old caches and take control of clients.
 self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
+  console.log('Service Worker: Activating...');
+  // Claim clients to take control of the page without a reload
+  event.waitUntil(self.clients.claim());
+  // Send a message to the client to notify of activation
+  self.clients.matchAll().then(clients => {
+    clients.forEach(client => client.postMessage({ type: 'SW_ACTIVATED' }));
+  });
+
+  // Clean up old caches
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+        cacheNames.map(cache => {
+          if (cache !== CACHE_NAME) {
+            console.log('Service Worker: Clearing old cache', cache);
+            return caches.delete(cache);
           }
         })
       );
-    }).then(() => {
-        // Take control of all open clients (tabs) to ensure the new SW is used.
-        return self.clients.claim();
-    }).then(() => {
-        // Notify clients that the new service worker is active.
-        self.clients.matchAll().then(clients => {
-            clients.forEach(client => client.postMessage({ type: 'SW_ACTIVATED' }));
-        });
     })
   );
 });
 
-// Fetch event: serve from cache first, then network.
+
 self.addEventListener('fetch', event => {
-  // We only want to handle GET requests.
-  if (event.request.method !== 'GET') {
+  // Let the browser handle requests for scripts from cloudworkstations.dev
+  if (event.request.url.includes('cloudworkstations.dev/_next/static/')) {
+    return;
+  }
+
+  // Handle navigation requests (for pages) with a network-first strategy, falling back to cache.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        // If network fails, serve the root from cache, allowing client-side routing to take over.
+        return caches.match('/');
+      })
+    );
     return;
   }
   
+  // For all other requests (CSS, JS, images), use a cache-first strategy.
   event.respondWith(
     caches.match(event.request)
-      .then(response => {
-        // If the response is in the cache, return it.
-        if (response) {
-          return response;
+      .then(cachedResponse => {
+        // If the response is in the cache, return it
+        if (cachedResponse) {
+          return cachedResponse;
         }
 
-        // If the response is not in the cache, fetch it from the network.
-        return fetch(event.request)
-          .then(networkResponse => {
-            // And also cache the new response for future use.
-            return caches.open(CACHE_NAME).then(cache => {
-              // We have to clone the response because it's a stream and can only be consumed once.
-              cache.put(event.request, networkResponse.clone());
-              return networkResponse;
+        // If not in cache, fetch from the network
+        return fetch(event.request).then(networkResponse => {
+          // Clone the response because it's a stream and can only be consumed once
+          const responseToCache = networkResponse.clone();
+          
+          // Open the dynamic cache and add the new response
+          caches.open('dynamic-cache-v1')
+            .then(cache => {
+              cache.put(event.request, responseToCache);
             });
-          });
-      })
-      .catch(() => {
-        // If both cache and network fail (e.g., offline and not in cache),
-        // you could return a fallback page here.
-        // For now, it will result in the default browser offline error.
+            
+          // Return the original network response to the browser
+          return networkResponse;
+        }).catch(error => {
+          // This catch is crucial for when the user is offline and the resource is not in the cache.
+          console.error('Fetch failed; returning offline fallback or error. URL:', event.request.url, error);
+          // Here you could return a generic offline fallback for images, etc. if you have one.
+          // For now, we let the browser handle the error, which avoids the TypeError.
+        });
       })
   );
+});
+
+// Listen for sync events
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'background-sync') {
+        console.log('Service Worker: Background sync event triggered.');
+        // Notify clients to perform the sync.
+        event.waitUntil(
+             self.clients.matchAll().then(clients => {
+                clients.forEach(client => client.postMessage({ type: 'SYNC_DATA' }));
+            })
+        );
+    }
 });
