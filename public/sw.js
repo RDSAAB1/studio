@@ -1,95 +1,95 @@
+// public/sw.js
 
-const CACHE_NAME = 'bizsuite-dataflow-cache-v1';
-// This list is intentionally minimal. The service worker will cache other resources
-// dynamically as the user navigates the app for the first time.
+const CACHE_NAME = 'bizsuite-dataflow-v1.3'; // Incremented version to ensure SW update
 const APP_SHELL_URLS = [
-  '/',
+    '/',
+    // We will let the service worker cache other assets as they are requested.
 ];
 
-// On install, cache the app shell
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[Service Worker] Caching App Shell');
-        return cache.addAll(APP_SHELL_URLS);
-      })
-  );
+self.addEventListener('install', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => {
+                console.log('Opened cache and caching app shell');
+                return cache.addAll(APP_SHELL_URLS);
+            })
+            .catch(error => {
+                console.error('Failed to cache app shell during install:', error);
+            })
+    );
 });
 
-// On activation, clean up old caches
-self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+self.addEventListener('activate', event => {
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('Deleting old cache:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
         })
-      );
-    })
-  );
+    );
+    return self.clients.claim();
 });
 
-// On fetch, use cache-first strategy
-self.addEventListener('fetch', (event) => {
-  // We only want to cache GET requests.
-  if (event.request.method !== 'GET') {
-    return;
-  }
+self.addEventListener('fetch', event => {
+    // Ignore non-GET requests (like POST for syncing)
+    if (event.request.method !== 'GET') {
+        // Let the browser handle it without interception.
+        return;
+    }
+    
+    // Ignore requests for Chrome extensions
+    if (event.request.url.startsWith('chrome-extension://')) {
+        return;
+    }
 
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // If the response is in the cache, return it
-        if (response) {
-          return response;
-        }
+    event.respondWith(
+        caches.match(event.request)
+            .then(cachedResponse => {
+                // If the response is in the cache, return it
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
 
-        // If it's not in the cache, fetch it from the network
-        return fetch(event.request)
-          .then((networkResponse) => {
-            // Check if we received a valid response
-            if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-              return networkResponse;
-            }
+                // If not in cache, fetch from the network
+                return fetch(event.request)
+                    .then(networkResponse => {
+                        // Check if we received a valid response
+                        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+                            return networkResponse;
+                        }
 
-            // IMPORTANT: Clone the response. A response is a stream
-            // and because we want the browser to consume the response
-            // as well as the cache consuming the response, we need
-            // to clone it so we have two streams.
-            const responseToCache = networkResponse.clone();
+                        // IMPORTANT: Clone the response. A response is a stream
+                        // and because we want the browser to consume the response
+                        // as well as the cache consuming the response, we need
+                        // to clone it so we have two streams.
+                        const responseToCache = networkResponse.clone();
 
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
+                        caches.open(CACHE_NAME)
+                            .then(cache => {
+                                cache.put(event.request, responseToCache);
+                            });
 
-            return networkResponse;
-          })
-          .catch(() => {
-            // **ERROR HANDLING ADDED HERE**
-            // If the network request fails (e.g., user is offline),
-            // we can return a fallback page or do nothing.
-            // For now, we will just log the error.
-            console.error('[Service Worker] Fetch failed, and no cache available for:', event.request.url);
-            // Optionally, you could return a fallback response:
-            // return caches.match('/offline.html');
-          });
-      })
-  );
+                        return networkResponse;
+                    })
+                    .catch(error => {
+                        // This catch handles network errors (e.g., offline)
+                        console.log('Fetch failed; returning basic offline response.', error);
+                        // Return a new, basic response. This prevents the "Failed to convert value to 'Response'" error.
+                        return new Response(null, { status: 503, statusText: 'Service Unavailable' });
+                    });
+            })
+    );
 });
 
-
-// Listen for the sync event
+// Sync event for background data synchronization
 self.addEventListener('sync', (event) => {
   if (event.tag === 'background-sync') {
-    console.log('[Service Worker] Background sync triggered!');
-    // The service worker will attempt to sync data with the server.
-    // We notify the client to handle the sync logic.
+    console.log('Background sync event triggered!');
     event.waitUntil(
       self.clients.matchAll().then(clients => {
         clients.forEach(client => {
@@ -100,18 +100,16 @@ self.addEventListener('sync', (event) => {
   }
 });
 
-// Listen for periodic sync events
+// Periodic Sync event
 self.addEventListener('periodicsync', (event) => {
-  const tag = (event as any).tag;
-  if (tag.startsWith('periodic-sync-')) {
-    console.log(`[Service Worker] Periodic sync triggered for tag: ${tag}`);
-    event.waitUntil(
-      self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-          client.postMessage({ type: 'SYNC_DATA' });
-        });
-      })
-    );
-  }
+    if (event.tag.startsWith('periodic-sync-')) {
+        console.log(`Periodic sync event triggered for tag: ${event.tag}`);
+        event.waitUntil(
+             self.clients.matchAll().then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({ type: 'SYNC_DATA' });
+                });
+            })
+        );
+    }
 });
-
