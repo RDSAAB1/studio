@@ -423,9 +423,13 @@ export default function SettingsPage() {
 
     const availableBranchOptions = useMemo(() => {
         if (!currentBankAccount.bankName) return [];
-        return bankBranches
+        const uniqueBranches = new Map<string, { value: string; label: string }>();
+        bankBranches
             .filter(branch => branch.bankName === currentBankAccount.bankName)
-            .map(branch => ({ value: branch.ifscCode, label: branch.branchName }));
+            .forEach(branch => {
+                uniqueBranches.set(branch.branchName.toLowerCase(), { value: branch.ifscCode, label: branch.branchName });
+            });
+        return Array.from(uniqueBranches.values());
     }, [currentBankAccount.bankName, bankBranches]);
 
     const handleBankSelect = (bankName: string | null) => {
@@ -685,43 +689,45 @@ export default function SettingsPage() {
                     <DialogHeader>
                         <DialogTitle>{currentBankAccount.id ? 'Edit' : 'Add'} Bank Account</DialogTitle>
                     </DialogHeader>
-                    <form className="grid gap-4 py-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="accountHolderName">Account Holder Name</Label>
-                            <Input id="accountHolderName" name="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={handleBankAccountInputChange} />
-                        </div>
-                         <div className="space-y-1.5">
-                            <Label>Bank</Label>
-                            <CustomDropdown options={allBankOptions} value={currentBankAccount.bankName || null} onChange={handleBankSelect} placeholder="Select a bank"/>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>Branch</Label>
-                            <CustomDropdown options={availableBranchOptions} value={currentBankAccount.ifscCode || null} onChange={handleBranchSelect} placeholder="Select a branch" />
-                        </div>
-                         <div className="space-y-1.5">
-                            <Label htmlFor="ifscCode">IFSC Code</Label>
-                            <Input id="ifscCode" name="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={e => setCurrentBankAccount(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} className="uppercase" />
-                        </div>
-                         <div className="space-y-1.5">
-                            <Label htmlFor="accountNumber">Account Number</Label>
-                            <Input id="accountNumber" name="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={e => setCurrentBankAccount(prev => ({...prev, accountNumber: e.target.value}))}/>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>Account Type</Label>
-                            <CustomDropdown
-                                options={[
-                                    { value: 'Savings', label: 'Savings' },
-                                    { value: 'Current', label: 'Current' },
-                                    { value: 'Loan', label: 'Loan Account' },
-                                    { value: 'Limit', label: 'Limit Account' },
-                                    { value: 'Other', label: 'Other' },
-                                ]}
-                                value={currentBankAccount.accountType || null}
-                                onChange={(value) => setCurrentBankAccount(prev => ({ ...prev, accountType: value as BankAccount['accountType'] }))}
-                                placeholder="Select account type"
-                            />
-                        </div>
-                    </form>
+                    <ScrollArea className="max-h-[70vh] -mr-6 pr-6">
+                        <form className="grid gap-4 py-4 pr-1">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="accountHolderName">Account Holder Name</Label>
+                                <Input id="accountHolderName" name="accountHolderName" value={currentBankAccount.accountHolderName || ''} onChange={handleBankAccountInputChange} />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Bank</Label>
+                                <CustomDropdown options={allBankOptions} value={currentBankAccount.bankName || null} onChange={handleBankSelect} placeholder="Select a bank"/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Branch</Label>
+                                <CustomDropdown options={availableBranchOptions} value={currentBankAccount.ifscCode || null} onChange={handleBranchSelect} placeholder="Select a branch" />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="ifscCode">IFSC Code</Label>
+                                <Input id="ifscCode" name="ifscCode" value={currentBankAccount.ifscCode || ''} onChange={e => setCurrentBankAccount(prev => ({...prev, ifscCode: e.target.value.toUpperCase()}))} className="uppercase" />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="accountNumber">Account Number</Label>
+                                <Input id="accountNumber" name="accountNumber" value={currentBankAccount.accountNumber || ''} onChange={e => setCurrentBankAccount(prev => ({...prev, accountNumber: e.target.value}))}/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Account Type</Label>
+                                <CustomDropdown
+                                    options={[
+                                        { value: 'Savings', label: 'Savings' },
+                                        { value: 'Current', label: 'Current' },
+                                        { value: 'Loan', label: 'Loan Account' },
+                                        { value: 'Limit', label: 'Limit Account' },
+                                        { value: 'Other', label: 'Other' },
+                                    ]}
+                                    value={currentBankAccount.accountType || null}
+                                    onChange={(value) => setCurrentBankAccount(prev => ({ ...prev, accountType: value as BankAccount['accountType'] }))}
+                                    placeholder="Select account type"
+                                />
+                            </div>
+                        </form>
+                    </ScrollArea>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsBankAccountDialogOpen(false)}>Cancel</Button>
                         <Button onClick={handleBankAccountSave}>Save Account</Button>
