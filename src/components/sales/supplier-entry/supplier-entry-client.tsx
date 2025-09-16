@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -125,7 +125,7 @@ export default function SupplierEntryClient() {
       setSuppliers(data);
       if (isInitialLoad.current && data) {
           const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-          const initialSrNo = formatSrNo(nextSrNum);
+          const initialSrNo = formatSrNo(nextSrNum, 'S');
           form.setValue('srNo', initialSrNo);
           setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
           isInitialLoad.current = false;
@@ -242,13 +242,14 @@ export default function SupplierEntryClient() {
     setIsEditing(false);
     const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum);
+    newState.srNo = formatSrNo(nextSrNum, 'S');
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState]);
+    setTimeout(() => form.setFocus('srNo'), 50);
+  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeSuppliers.find(c => c.id === id);
@@ -262,7 +263,7 @@ export default function SupplierEntryClient() {
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
     if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
-        formattedSrNo = formatSrNo(parseInt(formattedSrNo));
+        formattedSrNo = formatSrNo(parseInt(formattedSrNo), 'S');
         form.setValue('srNo', formattedSrNo);
     }
     const foundCustomer = safeSuppliers.find(c => c.srNo === formattedSrNo);
@@ -270,11 +271,13 @@ export default function SupplierEntryClient() {
         setIsEditing(true);
         resetFormToState(foundCustomer);
     } else {
-        setIsEditing(false);
-        const currentId = isEditing ? currentSupplier.srNo : "";
-        const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-        const currentState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum), id: currentId };
-        resetFormToState(currentState);
+        if (isEditing) {
+            setIsEditing(false);
+            const currentId = currentSupplier.srNo;
+            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
+            resetFormToState(newState);
+        }
     }
   }
 
@@ -475,8 +478,8 @@ export default function SupplierEntryClient() {
 
                 for (const item of json) {
                      const supplierData: Customer = {
-                        id: item['SR NO.'] || formatSrNo(nextSrNum++),
-                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++),
+                        id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
+                        srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
                         date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         term: String(item['TERM'] || '20'),
                         dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -517,6 +520,43 @@ export default function SupplierEntryClient() {
         reader.readAsBinaryString(file);
     };
   
+    const handleDeleteAll = async () => {
+        try {
+            await deleteAllSuppliers();
+            await deleteAllPayments();
+            toast({ title: "All entries deleted successfully", variant: "success" });
+            handleNew();
+        } catch (error) {
+            console.error("Error deleting all entries:", error);
+            toast({ title: "Failed to delete all entries", variant: "destructive" });
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+        if (e.key === 'Enter') {
+            const activeElement = document.activeElement as HTMLElement;
+            if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
+                return;
+            }
+            e.preventDefault(); // Prevent form submission
+            const formEl = e.currentTarget;
+            const formElements = Array.from(formEl.elements).filter(el => 
+                (el instanceof HTMLInputElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement) && 
+                !el.hasAttribute('disabled') && 
+                (el as HTMLElement).offsetParent !== null
+            ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+
+            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+            
+            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+                formElements[currentElementIndex + 1].focus();
+            } else if (currentElementIndex === formElements.length - 1) {
+                // Optional: loop back to the first element or submit
+                // formElements[0].focus();
+            }
+        }
+    };
+    
   const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
       if (event.ctrlKey) {
           switch (event.key.toLowerCase()) {
@@ -591,6 +631,7 @@ export default function SupplierEntryClient() {
                 selectedIdsCount={selectedSupplierIds.size}
                 onImport={handleImport}
                 onExport={handleExport}
+                onDeleteAll={handleDeleteAll}
             />
         </form>
       </FormProvider>      

@@ -329,6 +329,17 @@ export async function deleteSupplier(id: string): Promise<void> {
   await addToSyncQueue({ action: 'delete', payload: { collection: 'suppliers', id } });
 }
 
+export async function deleteAllSuppliers(): Promise<void> {
+    const q = query(suppliersCollection);
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(firestoreDB);
+    snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+}
+
+
 // --- Customer Functions ---
 
 export function getCustomersRealtime(callback: (customers: Customer[]) => void, onError: (error: Error) => void): () => void {
@@ -457,6 +468,17 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
     await batch.commit();
   }
 }
+
+export async function deleteAllPayments(): Promise<void> {
+    const q = query(supplierPaymentsCollection);
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(firestoreDB);
+    snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+}
+
 
 export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
   if (!srNo) {

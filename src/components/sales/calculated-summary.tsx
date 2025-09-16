@@ -7,12 +7,14 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 
 interface CalculatedSummaryProps {
     customer: Customer;
@@ -28,6 +30,7 @@ interface CalculatedSummaryProps {
     onBrokerageToggle?: (checked: boolean) => void;
     onImport?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onExport?: () => void;
+    onDeleteAll?: () => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -62,7 +65,8 @@ export const CalculatedSummary = ({
     isBrokerageIncluded,
     onBrokerageToggle,
     onImport,
-    onExport
+    onExport,
+    onDeleteAll,
 }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
@@ -109,6 +113,27 @@ export const CalculatedSummary = ({
                             <Button onClick={onExport} size="sm" variant="outline" className="h-8">
                             <Download className="mr-2 h-4 w-4"/> Export
                             </Button>
+                         )}
+                         {onDeleteAll && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button size="sm" variant="destructive" className="h-8">
+                                        <Trash2 className="mr-2 h-4 w-4"/> Delete All
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will permanently delete all supplier entries and their associated payments. This action cannot be undone.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={onDeleteAll}>Continue</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                          )}
                     </div>
 
