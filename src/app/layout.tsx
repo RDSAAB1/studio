@@ -5,7 +5,6 @@ import AppLayoutWrapper from '@/components/layout/app-layout';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
-import { useToast } from '@/hooks/use-toast';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,25 +30,18 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { toast } = useToast();
-
+  
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').then(registration => {
           console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          // Notify user that the app is ready for offline use
-          toast({
-            title: "Offline Ready",
-            description: "Application is now ready for offline use.",
-            variant: "success",
-          });
         }, err => {
           console.log('ServiceWorker registration failed: ', err);
         });
       });
     }
-  }, [toast]);
+  }, []);
 
   return (
     <html lang="en">
