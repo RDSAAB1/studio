@@ -30,7 +30,7 @@ interface CalculatedSummaryProps {
     onBrokerageToggle?: (checked: boolean) => void;
     onImport?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onExport?: () => void;
-    onDeleteAll?: () => void;
+    onDeleteSelected?: () => void;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -60,17 +60,17 @@ export const CalculatedSummary = ({
     isEditing, 
     onSearch, 
     onPrint, 
-    selectedIdsCount,
+    selectedIdsCount = 0,
     isCustomerForm = false,
     isBrokerageIncluded,
     onBrokerageToggle,
     onImport,
     onExport,
-    onDeleteAll,
+    onDeleteSelected,
 }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
-    const isPrintActionForSelected = selectedIdsCount && selectedIdsCount > 0;
+    const isPrintActionForSelected = selectedIdsCount > 0;
     
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
@@ -114,23 +114,23 @@ export const CalculatedSummary = ({
                             <Download className="mr-2 h-4 w-4"/> Export
                             </Button>
                          )}
-                         {onDeleteAll && (
+                         {onDeleteSelected && selectedIdsCount > 0 && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <Button size="sm" variant="destructive" className="h-8">
-                                        <Trash2 className="mr-2 h-4 w-4"/> Delete All
+                                        <Trash2 className="mr-2 h-4 w-4"/> Delete Selected ({selectedIdsCount})
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            This will permanently delete all supplier entries and their associated payments. This action cannot be undone.
+                                            This will permanently delete the {selectedIdsCount} selected entries and their associated payments. This action cannot be undone.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={onDeleteAll}>Continue</AlertDialogAction>
+                                        <AlertDialogAction onClick={onDeleteSelected}>Continue</AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>

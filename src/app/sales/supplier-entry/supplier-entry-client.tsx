@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteMultipleSuppliers } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -325,9 +325,9 @@ export default function SupplierEntryClient() {
 
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-            await deleteSupplier(currentSupplier.id);
+          await deleteSupplier(currentSupplier.id);
         }
-        
+
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
@@ -519,6 +519,23 @@ export default function SupplierEntryClient() {
         };
         reader.readAsBinaryString(file);
     };
+
+    const handleDeleteSelected = async () => {
+        if (selectedSupplierIds.size === 0) {
+            toast({ title: "No entries selected", variant: "destructive" });
+            return;
+        }
+
+        try {
+            const srNosToDelete = Array.from(selectedSupplierIds).map(id => suppliers.find(s => s.id === id)?.srNo).filter(Boolean) as string[];
+            await deleteMultipleSuppliers(srNosToDelete);
+            toast({ title: `${selectedSupplierIds.size} entries deleted successfully`, variant: "success" });
+            setSelectedSupplierIds(new Set());
+        } catch (error) {
+            console.error("Error deleting selected entries:", error);
+            toast({ title: "Failed to delete selected entries", variant: "destructive" });
+        }
+    };
   
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
         if (e.key === 'Enter') {
@@ -619,6 +636,7 @@ export default function SupplierEntryClient() {
                 selectedIdsCount={selectedSupplierIds.size}
                 onImport={handleImport}
                 onExport={handleExport}
+                onDeleteSelected={handleDeleteSelected}
             />
         </form>
       </FormProvider>      

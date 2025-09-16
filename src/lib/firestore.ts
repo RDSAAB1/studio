@@ -329,14 +329,37 @@ export async function deleteSupplier(id: string): Promise<void> {
   await addToSyncQueue({ action: 'delete', payload: { collection: 'suppliers', id } });
 }
 
-export async function deleteAllSuppliers(): Promise<void> {
-    const q = query(suppliersCollection);
-    const snapshot = await getDocs(q);
+export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
     const batch = writeBatch(firestoreDB);
-    snapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-    });
+    const paymentsBatch = writeBatch(firestoreDB);
+
+    for (const srNo of srNos) {
+        // Delete the supplier entry
+        const supplierDocRef = doc(suppliersCollection, srNo);
+        batch.delete(supplierDocRef);
+
+        // Find and delete related payments
+        const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo }));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        
+        paymentsSnapshot.forEach(paymentDoc => {
+            const payment = paymentDoc.data() as Payment;
+            // If the payment only contains this srNo, delete the whole payment
+            if (payment.paidFor && payment.paidFor.length === 1 && payment.paidFor[0].srNo === srNo) {
+                paymentsBatch.delete(paymentDoc.ref);
+            } else { // Otherwise, just remove the srNo from the paidFor array
+                const updatedPaidFor = payment.paidFor?.filter(pf => pf.srNo !== srNo);
+                const amountToDeduct = payment.paidFor?.find(pf => pf.srNo === srNo)?.amount || 0;
+                paymentsBatch.update(paymentDoc.ref, { 
+                    paidFor: updatedPaidFor,
+                    amount: payment.amount - amountToDeduct
+                });
+            }
+        });
+    }
+
     await batch.commit();
+    await paymentsBatch.commit();
 }
 
 
@@ -752,4 +775,5 @@ export async function addTransaction(transactionData: Omit<Transaction, 'id'|'tr
     return addDoc(collectionRef, transactionData);
 }
     
+
 
