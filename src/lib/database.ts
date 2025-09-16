@@ -28,7 +28,7 @@ class MyOfflineDB extends Dexie {
     super('myOfflineDB');
     this.version(1).stores({
       mainDataStore: 'id', // Primary key is 'id'
-      syncQueueStore: '++id', // Auto-incrementing primary key
+      syncQueueStore: '++id, timestamp', // Auto-incrementing primary key, and index on timestamp
     });
   }
 }
