@@ -63,6 +63,43 @@ const SyncButton = () => {
     );
 };
 
+const NetworkStatusIndicator = () => {
+    const [isOnline, setIsOnline] = useState(true);
+
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+
+        // Check on mount
+        if (typeof navigator !== 'undefined') {
+            setIsOnline(navigator.onLine);
+        }
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
+    return (
+        <div className="flex items-center gap-2">
+            <span
+                className={cn(
+                    "h-2.5 w-2.5 rounded-full transition-colors",
+                    isOnline ? "bg-green-500" : "bg-gray-400"
+                )}
+            />
+            <span className="text-xs text-muted-foreground sr-only">
+                {isOnline ? "Online" : "Offline"}
+            </span>
+        </div>
+    );
+};
+
+
 const NotificationBell = () => {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
@@ -227,6 +264,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle Sidebar</span>
             </Button>
+            <NetworkStatusIndicator />
         </div>
         
         {/* Center: Dynamic Island Toaster */}
