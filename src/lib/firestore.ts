@@ -1,6 +1,6 @@
 
 
-import { db } from "./database";
+import { db, addToSyncQueue } from "./database";
 import {
   collection,
   getDocs,
@@ -303,7 +303,7 @@ export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<C
     const newSupplier = { ...supplierData, id: docRef.id };
 
     await db.mainDataStore.put(newSupplier);
-    await db.syncQueueStore.add({ action: 'create', payload: { collection: 'suppliers', data: newSupplier }, timestamp: Date.now() });
+    await addToSyncQueue({ action: 'create', payload: { collection: 'suppliers', data: newSupplier } });
 
     return newSupplier;
 }
@@ -315,7 +315,7 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
   }
   
   await db.mainDataStore.update(id, supplierData);
-  await db.syncQueueStore.add({ action: 'update', payload: { collection: 'suppliers', id, changes: supplierData }, timestamp: Date.now() });
+  await addToSyncQueue({ action: 'update', payload: { collection: 'suppliers', id, changes: supplierData } });
 
   return true;
 }
@@ -326,7 +326,7 @@ export async function deleteSupplier(id: string): Promise<void> {
     return;
   }
   await db.mainDataStore.delete(id);
-  await db.syncQueueStore.add({ action: 'delete', payload: { collection: 'suppliers', id }, timestamp: Date.now() });
+  await addToSyncQueue({ action: 'delete', payload: { collection: 'suppliers', id } });
 }
 
 // --- Customer Functions ---
@@ -352,7 +352,7 @@ export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<C
     const newCustomer = { ...customerData, id: docRef.id };
     
     await db.mainDataStore.put(newCustomer);
-    await db.syncQueueStore.add({ action: 'create', payload: { collection: 'customers', data: newCustomer }, timestamp: Date.now() });
+    await addToSyncQueue({ action: 'create', payload: { collection: 'customers', data: newCustomer } });
 
     return newCustomer;
 }
@@ -363,7 +363,7 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
         return false;
     }
     await db.mainDataStore.update(id, customerData);
-    await db.syncQueueStore.add({ action: 'update', payload: { collection: 'customers', id, changes: customerData }, timestamp: Date.now() });
+    await addToSyncQueue({ action: 'update', payload: { collection: 'customers', id, changes: customerData } });
     return true;
 }
 
@@ -373,7 +373,7 @@ export async function deleteCustomer(id: string): Promise<void> {
       return;
     }
     await db.mainDataStore.delete(id);
-    await db.syncQueueStore.add({ action: 'delete', payload: { collection: 'customers', id }, timestamp: Date.now() });
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'customers', id } });
 }
 
 // --- Inventory Item Functions ---
@@ -393,17 +393,17 @@ export async function addInventoryItem(item: any) {
   const newItem = { ...item, id: newId, collection: 'inventoryItems' };
   
   await db.mainDataStore.put(newItem);
-  await db.syncQueueStore.add({ action: 'create', payload: { collection: 'inventoryItems', data: newItem }, timestamp: Date.now() });
+  await addToSyncQueue({ action: 'create', payload: { collection: 'inventoryItems', data: newItem } });
   
   return newItem;
 }
 export async function updateInventoryItem(id: string, item: any) {
   await db.mainDataStore.update(id, item);
-  await db.syncQueueStore.add({ action: 'update', payload: { collection: 'inventoryItems', id, changes: item }, timestamp: Date.now() });
+  await addToSyncQueue({ action: 'update', payload: { collection: 'inventoryItems', id, changes: item } });
 }
 export async function deleteInventoryItem(id: string) {
   await db.mainDataStore.delete(id);
-  await db.syncQueueStore.add({ action: 'delete', payload: { collection: 'inventoryItems', id }, timestamp: Date.now() });
+  await addToSyncQueue({ action: 'delete', payload: { collection: 'inventoryItems', id } });
 }
 
 
@@ -730,5 +730,4 @@ export async function addTransaction(transactionData: Omit<Transaction, 'id'|'tr
     return addDoc(collectionRef, transactionData);
 }
     
-
 

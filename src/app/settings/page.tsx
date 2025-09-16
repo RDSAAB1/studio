@@ -142,6 +142,8 @@ export default function SettingsPage() {
     const [formatSettings, setFormatSettings] = useState<FormatSettings>({});
     const [banks, setBanks] = useState<Bank[]>([]);
     const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
+    const [autoSyncInterval, setAutoSyncInterval] = useState<string>('never');
+
 
     // Form Hooks
     const companyForm = useForm<CompanyFormValues>({
@@ -214,6 +216,17 @@ export default function SettingsPage() {
                 const unsubBanks = getBanksRealtime(setBanks, console.error);
                 const unsubBankBranches = getBankBranchesRealtime(setBankBranches, console.error);
                 
+                // Get periodic sync status
+                navigator.serviceWorker.ready.then(async (registration) => {
+                    if ('periodicSync' in registration) {
+                        const tags = await (registration as any).periodicSync.getTags();
+                        if (tags.includes('periodic-sync-6h')) setAutoSyncInterval('6h');
+                        else if (tags.includes('periodic-sync-12h')) setAutoSyncInterval('12h');
+                        else if (tags.includes('periodic-sync-24h')) setAutoSyncInterval('24h');
+                        else setAutoSyncInterval('never');
+                    }
+                });
+
                 setLoading(false);
                 return () => { 
                     unsubVarieties(); 
@@ -229,6 +242,35 @@ export default function SettingsPage() {
         });
         return () => unsubscribeAuth();
     }, [router, companyForm, emailForm]);
+
+    const handleAutoSyncChange = async (value: string) => {
+        setAutoSyncInterval(value);
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            if ('periodicSync' in registration) {
+                 // First, unregister all periodic sync tags to avoid duplicates
+                await (registration as any).periodicSync.unregister('periodic-sync-6h');
+                await (registration as any).periodicSync.unregister('periodic-sync-12h');
+                await (registration as any).periodicSync.unregister('periodic-sync-24h');
+
+                if (value !== 'never') {
+                    const hours = parseInt(value.replace('h', ''));
+                    await (registration as any).periodicSync.register(`periodic-sync-${value}`, {
+                        minInterval: hours * 60 * 60 * 1000,
+                    });
+                    toast({ title: 'Auto-Sync Enabled', description: `Data will now sync automatically every ${hours} hours.`, variant: 'success' });
+                } else {
+                    toast({ title: 'Auto-Sync Disabled', description: 'Periodic background sync has been turned off.', variant: 'success' });
+                }
+            } else {
+                 toast({ title: 'Not Supported', description: 'Your browser does not support periodic background sync.', variant: 'destructive' });
+            }
+        } catch (error) {
+            console.error('Failed to set periodic sync:', error);
+            toast({ title: 'Error', description: 'Could not update auto-sync settings.', variant: 'destructive' });
+        }
+    };
+
     
     const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, selectionStart, selectionEnd } = e.target;
@@ -506,64 +548,79 @@ export default function SettingsPage() {
                                </div>
                             </SettingsCard>
                         </form>
-                         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} onKeyDown={handleKeyDown}>
-                             <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
-                                <div className="space-y-4">
-                                     <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
-                                     <div className="space-y-1"><Label>Google App Password</Label>
-                                        <div className="flex items-center gap-2">
-                                            <Input type="password" {...emailForm.register('appPassword')} placeholder="xxxx xxxx xxxx xxxx" />
-                                            <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}><DialogTrigger asChild><Button type="button" variant="outline" size="sm">How?</Button></DialogTrigger>
-                                                <DialogContent className="sm:max-w-lg">
-                                                     <DialogHeader><DialogTitle>How to Get an App Password</DialogTitle><DialogDescription>An App Password lets our app send emails on your behalf without needing your main password.</DialogDescription></DialogHeader>
-                                                     <ScrollArea className="max-h-[60vh] pr-4">
-                                                        <div className="space-y-4 text-sm">
-                                                                <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
-                                                                    <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
-                                                                    <p className="text-xs text-primary/90">To create an App Password, you first need to enable 2-Step Verification on your Google Account.</p>
+                         <div className="space-y-6">
+                            <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} onKeyDown={handleKeyDown}>
+                                <SettingsCard title="Email Configuration" description="Connect your Gmail account to send reports directly from the app. This requires an App Password from Google." footer={<Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Email Settings</Button>}>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1"><Label>Your Gmail Account</Label><Input value={emailForm.watch('email')} readOnly disabled /></div>
+                                        <div className="space-y-1"><Label>Google App Password</Label>
+                                            <div className="flex items-center gap-2">
+                                                <Input type="password" {...emailForm.register('appPassword')} placeholder="xxxx xxxx xxxx xxxx" />
+                                                <Dialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen}><DialogTrigger asChild><Button type="button" variant="outline" size="sm">How?</Button></DialogTrigger>
+                                                    <DialogContent className="sm:max-w-lg">
+                                                        <DialogHeader><DialogTitle>How to Get an App Password</DialogTitle><DialogDescription>An App Password lets our app send emails on your behalf without needing your main password.</DialogDescription></DialogHeader>
+                                                        <ScrollArea className="max-h-[60vh] pr-4">
+                                                            <div className="space-y-4 text-sm">
+                                                                    <div className="flex gap-2 p-2 border-l-4 border-primary/80 bg-primary/10 w-full">
+                                                                        <AlertCircle className="h-4 w-4 text-primary/80 flex-shrink-0 mt-0.5"/>
+                                                                        <p className="text-xs text-primary/90">To create an App Password, you first need to enable 2-Step Verification on your Google Account.</p>
+                                                                    </div>
+                                                                    <Card>
+                                                                        <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">This adds an extra layer of security to your account.</CardDescription></CardHeader>
+                                                                        <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
+                                                                            <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
+                                                                        </CardFooter>
+                                                                    </Card>
+                                                                    
+                                                                    <Card>
+                                                                        <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create & Copy Password</CardTitle></CardHeader>
+                                                                        <CardContent className="p-4 pt-0 space-y-2 text-xs">
+                                                                            <p className="font-bold">Follow these steps carefully on the Google page:</p>
+                                                                            <ul className="list-decimal pl-5 space-y-1">
+                                                                                <li>Under "Select app", choose <strong>"Other (Custom name)"</strong>.</li>
+                                                                                <li>Enter a name like <strong>"BizSuite DataFlow"</strong> and click "CREATE".</li>
+                                                                                <li>Google will show you a 16-character password. <strong>Copy this password.</strong></li>
+                                                                            </ul>
+                                                                        </CardContent>
+                                                                        <CardFooter className="p-4 pt-0">
+                                                                            <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full">
+                                                                                <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
+                                                                            </a>
+                                                                        </CardFooter>
+                                                                    </Card>
                                                                 </div>
-                                                                <Card>
-                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 1: Enable 2-Step Verification</CardTitle><CardDescription className="text-xs">This adds an extra layer of security to your account.</CardDescription></CardHeader>
-                                                                    <CardFooter className="p-4 pt-0 flex flex-col items-start gap-3">
-                                                                        <a href={`https://myaccount.google.com/signinoptions/two-step-verification?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full"><Button size="sm" className="w-full">Go to 2-Step Verification <ExternalLink className="ml-2 h-3 w-3"/></Button></a>
-                                                                    </CardFooter>
-                                                                </Card>
-                                                                
-                                                                <Card>
-                                                                    <CardHeader className="p-4"><CardTitle className="text-base">Step 2: Create & Copy Password</CardTitle></CardHeader>
-                                                                    <CardContent className="p-4 pt-0 space-y-2 text-xs">
-                                                                        <p className="font-bold">Follow these steps carefully on the Google page:</p>
-                                                                        <ul className="list-decimal pl-5 space-y-1">
-                                                                            <li>Under "Select app", choose <strong>"Other (Custom name)"</strong>.</li>
-                                                                            <li>Enter a name like <strong>"BizSuite DataFlow"</strong> and click "CREATE".</li>
-                                                                            <li>Google will show you a 16-character password. <strong>Copy this password.</strong></li>
-                                                                        </ul>
-                                                                    </CardContent>
-                                                                    <CardFooter className="p-4 pt-0">
-                                                                        <a href={`https://myaccount.google.com/apppasswords?authuser=${emailForm.watch('email')}`} target="_blank" rel="noopener noreferrer" className="w-full">
-                                                                            <Button size="sm" className="w-full">Go to App Passwords <ExternalLink className="ml-2 h-3 w-3"/></Button>
-                                                                        </a>
-                                                                    </CardFooter>
-                                                                </Card>
-                                                            </div>
-                                                     </ScrollArea>
-                                                        <DialogFooter className="sm:justify-start mt-4">
-                                                          <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
-                                                        </DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
+                                                        </ScrollArea>
+                                                            <DialogFooter className="sm:justify-start mt-4">
+                                                            <Button variant="outline" onClick={() => setIsHelpDialogOpen(false)}>Close</Button>
+                                                            </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </div>
                                         </div>
-                                     </div>
-                                     <AlertDialog>
-                                         <AlertDialogTrigger asChild><Button variant="destructive" type="button" disabled={saving || !emailForm.watch('appPassword')}><Trash2 className="mr-2 h-4 w-4"/>Disconnect</Button></AlertDialogTrigger>
-                                         <AlertDialogContent>
-                                             <AlertDialogHeader><AlertDialogTitle>Disconnect Email?</AlertDialogTitle><AlertDialogDescription>This will remove your saved App Password. You will need to reconnect to send emails.</AlertDialogDescription></AlertDialogHeader>
-                                             <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleEmailDisconnect}>Disconnect</AlertDialogAction></AlertDialogFooter>
-                                         </AlertDialogContent>
-                                     </AlertDialog>
-                                </div>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild><Button variant="destructive" type="button" disabled={saving || !emailForm.watch('appPassword')}><Trash2 className="mr-2 h-4 w-4"/>Disconnect</Button></AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>Disconnect Email?</AlertDialogTitle><AlertDialogDescription>This will remove your saved App Password. You will need to reconnect to send emails.</AlertDialogDescription></AlertDialogHeader>
+                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleEmailDisconnect}>Disconnect</AlertDialogAction></AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                </SettingsCard>
+                            </form>
+                             <SettingsCard title="Auto-Sync Settings" description="Set how often the app should automatically sync data in the background.">
+                                <CustomDropdown 
+                                    options={[
+                                        { value: 'never', label: 'Never (Manual Sync Only)' },
+                                        { value: '6h', label: 'Every 6 Hours' },
+                                        { value: '12h', label: 'Every 12 Hours' },
+                                        { value: '24h', label: 'Daily (Every 24 Hours)' },
+                                    ]}
+                                    value={autoSyncInterval}
+                                    onChange={handleAutoSyncChange}
+                                />
+                                <p className="text-xs text-muted-foreground mt-2">Note: Your browser controls the exact timing to optimize performance. The sync will happen around your selected interval.</p>
                              </SettingsCard>
-                        </form>
+                         </div>
                     </div>
                 </TabsContent>
                 <TabsContent value="banks" className="mt-6">

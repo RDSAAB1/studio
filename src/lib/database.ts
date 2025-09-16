@@ -35,12 +35,30 @@ class MyOfflineDB extends Dexie {
 
 export const db = new MyOfflineDB();
 
+// This function will register a background sync task
+async function registerBackgroundSync() {
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('background-sync');
+            console.log('Background sync registered');
+        } catch (error) {
+            console.error('Background sync registration failed:', error);
+        }
+    }
+}
+
+export async function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'timestamp'>) {
+    await db.syncQueueStore.add({ ...item, timestamp: Date.now() });
+    await registerBackgroundSync();
+}
+
 export async function syncData(): Promise<{ success: boolean; syncedCount: number; error?: string }> {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
         return { success: false, syncedCount: 0, error: "You are offline." };
     }
 
-    const pendingActions = await db.syncQueueStore.toArray();
+    const pendingActions = await db.syncQueueStore.orderBy('timestamp').toArray();
     if (pendingActions.length === 0) {
         return { success: true, syncedCount: 0 };
     }
@@ -74,4 +92,14 @@ export async function syncData(): Promise<{ success: boolean; syncedCount: numbe
     }
 
     return { success: true, syncedCount };
+}
+
+// Listen for messages from the service worker
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'SYNC_DATA') {
+            console.log('Client received sync message from service worker.');
+            syncData();
+        }
+    });
 }
