@@ -141,7 +141,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                         {filteredItems.length > 0 ? (
                             filteredItems.map((item) => (
                                 <li
-                                    key={item.value}
+                                    key={`${item.value}-${item.label}`}
                                     onClick={() => handleSelect(item)}
                                     className={cn(
                                         "cursor-pointer px-4 py-2 text-sm hover:bg-accent",
