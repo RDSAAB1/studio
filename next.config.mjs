@@ -1,5 +1,14 @@
 /** @type {import('next').NextConfig} */
-import withPWA from 'next-pwa';
+import withPWAInit from "@ducanh2912/next-pwa";
+
+const withPWA = withPWAInit({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  dynamicStartUrl: false, // Important for ensuring all chunks are cached
+  fallbacks: {
+    document: "/_offline", // You can create a custom offline page if you want
+  },
+});
 
 const nextConfig = {
   images: {
@@ -20,11 +29,4 @@ const nextConfig = {
   }
 };
 
-const pwaConfig = withPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-});
-
-export default pwaConfig(nextConfig);
+export default withPWA(nextConfig);
