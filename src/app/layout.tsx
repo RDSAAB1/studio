@@ -39,6 +39,7 @@ export default function RootLayout({
         if ('serviceWorker' in navigator) {
             const handleServiceWorkerMessage = (event: MessageEvent) => {
                 if (event.data && event.data.type === 'SW_ACTIVATED') {
+                    console.log("Client received SW_ACTIVATED message.");
                     toast({
                         title: "Application is ready for offline use.",
                         variant: 'success',
