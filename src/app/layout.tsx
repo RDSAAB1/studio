@@ -6,6 +6,8 @@ import AppLayoutWrapper from '@/components/layout/app-layout';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
+import { useToast } from '@/hooks/use-toast';
+
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,9 +33,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+    const { toast } = useToast();
 
     useEffect(() => {
         if ('serviceWorker' in navigator) {
+            const handleServiceWorkerMessage = (event: MessageEvent) => {
+                if (event.data && event.data.type === 'SW_ACTIVATED') {
+                    toast({
+                        title: "Application is ready for offline use.",
+                        variant: 'success',
+                    });
+                }
+            };
+
+            navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').then(registration => {
                     console.log('SW registered: ', registration);
@@ -41,8 +55,13 @@ export default function RootLayout({
                     console.log('SW registration failed: ', registrationError);
                 });
             });
+
+             // Cleanup
+            return () => {
+                navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+            };
         }
-    }, []);
+    }, [toast]);
   
   return (
     <html lang="en">
