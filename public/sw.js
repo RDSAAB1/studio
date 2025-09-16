@@ -1,105 +1,87 @@
-// A custom service worker with a pre-caching and stale-while-revalidate strategy.
+// A robust service worker with a "Cache falling back to Network" strategy.
 
-const PRECACHE_VERSION = 'v1';
-const PRECACHE_NAME = 'app-shell-cache-' + PRECACHE_VERSION;
-const RUNTIME_CACHE_NAME = 'runtime-cache';
-
-// A list of all the essential files to pre-cache.
-const PRECACHE_URLS = [
+const CACHE_NAME = 'bizsuite-offline-v2';
+const APP_SHELL_URLS = [
   '/',
   '/dashboard-overview',
-  '/sales/supplier-entry',
-  '/sales/supplier-payments',
-  '/sales/supplier-profile',
-  '/sales/customer-entry',
-  '/sales/customer-payments',
-  '/sales/customer-profile',
-  '/cash-bank',
-  '/expense-tracker',
-  '/sales/rtgs-report',
-  '/sales/daily-supplier-report',
-  '/hr/employee-database',
-  '/hr/payroll-management',
-  '/hr/attendance-tracking',
-  '/inventory/inventory-management',
-  '/inventory/purchase-orders',
-  '/projects/dashboard',
-  '/projects/management',
-  '/projects/tasks',
-  '/projects/collaboration',
-  '/data-capture',
-  '/settings',
-  '/settings/bank-management',
-  '/settings/printer',
-  // You might need to add specific JS/CSS chunks if Next.js doesn't name them consistently.
-  // However, the runtime caching should handle them.
+  '/offline.html' // A fallback page
 ];
 
-
-// The install handler takes care of pre-caching the resources we always need.
-self.addEventListener('install', event => {
+// 1. Install: Caches the basic app shell and a fallback offline page.
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(PRECACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
-      .then(self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('[Service Worker] Caching App Shell');
+      return cache.addAll(APP_SHELL_URLS);
+    })
   );
 });
 
-// The activate handler takes care of cleaning up old caches.
-self.addEventListener('activate', event => {
-  const currentCaches = [PRECACHE_NAME, RUNTIME_CACHE_NAME];
+// 2. Activate: Cleans up old caches.
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return cacheNames.filter(cacheName => !currentCaches.includes(cacheName));
-    }).then(cachesToDelete => {
-      return Promise.all(cachesToDelete.map(cacheToDelete => {
-        return caches.delete(cacheToDelete);
-      }));
-    }).then(() => self.clients.claim())
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
   );
+  return self.clients.claim();
 });
 
-// The fetch handler serves assets from cache or network.
-self.addEventListener('fetch', event => {
-    const { request } = event;
-    // Skip non-GET requests, and requests for browser extensions or Next.js specific dev files.
-    if (request.method !== 'GET' || request.url.startsWith('chrome-extension://') || request.url.includes('/_next/static/webpack')) {
-        return;
-    }
-
-    // For navigation requests (pages), use a network-first strategy to ensure users get the latest HTML.
-    if (request.mode === 'navigate') {
-        event.respondWith(
-            fetch(request).catch(() => {
-                // If the network fails, fall back to the precached root page.
-                // This is a basic fallback; a more robust solution might match a specific offline page.
-                return caches.match('/');
-            })
-        );
-        return;
-    }
-
-    // For other requests (JS, CSS, images), use Stale-While-Revalidate strategy.
+// 3. Fetch: Serves content from cache first, then falls back to the network.
+self.addEventListener('fetch', (event) => {
+  // We only want to cache GET requests.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
+  // For navigation requests (loading a page), try network first, then cache, then offline page.
+  if (event.request.mode === 'navigate') {
     event.respondWith(
-        caches.open(RUNTIME_CACHE_NAME).then(cache => {
-            return cache.match(request).then(cachedResponse => {
-                const fetchPromise = fetch(request).then(networkResponse => {
-                    // If the fetch is successful, clone the response and cache it.
-                    if (networkResponse && networkResponse.status === 200) {
-                        cache.put(request, networkResponse.clone());
-                    }
-                    return networkResponse;
-                });
-
-                // Return the cached response immediately if it exists,
-                // otherwise wait for the network response.
-                return cachedResponse || fetchPromise;
+      fetch(event.request)
+        .then(response => {
+            // If the network is available, cache the response and return it.
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
             });
-        }).catch(() => {
-            // A final fallback in case both cache and network fail,
-            // though this is unlikely with Stale-While-Revalidate.
-            // This prevents the "Failed to fetch" error.
-            return new Response('', { status: 503, statusText: 'Service Unavailable' });
+            return response;
+        })
+        .catch(() => {
+            // If the network fails, try to get the page from the cache.
+            return caches.match(event.request).then((response) => {
+                // If it's in the cache, return it. Otherwise, show the offline fallback page.
+                return response || caches.match('/offline.html');
+            });
         })
     );
+    return;
+  }
+
+  // For all other requests (JS, CSS, images, etc.), use a cache-first strategy.
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      // If the resource is in the cache, return it.
+      if (response) {
+        return response;
+      }
+      // If not, fetch it from the network, cache it, and then return it.
+      return fetch(event.request).then((networkResponse) => {
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+        });
+        return networkResponse;
+      }).catch(() => {
+        // If both cache and network fail (e.g., for an image), do nothing.
+        // The browser will show its default broken resource icon.
+      });
+    })
+  );
 });
