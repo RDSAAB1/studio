@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteMultipleSuppliers } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, deleteMultipleSuppliers } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -67,6 +67,7 @@ export default function SupplierEntryClient() {
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [detailsSupplier, setDetailsSupplier] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
@@ -525,7 +526,7 @@ export default function SupplierEntryClient() {
             toast({ title: "No entries selected", variant: "destructive" });
             return;
         }
-
+        setIsDeleting(true);
         try {
             const srNosToDelete = Array.from(selectedSupplierIds).map(id => suppliers.find(s => s.id === id)?.srNo).filter(Boolean) as string[];
             await deleteMultipleSuppliers(srNosToDelete);
@@ -534,9 +535,23 @@ export default function SupplierEntryClient() {
         } catch (error) {
             console.error("Error deleting selected entries:", error);
             toast({ title: "Failed to delete selected entries", variant: "destructive" });
+        } finally {
+            setIsDeleting(false);
         }
     };
   
+    const handleDeleteAll = async () => {
+        try {
+            await deleteAllSuppliers();
+            await deleteAllPayments();
+            toast({ title: "All entries deleted successfully", variant: "success" });
+            handleNew();
+        } catch (error) {
+            console.error("Error deleting all entries:", error);
+            toast({ title: "Failed to delete all entries", variant: "destructive" });
+        }
+    };
+    
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
         if (e.key === 'Enter') {
             const activeElement = document.activeElement as HTMLElement;
@@ -636,7 +651,9 @@ export default function SupplierEntryClient() {
                 selectedIdsCount={selectedSupplierIds.size}
                 onImport={handleImport}
                 onExport={handleExport}
+                onDeleteAll={handleDeleteAll}
                 onDeleteSelected={handleDeleteSelected}
+                isDeleting={isDeleting}
             />
         </form>
       </FormProvider>      

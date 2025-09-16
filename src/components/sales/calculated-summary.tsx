@@ -7,7 +7,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2 } from "lucide-react";
+import { Pen, PlusCircle, Save, Printer, ChevronsUpDown, Search, Upload, Download, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "../ui/separator";
 import { Input } from "../ui/input";
@@ -32,6 +32,7 @@ interface CalculatedSummaryProps {
     onExport?: () => void;
     onDeleteSelected?: () => void;
     onDeleteAll?: () => void;
+    isDeleting?: boolean;
 }
 
 const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: React.ReactNode }) => (
@@ -68,7 +69,8 @@ export const CalculatedSummary = ({
     onImport,
     onExport,
     onDeleteSelected,
-    onDeleteAll
+    onDeleteAll,
+    isDeleting = false
 }: CalculatedSummaryProps) => {
 
     const isLoading = !customer || !customer.srNo;
@@ -119,8 +121,9 @@ export const CalculatedSummary = ({
                          {onDeleteSelected && selectedIdsCount > 0 && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="destructive" className="h-8" type="button">
-                                        <Trash2 className="mr-2 h-4 w-4"/> Delete Selected ({selectedIdsCount})
+                                    <Button size="sm" variant="destructive" className="h-8" type="button" disabled={isDeleting}>
+                                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4"/>}
+                                        Delete Selected ({selectedIdsCount})
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
