@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useRef, useMemo } from 'react';
-import { RtgsSettings } from '@/lib/definitions';
+import { RtgsSettings, BankAccount } from '@/lib/definitions';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -34,10 +34,10 @@ interface RtgsReportRow {
 
 interface ConsolidatedRtgsPrintFormatProps {
     payments: RtgsReportRow[];
-    settings: RtgsSettings;
+    settings: RtgsSettings & { defaultBank?: BankAccount };
 }
 
-const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameCheckNo }: { settings: RtgsSettings, firstDate: string, firstCheckNo: string, isSameDate: boolean, isSameCheckNo: boolean }) => (
+const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameCheckNo }: { settings: RtgsSettings & { defaultBank?: BankAccount }, firstDate: string, firstCheckNo: string, isSameDate: boolean, isSameCheckNo: boolean }) => (
     <div className="flex-grow-0 printable-area">
         <style>
             {`
@@ -81,7 +81,7 @@ const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameChe
                         <div><span className="font-semibold">IFSC:</span> <span>{settings.defaultBank.ifscCode}</span></div>
                     </>
                 ) : (
-                    <p>Default bank not set.</p>
+                    <p>Default bank not set in settings.</p>
                 )}
             </div>
         </div>
@@ -122,6 +122,10 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
     const printRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     
+    if (!settings) {
+        return <div>Loading settings...</div>;
+    }
+
     const firstDate = payments.length > 0 ? payments[0].date : '';
     const isSameDate = payments.every(p => p.date === firstDate);
     
