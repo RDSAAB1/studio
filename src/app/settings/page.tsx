@@ -572,7 +572,7 @@ export default function SettingsPage() {
                             <Plus className="mr-2 h-4 w-4"/> Add Bank Account
                         </Button>
                      }>
-                        <ScrollArea className="h-80 border rounded-md [&_[data-radix-scroll-area-thumb]]:bg-primary">
+                        <ScrollArea className="h-80 border rounded-md scrollbar-hide">
                             {bankAccounts.map(account => {
                                 const isDefault = receiptSettings?.defaultBankAccountId === account.id;
                                 return (
