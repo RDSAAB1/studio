@@ -29,6 +29,7 @@ import { Users, Calendar as CalendarIcon, Download, Printer, Info, Scale, FileTe
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
+const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 // --- Sub-component 1: The Statement Preview ---
 const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
@@ -408,8 +409,8 @@ const CustomerProfileView = ({
     );
 };
 
-// --- Main Page Component ---
-export default function CustomerProfilePage() {
+
+export function CustomerProfileClient() {
   const [customers, setCustomers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(MILL_OVERVIEW_KEY);
@@ -584,7 +585,7 @@ export default function CustomerProfilePage() {
                     <CustomDropdown
                         options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedCustomerKey}
-                        onChange={(value) => setSelectedCustomerKey(value as string)}
+                        onChange={(value: string | null) => setSelectedCustomerKey(value as string)}
                         placeholder="Search and select profile..."
                     />
                 </div>
@@ -610,7 +611,7 @@ export default function CustomerProfilePage() {
       
       <DetailsDialog 
           isOpen={!!detailsCustomer}
-          onOpenChange={(open) => !open && setDetailsCustomer(null)}
+          onOpenChange={(open: boolean) => !open && setDetailsCustomer(null)}
           customer={detailsCustomer}
           paymentHistory={paymentHistory}
       />
@@ -625,5 +626,3 @@ export default function CustomerProfilePage() {
     </div>
   );
 }
-
-    

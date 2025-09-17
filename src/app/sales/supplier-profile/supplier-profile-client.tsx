@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 import { db } from "@/lib/firebase";
@@ -20,7 +20,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { Badge } from "@/components/ui/badge"; 
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
@@ -261,7 +260,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
             </div>
         </div>
         <DialogFooter className="p-4 border-t no-print">
-            <Button variant="outline" asChild><DialogClose>Close</DialogClose></Button>
+            <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
             <div className="flex-grow" />
             <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
             <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
@@ -271,7 +270,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 };
 
 
-export default function SupplierProfilePage() {
+export function SupplierProfileClient() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
@@ -440,7 +439,11 @@ export default function SupplierProfilePage() {
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
     const totalRateData = filteredSuppliers.reduce((acc, s) => {
-         if(s.rate > 0) { acc.karta += s.kartaPercentage; acc.laboury += s.labouryRate; acc.count++; }
+         if(s.rate > 0) {
+             acc.karta += s.kartaPercentage;
+             acc.laboury += s.labouryRate;
+             acc.count++;
+         }
          return acc;
      }, { karta: 0, laboury: 0, count: 0 });
     if(totalRateData.count > 0) {
@@ -502,7 +505,7 @@ export default function SupplierProfilePage() {
                     <CustomDropdown
                         options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedSupplierKey}
-                        onChange={(value) => setSelectedSupplierKey(value as string)}
+                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
                         placeholder="Search and select profile..."
                     />
                 </div>
@@ -528,20 +531,18 @@ export default function SupplierProfilePage() {
       
       <DetailsDialog 
           isOpen={!!detailsCustomer}
-          onOpenChange={(open) => !open && setDetailsCustomer(null)}
+          onOpenChange={(open: boolean) => !open && setDetailsCustomer(null)}
           customer={detailsCustomer}
           paymentHistory={paymentHistory}
       />
       
       <PaymentDetailsDialog
-          payment={selectedPaymentForDetails}
-          suppliers={suppliers}
-          onOpenChange={() => setSelectedPaymentForDetails(null)}
-          onShowEntryDetails={setDetailsCustomer}
+        payment={selectedPaymentForDetails}
+        suppliers={suppliers}
+        onOpenChange={() => setSelectedPaymentForDetails(null)}
+        onShowEntryDetails={setDetailsCustomer}
       />
       
     </div>
   );
 }
-
-    

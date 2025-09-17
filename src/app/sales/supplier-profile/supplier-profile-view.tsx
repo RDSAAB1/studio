@@ -282,5 +282,3 @@ export const SupplierProfileView = ({
         </div>
     );
 };
-
-    
