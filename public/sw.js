@@ -1,134 +1,120 @@
 // sw.js
 
-const CACHE_NAME = 'bizsuite-dataflow-cache-v1';
+const CACHE_NAME = 'bizsuite-v1';
+
+// App Shell: Files that are essential for the app to work offline.
 const urlsToCache = [
   '/',
-  '/dashboard-overview',
-  '/sales/supplier-entry',
-  '/sales/customer-entry',
-  '/sales/supplier-payments',
-  '/sales/customer-payments',
-  '/sales/supplier-profile',
-  '/sales/customer-profile',
-  '/cash-bank',
-  '/expense-tracker',
-  '/sales/rtgs-report',
-  '/sales/daily-supplier-report',
-  '/hr/employee-database',
-  '/hr/payroll-management',
-  '/hr/attendance-tracking',
-  '/inventory/inventory-management',
-  '/inventory/purchase-orders',
-  '/projects/dashboard',
-  '/projects/management',
-  '/projects/tasks',
-  '/projects/collaboration',
-  '/data-capture',
-  '/settings',
-  '/settings/bank-management',
-  '/settings/printer',
+  '/fallback', // A generic offline page
   '/manifest.json',
-  '/favicon.ico',
+  '/styles/globals.css', // Adjust path based on your project structure
+  // Add other critical assets like logo, main JS bundles if you know them.
+  // Next.js generates hashed bundle names, so this is tricky. We'll cache dynamically.
 ];
 
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
+      .then((cache) => {
         console.log('Service Worker: Caching app shell');
-        return cache.addAll(urlsToCache);
+        return cache.addAll(urlsToCache).catch(err => {
+            console.error("Failed to cache app shell on install:", err);
+        });
       })
       .then(() => {
-        console.log('Service Worker: App shell cached successfully');
-        return self.skipWaiting();
+        console.log('Service Worker: Install completed');
+        self.skipWaiting();
       })
   );
 });
 
-self.addEventListener('activate', event => {
+self.addEventListener('activate', (event) => {
   console.log('Service Worker: Activating...');
-  // Claim clients to take control of the page without a reload
-  event.waitUntil(self.clients.claim());
-  // Send a message to the client to notify of activation
-  self.clients.matchAll().then(clients => {
-    clients.forEach(client => client.postMessage({ type: 'SW_ACTIVATED' }));
-  });
-
-  // Clean up old caches
+  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then(cacheNames => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map(cache => {
-          if (cache !== CACHE_NAME) {
-            console.log('Service Worker: Clearing old cache', cache);
-            return caches.delete(cache);
+        cacheNames.map((cacheName) => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Service Worker: Deleting old cache', cacheName);
+            return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+        console.log('Service Worker: Activation completed');
+        return self.clients.claim();
     })
   );
 });
 
-
-self.addEventListener('fetch', event => {
-  // Let the browser handle requests for scripts from cloudworkstations.dev
-  if (event.request.url.includes('cloudworkstations.dev/_next/static/')) {
-    return;
-  }
-
-  // Handle navigation requests (for pages) with a network-first strategy, falling back to cache.
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        // If network fails, serve the root from cache, allowing client-side routing to take over.
-        return caches.match('/');
-      })
-    );
-    return;
-  }
-  
-  // For all other requests (CSS, JS, images), use a cache-first strategy.
-  event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        // If the response is in the cache, return it
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // If not in cache, fetch from the network
-        return fetch(event.request).then(networkResponse => {
-          // Clone the response because it's a stream and can only be consumed once
-          const responseToCache = networkResponse.clone();
-          
-          // Open the dynamic cache and add the new response
-          caches.open('dynamic-cache-v1')
-            .then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-            
-          // Return the original network response to the browser
-          return networkResponse;
-        }).catch(error => {
-          // This catch is crucial for when the user is offline and the resource is not in the cache.
-          console.error('Fetch failed; returning offline fallback or error. URL:', event.request.url, error);
-          // Here you could return a generic offline fallback for images, etc. if you have one.
-          // For now, we let the browser handle the error, which avoids the TypeError.
-        });
-      })
-  );
-});
-
-// Listen for sync events
-self.addEventListener('sync', (event) => {
-    if (event.tag === 'background-sync') {
-        console.log('Service Worker: Background sync event triggered.');
-        // Notify clients to perform the sync.
-        event.waitUntil(
-             self.clients.matchAll().then(clients => {
-                clients.forEach(client => client.postMessage({ type: 'SYNC_DATA' }));
+self.addEventListener('fetch', (event) => {
+    // For navigation requests (loading pages), use Stale-While-Revalidate
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            caches.open(CACHE_NAME).then((cache) => {
+                // 1. Return cached response if available
+                return cache.match(event.request).then((cachedResponse) => {
+                    // 2. Fetch from network in the background
+                    const fetchPromise = fetch(event.request).then((networkResponse) => {
+                        // If the fetch is successful, update the cache
+                        if (networkResponse.ok) {
+                            cache.put(event.request, networkResponse.clone());
+                        }
+                        return networkResponse;
+                    }).catch(error => {
+                        console.error('Service Worker: Fetch failed; returning offline page instead.', error);
+                        return caches.match('/fallback');
+                    });
+                    // Return cached response immediately, or wait for network if not cached
+                    return cachedResponse || fetchPromise;
+                });
             })
         );
+        return;
     }
+
+    // For other requests (CSS, JS, images, API calls), use a Cache-First strategy
+    event.respondWith(
+        caches.match(event.request)
+            .then((response) => {
+                // If the request is in the cache, return it
+                if (response) {
+                    return response;
+                }
+
+                // If the request is not in the cache, fetch it from the network
+                return fetch(event.request).then(
+                    (networkResponse) => {
+                        // Don't cache API calls or Chrome extension requests
+                        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' || event.request.url.startsWith('chrome-extension://')) {
+                            return networkResponse;
+                        }
+
+                        // Clone the response because it's a stream and can only be consumed once.
+                        const responseToCache = networkResponse.clone();
+
+                        caches.open(CACHE_NAME)
+                            .then((cache) => {
+                                cache.put(event.request, responseToCache);
+                            });
+
+                        return networkResponse;
+                    }
+                );
+            }).catch(error => {
+                console.error('Service Worker: Error fetching and caching new data', error);
+                // As a fallback for non-navigation requests, you might return a placeholder
+                // For example, for images, you could return a placeholder image
+                return caches.match('/fallback'); // Or a specific placeholder
+            })
+    );
+});
+
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

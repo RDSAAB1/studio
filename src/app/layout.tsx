@@ -7,6 +7,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 
 const inter = Inter({
@@ -46,12 +47,37 @@ export default function RootLayout({
                     });
                 }
             };
-
+            
             navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
 
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').then(registration => {
                     console.log('SW registered: ', registration);
+                    
+                    registration.onupdatefound = () => {
+                        const installingWorker = registration.installing;
+                        if (installingWorker) {
+                            installingWorker.onstatechange = () => {
+                                if (installingWorker.state === 'installed') {
+                                    if (navigator.serviceWorker.controller) {
+                                        // New content is available and will be used when all tabs for this page are closed.
+                                        console.log('New content is available; please refresh.');
+                                        toast({
+                                            title: 'Update Available',
+                                            description: 'A new version of the app is ready.',
+                                            action: (
+                                                <Button onClick={() => window.location.reload()} size="sm">
+                                                    Reload
+                                                </Button>
+                                            ),
+                                            duration: Infinity
+                                        });
+                                    }
+                                }
+                            };
+                        }
+                    };
+
                 }).catch(registrationError => {
                     console.log('SW registration failed: ', registrationError);
                 });
