@@ -38,8 +38,8 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { ite
 
     if (!item.subMenus) {
         return (
-             <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-1.5 flex-col gap-1 text-xs", isActive && "bg-accent")}>
-                <span className="icon">{React.createElement(item.icon, { className: "h-4 w-4" })}</span>
+             <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
+                <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
             </Button>
         )
     }
@@ -51,9 +51,9 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { ite
                     variant="ghost" 
                     onMouseEnter={() => setIsOpen(true)} 
                     onMouseLeave={() => setIsOpen(false)}
-                    className={cn("w-full h-auto py-1.5 flex-col gap-1 text-xs", (isSubMenuActive || isOpen) && "bg-accent")}
+                    className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", (isSubMenuActive || isOpen) && "bg-accent")}
                  >
-                    <span className="icon">{React.createElement(item.icon, { className: "h-4 w-4" })}</span>
+                    <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
                 </Button>
             </DropdownMenuTrigger>
              <DropdownMenuContent 
