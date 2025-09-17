@@ -72,12 +72,13 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-right: 20px; /* Add padding for the button */
+    padding-left: 10px;
+    padding-right: 20px; 
 }
 
 .logo_wrap{
     text-align: left;
-    margin-left: -5px; /* Adjust for icon padding */
+    margin-left: -5px; 
     padding: 10px 0;
 }
 
@@ -95,7 +96,7 @@ body {
     flex-shrink: 0;
 }
 
-/* Hide text when collapsed */
+
 .wrapper .side_bar .logo_wrap .text {
   display: none !important;
 }
@@ -107,6 +108,44 @@ body {
     padding: 0;
 }
 
+
+.side_bar_bottom .item .link{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 5px;
+    white-space: nowrap;
+}
+
+.side_bar_bottom .item .link:hover,
+.side_bar_bottom .item.active > .link,
+.side_bar_bottom .item .link.active{
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+}
+
+.side_bar_bottom .item .link .icon{
+    margin-right: 10px;
+}
+
+.side_bar_bottom .item .sub_menu{
+    background: hsl(var(--muted) / 0.5);
+    padding-left: 20px;
+    display: none;
+}
+
+.side_bar_bottom .item.active .sub_menu{
+    display: block;
+}
+
+.side_bar_bottom .item .sub_menu .link{
+    padding: 10px 20px;
+    font-size: 14px;
+}
+
+
 .shadow{
     display: none;
 }
@@ -116,7 +155,7 @@ body {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
-    min-width: 0; /* Prevents content from overflowing container */
+    min-width: 0; 
     margin-left: 60px; /* Always use collapsed sidebar width */
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
@@ -127,12 +166,17 @@ body {
 @media screen and (max-width: 1023px) {
     .wrapper .side_bar {
         left: -250px;
-        width: 250px; /* Full width on mobile */
+        width: 250px; 
     }
     
     .wrapper.active .side_bar{
         left: 0;
     }
+
+    .wrapper .side_bar .logo_wrap .text {
+      display: inline-block !important;
+    }
+
     
     .wrapper.active .shadow{
         display: block;
