@@ -143,10 +143,10 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     <div className="flex justify-between items-start mb-2">
                         <BankHeader />
                         <div className="text-center">
-                            <p className="font-bold text-xs">FORM</p>
-                            <h2 className="font-bold text-xl">{settings.companyName}</h2>
-                            <p className="font-bold text-sm">{settings.companyAddress1}</p>
-                            <p className="font-bold text-sm">{settings.companyAddress2}</p>
+                            <p className="font-bold text-xs text-black">FORM</p>
+                            <h2 className="font-bold text-xl text-black">{settings.companyName}</h2>
+                            <p className="font-bold text-sm text-black">{settings.companyAddress1}</p>
+                            <p className="font-bold text-sm text-black">{settings.companyAddress2}</p>
                         </div>
                         <BankHeader />
                     </div>
@@ -154,54 +154,54 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     <div className="flex justify-between items-start mb-4">
                         <table className="text-sm">
                             <tbody>
-                                <tr><td className="font-bold pr-4">BANK NAME</td><td>- {settings.defaultBank?.bankName}</td></tr>
-                                <tr><td className="font-bold pr-4">IFSC CODE</td><td>- {settings.defaultBank?.ifscCode}</td></tr>
-                                <tr><td className="font-bold pr-4">BRANCH NAME</td><td>- {settings.defaultBank?.branchName}</td></tr>
-                                <tr><td className="font-bold pr-4">A/C NO.</td><td>- '{settings.defaultBank?.accountNumber}</td></tr>
-                                <tr><td className="font-bold pr-4">CONTACT NO.</td><td>- {settings.contactNo}</td></tr>
-                                <tr><td className="font-bold pr-4">GMAIL</td><td>- {settings.gmail}</td></tr>
+                                <tr><td className="font-bold pr-4 text-black">BANK NAME</td><td className="text-black">- {settings.defaultBank?.bankName}</td></tr>
+                                <tr><td className="font-bold pr-4 text-black">IFSC CODE</td><td className="text-black">- {settings.defaultBank?.ifscCode}</td></tr>
+                                <tr><td className="font-bold pr-4 text-black">BRANCH NAME</td><td className="text-black">- {settings.defaultBank?.branchName}</td></tr>
+                                <tr><td className="font-bold pr-4 text-black">A/C NO.</td><td className="text-black">- '{settings.defaultBank?.accountNumber}</td></tr>
+                                <tr><td className="font-bold pr-4 text-black">CONTACT NO.</td><td className="text-black">- {settings.contactNo}</td></tr>
+                                <tr><td className="font-bold pr-4 text-black">GMAIL</td><td className="text-black">- {settings.gmail}</td></tr>
                             </tbody>
                         </table>
                         <div className="text-left text-sm">
                             <div className="flex">
-                                <span className="font-bold w-24">DATE</span>
-                                <span>{isSameDate ? format(new Date(firstDate), "dd MMMM yyyy") : 'Multiple'}</span>
+                                <span className="font-bold w-24 text-black">DATE</span>
+                                <span className="text-black">{isSameDate ? format(new Date(firstDate), "dd MMMM yyyy") : 'Multiple'}</span>
                             </div>
                             <div className="flex">
-                                <span className="font-bold w-24">CHECK NO.</span>
-                                <span>'{isSameCheckNo ? firstCheckNo : 'Multiple'}</span>
+                                <span className="font-bold w-24 text-black">CHECK NO.</span>
+                                <span className="text-black">'{isSameCheckNo ? firstCheckNo : 'Multiple'}</span>
                             </div>
                         </div>
                     </div>
                     
-                    <p className="text-center font-bold mb-1">INFORMATION</p>
+                    <p className="text-center font-bold mb-1 text-black">INFORMATION</p>
                     <table className="w-full text-xs border-collapse border border-black">
                         <thead className="text-black font-bold">
                             <tr className="print-header-bg" style={{ backgroundColor: '#fce5d5' }}>
-                                <th className="border border-black p-1">SR.NO.</th>
-                                <th className="border border-black p-1">NAME</th>
-                                <th className="border border-black p-1">A/C NO.</th>
-                                <th className="border border-black p-1">IFSC CODE</th>
-                                <th className="border border-black p-1">AMMOUNT</th>
-                                <th className="border border-black p-1">BRANCH</th>
-                                <th className="border border-black p-1">BANK</th>
+                                <th className="border border-black p-1 text-black">SR.NO.</th>
+                                <th className="border border-black p-1 text-black">NAME</th>
+                                <th className="border border-black p-1 text-black">A/C NO.</th>
+                                <th className="border border-black p-1 text-black">IFSC CODE</th>
+                                <th className="border border-black p-1 text-black">AMMOUNT</th>
+                                <th className="border border-black p-1 text-black">BRANCH</th>
+                                <th className="border border-black p-1 text-black">BANK</th>
                             </tr>
                         </thead>
                         <tbody>
                             {payments.map((p: any, index: number) => (
                                 <tr key={p.paymentId}>
-                                    <td className="border border-black p-1 text-center">{index + 1}</td>
-                                    <td className="border border-black p-1">{toTitleCase(p.supplierName)}</td>
-                                    <td className="border border-black p-1">'{p.acNo}</td>
-                                    <td className="border border-black p-1">{p.ifscCode}</td>
-                                    <td className="border border-black p-1 text-right">{formatCurrency(p.amount)}</td>
-                                    <td className="border border-black p-1">{toTitleCase(p.branch)}</td>
-                                    <td className="border border-black p-1">{p.bank}</td>
+                                    <td className="border border-black p-1 text-center h-6 text-black">{index + 1}</td>
+                                    <td className="border border-black p-1 text-black">{toTitleCase(p.supplierName)}</td>
+                                    <td className="border border-black p-1 text-black">'{p.acNo}</td>
+                                    <td className="border border-black p-1 text-black">{p.ifscCode}</td>
+                                    <td className="border border-black p-1 text-right text-black">{formatCurrency(p.amount)}</td>
+                                    <td className="border border-black p-1 text-black">{toTitleCase(p.branch)}</td>
+                                    <td className="border border-black p-1 text-black">{p.bank}</td>
                                 </tr>
                             ))}
                              {Array.from({ length: 15 - payments.length }).map((_, i) => (
                                 <tr key={`empty-${i}`}>
-                                    <td className="border border-black p-2 h-6 text-center">{payments.length + i + 1}</td>
+                                    <td className="border border-black p-2 h-6 text-center text-black">{payments.length + i + 1}</td>
                                     <td className="border border-black p-2 h-6"></td>
                                     <td className="border border-black p-2 h-6"></td>
                                     <td className="border border-black p-2 h-6"></td>
@@ -214,11 +214,11 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                     </table>
 
                      <div className="flex justify-between items-end mt-12">
-                        <p className="text-sm">(Sign. Of Clerk/Cashier/Teller)</p>
-                        <p className="text-sm">(Signature Of Owner)</p>
+                        <p className="text-sm text-black">(Sign. Of Clerk/Cashier/Teller)</p>
+                        <p className="text-sm text-black">(Signature Of Owner)</p>
                         <div className="text-right">
-                            <span className="font-bold mr-4">TOTAL</span>
-                            <span className="font-bold">{formatCurrency(totalAmount)}</span>
+                            <span className="font-bold mr-4 text-black">TOTAL</span>
+                            <span className="font-bold text-black">{formatCurrency(totalAmount)}</span>
                         </div>
                     </div>
                 </div>
