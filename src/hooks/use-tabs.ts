@@ -37,6 +37,9 @@ import {
   AreaChart,
   Lightbulb,
   User,
+  HandCoins,
+  CircleDollarSign,
+  PieChart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -57,7 +60,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "supplier",
     name: "Supplier",
-    icon: ShoppingCart,
+    icon: HandCoins,
     subMenus: [
       { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
       { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
@@ -67,7 +70,7 @@ export const allMenuItems: MenuItem[] = [
     {
     id: "customer",
     name: "Customer",
-    icon: TrendingUp,
+    icon: CircleDollarSign,
     subMenus: [
       { id: "sales/customer-entry", name: "Customer Entry", icon: UserPlus },
       { id: "sales/customer-payments", name: "Customer Payments", icon: Wallet },
@@ -87,7 +90,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "reports",
     name: "Reports",
-    icon: AreaChart,
+    icon: PieChart,
     subMenus: [
         { id: "sales/rtgs-report", name: "RTGS Report", icon: Banknote },
         { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: Truck },
