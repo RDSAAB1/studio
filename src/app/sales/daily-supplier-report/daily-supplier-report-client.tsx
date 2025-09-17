@@ -262,7 +262,7 @@ export default function DailySupplierReportClient() {
                                 </thead>
                                 <tbody>
                                     {filteredSuppliers.map((s) => (
-                                        <tr key={s.id} className="bg-white hover:bg-gray-50 whitespace-nowrap h-[29px]">
+                                        <tr key={s.id} className="hover:bg-muted/50 whitespace-nowrap h-[29px]">
                                             <td className="border border-gray-300 p-1 font-bold">{s.srNo}</td>
                                             <td className="border border-gray-300 p-1">{format(new Date(s.date), "dd-MMM")}</td>
                                             <td className="border border-gray-300 p-1 text-center">{s.term}</td>
