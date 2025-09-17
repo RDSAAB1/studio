@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { Payment, RtgsSettings } from '@/lib/definitions';
+import { Payment, RtgsSettings, BankAccount } from '@/lib/definitions';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Printer } from 'lucide-react';
 
 interface RtgsReceiptProps {
     payment: Payment;
-    settings: RtgsSettings;
+    settings: RtgsSettings & { defaultBank?: BankAccount };
     onPrint: () => void;
 }
 
@@ -84,16 +84,17 @@ export const RtgsReceipt: React.FC<RtgsReceiptProps> = ({ payment, settings, onP
                         <div className="border border-gray-200 p-4 rounded-lg mb-6">
                             <h3 className="font-bold text-gray-500 mb-3 uppercase tracking-wider text-sm">Our Bank Details</h3>
                              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-base">
-                                <div><span className="font-semibold">Bank:</span> <span>{settings.bankName}, {settings.branchName}</span></div>
-                                <div><span className="font-semibold">A/C No:</span> <span>{settings.accountNo}</span></div>
-                                <div><span className="font-semibold">IFSC:</span> <span>{settings.ifscCode}</span></div>
+                                <div><span className="font-semibold">Bank:</span> <span>{settings.defaultBank?.bankName}</span></div>
+                                <div><span className="font-semibold">Branch:</span> <span>{settings.defaultBank?.branchName}</span></div>
+                                <div><span className="font-semibold">A/C No:</span> <span>{settings.defaultBank?.accountNumber}</span></div>
+                                <div><span className="font-semibold">IFSC:</span> <span>{settings.defaultBank?.ifscCode}</span></div>
                             </div>
                         </div>
 
                         {/* Information Table */}
                          <table className="w-full text-left mb-4 print-table text-base">
                             <thead>
-                                <tr className="print-bg-gray-800 bg-gray-800 text-black uppercase text-xs">
+                                <tr className="print-bg-gray-800 bg-gray-100 text-black uppercase text-xs">
                                     <th className="p-2 font-semibold w-[20%]">Payee Name</th>
                                     <th className="p-2 font-semibold w-[20%]">Bank Name</th>
                                     <th className="p-2 font-semibold w-[15%]">Branch</th>
