@@ -60,7 +60,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "supplier",
     name: "Supplier",
-    icon: HandCoins,
+    icon: ShoppingCart,
     subMenus: [
       { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
       { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
@@ -70,7 +70,7 @@ export const allMenuItems: MenuItem[] = [
     {
     id: "customer",
     name: "Customer",
-    icon: CircleDollarSign,
+    icon: TrendingUp,
     subMenus: [
       { id: "sales/customer-entry", name: "Customer Entry", icon: UserPlus },
       { id: "sales/customer-payments", name: "Customer Payments", icon: Wallet },
@@ -99,7 +99,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "hr",
     name: "HR Management",
-    icon: Users2,
+    icon: Users,
     subMenus: [
       { id: "hr/employee-database", name: "Employee Database", icon: Database },
       { id: "hr/payroll-management", name: "Payroll Management", icon: Calculator },
@@ -109,7 +109,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "inventory",
     name: "Inventory",
-    icon: Boxes,
+    icon: Building2,
     subMenus: [
       { id: "inventory/inventory-management", name: "Inventory", icon: Boxes },
       { id: "inventory/purchase-orders", name: "Purchase Orders", icon: ShoppingCart },
