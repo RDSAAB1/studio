@@ -124,14 +124,14 @@ export default function SupplierEntryClient() {
     const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
       setSuppliers(data);
       if (isInitialLoad.current) {
-        if (data && data.length > 0) {
-            const nextSrNum = Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'S');
-            form.setValue('srNo', initialSrNo);
-            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-        }
-        isInitialLoad.current = false;
-        setIsLoading(false);
+          if (data && data.length > 0) {
+              const nextSrNum = Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
+              const initialSrNo = formatSrNo(nextSrNum, 'S');
+              form.setValue('srNo', initialSrNo);
+              setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+          }
+          isInitialLoad.current = false;
+          setIsLoading(false);
       }
     }, (error) => {
       console.error("Error fetching suppliers: ", error);

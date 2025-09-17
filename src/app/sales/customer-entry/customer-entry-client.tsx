@@ -143,17 +143,18 @@ export default function CustomerEntryClient() {
   useEffect(() => {
     if (!isClient) return;
 
-    setIsLoading(true);
     const unsubscribeCustomers = getCustomersRealtime((data: Customer[]) => {
       setCustomers(data);
-      if (isInitialLoad.current && data) {
-          const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-          const initialSrNo = formatSrNo(nextSrNum, 'C');
-          form.setValue('srNo', initialSrNo);
-          setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+      if (isInitialLoad.current) {
+          if (data) {
+              const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+              const initialSrNo = formatSrNo(nextSrNum, 'C');
+              form.setValue('srNo', initialSrNo);
+              setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+          }
           isInitialLoad.current = false;
+          setIsLoading(false);
       }
-      setIsLoading(false);
     }, (error) => {
       console.error("Error fetching customers: ", error);
       toast({ title: "Failed to load customer data", variant: "destructive" });
@@ -696,7 +697,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-
-    
-
-    
