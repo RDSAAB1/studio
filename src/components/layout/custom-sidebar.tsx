@@ -15,6 +15,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 
 interface CustomSidebarProps {
@@ -38,9 +44,18 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { ite
 
     if (!item.subMenus) {
         return (
-             <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
-                <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
-            </Button>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                         <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
+                            <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                        <p>{item.name}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         )
     }
     
