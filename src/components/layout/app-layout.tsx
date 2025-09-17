@@ -139,7 +139,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             if (currentUser) {
                 // Check global setup status, not per-user
                 const companySettings = await getRtgsSettings();
-                if (!companySettings?.companyName || !companySettings.bankName || !companySettings.gmail) {
+                if (!companySettings?.companyName) {
                     setIsSetupComplete(false);
                 } else {
                     setIsSetupComplete(true);
@@ -182,7 +182,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     }, [user, authChecked, isSetupComplete, pathname, router]);
 
     // Show a global loader while auth state or setup state is being determined
-    if (!authChecked || isSetupComplete === null && user) {
+    if (!authChecked || (user && isSetupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

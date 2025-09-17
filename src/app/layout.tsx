@@ -66,7 +66,10 @@ export default function RootLayout({
                                             title: 'Update Available',
                                             description: 'A new version of the app is ready.',
                                             action: (
-                                                <Button onClick={() => window.location.reload()} size="sm">
+                                                <Button onClick={() => {
+                                                    installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                                                    window.location.reload();
+                                                }} size="sm">
                                                     Reload
                                                 </Button>
                                             ),

@@ -1,114 +1,98 @@
 
-const CACHE_NAME = 'bizsuite-cache-v2';
-const urlsToCache = [
+const CACHE_NAME = 'bizsuite-dataflow-cache-v3';
+const PRECACHE_ASSETS = [
   '/',
-  '/manifest.json',
-  '/favicon.ico',
-  // Add other critical assets like fonts, icons, etc.
-  // Note: Next.js assets are often dynamically named, so caching them
-  // directly here can be tricky. The fetch handler is more robust.
+  // Next.js build manifest files
+  '/_next/static/css/app/layout.css',
+  // You would add more specific build output files here
+  // However, for a dynamic approach, we'll cache on the fly.
 ];
 
-self.addEventListener('install', event => {
-  console.log('Service Worker: Installing...');
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Service Worker: Caching app shell');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => {
-        console.log('Service Worker: App shell cached successfully');
-        return self.skipWaiting();
-      })
-  );
-});
-
-self.addEventListener('activate', event => {
-  console.log('Service Worker: Activating...');
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Service Worker: Deleting old cache', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => {
-      console.log('Service Worker: Activated and old caches cleared');
-      // Inform clients that the new service worker is active.
-      self.clients.claim().then(() => {
-          self.clients.matchAll().then(clients => {
-              clients.forEach(client => client.postMessage({ type: 'SW_ACTIVATED' }));
-          });
-      });
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('[Service Worker] Pre-caching App Shell');
+      // Precaching a minimal set of assets. More will be cached on the fly.
+      return cache.addAll(PRECACHE_ASSETS.map(url => new Request(url, { cache: 'reload' })));
+    }).catch(error => {
+      console.error('[Service Worker] Pre-caching failed:', error);
     })
   );
 });
 
-
-self.addEventListener('fetch', event => {
-    const { request } = event;
-
-    // For navigation requests, use a Stale-While-Revalidate strategy.
-    if (request.mode === 'navigate') {
-        event.respondWith(
-            caches.open(CACHE_NAME).then(cache => {
-                // Get from cache first
-                return cache.match(request).then(cachedResponse => {
-                    // Fetch from network in the background to update cache
-                    const fetchPromise = fetch(request).then(networkResponse => {
-                        // Check if we received a valid response
-                        if (networkResponse && networkResponse.status === 200) {
-                            cache.put(request, networkResponse.clone());
-                        }
-                        return networkResponse;
-                    }).catch(() => {
-                        // Network fetch failed, do nothing, rely on cache.
-                    });
-
-                    // Return cached response if available, otherwise wait for network
-                    return cachedResponse || fetchPromise;
-                });
-            })
-        );
-        return;
-    }
-
-    // For other requests (API, images, scripts), use Network First, then Cache.
-    event.respondWith(
-        fetch(request)
-            .then(networkResponse => {
-                // If the fetch is successful, clone it and cache it.
-                if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
-                    const responseToCache = networkResponse.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(request, responseToCache);
-                    });
-                }
-                return networkResponse;
-            })
-            .catch(() => {
-                // If the network fetch fails, try to get it from the cache.
-                return caches.match(request);
-            })
-    );
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  return self.clients.claim();
 });
 
 
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'background-sync') {
-    console.log('Service Worker: Background sync event triggered.');
-    event.waitUntil(
-      self.clients.matchAll().then((clients) => {
-        if (clients && clients.length) {
-          clients.forEach((client) => {
-            client.postMessage({ type: 'SYNC_DATA' });
-          });
-        }
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
+  // For navigation requests (loading pages), use a network-first strategy
+  // to ensure users get the latest HTML, then fall back to cache.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).then(response => {
+        // If the fetch is successful, cache the new response
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(request, responseToCache);
+        });
+        return response;
+      }).catch(() => {
+        // If the network fails, serve the page from the cache
+        return caches.match(request).then(cachedResponse => {
+            return cachedResponse || caches.match('/');
+        });
       })
     );
+    return;
   }
+
+  // For other requests (CSS, JS, images), use a Stale-While-Revalidate strategy
+  event.respondWith(
+    caches.match(request).then((cachedResponse) => {
+      const fetchPromise = fetch(request).then((networkResponse) => {
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(request, responseToCache);
+        });
+        return networkResponse;
+      });
+
+      // Return cached response immediately if available, while revalidating in the background
+      return cachedResponse || fetchPromise;
+    })
+  );
+});
+
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'background-sync') {
+        console.log('[Service Worker] Background sync triggered.');
+        event.waitUntil(
+            self.clients.matchAll().then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({ type: 'SYNC_DATA' });
+                });
+            })
+        );
+    }
+});
+
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
