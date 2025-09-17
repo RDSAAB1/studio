@@ -235,7 +235,6 @@ export default function SupplierPaymentsClient() {
     if(!isClient) return;
     
     let isSubscribed = true;
-    setLoading(true);
 
     const unsubSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
       if (isSubscribed) {
@@ -928,18 +927,10 @@ export default function SupplierPaymentsClient() {
             onOpenChange={() => setRtgsReceiptData(null)}
        />
 
-       <Dialog open={isBankSettingsOpen} onOpenChange={setIsBankSettingsOpen}>
-            <DialogContent className="max-w-5xl h-[80vh] flex flex-col p-0">
-                 <DialogHeader className="p-4 border-b">
-                    <DialogTitle>Bank & Branch Management</DialogTitle>
-                    <DialogDescription>Add, edit, or manage banks and their branches here.</DialogDescription>
-                </DialogHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto p-6">
-                    <BankManagementPage />
-                </div>
-            </DialogContent>
-       </Dialog>
+       <BankSettingsDialog
+            isOpen={isBankSettingsOpen}
+            onOpenChange={setIsBankSettingsOpen}
+       />
     </div>
   );
 }
-
