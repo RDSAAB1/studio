@@ -284,6 +284,7 @@ export default function SupplierPaymentsClient() {
     };
     fetchSettings();
 
+
     setLoading(false);
 
 
@@ -780,7 +781,7 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient || isLoading) {
+    if (!isClient || loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
