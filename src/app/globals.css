@@ -53,11 +53,11 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 80px; /* Always collapsed */
+    width: 60px; /* Always collapsed */
     height: 100%;
     background: hsl(var(--card));
     border-right: 1px solid hsl(var(--border));
-    padding: 20px 0;
+    padding: 10px 0;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
@@ -117,7 +117,7 @@ body {
     flex-direction: column;
     flex-grow: 1;
     min-width: 0; /* Prevents content from overflowing container */
-    margin-left: 80px; /* Always use collapsed sidebar width */
+    margin-left: 60px; /* Always use collapsed sidebar width */
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     z-index: 40;
