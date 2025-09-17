@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef } from 'react';
 import { RtgsSettings, BankAccount } from '@/lib/definitions';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -45,6 +45,13 @@ const BankHeader = () => (
     </div>
 );
 
+const chunkArray = <T,>(array: T[], size: number): T[][] => {
+    const chunkedArr: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+        chunkedArr.push(array.slice(i, i + size));
+    }
+    return chunkedArr;
+};
 
 export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: ConsolidatedRtgsPrintFormatProps) => {
     const printRef = useRef<HTMLDivElement>(null);
@@ -54,13 +61,8 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         return <div>Loading settings...</div>;
     }
 
-    const firstDate = payments.length > 0 ? payments[0].date : '';
-    const isSameDate = payments.every(p => p.date === firstDate);
-    
-    const firstCheckNo = payments.length > 0 ? payments[0].checkNo : '';
-    const isSameCheckNo = payments.every(p => p.checkNo === firstCheckNo);
-    
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    const paymentChunks = chunkArray(payments, 10);
+    const grandTotalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
 
     const handlePrint = () => {
         const node = printRef.current;
@@ -79,6 +81,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
         const iframeDoc = iframe.contentWindow?.document;
         if (!iframeDoc) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not create print content.' });
+            document.body.removeChild(iframe);
             return;
         }
 
@@ -115,6 +118,9 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 .print-header-bg {
                      background-color: #fce5d5 !important;
                 }
+                .page-break {
+                    page-break-after: always;
+                }
             }
         `;
         iframeDoc.head.appendChild(printStyles);
@@ -139,88 +145,106 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
-                <div ref={printRef} className="p-4 font-sans leading-normal bg-white text-black printable-area">
-                    <div className="flex justify-between items-start mb-2">
-                        <BankHeader />
-                        <div className="text-center">
-                            <p className="font-bold text-xs text-black">FORM</p>
-                            <h2 className="font-bold text-xl text-black">{settings.companyName}</h2>
-                            <p className="font-bold text-sm text-black">{settings.companyAddress1}</p>
-                            <p className="font-bold text-sm text-black">{settings.companyAddress2}</p>
-                        </div>
-                        <BankHeader />
-                    </div>
+                <div ref={printRef}>
+                    {paymentChunks.map((chunk, pageIndex) => {
+                        const firstDate = chunk.length > 0 ? chunk[0].date : '';
+                        const isSameDate = chunk.every(p => p.date === firstDate);
+                        const firstCheckNo = chunk.length > 0 ? chunk[0].checkNo : '';
+                        const isSameCheckNo = chunk.every(p => p.checkNo === firstCheckNo);
+                        const pageTotalAmount = chunk.reduce((sum, p) => sum + p.amount, 0);
 
-                    <div className="flex justify-between items-start mb-4">
-                        <table className="text-sm">
-                            <tbody>
-                                <tr><td className="font-bold pr-4 text-black">BANK NAME</td><td className="text-black">- {settings.defaultBank?.bankName}</td></tr>
-                                <tr><td className="font-bold pr-4 text-black">IFSC CODE</td><td className="text-black">- {settings.defaultBank?.ifscCode}</td></tr>
-                                <tr><td className="font-bold pr-4 text-black">BRANCH NAME</td><td className="text-black">- {settings.defaultBank?.branchName}</td></tr>
-                                <tr><td className="font-bold pr-4 text-black">A/C NO.</td><td className="text-black">- '{settings.defaultBank?.accountNumber}</td></tr>
-                                <tr><td className="font-bold pr-4 text-black">CONTACT NO.</td><td className="text-black">- {settings.contactNo}</td></tr>
-                                <tr><td className="font-bold pr-4 text-black">GMAIL</td><td className="text-black">- {settings.gmail}</td></tr>
-                            </tbody>
-                        </table>
-                        <div className="text-left text-sm">
-                            <div className="flex">
-                                <span className="font-bold w-24 text-black">DATE</span>
-                                <span className="text-black">{isSameDate ? format(new Date(firstDate), "dd MMMM yyyy") : 'Multiple'}</span>
-                            </div>
-                            <div className="flex">
-                                <span className="font-bold w-24 text-black">CHECK NO.</span>
-                                <span className="text-black">'{isSameCheckNo ? firstCheckNo : 'Multiple'}</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <p className="text-center font-bold mb-1 text-black">INFORMATION</p>
-                    <table className="w-full text-xs border-collapse border border-black">
-                        <thead className="text-black font-bold">
-                            <tr className="print-header-bg" style={{ backgroundColor: '#fce5d5' }}>
-                                <th className="border border-black p-1 text-black">SR.NO.</th>
-                                <th className="border border-black p-1 text-black">NAME</th>
-                                <th className="border border-black p-1 text-black">A/C NO.</th>
-                                <th className="border border-black p-1 text-black">IFSC CODE</th>
-                                <th className="border border-black p-1 text-black">AMMOUNT</th>
-                                <th className="border border-black p-1 text-black">BRANCH</th>
-                                <th className="border border-black p-1 text-black">BANK</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {payments.map((p: any, index: number) => (
-                                <tr key={p.paymentId}>
-                                    <td className="border border-black p-1 text-center h-6 text-black">{index + 1}</td>
-                                    <td className="border border-black p-1 text-black">{toTitleCase(p.supplierName)}</td>
-                                    <td className="border border-black p-1 text-black">'{p.acNo}</td>
-                                    <td className="border border-black p-1 text-black">{p.ifscCode}</td>
-                                    <td className="border border-black p-1 text-right text-black">{formatCurrency(p.amount)}</td>
-                                    <td className="border border-black p-1 text-black">{toTitleCase(p.branch)}</td>
-                                    <td className="border border-black p-1 text-black">{p.bank}</td>
-                                </tr>
-                            ))}
-                             {Array.from({ length: Math.max(0, 10 - payments.length) }).map((_, i) => (
-                                <tr key={`empty-${i}`}>
-                                    <td className="border border-black p-2 h-6 text-center text-black">{payments.length + i + 1}</td>
-                                    <td className="border border-black p-2 h-6"></td>
-                                    <td className="border border-black p-2 h-6"></td>
-                                    <td className="border border-black p-2 h-6"></td>
-                                    <td className="border border-black p-2 h-6"></td>
-                                    <td className="border border-black p-2 h-6"></td>
-                                    <td className="border border-black p-2 h-6"></td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                        return (
+                            <div key={pageIndex} className="p-4 font-sans leading-normal bg-white text-black printable-area page-break">
+                                <div className="flex justify-between items-start mb-2">
+                                    <BankHeader />
+                                    <div className="text-center">
+                                        <p className="font-bold text-xs text-black">FORM</p>
+                                        <h2 className="font-bold text-xl text-black">{settings.companyName}</h2>
+                                        <p className="font-bold text-sm text-black">{settings.companyAddress1}</p>
+                                        <p className="font-bold text-sm text-black">{settings.companyAddress2}</p>
+                                    </div>
+                                    <BankHeader />
+                                </div>
 
-                     <div className="flex justify-between items-end mt-12">
-                        <p className="text-sm text-black">(Sign. Of Clerk/Cashier/Teller)</p>
-                        <p className="text-sm text-black">(Signature Of Owner)</p>
-                        <div className="text-right">
-                            <span className="font-bold mr-4 text-black">TOTAL</span>
-                            <span className="font-bold text-black">{formatCurrency(totalAmount)}</span>
-                        </div>
-                    </div>
+                                <div className="flex justify-between items-start mb-4">
+                                    <table className="text-sm">
+                                        <tbody>
+                                            <tr><td className="font-bold pr-4 text-black">BANK NAME</td><td className="text-black">- {settings.defaultBank?.bankName}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">IFSC CODE</td><td className="text-black">- {settings.defaultBank?.ifscCode}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">BRANCH NAME</td><td className="text-black">- {settings.defaultBank?.branchName}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">A/C NO.</td><td className="text-black">- '{settings.defaultBank?.accountNumber}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">CONTACT NO.</td><td className="text-black">- {settings.contactNo}</td></tr>
+                                            <tr><td className="font-bold pr-4 text-black">GMAIL</td><td className="text-black">- {settings.gmail}</td></tr>
+                                        </tbody>
+                                    </table>
+                                    <div className="text-left text-sm">
+                                        <div className="flex">
+                                            <span className="font-bold w-24 text-black">DATE</span>
+                                            <span className="text-black">{isSameDate ? format(new Date(firstDate), "dd MMMM yyyy") : 'Multiple'}</span>
+                                        </div>
+                                        <div className="flex">
+                                            <span className="font-bold w-24 text-black">CHECK NO.</span>
+                                            <span className="text-black">'{isSameCheckNo ? firstCheckNo : 'Multiple'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-center font-bold mb-1 text-black">INFORMATION</p>
+                                <table className="w-full text-xs border-collapse border border-black">
+                                    <thead className="text-black font-bold">
+                                        <tr className="print-header-bg" style={{ backgroundColor: '#fce5d5' }}>
+                                            <th className="border border-black p-1 text-black">SR.NO.</th>
+                                            <th className="border border-black p-1 text-black">NAME</th>
+                                            <th className="border border-black p-1 text-black">A/C NO.</th>
+                                            <th className="border border-black p-1 text-black">IFSC CODE</th>
+                                            <th className="border border-black p-1 text-black">AMMOUNT</th>
+                                            <th className="border border-black p-1 text-black">BRANCH</th>
+                                            <th className="border border-black p-1 text-black">BANK</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {chunk.map((p, index) => (
+                                            <tr key={p.paymentId}>
+                                                <td className="border border-black p-1 text-center h-6 text-black">{index + 1}</td>
+                                                <td className="border border-black p-1 text-black">{toTitleCase(p.supplierName)}</td>
+                                                <td className="border border-black p-1 text-black">'{p.acNo}</td>
+                                                <td className="border border-black p-1 text-black">{p.ifscCode}</td>
+                                                <td className="border border-black p-1 text-right text-black">{formatCurrency(p.amount)}</td>
+                                                <td className="border border-black p-1 text-black">{toTitleCase(p.branch)}</td>
+                                                <td className="border border-black p-1 text-black">{p.bank}</td>
+                                            </tr>
+                                        ))}
+                                         {Array.from({ length: Math.max(0, 10 - chunk.length) }).map((_, i) => (
+                                            <tr key={`empty-${i}`}>
+                                                <td className="border border-black p-1 h-6 text-center text-black">{chunk.length + i + 1}</td>
+                                                <td className="border border-black p-1 h-6"></td>
+                                                <td className="border border-black p-1 h-6"></td>
+                                                <td className="border border-black p-1 h-6"></td>
+                                                <td className="border border-black p-1 h-6"></td>
+                                                <td className="border border-black p-1 h-6"></td>
+                                                <td className="border border-black p-1 h-6"></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+
+                                 <div className="flex justify-between items-end mt-12">
+                                    <p className="text-sm text-black">(Sign. Of Clerk/Cashier/Teller)</p>
+                                    <p className="text-sm text-black">(Signature Of Owner)</p>
+                                    <div className="text-right">
+                                        <span className="font-bold mr-4 text-black">PAGE TOTAL</span>
+                                        <span className="font-bold text-black">{formatCurrency(pageTotalAmount)}</span>
+                                        {pageIndex === paymentChunks.length - 1 && (
+                                            <div className="border-t border-black mt-1 pt-1">
+                                                <span className="font-bold mr-4 text-black">GRAND TOTAL</span>
+                                                <span className="font-bold text-black">{formatCurrency(grandTotalAmount)}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
             </ScrollArea>
              <DialogFooter className="p-4 pt-2 print:hidden">
