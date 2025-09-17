@@ -50,6 +50,7 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { ite
                 <Button 
                     variant="ghost" 
                     onMouseEnter={() => setIsOpen(true)} 
+                    onMouseLeave={() => setIsOpen(false)}
                     className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", (isSubMenuActive || isOpen) && "bg-accent")}
                  >
                     <span className="icon">{React.createElement(item.icon)}</span>
@@ -58,6 +59,7 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { ite
              <DropdownMenuContent 
                 side="right" 
                 align="start" 
+                onMouseEnter={() => setIsOpen(true)}
                 onMouseLeave={() => setIsOpen(false)}
              >
                 <DropdownMenuLabel className="font-bold text-base mb-1">{item.name}</DropdownMenuLabel>
