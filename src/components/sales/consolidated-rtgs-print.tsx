@@ -37,87 +37,14 @@ interface ConsolidatedRtgsPrintFormatProps {
     settings: RtgsSettings & { defaultBank?: BankAccount };
 }
 
-const ReportHeader = ({ settings, firstDate, firstCheckNo, isSameDate, isSameCheckNo }: { settings: RtgsSettings & { defaultBank?: BankAccount }, firstDate: string, firstCheckNo: string, isSameDate: boolean, isSameCheckNo: boolean }) => (
-    <div className="flex-grow-0 printable-area">
-        <style>
-            {`
-            @media print {
-                .printable-area, .printable-area * {
-                    background-color: #fff !important;
-                    color: #000 !important;
-                }
-            }
-            `}
-        </style>
-        <div className="flex justify-between items-start mb-4">
-            <div className="w-1/2">
-                <h2 className="font-bold text-3xl mb-1">{settings.companyName}</h2>
-                <p className="text-gray-600 text-sm">{settings.companyAddress1}, {settings.companyAddress2}</p>
-                <p className="text-gray-600 text-sm">Phone: {settings.contactNo} | Email: {settings.gmail}</p>
-            </div>
-            <div className="text-right">
-                <h1 className="text-4xl font-bold text-gray-800 uppercase mb-1">RTGS ADVICE</h1>
-                <div className="text-base text-gray-700">
-                    <div className="grid grid-cols-2 text-left">
-                        {isSameDate && <>
-                            <span className="font-bold pr-2">Date:</span>
-                            <span>{format(new Date(firstDate), "dd MMM, yyyy")}</span>
-                        </>}
-                        {isSameCheckNo && <>
-                            <span className="font-bold pr-2">Check #:</span>
-                            <span>{firstCheckNo}</span>
-                        </>}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div className="border border-gray-200 p-3 rounded-lg mb-4">
-            <h3 className="font-bold text-gray-500 mb-2 uppercase tracking-wider text-sm">Our Bank Details</h3>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-base">
-                {settings.defaultBank ? (
-                    <>
-                        <div><span className="font-semibold">Bank:</span> <span>{settings.defaultBank.bankName}</span></div>
-                        <div><span className="font-semibold">Branch:</span> <span>{settings.defaultBank.branchName}</span></div>
-                        <div><span className="font-semibold">A/C No:</span> <span>{settings.defaultBank.accountNumber}</span></div>
-                        <div><span className="font-semibold">IFSC:</span> <span>{settings.defaultBank.ifscCode}</span></div>
-                    </>
-                ) : (
-                    <p>Default bank not set in settings.</p>
-                )}
-            </div>
-        </div>
+const BankHeader = () => (
+    <div className="text-orange-700">
+        <h3 className="font-bold text-lg">बैंक ऑफ़ बड़ौदा</h3>
+        <h3 className="font-bold text-lg">Bank of Baroda</h3>
+        <p className="text-xs">India's International Bank</p>
     </div>
 );
 
-const ReportFooter = ({ settings }: { settings: RtgsSettings }) => (
-    <div className="flex-grow-0 pt-4 mt-auto printable-area">
-        <style>
-            {`
-            @media print {
-                .printable-area, .printable-area * {
-                    background-color: #fff !important;
-                    color: #000 !important;
-                }
-            }
-            `}
-        </style>
-        <div className="border-t border-gray-300 pt-2">
-            <div className="flex justify-between items-end">
-                <div className="w-3/5">
-                    <h4 className="font-bold mb-1 text-gray-600 uppercase text-xs">Notes</h4>
-                    <p className="text-gray-600 text-[9px]">This is a computer-generated advice and does not require a signature.</p>
-                </div>
-                <div className="w-2/5 text-center">
-                    <div className="h-12"></div>
-                    <div className="border-t-2 border-gray-400 w-4/5 mx-auto pt-1">
-                        <p className="font-bold text-xs">Authorised Signatory</p>
-                        <p className="text-gray-600 text-[10px]">For {settings.companyName}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-);
 
 export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: ConsolidatedRtgsPrintFormatProps) => {
     const printRef = useRef<HTMLDivElement>(null);
@@ -132,17 +59,8 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
     
     const firstCheckNo = payments.length > 0 ? payments[0].checkNo : '';
     const isSameCheckNo = payments.every(p => p.checkNo === firstCheckNo);
-
-    const CHUNK_SIZE = 10;
-    const paymentChunks = useMemo(() => {
-        const chunks = [];
-        for (let i = 0; i < payments.length; i += CHUNK_SIZE) {
-            chunks.push(payments.slice(i, i + CHUNK_SIZE));
-        }
-        return chunks;
-    }, [payments]);
     
-    let cumulativeTotal = 0;
+    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
 
     const handlePrint = () => {
         const node = printRef.current;
@@ -183,23 +101,19 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
             @media print {
                 @page {
                     size: A4 landscape;
-                    margin: 15mm;
+                    margin: 10mm;
                 }
                 body {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
                 }
-                .page-break-after { page-break-after: always !important; }
                 .printable-area, .printable-area * {
                     background-color: #fff !important;
                     color: #000 !important;
-                    border-color: #ccc !important;
+                    border-color: #000 !important;
                 }
-                .printable-area tbody tr, .printable-area tbody td {
-                    color: #000 !important;
-                }
-                thead tr {
-                    background-color: #f2f2f2 !important;
+                .print-header-bg {
+                     background-color: #fce5d5 !important;
                 }
             }
         `;
@@ -225,74 +139,88 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh]">
-                <div ref={printRef} className="bg-white text-black">
-                    {paymentChunks.map((chunk, pageIndex) => {
-                        const isLastPage = pageIndex === paymentChunks.length - 1;
-                        const pageTotal = chunk.reduce((sum, p) => sum + p.amount, 0);
-                        cumulativeTotal += pageTotal;
+                <div ref={printRef} className="p-4 font-sans leading-normal bg-white text-black printable-area">
+                    <div className="flex justify-between items-start mb-2">
+                        <BankHeader />
+                        <div className="text-center">
+                            <p className="font-bold text-xs">FORM</p>
+                            <h2 className="font-bold text-xl">{settings.companyName}</h2>
+                            <p className="font-bold text-sm">{settings.companyAddress1}</p>
+                            <p className="font-bold text-sm">{settings.companyAddress2}</p>
+                        </div>
+                        <BankHeader />
+                    </div>
 
-                        return (
-                            <div key={pageIndex} className={`p-4 font-sans leading-normal flex flex-col justify-between min-h-[18.5cm] ${!isLastPage ? 'page-break-after' : ''}`}>
-                                <ReportHeader settings={settings} firstDate={firstDate} firstCheckNo={firstCheckNo} isSameDate={isSameDate} isSameCheckNo={isSameCheckNo} />
-                                
-                                <div className="flex-grow overflow-x-auto">
-                                    <table className="w-full text-left print-table text-sm">
-                                        <thead className="text-[10px]">
-                                            <tr className="bg-gray-100 text-black uppercase">
-                                                <th className="py-1 px-2 font-semibold text-center">#</th>
-                                                <th className="py-1 px-2 font-semibold">Payee Name</th>
-                                                <th className="py-1 px-2 font-semibold">Bank Name</th>
-                                                <th className="py-1 px-2 font-semibold">Branch</th>
-                                                <th className="py-1 px-2 font-semibold">A/C No.</th>
-                                                <th className="py-1 px-2 font-semibold">IFSC Code</th>
-                                                <th className="py-1 px-2 font-semibold text-right">Amount</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {chunk.map((payment, index) => (
-                                                <tr key={payment.paymentId} className="border-b border-gray-200">
-                                                    <td className="py-1 px-2 text-xs text-center border-x border-gray-200">{pageIndex * CHUNK_SIZE + index + 1}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{toTitleCase(payment.supplierName || '')}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{payment.bank}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{toTitleCase(payment.branch || '')}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{payment.acNo}</td>
-                                                    <td className="py-1 px-2 text-xs border-x border-gray-200">{payment.ifscCode}</td>
-                                                    <td className="py-1 px-2 text-xs font-semibold text-right border-x border-gray-200">{formatCurrency(payment.amount)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                        <tfoot className="font-bold border-t-2 border-black">
-                                            {paymentChunks.length === 1 ? (
-                                                <tr>
-                                                    <td className="py-1 px-2 text-right" colSpan={6}>GRAND TOTAL</td>
-                                                    <td className="py-1 px-2 text-right">{formatCurrency(cumulativeTotal)}</td>
-                                                </tr>
-                                            ) : (
-                                                <>
-                                                    <tr>
-                                                        <td className="py-1 px-2 text-right text-xs" colSpan={6}>Page Total</td>
-                                                        <td className="py-1 px-2 text-right text-xs">{formatCurrency(pageTotal)}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="py-1 px-2 text-right text-xs" colSpan={6}>Cumulative Total</td>
-                                                        <td className="py-1 px-2 text-right text-xs">{formatCurrency(cumulativeTotal)}</td>
-                                                    </tr>
-                                                    {isLastPage && (
-                                                        <tr className="bg-gray-200">
-                                                            <td className="py-1 px-2 text-right" colSpan={6}>GRAND TOTAL</td>
-                                                            <td className="py-1 px-2 text-right">{formatCurrency(cumulativeTotal)}</td>
-                                                        </tr>
-                                                    )}
-                                                </>
-                                            )}
-                                        </tfoot>
-                                    </table>
-                                </div>
-                                
-                                <ReportFooter settings={settings} />
+                    <div className="flex justify-between items-start mb-4">
+                        <table className="text-sm">
+                            <tbody>
+                                <tr><td className="font-bold pr-4">BANK NAME</td><td>- {settings.defaultBank?.bankName}</td></tr>
+                                <tr><td className="font-bold pr-4">IFSC CODE</td><td>- {settings.defaultBank?.ifscCode}</td></tr>
+                                <tr><td className="font-bold pr-4">BRANCH NAME</td><td>- {settings.defaultBank?.branchName}</td></tr>
+                                <tr><td className="font-bold pr-4">A/C NO.</td><td>- '{settings.defaultBank?.accountNumber}</td></tr>
+                                <tr><td className="font-bold pr-4">CONTACT NO.</td><td>- {settings.contactNo}</td></tr>
+                                <tr><td className="font-bold pr-4">GMAIL</td><td>- {settings.gmail}</td></tr>
+                            </tbody>
+                        </table>
+                        <div className="text-left text-sm">
+                            <div className="flex">
+                                <span className="font-bold w-24">DATE</span>
+                                <span>{isSameDate ? format(new Date(firstDate), "dd MMMM yyyy") : 'Multiple'}</span>
                             </div>
-                        );
-                    })}
+                            <div className="flex">
+                                <span className="font-bold w-24">CHECK NO.</span>
+                                <span>'{isSameCheckNo ? firstCheckNo : 'Multiple'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p className="text-center font-bold mb-1">INFORMATION</p>
+                    <table className="w-full text-xs border-collapse border border-black">
+                        <thead className="text-black font-bold">
+                            <tr className="print-header-bg" style={{ backgroundColor: '#fce5d5' }}>
+                                <th className="border border-black p-1">SR.NO.</th>
+                                <th className="border border-black p-1">NAME</th>
+                                <th className="border border-black p-1">A/C NO.</th>
+                                <th className="border border-black p-1">IFSC CODE</th>
+                                <th className="border border-black p-1">AMMOUNT</th>
+                                <th className="border border-black p-1">BRANCH</th>
+                                <th className="border border-black p-1">BANK</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {payments.map((p: any, index: number) => (
+                                <tr key={p.paymentId}>
+                                    <td className="border border-black p-1 text-center">{index + 1}</td>
+                                    <td className="border border-black p-1">{toTitleCase(p.supplierName)}</td>
+                                    <td className="border border-black p-1">'{p.acNo}</td>
+                                    <td className="border border-black p-1">{p.ifscCode}</td>
+                                    <td className="border border-black p-1 text-right">{formatCurrency(p.amount)}</td>
+                                    <td className="border border-black p-1">{toTitleCase(p.branch)}</td>
+                                    <td className="border border-black p-1">{p.bank}</td>
+                                </tr>
+                            ))}
+                             {Array.from({ length: 15 - payments.length }).map((_, i) => (
+                                <tr key={`empty-${i}`}>
+                                    <td className="border border-black p-2 h-6 text-center">{payments.length + i + 1}</td>
+                                    <td className="border border-black p-2 h-6"></td>
+                                    <td className="border border-black p-2 h-6"></td>
+                                    <td className="border border-black p-2 h-6"></td>
+                                    <td className="border border-black p-2 h-6"></td>
+                                    <td className="border border-black p-2 h-6"></td>
+                                    <td className="border border-black p-2 h-6"></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                     <div className="flex justify-between items-end mt-12">
+                        <p className="text-sm">(Sign. Of Clerk/Cashier/Teller)</p>
+                        <p className="text-sm">(Signature Of Owner)</p>
+                        <div className="text-right">
+                            <span className="font-bold mr-4">TOTAL</span>
+                            <span className="font-bold">{formatCurrency(totalAmount)}</span>
+                        </div>
+                    </div>
                 </div>
             </ScrollArea>
              <DialogFooter className="p-4 pt-2 print:hidden">
