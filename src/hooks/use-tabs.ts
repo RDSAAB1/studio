@@ -57,7 +57,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "supplier",
     name: "Supplier",
-    icon: User,
+    icon: ShoppingCart,
     subMenus: [
       { id: "sales/supplier-entry", name: "Supplier Entry", icon: UserPlus },
       { id: "sales/supplier-payments", name: "Supplier Payments", icon: Wallet },
@@ -67,7 +67,7 @@ export const allMenuItems: MenuItem[] = [
     {
     id: "customer",
     name: "Customer",
-    icon: Users,
+    icon: TrendingUp,
     subMenus: [
       { id: "sales/customer-entry", name: "Customer Entry", icon: UserPlus },
       { id: "sales/customer-payments", name: "Customer Payments", icon: Wallet },
