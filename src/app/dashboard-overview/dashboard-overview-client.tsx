@@ -77,7 +77,7 @@ export default function DashboardOverviewClient() {
         });
         const unsubExpenseCats = getExpenseCategories((data) => {
             setExpenseCategories(data);
-            setLoading(false);
+            if(loading) setLoading(false);
         }, console.error);
         
         return () => {
@@ -203,7 +203,9 @@ export default function DashboardOverviewClient() {
         };
     }, [allTransactions, financialState, customers]);
 
-    if (loading) return <div>Loading Dashboard...</div>;
+    if (loading) {
+        return <div>Loading Dashboard...</div>;
+    }
 
     return (
         <div className="space-y-6">

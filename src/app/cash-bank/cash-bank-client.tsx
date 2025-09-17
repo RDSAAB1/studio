@@ -92,10 +92,10 @@ export default function CashBankClient() {
         const unsubscribeLoans = getLoansRealtime(setLoans, (e) => toast({ title: "Error loading loan data", variant: "destructive" }));
         const unsubscribeBankAccounts = getBankAccountsRealtime((data) => {
             setBankAccounts(data);
-            setLoading(false);
+            if (loading) setLoading(false);
         }, (e) => {
             toast({ title: "Error loading bank accounts", variant: "destructive" });
-            setLoading(false);
+            if (loading) setLoading(false);
         });
         
         return () => {
@@ -338,7 +338,11 @@ export default function CashBankClient() {
     };
 
 
-    if (!isClient || loading) return <div>Loading...</div>;
+    if (!isClient || loading) {
+      if (loading) {
+        return <div>Loading...</div>;
+      }
+    }
 
     return (
         <div className="space-y-6">

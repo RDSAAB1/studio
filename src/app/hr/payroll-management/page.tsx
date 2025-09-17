@@ -46,7 +46,7 @@ export default function PayrollManagementPage() {
     }, (err) => {
       console.error("Error fetching payroll data:", err);
       setError("Failed to load payroll data.");
-      setLoading(false);
+      if(loading) setLoading(false);
     });
 
     const qEmployees = query(collection(db, "employees"));
@@ -175,7 +175,7 @@ export default function PayrollManagementPage() {
     return employee ? employee.name : 'Unknown';
   }
 
-  if (loading) {
+  if (loading && employees.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -226,6 +226,11 @@ export default function PayrollManagementPage() {
                   </TableCell>
                 </TableRow>
               ))}
+               {payrollEntries.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center h-24">No payroll entries found.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
           </div>

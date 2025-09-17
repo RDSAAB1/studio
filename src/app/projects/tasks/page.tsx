@@ -48,10 +48,10 @@ export default function TasksPage() {
         });
       });
       setTasks(tasksData);
-      setLoading(false);
+      if (loading) setLoading(false);
     }, (error) => {
       console.error("Error fetching tasks: ", error);
-      setLoading(false);
+      if (loading) setLoading(false);
     });
 
     return () => unsubscribe(); // Clean up the listener on unmount
@@ -133,6 +133,7 @@ export default function TasksPage() {
               </TableCell>
             </TableRow>
           ))}
+           {tasks.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">No tasks found.</TableCell></TableRow>}
         </TableBody>
       </Table>
 

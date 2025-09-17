@@ -40,7 +40,7 @@ export default function InventoryManagementPage() {
     const unsubscribe = getInventoryItems(
       (items) => {
         setInventoryItems(items);
-        setLoading(false);
+        if (loading) setLoading(false);
       },
       (error) => {
         console.error("Error fetching inventory items:", error);
@@ -48,7 +48,7 @@ export default function InventoryManagementPage() {
           title: "Failed to load inventory",
           variant: "destructive",
         });
-        setLoading(false);
+        if (loading) setLoading(false);
       }
     );
 
@@ -205,6 +205,7 @@ export default function InventoryManagementPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {inventoryItems.length === 0 && <TableRow><TableCell colSpan={7} className="text-center h-24">No items in inventory.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>

@@ -48,14 +48,14 @@ export default function PurchaseOrdersPage() {
         ...doc.data()
       })) as PurchaseOrder[];
       setPurchaseOrders(ordersData);
-      setLoading(false);
+      if (loading) setLoading(false);
     }, (error) => {
       console.error("Error fetching purchase orders: ", error);
       toast({
         title: "Failed to load purchase orders",
         variant: "destructive",
       });
-      setLoading(false);
+      if (loading) setLoading(false);
     });
 
     return () => unsubscribe(); // Cleanup listener on unmount
