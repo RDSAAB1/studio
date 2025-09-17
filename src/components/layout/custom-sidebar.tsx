@@ -65,7 +65,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
                     <span className="icon">{React.createElement(item.icon)}</span>
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="start">
+             <DropdownMenuContent side="right" align="start">
                 <DropdownMenuLabel className="font-bold text-base mb-1">{item.name}</DropdownMenuLabel>
                 {item.subMenus.map(subItem => (
                     <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)} className={cn(`/${subItem.id}` === activePath && "bg-accent")}>
