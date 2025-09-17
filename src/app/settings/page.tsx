@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -465,7 +464,7 @@ export default function SettingsPage() {
     
     const allBankOptions = useMemo(() => {
         const combinedNames = [...new Set([...bankNames, ...banks.map((b) => b.name)])];
-        return uniqueNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
+        return combinedNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
     }, [banks]);
 
     const availableBranchOptions = useMemo(() => {
