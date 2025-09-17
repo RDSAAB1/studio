@@ -199,7 +199,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                     <td className="border border-black p-1 text-black">{p.bank}</td>
                                 </tr>
                             ))}
-                             {Array.from({ length: 15 - payments.length }).map((_, i) => (
+                             {Array.from({ length: Math.max(0, 10 - payments.length) }).map((_, i) => (
                                 <tr key={`empty-${i}`}>
                                     <td className="border border-black p-2 h-6 text-center text-black">{payments.length + i + 1}</td>
                                     <td className="border border-black p-2 h-6"></td>
