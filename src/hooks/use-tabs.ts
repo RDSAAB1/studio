@@ -34,6 +34,8 @@ import {
   Upload,
   List,
   Printer,
+  AreaChart,
+  Lightbulb,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -84,16 +86,16 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "reports",
     name: "Reports",
-    icon: FileText,
+    icon: AreaChart,
     subMenus: [
-        { id: "sales/rtgs-report", name: "RTGS Report", icon: FileText },
-        { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: FileText },
+        { id: "sales/rtgs-report", name: "RTGS Report", icon: Banknote },
+        { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: Truck },
     ]
   },
   {
     id: "hr",
     name: "HR Management",
-    icon: Users2,
+    icon: Briefcase,
     subMenus: [
       { id: "hr/employee-database", name: "Employee Database", icon: Database },
       { id: "hr/payroll-management", name: "Payroll Management", icon: Calculator },
@@ -112,7 +114,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "projects",
     name: "Projects",
-    icon: Briefcase,
+    icon: Lightbulb,
     subMenus: [
         { id: "projects/dashboard", name: "Dashboard", icon: LayoutDashboard },
         { id: "projects/management", name: "Management", icon: List },
