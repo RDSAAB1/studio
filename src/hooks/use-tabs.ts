@@ -99,7 +99,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "hr",
     name: "HR Management",
-    icon: Briefcase,
+    icon: Users2,
     subMenus: [
       { id: "hr/employee-database", name: "Employee Database", icon: Database },
       { id: "hr/payroll-management", name: "Payroll Management", icon: Calculator },
@@ -109,7 +109,7 @@ export const allMenuItems: MenuItem[] = [
   {
     id: "inventory",
     name: "Inventory",
-    icon: PackageIcon,
+    icon: Boxes,
     subMenus: [
       { id: "inventory/inventory-management", name: "Inventory", icon: Boxes },
       { id: "inventory/purchase-orders", name: "Purchase Orders", icon: ShoppingCart },
