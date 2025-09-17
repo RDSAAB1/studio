@@ -67,12 +67,6 @@ body {
     overflow-x: hidden;
 }
 
-/* Expanded state on mobile */
-.wrapper.active .side_bar {
-    width: 250px;
-}
-
-
 .side_bar_top{
     padding-bottom: 10px;
     margin-bottom: 10px;
@@ -116,13 +110,9 @@ body {
 }
 
 /* Hide text when collapsed */
-.wrapper:not(.active) .side_bar .logo_wrap .text {
+.wrapper .side_bar .logo_wrap .text {
   display: none !important;
 }
-.wrapper.active .side_bar .logo_wrap .text {
-  display: inline;
-}
-
 
 .side_bar_bottom{
     flex-grow: 1;
@@ -131,76 +121,9 @@ body {
     padding-right: 20px;
 }
 
-.side_bar_bottom ul li{
-    position: relative;
-}
-
-.side_bar_bottom ul li button {
-    display: flex;
-    align-items: center;
-    justify-content: center; /* Center items in collapsed state */
-    width: 100%;
-    padding: 12px 0;
-    color: hsl(var(--primary-foreground));
-    margin-bottom: 5px;
-    border-radius: 8px; /* Rounded corners for the button */	
-    transition: color 0.2s ease, background-color 0.2s ease;			
-    position: relative;
-}
-
-/* Adjust padding when sidebar is active on mobile */
-.wrapper.active .side_bar .side_bar_bottom ul li button {
-    justify-content: flex-start;
-    padding: 12px 15px;
-}
-.wrapper.active .side_bar .side_bar_bottom ul li button .icon {
-    margin-right: 15px;
-}
-.wrapper.active .side_bar .item {
-    display: inline;
-}
-
-
-.side_bar_bottom ul li button:hover {
-  background: hsl(var(--accent) / 0.5);
-}
-
-
-.side_bar_bottom ul li button .icon {
-    margin-right: 0; /* No margin in collapsed state */
-    font-size: 18px;
-    height: 18px;
-    flex-shrink: 0;
-    color: hsl(var(--primary-foreground));
-    transition: color 0.2s ease;
-}
-
-
-/* Hide text when collapsed */
-.wrapper:not(.active) .side_bar .item {
-  display: none !important;
-}
-
-
-
-.side_bar_bottom ul li.active button {
-    background: hsl(var(--accent));
-    color: hsl(var(--primary));
-    font-weight: 600;
-}
-.side_bar_bottom ul li.active button .icon {
-  color: hsl(var(--primary));
-}
-
-
 .shadow{
     display: none;
 }
-
-.submenu {
-  display: none;
-}
-
 
 .main_container{
     height: 100vh;
@@ -216,8 +139,7 @@ body {
 
 
 @media screen and (max-width: 1023px) {
-    .wrapper .side_bar,
-    .wrapper.active .side_bar {
+    .wrapper .side_bar {
         left: -250px;
         width: 250px; /* Full width on mobile */
     }
