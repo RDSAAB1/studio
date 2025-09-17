@@ -71,7 +71,8 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { ite
             </DropdownMenuTrigger>
              <DropdownMenuContent 
                 side="right" 
-                align="start" 
+                align="start"
+                className="w-[var(--sidebar-width-icon)]" 
                 onMouseEnter={() => setIsOpen(true)}
                 onMouseLeave={() => setIsOpen(false)}
              >
