@@ -13,6 +13,7 @@ import TabBar from './tab-bar';
 import { ScrollArea } from "../ui/scroll-area";
 import LoginPage from "@/app/login/page";
 import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
+import { cn } from "@/lib/utils";
 
 const AppContent = ({ children }: { children: ReactNode }) => {
     const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
@@ -29,7 +30,7 @@ const AppContent = ({ children }: { children: ReactNode }) => {
                router.push('/dashboard-overview');
             }
         }
-    }, [router, pathname, openTabs]);
+    }, []);
 
     useEffect(() => {
         const currentPathId = pathname.substring(1);
@@ -42,7 +43,7 @@ const AppContent = ({ children }: { children: ReactNode }) => {
                  setActiveTabId(currentPathId);
             }
         }
-    }, [pathname, openTabs, activeTabId]);
+    }, [pathname]);
     
     const handleTabSelect = (tabId: string) => {
         setActiveTabId(tabId);
@@ -85,6 +86,9 @@ const AppContent = ({ children }: { children: ReactNode }) => {
     const toggleSidebar = () => {
         setIsSidebarActive(prev => !prev);
     };
+    
+    const pageId = pathname.substring(1);
+    const ActivePageComponent = children;
 
     return (
        <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
@@ -95,19 +99,31 @@ const AppContent = ({ children }: { children: ReactNode }) => {
                 <Header toggleSidebar={toggleSidebar} />
               </div>
             </Suspense>
-              <ScrollArea className="flex-grow">
-                <main className="p-4 sm:p-6">
-                    <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                        {children}
-                    </Suspense>
-                </main>
-              </ScrollArea>
+              <div className="flex-grow relative">
+                {openTabs.map(tab => {
+                  const isTabActive = tab.id === pageId;
+                  return (
+                    <div
+                      key={tab.id}
+                      className={cn("absolute inset-0 overflow-y-auto", isTabActive ? "z-10" : "z-0 invisible")}
+                    >
+                      {isTabActive && (
+                        <main className="p-4 sm:p-6">
+                            <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                                {ActivePageComponent}
+                            </Suspense>
+                        </main>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
           </div>
        </CustomSidebar>
     );
 };
 
-const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
+const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
     const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
@@ -200,7 +216,7 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
 
 export default function AppLayoutWrapper({ children }: { children: ReactNode }) {
     const pathname = usePathname();
-    const isLoginPage = pathname === '/login';
+    const isLoginPage = pathname === '/login' || pathname === '/forgot-password';
     
     if (isLoginPage) {
         return <AuthWrapper>{children}</AuthWrapper>;
