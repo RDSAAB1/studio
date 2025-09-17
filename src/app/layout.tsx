@@ -11,14 +11,9 @@ import { Button } from '@/components/ui/button';
 import { StateProvider } from '@/lib/state-store.tsx';
 import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
-import CustomSidebar from '@/components/layout/custom-sidebar';
-import { Header } from "@/components/layout/header";
-import { allMenuItems, type MenuItem } from "@/hooks/use-tabs";
-import TabBar from '@/components/layout/tab-bar';
-import { cn } from "@/lib/utils";
-import LoginPage from "@/app/login/page";
-import { getCompanySettings, getRtgsSettings } from "@/lib/firestore";
-
+import { getRtgsSettings } from "@/lib/firestore";
+import AppLayoutWrapper from '@/components/layout/app-layout';
+import LoginPage from './login/page';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -38,107 +33,12 @@ const sourceCodePro = Source_Code_Pro({
   variable: '--font-source-code-pro',
 });
 
-function AppContent({ children }: { children: ReactNode }) {
-  const [openTabs, setOpenTabs] = useState<MenuItem[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string>('dashboard-overview');
-  const [isSidebarActive, setIsSidebarActive] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
-    if (dashboardTab && openTabs.length === 0) {
-      setOpenTabs([dashboardTab]);
-      if (pathname === '/') {
-        router.push('/dashboard-overview');
-      }
-    }
-  }, [openTabs.length, pathname, router]);
-
-  useEffect(() => {
-    const currentPathId = pathname.substring(1);
-    if (currentPathId && currentPathId !== activeTabId) {
-      const menuItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === currentPathId);
-      if (menuItem) {
-        if (!openTabs.some(tab => tab.id === currentPathId)) {
-          setOpenTabs(prev => [...prev, menuItem]);
-        }
-        setActiveTabId(currentPathId);
-      }
-    }
-  }, [pathname, activeTabId, openTabs]);
-
-  const handleTabSelect = (tabId: string) => {
-    setActiveTabId(tabId);
-    router.push(`/${tabId}`);
-  };
-
-  const handleTabClose = (tabIdToClose: string) => {
-    if (tabIdToClose === 'dashboard-overview') return;
-
-    const tabIndex = openTabs.findIndex(tab => tab.id === tabIdToClose);
-    const newTabs = openTabs.filter(tab => tab.id !== tabIdToClose);
-    setOpenTabs(newTabs);
-
-    if (activeTabId === tabIdToClose) {
-      const newActiveTab = newTabs[tabIndex - 1] || newTabs[0];
-      if (newActiveTab) {
-        setActiveTabId(newActiveTab.id);
-        router.push(`/${newActiveTab.id}`);
-      } else {
-        const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
-        if (dashboardTab) {
-          setOpenTabs([dashboardTab]);
-          setActiveTabId(dashboardTab.id);
-          router.push(`/${dashboardTab.id}`);
-        }
-      }
-    }
-  };
-
-  const handleOpenTab = (menuItem: MenuItem) => {
-    if (!openTabs.some(tab => tab.id === menuItem.id)) {
-      setOpenTabs(prev => [...prev, menuItem]);
-    }
-    setActiveTabId(menuItem.id);
-    router.push(`/${menuItem.id}`);
-  };
-
-  const toggleSidebar = () => setIsSidebarActive(prev => !prev);
-  const pageId = pathname.substring(1);
-
-  return (
-    <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
-      <div className="flex flex-col flex-grow min-h-0 h-screen overflow-hidden">
-        <Suspense>
-          <div className="sticky top-0 z-30 flex-shrink-0">
-            <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
-            <Header toggleSidebar={toggleSidebar} />
-          </div>
-        </Suspense>
-        <div className="flex-grow relative overflow-y-auto">
-          {openTabs.map(tab => {
-            const isTabActive = tab.id === pageId;
-            return (
-              <div key={tab.id} className={cn("absolute inset-0", isTabActive ? "z-10" : "z-0 invisible")}>
-                {isTabActive && (
-                  <main className="p-4 sm:p-6">
-                    <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                      {children}
-                    </Suspense>
-                  </main>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </CustomSidebar>
-  );
-}
-
-
-function AuthWrapper({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+    const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
     const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
@@ -180,35 +80,6 @@ function AuthWrapper({ children }: { children: ReactNode }) {
             }
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
-
-
-    if (!authChecked || (user && isSetupComplete === null)) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-    
-    if (!user) {
-        return <LoginPage />;
-    }
-    
-    if (isSetupComplete === false) {
-       // Still render the layout for the settings page
-       return <AppContent>{children}</AppContent>;
-    }
-    
-    return <AppContent>{children}</AppContent>;
-}
-
-
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-    const { toast } = useToast();
 
     useEffect(() => {
         if ('serviceWorker' in navigator) {
@@ -252,20 +123,36 @@ export default function RootLayout({
         }
     }, [toast]);
  
-  return (
-    <html lang="en">
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#4F46E5" />
-      </head>
-      <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
-          <StateProvider>
-            <AuthWrapper>
+    let content: ReactNode;
+
+    if (!authChecked || (user && isSetupComplete === null)) {
+        content = (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    } else if (!user) {
+        content = <LoginPage />;
+    } else {
+        content = (
+            <AppLayoutWrapper>
                 {children}
-            </AuthWrapper>
-          </StateProvider>
-        <Toaster />
-      </body>
-    </html>
-  );
+            </AppLayoutWrapper>
+        );
+    }
+
+    return (
+        <html lang="en" suppressHydrationWarning>
+          <head>
+            <link rel="manifest" href="/manifest.json" />
+            <meta name="theme-color" content="#4F46E5" />
+          </head>
+          <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
+              <StateProvider>
+                  {content}
+              </StateProvider>
+            <Toaster />
+          </body>
+        </html>
+    );
 }

@@ -154,8 +154,8 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
   }, []);
 
   return (
-    <div className={cn("wrapper", isSidebarActive && "active")}>
-        <aside className="side_bar">
+    <>
+      <aside className="side_bar">
         <div className="side_bar_top">
             <div className="logo_wrap">
              <button onClick={() => onTabSelect(allMenuItems.find(i => i.id === 'dashboard-overview')!)} className='flex items-center gap-2'>
@@ -189,7 +189,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
         {isSidebarActive && isMobile && (
             <div className="shadow" onClick={toggleSidebar}></div>
         )}
-    </div>
+    </>
   );
 };
 
