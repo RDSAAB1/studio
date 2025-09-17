@@ -7,7 +7,18 @@ import { allMenuItems, type MenuItem as MenuItemType } from '@/hooks/use-tabs';
 import { cn } from '@/lib/utils';
 import { Sparkles, Menu } from 'lucide-react';
 import { Button } from '../ui/button';
-import { getRtgsSettings } from '@/lib/firestore'; // Import the settings function
+import { getRtgsSettings } from '@/lib/firestore';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from '@/components/ui/dropdown-menu';
+
 
 interface CustomSidebarProps {
   children: ReactNode;
@@ -17,12 +28,10 @@ interface CustomSidebarProps {
 }
 
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, isSidebarActive, toggleSidebar }) => {
-  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState('BizSuite DataFlow'); // Default name
+  const [companyName, setCompanyName] = useState('BizSuite DataFlow');
   const activePath = usePathname();
 
   useEffect(() => {
-    // Fetch company name from settings
     const fetchCompanyName = async () => {
       try {
         const settings = await getRtgsSettings();
@@ -30,34 +39,12 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
           setCompanyName(settings.companyName);
         }
       } catch (error) {
-        console.error("Could not fetch company settings (likely offline):", error);
-        // It's okay to fail, we'll just use the default name.
+        console.error("Could not fetch company settings:", error);
       }
     };
     fetchCompanyName();
   }, []);
 
-  useEffect(() => {
-    // This effect ensures that the submenu closes when the sidebar itself is collapsed or on mobile when it closes.
-    if (!isSidebarActive) {
-      setOpenSubMenu(null);
-    } else {
-        // If sidebar is active, check for active submenus
-        const activeParent = allMenuItems.find(item => 
-            item.subMenus?.some(sub => `/${sub.id}` === activePath)
-        );
-        if (activeParent) {
-            setOpenSubMenu(activeParent.id);
-        }
-    }
-  }, [isSidebarActive, activePath]);
-  
-  const handleSubMenuToggle = (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setOpenSubMenu(prev => (prev === id ? null : id));
-  };
-  
   const handleLinkClick = (menuItem: MenuItemType) => {
     onTabSelect(menuItem);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -66,25 +53,36 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
   };
 
   const renderMenuItem = (item: MenuItemType) => {
+    const isActive = `/${item.id}` === activePath;
     const isSubMenuActive = item.subMenus?.some(sub => `/${sub.id}` === activePath) ?? false;
-    const isActive = !item.subMenus && `/${item.id}` === activePath;
 
     if (item.subMenus) {
       return (
-        <li className={cn(isSubMenuActive && "active")}>
-          {isSubMenuActive && <span className="top_curve"></span>}
-           <button onClick={(e) => handleSubMenuToggle(e, item.id)} className="w-full">
-                <span className="icon">{React.createElement(item.icon)}</span>
-                <span className="item">{item.name}</span>
-            </button>
-          {isSubMenuActive && <span className="bottom_curve"></span>}
-        </li>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <li className={cn("relative", isSubMenuActive && "active")}>
+                {isSubMenuActive && <span className="top_curve"></span>}
+                 <button className="w-full">
+                    <span className="icon">{React.createElement(item.icon)}</span>
+                    <span className="item">{item.name}</span>
+                </button>
+                {isSubMenuActive && <span className="bottom_curve"></span>}
+            </li>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="ml-2">
+            {item.subMenus.map(subItem => (
+              <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)}>
+                {subItem.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       );
     }
 
     return (
-      <li className={cn(isActive && "active")}>
-        {isActive && <span className="top_curve"></span>}
+      <li className={cn(isActive && "active", "relative")}>
+         {isActive && <span className="top_curve"></span>}
         <button onClick={() => handleLinkClick(item)} className="w-full">
           <span className="icon">{React.createElement(item.icon)}</span>
           <span className="item">{item.name}</span>
@@ -107,22 +105,11 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
         </div>
         <div className="side_bar_bottom scrollbar-hide">
             <ul>
-            {allMenuItems.map(item => (
-                <React.Fragment key={item.id}>
-                {renderMenuItem(item)}
-                {item.subMenus && (
-                    <ul className={cn("submenu", (openSubMenu === item.id) && "open")}>
-                    {item.subMenus.map(subItem => (
-                        <li key={subItem.id} className={cn(`/${subItem.id}` === activePath && "active")}>
-                        <button onClick={() => handleLinkClick(subItem)} className="w-full text-left">
-                            {subItem.name}
-                        </button>
-                        </li>
-                    ))}
-                    </ul>
-                )}
-                </React.Fragment>
-            ))}
+                {allMenuItems.map(item => (
+                    <React.Fragment key={item.id}>
+                        {renderMenuItem(item)}
+                    </React.Fragment>
+                ))}
             </ul>
         </div>
         </aside>

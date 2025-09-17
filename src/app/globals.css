@@ -53,7 +53,7 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 80px; /* Collapsed width */
+    width: 80px; /* Always collapsed */
     height: 100%;
     background: hsl(var(--card));
     border-right: 1px solid hsl(var(--border));
@@ -67,12 +67,7 @@ body {
     overflow-x: hidden;
 }
 
-/* Expanded state on hover */
-.side_bar:hover {
-    width: 250px;
-}
-
-/* Expanded state when wrapper is active (pinned) */
+/* Expanded state on mobile */
 .wrapper.active .side_bar {
     width: 250px;
 }
@@ -121,12 +116,10 @@ body {
 }
 
 /* Hide text when collapsed */
-.wrapper:not(.active) .side_bar:not(:hover) .logo_wrap .text,
-.side_bar:not(:hover) .logo_wrap .text {
+.wrapper:not(.active) .side_bar .logo_wrap .text {
   display: none !important;
 }
-.wrapper.active .side_bar .logo_wrap .text,
-.side_bar:hover .logo_wrap .text {
+.wrapper.active .side_bar .logo_wrap .text {
   display: inline;
 }
 
@@ -145,14 +138,26 @@ body {
 .side_bar_bottom ul li button {
     display: flex;
     align-items: center;
-    justify-content: flex-start; /* Align items to the start */
+    justify-content: center; /* Center items in collapsed state */
     width: 100%;
-    padding: 12px 15px; /* Adjusted padding */
+    padding: 12px 0;
     color: hsl(var(--primary-foreground));
     margin-bottom: 5px;
     border-radius: 8px; /* Rounded corners for the button */	
     transition: color 0.2s ease, background-color 0.2s ease;			
     position: relative;
+}
+
+/* Adjust padding when sidebar is active on mobile */
+.wrapper.active .side_bar .side_bar_bottom ul li button {
+    justify-content: flex-start;
+    padding: 12px 15px;
+}
+.wrapper.active .side_bar .side_bar_bottom ul li button .icon {
+    margin-right: 15px;
+}
+.wrapper.active .side_bar .item {
+    display: inline;
 }
 
 
@@ -162,7 +167,7 @@ body {
 
 
 .side_bar_bottom ul li button .icon {
-    margin-right: 15px;
+    margin-right: 0; /* No margin in collapsed state */
     font-size: 18px;
     height: 18px;
     flex-shrink: 0;
@@ -170,26 +175,12 @@ body {
     transition: color 0.2s ease;
 }
 
-/* Adjust icon margin when collapsed */
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button .icon,
-.side_bar:not(:hover) .side_bar_bottom ul li button .icon {
-    margin-right: 0;
-}
-.wrapper:not(.active) .side_bar:not(:hover) .side_bar_bottom ul li button,
-.side_bar:not(:hover) .side_bar_bottom ul li button {
-    justify-content: center;
-    padding: 12px 0;
-}
 
 /* Hide text when collapsed */
-.wrapper:not(.active) .side_bar:not(:hover) .item,
-.side_bar:not(:hover) .item {
+.wrapper:not(.active) .side_bar .item {
   display: none !important;
 }
-.wrapper.active .side_bar .item,
-.side_bar:hover .item {
-  display: inline;
-}
+
 
 
 .side_bar_bottom ul li.active button {
@@ -207,45 +198,9 @@ body {
 }
 
 .submenu {
-  padding-left: 2rem;
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease-in-out;
+  display: none;
 }
 
-.wrapper:not(.active) .side_bar:not(:hover) .submenu {
-    display: none;
-}
-
-
-.submenu.open {
-  max-height: 500px; /* Adjust as needed */
-}
-
-/* Automatically close submenu when not hovering sidebar */
-.wrapper:not(.active) .side_bar:not(:hover) .submenu {
-    max-height: 0;
-}
-
-.submenu li button {
-  padding: 10px 15px; /* Consistent padding */
-  font-size: 0.875rem; /* text-sm */
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 2px;
-  border-radius: 8px;
-  justify-content: flex-start; /* Align text to left */
-}
-
-.submenu li button:hover {
-  color: hsl(var(--primary-foreground));
-  background: hsl(var(--accent) / 0.5);
-}
-
-.submenu li.active button {
-  color: hsl(var(--primary));
-  font-weight: 600;
-  background: transparent !important; /* Override active background from parent */
-}
 
 .main_container{
     height: 100vh;
@@ -253,19 +208,12 @@ body {
     flex-direction: column;
     flex-grow: 1;
     min-width: 0; /* Prevents content from overflowing container */
-    margin-left: 80px; /* Collapsed sidebar width */
+    margin-left: 80px; /* Always use collapsed sidebar width */
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     z-index: 40;
 }
 
-.side_bar:hover ~ .main_container {
-    margin-left: 250px; /* Adjust for expanded sidebar on hover */
-}
-
-.wrapper.active .main_container {
-    margin-left: 250px; /* Expanded sidebar width */
-}
 
 @media screen and (max-width: 1023px) {
     .wrapper .side_bar,
@@ -296,10 +244,6 @@ body {
     
     .wrapper.active .main_container {
         margin-left: 0;
-    }
-    
-    .side_bar:hover ~ .main_container {
-        margin-left: 0; /* No margin change on hover for mobile */
     }
 }
 
