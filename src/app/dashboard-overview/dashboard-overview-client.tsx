@@ -50,11 +50,12 @@ export default function DashboardOverviewClient() {
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [isClient, setIsClient] = useState(false);
 
     const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
     useEffect(() => {
+        setIsClient(true);
         const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
         const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
         const unsubFunds = onSnapshot(query(collection(db, "fund_transactions"), orderBy("date", "desc")), (snapshot) => {
@@ -75,10 +76,7 @@ export default function DashboardOverviewClient() {
         const unsubCustomers = onSnapshot(query(collection(db, "customers")), (snapshot) => {
             setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         });
-        const unsubExpenseCats = getExpenseCategories((data) => {
-            setExpenseCategories(data);
-            if(loading) setLoading(false);
-        }, console.error);
+        const unsubExpenseCats = getExpenseCategories(setExpenseCategories, console.error);
         
         return () => {
             unsubIncomes();
@@ -203,8 +201,8 @@ export default function DashboardOverviewClient() {
         };
     }, [allTransactions, financialState, customers]);
 
-    if (loading) {
-        return <div>Loading Dashboard...</div>;
+    if (!isClient) {
+        return null;
     }
 
     return (
@@ -333,11 +331,3 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
-
-    
-
-    
-
-  
-
-    

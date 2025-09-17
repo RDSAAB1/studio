@@ -26,13 +26,14 @@ interface Task {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [newTask, setNewTask] = useState<{name: string; description: string; status: "todo" | "in-progress" | "done"}>({ name: "", description: "", status: "todo" });
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
+    setIsClient(true);
     const q = query(collection(db, "tasks"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const tasksData: Task[] = [];
@@ -48,10 +49,8 @@ export default function TasksPage() {
         });
       });
       setTasks(tasksData);
-      if (loading) setLoading(false);
     }, (error) => {
       console.error("Error fetching tasks: ", error);
-      if (loading) setLoading(false);
     });
 
     return () => unsubscribe(); // Clean up the listener on unmount
@@ -103,8 +102,8 @@ export default function TasksPage() {
     }
   };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (!isClient) {
+    return null;
   }
 
   return (

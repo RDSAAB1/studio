@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function EmployeeDatabasePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState<Omit<Employee, 'id'>>({
@@ -33,6 +33,7 @@ export default function EmployeeDatabasePage() {
   const { toast } = useToast();
 
   useEffect(() => {
+    setIsClient(true);
     const q = query(collection(db, "employees"), orderBy("employeeId"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const employeesData: Employee[] = [];
@@ -40,14 +41,12 @@ export default function EmployeeDatabasePage() {
         employeesData.push({ id: doc.id, ...doc.data() as Omit<Employee, 'id'> });
       });
       setEmployees(employeesData);
-      setLoading(false);
     }, (error) => {
       console.error("Error fetching employees: ", error);
       toast({
         title: "Failed to load employee data",
         variant: "destructive",
       });
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -160,6 +159,8 @@ export default function EmployeeDatabasePage() {
     setCurrentEmployee(null);
     setFormData({ name: '', employeeId: '', position: '', contact: '', baseSalary: 0, monthlyLeaveAllowance: 0 });
   }
+  
+  if (!isClient) return null;
 
   return (
     <div className="space-y-6">
@@ -172,7 +173,7 @@ export default function EmployeeDatabasePage() {
             <Button onClick={openDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Employee</Button>
         </CardHeader>
         <CardContent>
-            {loading ? (
+            {employees.length === 0 && !isClient ? (
                  <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : (
                 <div className="overflow-x-auto">

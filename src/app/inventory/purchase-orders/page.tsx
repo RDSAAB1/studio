@@ -18,7 +18,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function PurchaseOrdersPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
 
   const [isAdding, setIsAdding] = useState(false);
@@ -48,14 +47,12 @@ export default function PurchaseOrdersPage() {
         ...doc.data()
       })) as PurchaseOrder[];
       setPurchaseOrders(ordersData);
-      if (loading) setLoading(false);
     }, (error) => {
       console.error("Error fetching purchase orders: ", error);
       toast({
         title: "Failed to load purchase orders",
         variant: "destructive",
       });
-      if (loading) setLoading(false);
     });
 
     return () => unsubscribe(); // Cleanup listener on unmount
@@ -131,10 +128,6 @@ export default function PurchaseOrdersPage() {
 
   if (!isClient) {
     return null; // Or a loading skeleton
-  }
-  
-  if (loading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
   }
 
   return (

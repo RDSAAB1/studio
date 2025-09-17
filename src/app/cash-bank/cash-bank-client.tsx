@@ -63,7 +63,6 @@ export default function CashBankClient() {
     const [loans, setLoans] = useState<Loan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isClient, setIsClient] = useState(false);
-    const [loading, setLoading] = useState(true);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
     const [isFundTransactionDialogOpen, setIsFundTransactionDialogOpen] = useState(false);
@@ -90,12 +89,8 @@ export default function CashBankClient() {
         const unsubscribeIncomes = getIncomeRealtime(setIncomes, (e) => toast({ title: "Error loading income data", variant: "destructive" }));
         const unsubscribeExpenses = getExpensesRealtime(setExpenses, (e) => toast({ title: "Error loading expense data", variant: "destructive" }));
         const unsubscribeLoans = getLoansRealtime(setLoans, (e) => toast({ title: "Error loading loan data", variant: "destructive" }));
-        const unsubscribeBankAccounts = getBankAccountsRealtime((data) => {
-            setBankAccounts(data);
-            if (loading) setLoading(false);
-        }, (e) => {
+        const unsubscribeBankAccounts = getBankAccountsRealtime(setBankAccounts, (e) => {
             toast({ title: "Error loading bank accounts", variant: "destructive" });
-            if (loading) setLoading(false);
         });
         
         return () => {
@@ -338,10 +333,8 @@ export default function CashBankClient() {
     };
 
 
-    if (!isClient || loading) {
-      if (loading) {
-        return <div>Loading...</div>;
-      }
+    if (!isClient) {
+        return null;
     }
 
     return (

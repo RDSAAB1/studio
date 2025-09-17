@@ -24,7 +24,7 @@ import { toTitleCase } from '@/lib/utils';
 
 export default function InventoryManagementPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentInventoryItem, setCurrentInventoryItem] = useState<InventoryItem | null>(null);
   const [formData, setFormData] = useState<Omit<InventoryItem, 'id' | 'createdAt'>>({
@@ -37,10 +37,10 @@ export default function InventoryManagementPage() {
   });
 
   useEffect(() => {
+    setIsClient(true);
     const unsubscribe = getInventoryItems(
       (items) => {
         setInventoryItems(items);
-        if (loading) setLoading(false);
       },
       (error) => {
         console.error("Error fetching inventory items:", error);
@@ -48,7 +48,6 @@ export default function InventoryManagementPage() {
           title: "Failed to load inventory",
           variant: "destructive",
         });
-        if (loading) setLoading(false);
       }
     );
 
@@ -161,8 +160,8 @@ export default function InventoryManagementPage() {
     setIsModalOpen(true);
   };
   
-  if (loading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  if (!isClient) {
+    return null;
   }
 
   return (

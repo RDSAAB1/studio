@@ -21,18 +21,17 @@ import { toTitleCase } from '@/lib/utils';
 
 export default function ProjectManagementPage() {
     const [projects, setProjects] = useState<Project[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [isClient, setIsClient] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProject, setCurrentProject] = useState<Partial<Project> | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
+        setIsClient(true);
         const unsubscribe = getProjectsRealtime((projectsData) => {
             setProjects(projectsData);
-            setLoading(false);
         }, (error) => {
             console.error("Error fetching projects:", error);
-            setLoading(false);
             toast({ title: "Failed to load projects", variant: "destructive" });
         });
         return () => unsubscribe();
@@ -106,8 +105,8 @@ export default function ProjectManagementPage() {
         setCurrentProject({ ...currentProject, status });
     }
     
-    if (loading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+    if (!isClient) {
+        return null;
     }
 
     return (

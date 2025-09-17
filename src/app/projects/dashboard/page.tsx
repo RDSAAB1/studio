@@ -65,9 +65,10 @@ const initialDashboardData: DashboardData = {
 
 export default function ProjectDashboardPage({ params, searchParams }: PageProps) {
   const [dashboardData, setDashboardData] = useState<DashboardData>(initialDashboardData);
-  const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     const projectsQuery = query(collection(db, 'projects'));
     const tasksQuery = query(collection(db, 'tasks'));
 
@@ -97,7 +98,6 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
         totalProjectCost,
         totalProjectBilled
       }));
-      setLoading(false);
     });
 
     let tasksSnapshot: any = null;
@@ -112,7 +112,6 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
         completedTasks: tasks.filter(t => t.status === 'Completed').length,
         latestTasks: tasks.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()).slice(0, 5), // Get latest 5 tasks
       }));
-      setLoading(false);
     });
 
     return () => {
@@ -121,8 +120,8 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
     };
   }, []);
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (!isClient) {
+    return null;
   }
 
   return (

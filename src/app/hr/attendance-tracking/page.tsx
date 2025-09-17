@@ -33,18 +33,17 @@ export default function AttendanceTrackingPage() {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [attendanceRecords, setAttendanceRecords] = useState<Map<string, AttendanceEntry>>(new Map());
     const { toast } = useToast();
-    const [loading, setLoading] = useState(true);
+    const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
+        setIsClient(true);
         const q = query(collection(db, "employees"));
         const unsubscribeEmployees = onSnapshot(q, (snapshot) => {
             const employeesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
             setEmployees(employeesData);
-            if (loading) setLoading(false);
         }, (error) => {
             console.error("Error fetching employees: ", error);
             toast({ title: "Failed to load employees", variant: "destructive" });
-            if (loading) setLoading(false);
         });
 
         return () => unsubscribeEmployees();
@@ -86,8 +85,8 @@ export default function AttendanceTrackingPage() {
         total: employees.length
     };
     
-    if (loading) {
-      return <div>Loading...</div>;
+    if (!isClient) {
+        return null;
     }
 
     return (

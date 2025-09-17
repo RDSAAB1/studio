@@ -30,7 +30,7 @@ type AttendanceSummary = {
 export default function PayrollManagementPage() {
   const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -38,15 +38,14 @@ export default function PayrollManagementPage() {
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
   
   useEffect(() => {
+    setIsClient(true);
     const qPayroll = query(collection(db, "payroll"));
     const unsubscribePayroll = onSnapshot(qPayroll, (snapshot) => {
       const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PayrollEntry[];
       setPayrollEntries(entries);
-      if(loading) setLoading(false);
     }, (err) => {
       console.error("Error fetching payroll data:", err);
       setError("Failed to load payroll data.");
-      if(loading) setLoading(false);
     });
 
     const qEmployees = query(collection(db, "employees"));
@@ -175,17 +174,11 @@ export default function PayrollManagementPage() {
     return employee ? employee.name : 'Unknown';
   }
 
-  if (loading && employees.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   if (error) {
     return <div className="text-center text-destructive">{error}</div>;
   }
+  
+  if (!isClient) return null;
 
   return (
     <div className="space-y-6">
@@ -211,22 +204,30 @@ export default function PayrollManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payrollEntries.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{getEmployeeName(entry.employeeId)} ({entry.employeeId})</TableCell>
-                  <TableCell>{entry.payPeriod}</TableCell>
-                  <TableCell>₹{entry.amount.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="mr-2" onClick={() => handleEditEntry(entry)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => entry.id && handleDeleteEntry(entry.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+              {payrollEntries.length === 0 && !isClient ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center h-24">
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin" />
                   </TableCell>
                 </TableRow>
-              ))}
-               {payrollEntries.length === 0 && (
+              ) : (
+                payrollEntries.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell>{getEmployeeName(entry.employeeId)} ({entry.employeeId})</TableCell>
+                    <TableCell>{entry.payPeriod}</TableCell>
+                    <TableCell>₹{entry.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" className="mr-2" onClick={() => handleEditEntry(entry)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => entry.id && handleDeleteEntry(entry.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+               {payrollEntries.length === 0 && isClient && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center h-24">No payroll entries found.</TableCell>
                 </TableRow>

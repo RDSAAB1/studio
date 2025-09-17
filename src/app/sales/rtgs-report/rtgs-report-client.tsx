@@ -47,7 +47,7 @@ interface RtgsReportRow {
 
 export default function RtgsReportClient() {
     const [reportRows, setReportRows] = useState<RtgsReportRow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [isClient, setIsClient] = useState(false);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
@@ -64,7 +64,7 @@ export default function RtgsReportClient() {
     const [endDate, setEndDate] = useState<Date | undefined>();
 
     useEffect(() => {
-        setLoading(true);
+        setIsClient(true);
         let currentSettings: RtgsSettings | null = null;
         let unsubscribePayments: (() => void) | undefined;
 
@@ -103,17 +103,12 @@ export default function RtgsReportClient() {
                         });
                         newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                         setReportRows(newReportRows);
-                        setLoading(false);
                     }, (error) => {
                         console.error("Error fetching RTGS reports: ", error);
-                        setLoading(false);
                     });
-                } else {
-                    setLoading(false); // Stop loading if settings fail
                 }
             } catch (error) {
                 console.error("Error fetching initial settings: ", error);
-                setLoading(false);
             }
         };
 
@@ -159,67 +154,65 @@ export default function RtgsReportClient() {
         return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
-    const handlePrint = () => {
-        const node = tablePrintRef.current;
+    const handlePrint = (printRef: React.RefObject<HTMLDivElement>) => {
+        const node = printRef.current;
         if (!node || !settings) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not find the table content to print.' });
             return;
         }
-    
-        const newWindow = window.open('', '_blank', 'height=800,width=1200');
-        if (newWindow) {
-            newWindow.document.open();
-            newWindow.document.write(`
-                <html>
-                    <head>
-                        <title>RTGS Payment Report</title>
-                        <style>
-                            @page { 
-                                size: landscape; 
-                                margin: 10mm; 
-                            }
-                            body { 
-                                font-family: sans-serif;
-                                -webkit-print-color-adjust: exact;
-                                print-color-adjust: exact;
-                            }
-                            table {
-                                font-size: 8pt;
-                                border-collapse: collapse;
-                                width: 100%;
-                            }
-                            th, td {
-                                padding: 4px 6px;
-                                border: 1px solid #ccc;
-                                white-space: nowrap;
-                                text-align: left;
-                            }
-                            thead {
-                                background-color: #f2f2f2;
-                            }
-                            .print-header {
-                                margin-bottom: 1rem;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="print-header">
-                          <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
-                          <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
-                        </div>
-                        ${node.outerHTML}
-                    </body>
-                </html>
-            `);
-            newWindow.document.close();
-            newWindow.focus();
-            setTimeout(() => {
-                newWindow.print();
-                newWindow.close();
-            }, 250);
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not open print window. Please disable pop-up blockers.' });
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
+            document.body.removeChild(iframe);
+            return;
         }
+
+        iframeDoc.open();
+        iframeDoc.write('<html><head><title>RTGS Payment Report</title>');
+
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                const style = iframeDoc.createElement('style');
+                style.appendChild(iframeDoc.createTextNode(cssText));
+                style.appendChild(iframeDoc.createTextNode(`
+                    @page { size: landscape; margin: 10mm; }
+                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .print-header { margin-bottom: 1rem; text-align: center; }
+                    thead { background-color: #f2f2f2 !important; }
+                `));
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn("Could not copy stylesheet:", e);
+            }
+        });
+        
+        iframeDoc.write('</head><body></body></html>');
+        
+        const printContent = `
+            <div class="print-header">
+                <h2>${toTitleCase(settings.companyName)} - RTGS Payment Report</h2>
+                <p>Date: ${format(new Date(), 'dd-MMM-yyyy')}</p>
+            </div>
+            ${node.outerHTML}
+        `;
+        
+        iframeDoc.body.innerHTML = printContent;
+        iframeDoc.close();
+        
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+        }, 500);
     };
     
     const handleDownloadExcel = () => {
@@ -254,8 +247,8 @@ export default function RtgsReportClient() {
         XLSX.writeFile(workbook, `RTGS_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     };
 
-    if (loading || !settings) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
+    if (!isClient) {
+        return null;
     }
     
     return (
@@ -344,7 +337,7 @@ export default function RtgsReportClient() {
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-auto h-[60vh] border rounded-md">
-                        <Table ref={tablePrintRef}>
+                        <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date / SR No.</TableHead>
@@ -420,7 +413,7 @@ export default function RtgsReportClient() {
                          <Button variant="outline" onClick={handleDownloadExcel}>
                             <Download className="mr-2 h-4 w-4" /> Download Excel
                         </Button>
-                        <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/>Print</Button>
+                        <Button onClick={() => handlePrint(tablePrintRef)}><Printer className="mr-2 h-4 w-4"/>Print</Button>
                     </DialogFooter>
                     <div className="p-4 overflow-auto flex-grow">
                          <div ref={tablePrintRef}>
@@ -495,4 +488,3 @@ export default function RtgsReportClient() {
         </div>
     );
 }
-
