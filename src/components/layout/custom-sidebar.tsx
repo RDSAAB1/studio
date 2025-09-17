@@ -14,10 +14,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-  DropdownMenuPortal,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 
 
@@ -26,6 +22,53 @@ interface CustomSidebarProps {
   onTabSelect: (menuItem: MenuItemType) => void;
   isSidebarActive: boolean;
   toggleSidebar: () => void;
+}
+
+const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { item: MenuItemType, activePath: string, onTabSelect: (menuItem: MenuItemType) => void, toggleSidebar: () => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const isSubMenuActive = item.subMenus?.some(sub => `/${sub.id}` === activePath) ?? false;
+     const isActive = `/${item.id}` === activePath;
+
+    const handleLinkClick = (menuItem: MenuItemType) => {
+        onTabSelect(menuItem);
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+            toggleSidebar();
+        }
+    };
+
+    if (!item.subMenus) {
+        return (
+             <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
+                <span className="icon">{React.createElement(item.icon)}</span>
+            </Button>
+        )
+    }
+    
+    return (
+        <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+            <DropdownMenuTrigger asChild>
+                <Button 
+                    variant="ghost" 
+                    onMouseEnter={() => setIsOpen(true)} 
+                    className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", (isSubMenuActive || isOpen) && "bg-accent")}
+                 >
+                    <span className="icon">{React.createElement(item.icon)}</span>
+                </Button>
+            </DropdownMenuTrigger>
+             <DropdownMenuContent 
+                side="right" 
+                align="start" 
+                onMouseLeave={() => setIsOpen(false)}
+             >
+                <DropdownMenuLabel className="font-bold text-base mb-1">{item.name}</DropdownMenuLabel>
+                {item.subMenus.map(subItem => (
+                    <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)} className={cn(`/${subItem.id}` === activePath && "bg-accent")}>
+                        {subItem.name}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
 }
 
 const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, isSidebarActive, toggleSidebar }) => {
@@ -46,44 +89,6 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
     fetchCompanyName();
   }, []);
 
-  const handleLinkClick = (menuItem: MenuItemType) => {
-    onTabSelect(menuItem);
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      toggleSidebar();
-    }
-  };
-
-  const renderMenuItem = (item: MenuItemType) => {
-    const isActive = `/${item.id}` === activePath;
-    const isSubMenuActive = item.subMenus?.some(sub => `/${sub.id}` === activePath) ?? false;
-
-    if (item.subMenus) {
-      return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isSubMenuActive && "bg-accent")}>
-                    <span className="icon">{React.createElement(item.icon)}</span>
-                </Button>
-            </DropdownMenuTrigger>
-             <DropdownMenuContent side="right" align="start">
-                <DropdownMenuLabel className="font-bold text-base mb-1">{item.name}</DropdownMenuLabel>
-                {item.subMenus.map(subItem => (
-                    <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)} className={cn(`/${subItem.id}` === activePath && "bg-accent")}>
-                        {subItem.name}
-                    </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    }
-
-    return (
-        <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
-            <span className="icon">{React.createElement(item.icon)}</span>
-        </Button>
-    );
-  };
-
   return (
     <div className={cn("wrapper", isSidebarActive && "active")}>
         <aside className="side_bar">
@@ -97,9 +102,13 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
         <div className="side_bar_bottom scrollbar-hide">
              <div className="space-y-2">
                 {allMenuItems.map(item => (
-                    <React.Fragment key={item.id}>
-                        {renderMenuItem(item)}
-                    </React.Fragment>
+                    <SidebarMenuItem 
+                        key={item.id} 
+                        item={item} 
+                        activePath={activePath} 
+                        onTabSelect={onTabSelect} 
+                        toggleSidebar={toggleSidebar} 
+                    />
                 ))}
             </div>
         </div>
