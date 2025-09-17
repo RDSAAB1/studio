@@ -44,18 +44,16 @@ const SidebarMenuItem = ({ item, activePath, onTabSelect, toggleSidebar }: { ite
 
     if (!item.subMenus) {
         return (
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                         <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
-                            <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                        <p>{item.name}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
+                        <span className="icon">{React.createElement(item.icon, { className: "h-5 w-5" })}</span>
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                    <p>{item.name}</p>
+                </TooltipContent>
+            </Tooltip>
         )
     }
     
@@ -117,17 +115,19 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
             </div>
         </div>
         <div className="side_bar_bottom scrollbar-hide">
-             <div className="space-y-1">
-                {allMenuItems.map(item => (
-                    <SidebarMenuItem 
-                        key={item.id} 
-                        item={item} 
-                        activePath={activePath} 
-                        onTabSelect={onTabSelect} 
-                        toggleSidebar={toggleSidebar} 
-                    />
-                ))}
-            </div>
+            <TooltipProvider delayDuration={0}>
+                <div className="space-y-1">
+                    {allMenuItems.map(item => (
+                        <SidebarMenuItem 
+                            key={item.id} 
+                            item={item} 
+                            activePath={activePath} 
+                            onTabSelect={onTabSelect} 
+                            toggleSidebar={toggleSidebar} 
+                        />
+                    ))}
+                </div>
+             </TooltipProvider>
         </div>
         </aside>
         <div className="main_container">
