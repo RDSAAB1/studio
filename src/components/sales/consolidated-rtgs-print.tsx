@@ -232,7 +232,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                     <p className="text-sm text-black">(Sign. Of Clerk/Cashier/Teller)</p>
                                     <p className="text-sm text-black">(Signature Of Owner)</p>
                                     <div className="text-right">
-                                        <span className="font-bold mr-4 text-black">PAGE TOTAL</span>
+                                        <span className="font-bold mr-4 text-black">TOTAL</span>
                                         <span className="font-bold text-black">{formatCurrency(pageTotalAmount)}</span>
                                         {pageIndex === paymentChunks.length - 1 && (
                                             <div className="border-t border-black mt-1 pt-1">
