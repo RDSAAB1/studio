@@ -105,6 +105,10 @@ export default function ProjectManagementPage() {
         if (!currentProject) return;
         setCurrentProject({ ...currentProject, status });
     }
+    
+    if (loading) {
+        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+    }
 
     return (
         <div className="space-y-6">
@@ -117,41 +121,37 @@ export default function ProjectManagementPage() {
                     <Button onClick={handleNewProject}><PlusCircle className="mr-2 h-4 w-4" /> Add New Project</Button>
                 </CardHeader>
                 <CardContent>
-                    {loading ? (
-                        <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Project Name</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Start Date</TableHead>
-                                        <TableHead>End Date</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Project Name</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Start Date</TableHead>
+                                    <TableHead>End Date</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {projects.length > 0 ? projects.map((project) => (
+                                    <TableRow key={project.id}>
+                                        <TableCell className="font-medium">{project.name}</TableCell>
+                                        <TableCell>{project.status}</TableCell>
+                                        <TableCell>{format(new Date(project.startDate), "PPP")}</TableCell>
+                                        <TableCell>{project.endDate ? format(new Date(project.endDate), "PPP") : '-'}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => handleEditProject(project)}><Edit className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteProject(project.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {projects.length > 0 ? projects.map((project) => (
-                                        <TableRow key={project.id}>
-                                            <TableCell className="font-medium">{project.name}</TableCell>
-                                            <TableCell>{project.status}</TableCell>
-                                            <TableCell>{format(new Date(project.startDate), "PPP")}</TableCell>
-                                            <TableCell>{project.endDate ? format(new Date(project.endDate), "PPP") : '-'}</TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 mr-2" onClick={() => handleEditProject(project)}><Edit className="h-4 w-4" /></Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteProject(project.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    )) : (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">No projects found. Start by adding a new one.</TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">No projects found. Start by adding a new one.</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -213,4 +213,3 @@ export default function ProjectManagementPage() {
         </div>
     );
 }
-

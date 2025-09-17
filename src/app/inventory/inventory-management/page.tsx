@@ -53,7 +53,7 @@ export default function InventoryManagementPage() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -160,6 +160,10 @@ export default function InventoryManagementPage() {
     });
     setIsModalOpen(true);
   };
+  
+  if (loading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  }
 
   return (
     <div className="space-y-6">
@@ -169,11 +173,6 @@ export default function InventoryManagementPage() {
           <Button onClick={openAddModal}><PlusCircle className="mr-2 h-4 w-4" /> Add New Item</Button>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center">
-              <Loader2 className="mr-2 h-8 w-8 animate-spin" /> Loading Inventory...
-            </div>
-          ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -209,7 +208,6 @@ export default function InventoryManagementPage() {
                 </TableBody>
               </Table>
             </div>
-          )}
         </CardContent>
       </Card>
 
@@ -259,4 +257,3 @@ export default function InventoryManagementPage() {
     </div>
   );
 }
-

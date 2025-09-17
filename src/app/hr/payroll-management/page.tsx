@@ -61,7 +61,7 @@ export default function PayrollManagementPage() {
       unsubscribePayroll();
       unsubscribeEmployees();
     };
-  }, [loading]);
+  }, []);
 
   const calculateSalary = async () => {
     if (!currentEntry.employeeId || !currentEntry.payPeriod) {

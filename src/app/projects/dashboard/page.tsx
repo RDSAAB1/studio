@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AreaChart, Briefcase, CheckCircle, Clock, ListChecks, Users, DollarSign } from 'lucide-react';
+import { AreaChart, Briefcase, CheckCircle, Clock, ListChecks, Users, DollarSign, Loader2 } from 'lucide-react';
 
 interface Task {
   id: string;
@@ -68,7 +68,6 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     const projectsQuery = query(collection(db, 'projects'));
     const tasksQuery = query(collection(db, 'tasks'));
 
@@ -123,7 +122,7 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
   }, []);
 
   if (loading) {
-    return <div>Loading Dashboard...</div>; // Basic loading indicator
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   return (

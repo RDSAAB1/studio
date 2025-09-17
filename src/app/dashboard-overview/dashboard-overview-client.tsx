@@ -75,10 +75,11 @@ export default function DashboardOverviewClient() {
         const unsubCustomers = onSnapshot(query(collection(db, "customers")), (snapshot) => {
             setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         });
-        const unsubExpenseCats = getExpenseCategories(setExpenseCategories, console.error);
+        const unsubExpenseCats = getExpenseCategories((data) => {
+            setExpenseCategories(data);
+            setLoading(false);
+        }, console.error);
         
-        setLoading(false);
-
         return () => {
             unsubIncomes();
             unsubExpenses();

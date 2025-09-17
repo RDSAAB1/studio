@@ -36,7 +36,6 @@ export default function AttendanceTrackingPage() {
     const { toast } = useToast();
 
     useEffect(() => {
-        setLoading(true);
         const q = query(collection(db, "employees"));
         const unsubscribeEmployees = onSnapshot(q, (snapshot) => {
             const employeesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
@@ -87,6 +86,10 @@ export default function AttendanceTrackingPage() {
         total: employees.length
     };
 
+    if (loading) {
+        return <div>Loading...</div>;
+    }
+
     return (
         <div className="space-y-6">
             <Card>
@@ -129,7 +132,7 @@ export default function AttendanceTrackingPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {loading ? (
+                                {employees.length === 0 ? (
                                     <TableRow><TableCell colSpan={2} className="h-24 text-center">Loading employees...</TableCell></TableRow>
                                 ) : (
                                     employees.map((employee) => {

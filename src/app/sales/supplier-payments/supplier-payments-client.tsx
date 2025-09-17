@@ -284,6 +284,8 @@ export default function SupplierPaymentsClient() {
     };
     fetchSettings();
 
+    setLoading(false);
+
 
     return () => {
       isSubscribed = false;
@@ -296,7 +298,7 @@ export default function SupplierPaymentsClient() {
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo, loading]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
   
   useEffect(() => {
     autoSetCDToggle();
@@ -778,7 +780,7 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient || isLoadingInitial) {
+    if (!isClient || isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

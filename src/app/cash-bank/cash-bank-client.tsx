@@ -90,10 +90,14 @@ export default function CashBankClient() {
         const unsubscribeIncomes = getIncomeRealtime(setIncomes, (e) => toast({ title: "Error loading income data", variant: "destructive" }));
         const unsubscribeExpenses = getExpensesRealtime(setExpenses, (e) => toast({ title: "Error loading expense data", variant: "destructive" }));
         const unsubscribeLoans = getLoansRealtime(setLoans, (e) => toast({ title: "Error loading loan data", variant: "destructive" }));
-        const unsubscribeBankAccounts = getBankAccountsRealtime(setBankAccounts, (e) => toast({ title: "Error loading bank accounts", variant: "destructive" }));
+        const unsubscribeBankAccounts = getBankAccountsRealtime((data) => {
+            setBankAccounts(data);
+            setLoading(false);
+        }, (e) => {
+            toast({ title: "Error loading bank accounts", variant: "destructive" });
+            setLoading(false);
+        });
         
-        setLoading(false);
-
         return () => {
             unsubscribeFunds();
             unsubscribeIncomes();

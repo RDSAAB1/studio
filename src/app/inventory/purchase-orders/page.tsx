@@ -41,7 +41,6 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     if (!isClient) return;
 
-    setLoading(true);
     const q = query(collection(db, 'purchaseOrders'), orderBy('orderDate', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
@@ -133,6 +132,10 @@ export default function PurchaseOrdersPage() {
   if (!isClient) {
     return null; // Or a loading skeleton
   }
+  
+  if (loading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  }
 
   return (
     <div className="space-y-6">
@@ -143,11 +146,7 @@ export default function PurchaseOrdersPage() {
         </Button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-40">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : purchaseOrders.length === 0 ? (
+      {purchaseOrders.length === 0 ? (
         <div className="text-center text-muted-foreground h-40 flex items-center justify-center">
           No purchase orders found.
         </div>
@@ -281,4 +280,3 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
-
