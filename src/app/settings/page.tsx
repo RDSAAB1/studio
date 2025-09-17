@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -50,6 +51,9 @@ const companySchema = z.object({
   panNo: z.string().optional(),
   companyStateName: z.string().optional(),
   companyStateCode: z.string().optional(),
+  bankHeaderLine1: z.string().optional(),
+  bankHeaderLine2: z.string().optional(),
+  bankHeaderLine3: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -461,7 +465,7 @@ export default function SettingsPage() {
     
     const allBankOptions = useMemo(() => {
         const combinedNames = [...new Set([...bankNames, ...banks.map((b) => b.name)])];
-        return combinedNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
+        return uniqueNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
     }, [banks]);
 
     const availableBranchOptions = useMemo(() => {
@@ -544,6 +548,14 @@ export default function SettingsPage() {
                                     <div className="space-y-1">
                                         <Label>State Code</Label>
                                         <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode')} onChange={handleStateCodeChange} placeholder="Select Code"/>
+                                    </div>
+                                    <div className="space-y-1 sm:col-span-2 border-t pt-4 mt-2">
+                                        <Label className="font-semibold">RTGS Print Header</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <Input {...companyForm.register("bankHeaderLine1")} placeholder="Header Line 1" />
+                                        <Input {...companyForm.register("bankHeaderLine2")} placeholder="Header Line 2" />
+                                        <Input {...companyForm.register("bankHeaderLine3")} placeholder="Header Line 3" />
+                                        </div>
                                     </div>
                                </div>
                             </SettingsCard>

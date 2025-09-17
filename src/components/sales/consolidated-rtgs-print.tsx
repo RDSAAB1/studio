@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef } from 'react';
@@ -37,11 +38,11 @@ interface ConsolidatedRtgsPrintFormatProps {
     settings: RtgsSettings & { defaultBank?: BankAccount };
 }
 
-const BankHeader = () => (
+const BankHeader = ({ settings }: { settings: RtgsSettings }) => (
     <div className="text-orange-700">
-        <h3 className="font-bold text-lg">बैंक ऑफ़ बड़ौदा</h3>
-        <h3 className="font-bold text-lg">Bank of Baroda</h3>
-        <p className="text-xs">India's International Bank</p>
+        <h3 className="font-bold text-lg">{settings.bankHeaderLine1 || 'बैंक ऑफ़ बड़ौदा'}</h3>
+        <h3 className="font-bold text-lg">{settings.bankHeaderLine2 || 'Bank of Baroda'}</h3>
+        <p className="text-xs">{settings.bankHeaderLine3 || "India's International Bank"}</p>
     </div>
 );
 
@@ -156,14 +157,14 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                         return (
                             <div key={pageIndex} className="p-4 font-sans leading-normal bg-white text-black printable-area page-break">
                                 <div className="flex justify-between items-start mb-2">
-                                    <BankHeader />
+                                    <BankHeader settings={settings} />
                                     <div className="text-center">
                                         <p className="font-bold text-xs text-black">FORM</p>
                                         <h2 className="font-bold text-xl text-black">{settings.companyName}</h2>
                                         <p className="font-bold text-sm text-black">{settings.companyAddress1}</p>
                                         <p className="font-bold text-sm text-black">{settings.companyAddress2}</p>
                                     </div>
-                                    <BankHeader />
+                                    <BankHeader settings={settings} />
                                 </div>
 
                                 <div className="flex justify-between items-start mb-4">

@@ -79,6 +79,7 @@ export type Customer = {
   grNo?: string;
   grDate?: string;
   transport?: string;
+  isDeleted?: boolean; // For soft delete
 };
 
 export type Transaction = {
@@ -107,6 +108,7 @@ export type Transaction = {
   projectId?: string; 
   loanId?: string; 
   bankAccountId?: string;
+  isDeleted?: boolean;
 };
 
 export type Income = Omit<Transaction, 'transactionType'> & { transactionType: 'Income' };
@@ -180,6 +182,7 @@ export type SupplierPayment = {
     rtgsSrNo?: string; 
     expenseTransactionId?: string;
     bankAccountId?: string; 
+    isDeleted?: boolean;
 }
 
 export type CustomerPayment = {
@@ -194,6 +197,7 @@ export type CustomerPayment = {
     paidFor?: { srNo: string; amount: number }[];
     incomeTransactionId?: string;
     bankAccountId?: string;
+    isDeleted?: boolean;
 };
 
 export type Payment = SupplierPayment;
@@ -285,6 +289,7 @@ export type InventoryItem = {
     purchasePrice: number;
     sellingPrice: number;
     createdAt?: string;
+    isDeleted?: boolean;
 };
 
 export type PurchaseOrder = {
@@ -305,6 +310,7 @@ export type Employee = {
     contact: string;
     baseSalary: number;
     monthlyLeaveAllowance: number;
+    isDeleted?: boolean;
 };
 
 export type PayrollEntry = {
@@ -364,6 +370,9 @@ export type ReceiptSettings = {
     fields: ReceiptFieldSettings;
     defaultBankAccountId?: string;
     defaultBank?: BankAccount;
+    bankHeaderLine1?: string;
+    bankHeaderLine2?: string;
+    bankHeaderLine3?: string;
 };
 
 export type RtgsSettings = ReceiptSettings;
@@ -421,6 +430,7 @@ export type Loan = {
     status?: 'Active' | 'Paid';
     depositTo: 'BankAccount' | 'CashInHand' | 'CashAtHome' | string;
     nextEmiDueDate?: string;
+    isDeleted?: boolean;
 }
 
 export type SerialNumberFormat = {
