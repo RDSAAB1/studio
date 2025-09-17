@@ -23,9 +23,8 @@ import { TransactionTable } from '@/components/sales/supplier-payments/transacti
 import { DetailsDialog } from '@/components/sales/supplier-payments/details-dialog';
 import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payment-details-dialog';
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
-import BankManagementPage from '@/app/settings/bank-management/page';
+import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 
 const suppliersCollection = collection(db, "suppliers");
@@ -872,7 +871,7 @@ export default function SupplierPaymentsClient() {
                         />
                     )}
                 </TabsContent>
-                <TabsContent value="history" className="mt-0">
+                <TabsContent value="history">
                      <div className="p-4 space-y-3">
                         <PaymentHistory
                             payments={paymentHistory}
@@ -928,8 +927,11 @@ export default function SupplierPaymentsClient() {
        />
 
        <BankSettingsDialog
-            isOpen={isBankSettingsOpen}
-            onOpenChange={setIsBankSettingsOpen}
+        isOpen={isBankSettingsOpen}
+        onOpenChange={setIsBankSettingsOpen}
+        banks={banks}
+        onAddBank={async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }}
+        onAddBranch={async (branch: any) => { await addBankBranch(branch); toast({title: 'Branch Added', variant: 'success'}); }}
        />
     </div>
   );
