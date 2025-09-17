@@ -237,10 +237,10 @@ export default function DailySupplierReportClient() {
                         </div>
                         
 
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto scrollbar-hide">
                             <table className="w-full text-xs border-collapse border border-gray-300">
-                                <thead>
-                                    <tr className="bg-gray-100 text-black font-semibold text-[10px] uppercase whitespace-nowrap">
+                                <thead className="bg-gray-100 font-semibold text-[10px] uppercase whitespace-nowrap">
+                                    <tr className="text-black">
                                         <th className="border border-gray-300 p-1 text-left">SR</th>
                                         <th className="border border-gray-300 p-1 text-left">Date</th>
                                         <th className="border border-gray-300 p-1 text-left">Term</th>
