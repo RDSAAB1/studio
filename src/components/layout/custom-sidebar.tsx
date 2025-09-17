@@ -116,7 +116,7 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
             </div>
         </div>
         <div className="side_bar_bottom scrollbar-hide">
-            <TooltipProvider delayDuration={0}>
+            <TooltipProvider>
                 <div className="space-y-1">
                     {allMenuItems.map(item => (
                         <SidebarMenuItem 
