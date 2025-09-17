@@ -238,13 +238,13 @@ export default function SupplierPaymentsClient() {
     const unsubSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
       if (isSubscribed) {
           setSuppliers(fetchedSuppliers);
-          setLoading(false);
+          if (loading) setLoading(false);
       }
     }, (error) => {
         if(isSubscribed) {
             console.error("Error fetching suppliers:", error);
             stableToast({ title: "Failed to load supplier data.", variant: 'destructive' });
-            setLoading(false);
+            if (loading) setLoading(false);
         }
     });
 
@@ -296,7 +296,7 @@ export default function SupplierPaymentsClient() {
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo, loading]);
   
   useEffect(() => {
     autoSetCDToggle();
@@ -926,13 +926,13 @@ export default function SupplierPaymentsClient() {
             onOpenChange={() => setRtgsReceiptData(null)}
        />
 
-       <BankSettingsDialog
+      <BankSettingsDialog
         isOpen={isBankSettingsOpen}
         onOpenChange={setIsBankSettingsOpen}
         banks={banks}
         onAddBank={async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }}
         onAddBranch={async (branch: any) => { await addBankBranch(branch); toast({title: 'Branch Added', variant: 'success'}); }}
-       />
+      />
     </div>
   );
 }
