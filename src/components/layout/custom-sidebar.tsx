@@ -58,8 +58,8 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
 
     if (item.subMenus) {
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger asChild>
             <li className={cn("relative", isSubMenuActive && "active")}>
                 {isSubMenuActive && <span className="top_curve"></span>}
                  <button className="w-full">
@@ -68,27 +68,32 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
                 </button>
                 {isSubMenuActive && <span className="bottom_curve"></span>}
             </li>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="ml-2">
-            {item.subMenus.map(subItem => (
-              <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)}>
-                {subItem.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent sideOffset={8} alignOffset={-5}>
+                <DropdownMenuItem className="font-bold text-base mb-1 pointer-events-none">{item.name}</DropdownMenuItem>
+                {item.subMenus.map(subItem => (
+                  <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)}>
+                    {subItem.name}
+                  </DropdownMenuItem>
+                ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
       );
     }
 
     return (
-      <li className={cn(isActive && "active", "relative")}>
-         {isActive && <span className="top_curve"></span>}
-        <button onClick={() => handleLinkClick(item)} className="w-full">
-          <span className="icon">{React.createElement(item.icon)}</span>
-          <span className="item">{item.name}</span>
-        </button>
-        {isActive && <span className="bottom_curve"></span>}
-      </li>
+      <DropdownMenuItem asChild>
+        <li className={cn(isActive && "active", "relative")}>
+           {isActive && <span className="top_curve"></span>}
+          <button onClick={() => handleLinkClick(item)} className="w-full">
+            <span className="icon">{React.createElement(item.icon)}</span>
+            <span className="item">{item.name}</span>
+          </button>
+          {isActive && <span className="bottom_curve"></span>}
+        </li>
+      </DropdownMenuItem>
     );
   };
 
@@ -104,13 +109,17 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
             </div>
         </div>
         <div className="side_bar_bottom scrollbar-hide">
-            <ul>
-                {allMenuItems.map(item => (
-                    <React.Fragment key={item.id}>
-                        {renderMenuItem(item)}
-                    </React.Fragment>
-                ))}
-            </ul>
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <ul>
+                        {allMenuItems.map(item => (
+                            <React.Fragment key={item.id}>
+                                {renderMenuItem(item)}
+                            </React.Fragment>
+                        ))}
+                    </ul>
+                </DropdownMenuTrigger>
+             </DropdownMenu>
         </div>
         </aside>
         <div className="main_container">
