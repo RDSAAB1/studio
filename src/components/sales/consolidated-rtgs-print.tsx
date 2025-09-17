@@ -234,7 +234,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                                     <div className="text-right">
                                         <span className="font-bold mr-4 text-black">TOTAL</span>
                                         <span className="font-bold text-black">{formatCurrency(pageTotalAmount)}</span>
-                                        {pageIndex === paymentChunks.length - 1 && (
+                                        {paymentChunks.length > 1 && pageIndex === paymentChunks.length - 1 && (
                                             <div className="border-t border-black mt-1 pt-1">
                                                 <span className="font-bold mr-4 text-black">GRAND TOTAL</span>
                                                 <span className="font-bold text-black">{formatCurrency(grandTotalAmount)}</span>
