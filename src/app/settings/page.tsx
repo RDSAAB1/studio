@@ -549,7 +549,7 @@ export default function SettingsPage() {
                                         <CustomDropdown options={stateCodeOptions} value={companyForm.watch('companyStateCode')} onChange={handleStateCodeChange} placeholder="Select Code"/>
                                     </div>
                                     <div className="space-y-1 sm:col-span-2 border-t pt-4 mt-2">
-                                        <Label className="font-semibold">RTGS Print Header</Label>
+                                        <Label className="font-semibold">BANK LOGO</Label>
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         <Input {...companyForm.register("bankHeaderLine1")} placeholder="Header Line 1" />
                                         <Input {...companyForm.register("bankHeaderLine2")} placeholder="Header Line 2" />
