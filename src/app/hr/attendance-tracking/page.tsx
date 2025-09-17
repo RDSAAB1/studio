@@ -32,7 +32,6 @@ export default function AttendanceTrackingPage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [attendanceRecords, setAttendanceRecords] = useState<Map<string, AttendanceEntry>>(new Map());
-    const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -53,11 +52,9 @@ export default function AttendanceTrackingPage() {
         const unsubscribeAttendance = getAttendanceForDateRealtime(dateStr, (records) => {
             const recordsMap = new Map(records.map(r => [r.employeeId, r]));
             setAttendanceRecords(recordsMap);
-            setLoading(false);
         }, (error) => {
             console.error("Error fetching attendance: ", error);
             toast({ title: "Failed to load attendance records", variant: "destructive" });
-            setLoading(false);
         });
 
         return () => unsubscribeAttendance();
@@ -85,10 +82,6 @@ export default function AttendanceTrackingPage() {
         leave: Array.from(attendanceRecords.values()).filter(r => r.status === 'Leave' || r.status === 'Half-day').length,
         total: employees.length
     };
-
-    if (loading) {
-        return <div>Loading...</div>;
-    }
 
     return (
         <div className="space-y-6">

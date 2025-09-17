@@ -214,8 +214,6 @@ export default function SupplierPaymentsClient() {
       p.paidFor?.some(pf => pf.srNo === detailsSupplierEntry.srNo)
     );
   }, [detailsSupplierEntry, paymentHistory]);
-
-  const isLoadingInitial = loading && suppliers.length === 0;
   
   useEffect(() => {
     setIsClient(true);
@@ -283,10 +281,6 @@ export default function SupplierPaymentsClient() {
         }
     };
     fetchSettings();
-
-
-    setLoading(false);
-
 
     return () => {
       isSubscribed = false;
@@ -781,11 +775,11 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient || loading) {
+    if (!isClient) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-4 text-muted-foreground">Loading Supplier Data...</span>
+                <span className="ml-4 text-muted-foreground">Loading...</span>
             </div>
         );
     }

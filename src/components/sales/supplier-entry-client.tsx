@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -120,21 +120,20 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (!isClient) return;
 
-    setIsLoading(true);
     const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
       setSuppliers(data);
-      if (isInitialLoad.current && data) {
-          const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+      if (isInitialLoad.current && data.length > 0) {
+          const nextSrNum = Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
           const initialSrNo = formatSrNo(nextSrNum, 'S');
           form.setValue('srNo', initialSrNo);
           setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
           isInitialLoad.current = false;
       }
-      setIsLoading(false);
+       if (isLoading) setIsLoading(false);
     }, (error) => {
       console.error("Error fetching suppliers: ", error);
       toast({ title: "Failed to load supplier data", variant: "destructive" });
-      setIsLoading(false);
+      if (isLoading) setIsLoading(false);
     });
 
     const unsubscribePayments = getPaymentsRealtime((data: Payment[]) => {
@@ -325,9 +324,9 @@ export default function SupplierEntryClient() {
 
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
-            await deleteSupplier(currentSupplier.id);
+          await deleteSupplier(currentSupplier.id);
         }
-        
+
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
@@ -520,19 +519,40 @@ export default function SupplierEntryClient() {
         reader.readAsBinaryString(file);
     };
   
+    const handleDeleteAll = async () => {
+        try {
+            await deleteAllSuppliers();
+            await deleteAllPayments();
+            toast({ title: "All entries deleted successfully", variant: "success" });
+            handleNew();
+        } catch (error) {
+            console.error("Error deleting all entries:", error);
+            toast({ title: "Failed to delete all entries", variant: "destructive" });
+        }
+    };
+    
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
         if (e.key === 'Enter') {
-          const activeElement = document.activeElement as HTMLElement;
-          if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
-            return;
-          }
-          const formEl = e.currentTarget;
-          const formElements = Array.from(formEl.elements).filter(el => (el as HTMLElement).offsetParent !== null) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
-          const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
-          if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
-            e.preventDefault();
-            formElements[currentElementIndex + 1].focus();
-          }
+            const activeElement = document.activeElement as HTMLElement;
+            if (activeElement.tagName === 'BUTTON' || activeElement.closest('[role="dialog"]') || activeElement.closest('[role="menu"]') || activeElement.closest('[cmdk-root]')) {
+                return;
+            }
+            e.preventDefault(); // Prevent form submission
+            const formEl = e.currentTarget;
+            const formElements = Array.from(formEl.elements).filter(el => 
+                (el instanceof HTMLInputElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement) && 
+                !el.hasAttribute('disabled') && 
+                (el as HTMLElement).offsetParent !== null
+            ) as (HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement)[];
+
+            const currentElementIndex = formElements.findIndex(el => el === document.activeElement);
+            
+            if (currentElementIndex > -1 && currentElementIndex < formElements.length - 1) {
+                formElements[currentElementIndex + 1].focus();
+            } else if (currentElementIndex === formElements.length - 1) {
+                // Optional: loop back to the first element or submit
+                // formElements[0].focus();
+            }
         }
     };
     
@@ -610,6 +630,7 @@ export default function SupplierEntryClient() {
                 selectedIdsCount={selectedSupplierIds.size}
                 onImport={handleImport}
                 onExport={handleExport}
+                onDeleteAll={handleDeleteAll}
             />
         </form>
       </FormProvider>      
