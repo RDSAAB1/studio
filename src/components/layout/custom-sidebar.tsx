@@ -12,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
   DropdownMenuPortal,
   DropdownMenuSub,
@@ -58,64 +59,49 @@ const CustomSidebar: React.FC<CustomSidebarProps> = ({ children, onTabSelect, is
 
     if (item.subMenus) {
       return (
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger
-            className={cn(
-              "focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
-              isSubMenuActive && "bg-accent text-accent-foreground"
-            )}
-          >
-            <span className="icon mr-2">{React.createElement(item.icon)}</span>
-            <span className="item">{item.name}</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuSubContent sideOffset={8} alignOffset={-5}>
-                <DropdownMenuItem className="font-bold text-base mb-1 pointer-events-none">{item.name}</DropdownMenuItem>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isSubMenuActive && "bg-accent")}>
+                    <span className="icon">{React.createElement(item.icon)}</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start">
+                <DropdownMenuLabel className="font-bold text-base mb-1">{item.name}</DropdownMenuLabel>
                 {item.subMenus.map(subItem => (
-                  <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)}>
-                    {subItem.name}
-                  </DropdownMenuItem>
+                    <DropdownMenuItem key={subItem.id} onClick={() => handleLinkClick(subItem)} className={cn(`/${subItem.id}` === activePath && "bg-accent")}>
+                        {subItem.name}
+                    </DropdownMenuItem>
                 ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuPortal>
-        </DropdownMenuSub>
+            </DropdownMenuContent>
+        </DropdownMenu>
       );
     }
 
     return (
-        <DropdownMenuItem onClick={() => handleLinkClick(item)} className={cn(isActive && "bg-accent text-accent-foreground")}>
-             <span className="icon mr-2">{React.createElement(item.icon)}</span>
-             <span className="item">{item.name}</span>
-        </DropdownMenuItem>
+        <Button variant="ghost" onClick={() => handleLinkClick(item)} className={cn("w-full h-auto py-2 flex-col gap-1 text-xs", isActive && "bg-accent")}>
+            <span className="icon">{React.createElement(item.icon)}</span>
+        </Button>
     );
   };
 
   return (
     <div className={cn("wrapper", isSidebarActive && "active")}>
         <aside className="side_bar">
-        <div className="side_bar_top">
+        <div className="side_bar_top justify-center">
             <div className="logo_wrap">
-             <button onClick={() => onTabSelect(allMenuItems.find(i => i.id === 'dashboard-overview')!)} className='flex items-center gap-2'>
+             <button onClick={() => onTabSelect(allMenuItems.find(i => i.id === 'dashboard-overview')!)} className='flex items-center justify-center'>
                     <span className="icon"><Sparkles/></span>
-                    <span className="text">{companyName}</span>
             </button>
             </div>
         </div>
         <div className="side_bar_bottom scrollbar-hide">
-             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="w-full h-auto py-2 flex-col gap-1 text-xs">
-                        <Menu/> Menu
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="right" align="start">
-                    {allMenuItems.map(item => (
-                        <React.Fragment key={item.id}>
-                            {renderMenuItem(item)}
-                        </React.Fragment>
-                    ))}
-                </DropdownMenuContent>
-             </DropdownMenu>
+             <div className="space-y-2">
+                {allMenuItems.map(item => (
+                    <React.Fragment key={item.id}>
+                        {renderMenuItem(item)}
+                    </React.Fragment>
+                ))}
+            </div>
         </div>
         </aside>
         <div className="main_container">
