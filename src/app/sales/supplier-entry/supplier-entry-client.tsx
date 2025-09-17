@@ -121,17 +121,18 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (!isClient) return;
 
-    setIsLoading(true);
     const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
       setSuppliers(data);
-      if (isInitialLoad.current && data) {
-          const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-          const initialSrNo = formatSrNo(nextSrNum, 'S');
-          form.setValue('srNo', initialSrNo);
-          setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-          isInitialLoad.current = false;
+      if (isInitialLoad.current) {
+        if (data && data.length > 0) {
+            const nextSrNum = Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'S');
+            form.setValue('srNo', initialSrNo);
+            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+        }
+        isInitialLoad.current = false;
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }, (error) => {
       console.error("Error fetching suppliers: ", error);
       toast({ title: "Failed to load supplier data", variant: "destructive" });

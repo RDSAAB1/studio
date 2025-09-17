@@ -775,5 +775,15 @@ export async function addTransaction(transactionData: Omit<Transaction, 'id'|'tr
     return addDoc(collectionRef, transactionData);
 }
     
+// --- Batch Deletion for All Suppliers ---
+export async function deleteAllSuppliers(): Promise<void> {
+  const q = query(suppliersCollection);
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return;
 
-
+  const batch = writeBatch(firestoreDB);
+  snapshot.docs.forEach(doc => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+}
