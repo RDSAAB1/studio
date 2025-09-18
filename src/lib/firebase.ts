@@ -1,6 +1,7 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, setLogLevel } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { 
     getAuth, 
@@ -48,6 +49,12 @@ const db = initializeFirestore(app, {
     localCache: persistentLocalCache({})
 });
 const storage = getStorage(app);
+
+// Suppress non-critical Firestore connection warnings.
+// The app is designed to work offline, so these warnings are expected and normal.
+if (typeof window !== 'undefined') {
+    setLogLevel('error');
+}
 
 
 // Use a function to get auth instance to ensure it's client-side
