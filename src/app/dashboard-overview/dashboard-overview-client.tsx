@@ -2,8 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useLiveQuery } from 'dexie-react-hooks';
 import type { Income, Expense, FundTransaction, Loan, BankAccount, Customer, ExpenseCategory, Payment } from "@/lib/definitions";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, subDays, differenceInMonths } from 'date-fns';
 import { DonutChart, BarChart, AreaChart } from '@tremor/react';
 import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List, Bank, Percent } from 'lucide-react';
-import { getExpenseCategories, getIncomeRealtime, getExpensesRealtime } from '@/lib/firestore';
+import { getExpenseCategories, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getPaymentsRealtime, getLoansRealtime, getBankAccountsRealtime, getSuppliersRealtime, getCustomersRealtime } from '@/lib/firestore';
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm">
@@ -41,14 +40,14 @@ const BalanceCard = ({ title, value, icon, colorClass, description }: { title: s
 );
 
 export default function DashboardOverviewClient() {
-    const [incomes, setIncomes] = useState<Income[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [payments, setPayments] = useState<Payment[]>([]);
-    const [loans, setLoans] = useState<Loan[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
-    const [customers, setCustomers] = useState<Customer[]>([]);
+    const incomes = useLiveQuery(getIncomeRealtime) || [];
+    const expenses = useLiveQuery(getExpensesRealtime) || [];
+    const fundTransactions = useLiveQuery(getFundTransactionsRealtime) || [];
+    const payments = useLiveQuery(getPaymentsRealtime) || [];
+    const loans = useLiveQuery(getLoansRealtime) || [];
+    const bankAccounts = useLiveQuery(getBankAccountsRealtime) || [];
+    const suppliers = useLiveQuery(getSuppliersRealtime) || [];
+    const customers = useLiveQuery(getCustomersRealtime) || [];
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [isClient, setIsClient] = useState(false);
 
@@ -56,39 +55,9 @@ export default function DashboardOverviewClient() {
 
     useEffect(() => {
         setIsClient(true);
-        const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
-        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
-        const unsubFunds = onSnapshot(query(collection(db, "fund_transactions"), orderBy("date", "desc")), (snapshot) => {
-            setFundTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundTransaction)));
-        });
-        const unsubPayments = onSnapshot(query(collection(db, "payments"), orderBy("date", "desc")), (snapshot) => {
-            setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment)));
-        });
-        const unsubLoans = onSnapshot(query(collection(db, "loans"), orderBy("startDate", "desc")), (snapshot) => {
-            setLoans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan)));
-        });
-        const unsubBankAccounts = onSnapshot(query(collection(db, "bankAccounts"), orderBy("bankName", "asc")), (snapshot) => {
-            setBankAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount)));
-        });
-        const unsubSuppliers = onSnapshot(query(collection(db, "suppliers")), (snapshot) => {
-            setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
-        });
-        const unsubCustomers = onSnapshot(query(collection(db, "customers")), (snapshot) => {
-            setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
-        });
+        // Expense categories are not part of the offline-first sync yet, so we fetch them directly.
         const unsubExpenseCats = getExpenseCategories(setExpenseCategories, console.error);
-        
-        return () => {
-            unsubIncomes();
-            unsubExpenses();
-            unsubFunds();
-            unsubPayments();
-            unsubLoans();
-            unsubBankAccounts();
-            unsubSuppliers();
-            unsubCustomers();
-            unsubExpenseCats();
-        };
+        return () => unsubExpenseCats();
     }, []);
     
     const financialState = useMemo(() => {
