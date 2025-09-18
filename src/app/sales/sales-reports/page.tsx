@@ -4,7 +4,7 @@
 import PlaceholderPage from "@/components/placeholder-page";
 import { useEffect, useState } from "react";
 import { collection, query, onSnapshot, orderBy, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Assuming db is exported from your firebase.ts
+import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from your firebase.ts
 import { Customer } from "@/lib/definitions"; // Assuming Customer type includes relevant fields for reports
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,7 +23,7 @@ export default function SalesReportsPage() {
   const [totalTransactions, setTotalTransactions] = useState(0);
 
   useEffect(() => {
-    const salesCollectionRef = collection(db, "customers"); // Changed to customers collection
+    const salesCollectionRef = collection(firestoreDB, "customers"); // Changed to customers collection
     const q = query(salesCollectionRef, orderBy("date", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {

@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { collection, query, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Assuming db is exported from firebase.ts
+import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from firebase.ts
 import type { Customer } from "@/lib/definitions"; // Assuming Customer type is relevant
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AreaChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -15,7 +15,7 @@ export default function AnalyticsPage() {
   // Add more state variables for other data needed for analytics, e.g., orders, campaigns
 
   useEffect(() => {
-    const q = query(collection(db, "customers")); // Example: fetch customer data
+    const q = query(collection(firestoreDB, "customers")); // Example: fetch customer data
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const customersData = snapshot.docs.map(doc => ({

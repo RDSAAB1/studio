@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Assuming firebase.ts exports db
+import { firestoreDB } from '@/lib/firebase'; // Assuming firebase.ts exports db as firestoreDB
 import { PurchaseOrder } from '@/lib/definitions'; // Assuming PurchaseOrder type exists
 
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     if (!isClient) return;
 
-    const q = query(collection(db, 'purchaseOrders'), orderBy('orderDate', 'desc'));
+    const q = query(collection(firestoreDB, 'purchaseOrders'), orderBy('orderDate', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -67,7 +67,7 @@ export default function PurchaseOrdersPage() {
       return;
     }
     try {
-      await addDoc(collection(db, 'purchaseOrders'), newOrder);
+      await addDoc(collection(firestoreDB, 'purchaseOrders'), newOrder);
       toast({
         title: "Purchase order added successfully",
         variant: "success",
@@ -93,7 +93,7 @@ export default function PurchaseOrdersPage() {
   const handleUpdateOrder = async () => {
     if (!editingOrder || !editingOrder.id) return;
     try {
-      const orderRef = doc(db, 'purchaseOrders', editingOrder.id);
+      const orderRef = doc(firestoreDB, 'purchaseOrders', editingOrder.id);
       await updateDoc(orderRef, editingOrder);
       toast({
         title: "Purchase order updated successfully",
@@ -112,7 +112,7 @@ export default function PurchaseOrdersPage() {
 
   const handleDeleteOrder = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'purchaseOrders', id));
+      await deleteDoc(doc(firestoreDB, 'purchaseOrders', id));
       toast({
         title: "Purchase order deleted successfully",
         variant: "success",

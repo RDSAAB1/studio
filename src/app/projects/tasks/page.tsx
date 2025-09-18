@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Assuming db is exported from your firebase config
+import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from your firebase config
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,7 +34,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const q = query(collection(db, "tasks"));
+    const q = query(collection(firestoreDB, "tasks"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const tasksData: Task[] = [];
       querySnapshot.forEach((doc) => {
@@ -60,7 +60,7 @@ export default function TasksPage() {
     if (newTask.name.trim() === "") return;
     try {
       const now = new Date();
-      await addDoc(collection(db, "tasks"), {
+      await addDoc(collection(firestoreDB, "tasks"), {
         ...newTask,
         createdAt: now,
         updatedAt: now,
@@ -80,7 +80,7 @@ export default function TasksPage() {
   const handleUpdateTask = async () => {
     if (!editingTask) return;
     try {
-      const taskRef = doc(db, "tasks", editingTask.id);
+      const taskRef = doc(firestoreDB, "tasks", editingTask.id);
       await updateDoc(taskRef, {
         name: editingTask.name,
         description: editingTask.description,
@@ -96,7 +96,7 @@ export default function TasksPage() {
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      await deleteDoc(doc(db, "tasks", taskId));
+      await deleteDoc(doc(firestoreDB, "tasks", taskId));
     } catch (e) {
       console.error("Error deleting document: ", e);
     }

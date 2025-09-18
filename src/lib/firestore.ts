@@ -20,7 +20,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
-import { db as firestoreDB } from "./firebase"; // Renamed to avoid conflict
+import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
 

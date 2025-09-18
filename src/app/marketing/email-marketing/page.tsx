@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Assuming db is exported from firebase.ts
+import { firestoreDB } from "@/lib/firebase"; // Assuming db is exported from firebase.ts
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +34,7 @@ export default function EmailMarketingPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const q = query(collection(db, "emailCampaigns")); // Assuming a collection named 'emailCampaigns'
+    const q = query(collection(firestoreDB, "emailCampaigns")); // Assuming a collection named 'emailCampaigns'
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const campaignsData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -66,7 +66,7 @@ export default function EmailMarketingPage() {
     try {
       if (currentCampaign?.id) {
         // Update existing campaign
-        const campaignRef = doc(db, "emailCampaigns", currentCampaign.id);
+        const campaignRef = doc(firestoreDB, "emailCampaigns", currentCampaign.id);
         await updateDoc(campaignRef, {
           name: formData.name,
           subject: formData.subject,
@@ -76,7 +76,7 @@ export default function EmailMarketingPage() {
         toast({ title: "Email campaign updated successfully", variant: "success" });
       } else {
         // Add new campaign
-        await addDoc(collection(db, "emailCampaigns"), {
+        await addDoc(collection(firestoreDB, "emailCampaigns"), {
           ...formData,
           createdAt: new Date(),
           // Add other initial fields
@@ -101,7 +101,7 @@ export default function EmailMarketingPage() {
   const handleDeleteCampaign = async (id: string) => {
     if (confirm("Are you sure you want to delete this campaign?")) {
       try {
-        await deleteDoc(doc(db, "emailCampaigns", id));
+        await deleteDoc(doc(firestoreDB, "emailCampaigns", id));
         toast({ title: "Email campaign deleted successfully", variant: "success" });
       } catch (e) {
         console.error("Error deleting campaign:", e);

@@ -4,7 +4,7 @@
 import type { PageProps } from '@/app/types';
 import { useEffect, useState } from 'react';
 import { collection, query, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Assuming you have initialized Firestore in firebase.ts
+import { firestoreDB } from '@/lib/firebase'; // Assuming you have initialized Firestore in firebase.ts
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -69,8 +69,8 @@ export default function ProjectDashboardPage({ params, searchParams }: PageProps
 
   useEffect(() => {
     setIsClient(true);
-    const projectsQuery = query(collection(db, 'projects'));
-    const tasksQuery = query(collection(db, 'tasks'));
+    const projectsQuery = query(collection(firestoreDB, 'projects'));
+    const tasksQuery = query(collection(firestoreDB, 'tasks'));
 
     const unsubscribeProjects = onSnapshot(projectsQuery, (projectSnapshot) => {
       const projects = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));

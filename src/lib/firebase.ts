@@ -45,7 +45,7 @@ if (typeof window !== 'undefined') {
 }
 
 
-const db = initializeFirestore(app, {
+const firestoreDB = initializeFirestore(app, {
     localCache: persistentLocalCache({ cacheSizeBytes: CACHE_SIZE_UNLIMITED })
 });
 const storage = getStorage(app);
@@ -79,7 +79,7 @@ const getGoogleProvider = (): GoogleAuthProvider => {
 
 export { 
     app, 
-    db, 
+    firestoreDB, // Changed export name
     storage, 
     getFirebaseAuth, 
     getGoogleProvider, 
@@ -90,5 +90,3 @@ export {
     sendPasswordResetEmail,
     signInWithRedirect
 };
-
-

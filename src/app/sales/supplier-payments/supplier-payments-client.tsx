@@ -6,18 +6,18 @@ import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, Fund
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { addBank, addBankBranch, getReceiptSettings } from "@/lib/firestore";
-import { db as firestoreDB } from "@/lib/firebase";
+import { firestoreDB as db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
+import { db as dexieDB } from '@/lib/database';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Pen } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
@@ -29,9 +29,9 @@ import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-se
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 
 
-const suppliersCollection = collection(firestoreDB, "suppliers");
-const expensesCollection = collection(firestoreDB, "expenses");
-const incomesCollection = collection(firestoreDB, "incomes");
+const suppliersCollection = collection(db, "suppliers");
+const expensesCollection = collection(db, "expenses");
+const incomesCollection = collection(db, "incomes");
 
 
 type PaymentOption = {
@@ -48,14 +48,14 @@ type SortConfig = {
 
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.mainDataStore?.where('collection').equals('suppliers').sortBy('srNo')) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore?.where('collection').equals('payments').sortBy('date')) || [];
-  const incomes = useLiveQuery(() => db.mainDataStore?.where('collection').equals('incomes').toArray()) || [];
-  const expenses = useLiveQuery(() => db.mainDataStore?.where('collection').equals('expenses').toArray()) || [];
-  const fundTransactions = useLiveQuery(() => db.mainDataStore?.where('collection').equals('fund_transactions').toArray()) || [];
-  const bankAccounts = useLiveQuery(() => db.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
-  const banks = useLiveQuery(() => db.mainDataStore?.where('collection').equals('banks').toArray()) || [];
-  const bankBranches = useLiveQuery(() => db.mainDataStore?.where('collection').equals('bankBranches').toArray()) || [];
+  const suppliers = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('suppliers').sortBy('srNo')) || [];
+  const paymentHistory = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('payments').sortBy('date')) || [];
+  const incomes = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('incomes').toArray()) || [];
+  const expenses = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('expenses').toArray()) || [];
+  const fundTransactions = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('fund_transactions').toArray()) || [];
+  const bankAccounts = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
+  const banks = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('banks').toArray()) || [];
+  const bankBranches = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('bankBranches').toArray()) || [];
 
   
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
@@ -140,10 +140,6 @@ export default function SupplierPaymentsClient() {
   
   const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
-    if (safeSuppliers.length === 0) {
-        return new Map<string, CustomerSummary>();
-    }
-
     const summary = new Map<string, CustomerSummary>();
 
     for (const s of safeSuppliers) {
@@ -944,3 +940,11 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
+
+    
+
+    
+
+

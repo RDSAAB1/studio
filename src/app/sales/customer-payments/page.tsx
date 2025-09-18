@@ -28,7 +28,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { collection, runTransaction, doc, getDocs, where, limit } from "firebase/firestore";
-import { db as firestoreDB } from "@/lib/firebase";
+import { firestoreDB } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { getReceiptSettings, addCustomerPayment, deleteCustomerPayment, updateCustomer, addIncome, deleteIncome } from "@/lib/firestore";
 import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";

@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
 import PlaceholderPage from "@/components/placeholder-page";
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Assuming db is exported from firebase.ts
+import { firestoreDB } from '@/lib/firebase'; // Assuming db is exported from firebase.ts
 import { Order } from '@/lib/definitions'; // Assuming you have an Order type defined
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,7 +18,7 @@ export default function OrderTrackingPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const ordersCollection = collection(db, 'orders');
+    const ordersCollection = collection(firestoreDB, 'orders');
     const q = query(ordersCollection, orderBy('orderDate', 'desc')); // Assuming a 'createdAt' field for ordering
 
     const unsubscribe = onSnapshot(q, (snapshot) => {

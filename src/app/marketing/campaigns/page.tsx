@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Assuming db is your Firestore instance
+import { firestoreDB } from "@/lib/firebase"; // Assuming db is your Firestore instance
 import { Campaign } from "@/lib/definitions"; // Adjust the import based on your definition file
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ export default function CampaignsPage() {
   const [formData, setFormData] = useState({ name: '', description: '', startDate: '', endDate: '' });
 
   useEffect(() => {
-    const q = query(collection(db, "campaigns"));
+    const q = query(collection(firestoreDB, "campaigns"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const campaignsData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -64,7 +65,7 @@ export default function CampaignsPage() {
   const handleDeleteCampaign = async (id: string) => {
     if (confirm("Are you sure you want to delete this campaign?")) {
       try {
-        await deleteDoc(doc(db, "campaigns", id));
+        await deleteDoc(doc(firestoreDB, "campaigns", id));
       } catch (error) {
         console.error("Error deleting campaign: ", error);
       }
@@ -82,10 +83,10 @@ export default function CampaignsPage() {
       };
       if (currentCampaign) {
         // Update existing campaign
-        await updateDoc(doc(db, "campaigns", currentCampaign.id), campaignDataToSave);
+        await updateDoc(doc(firestoreDB, "campaigns", currentCampaign.id), campaignDataToSave);
       } else {
         // Add new campaign
-        await addDoc(collection(db, "campaigns"), campaignDataToSave);
+        await addDoc(collection(firestoreDB, "campaigns"), campaignDataToSave);
       }
       setIsFormOpen(false);
       setFormData({ name: '', description: '', startDate: '', endDate: '' });
