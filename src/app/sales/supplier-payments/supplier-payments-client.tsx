@@ -47,12 +47,12 @@ type SortConfig = {
 
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo')) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
-  const incomes = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').toArray()) || [];
-  const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').toArray()) || [];
-  const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray()) || [];
-  const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
+  const suppliers = useLiveQuery(() => db.mainDataStore?.where('collection').equals('suppliers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore?.where('collection').equals('payments').sortBy('date')) || [];
+  const incomes = useLiveQuery(() => db.mainDataStore?.where('collection').equals('incomes').toArray()) || [];
+  const expenses = useLiveQuery(() => db.mainDataStore?.where('collection').equals('expenses').toArray()) || [];
+  const fundTransactions = useLiveQuery(() => db.mainDataStore?.where('collection').equals('fund_transactions').toArray()) || [];
+  const bankAccounts = useLiveQuery(() => db.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
 
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
@@ -89,7 +89,6 @@ export default function SupplierPaymentsClient() {
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [isClient, setIsClient] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
@@ -220,7 +219,6 @@ export default function SupplierPaymentsClient() {
     );
   }, [detailsSupplierEntry, paymentHistory]);
 
-  const isLoadingInitial = loading && (!suppliers || suppliers.length === 0);
   
   useEffect(() => {
     setIsClient(true);
@@ -235,12 +233,6 @@ export default function SupplierPaymentsClient() {
     localStorage.setItem('lastSelectedAccountId', accountId);
   }
   
-  useEffect(() => {
-    if (suppliers !== undefined) {
-        setLoading(false);
-    }
-  }, [suppliers]);
-
   useEffect(() => {
     if(!isClient) return;
     
@@ -757,7 +749,7 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient || isLoadingInitial) {
+    if (!isClient || suppliers === undefined) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
