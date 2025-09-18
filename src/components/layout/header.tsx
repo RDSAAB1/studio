@@ -21,7 +21,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useToast } from "@/hooks/use-toast";
 
 const DynamicIslandToaster = dynamic(
-  () => import('../ui/dynamic-island-toaster'),
+  () => import('../ui/dynamic-island-toaster').then(mod => mod.default),
   { ssr: false }
 );
 
@@ -101,18 +101,20 @@ const NetworkStatusIndicator = () => {
 
 
 const NotificationBell = () => {
-    const loans = useLiveQuery(getLoansRealtime) || [];
+    const loans = useLiveQuery(getLoansRealtime);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const pending = loans.filter(loan => 
-            loan.nextEmiDueDate && new Date(loan.nextEmiDueDate) <= today
-        );
-        setPendingNotifications(pending);
+        if (Array.isArray(loans)) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const pending = loans.filter(loan => 
+                loan.nextEmiDueDate && new Date(loan.nextEmiDueDate) <= today
+            );
+            setPendingNotifications(pending);
+        }
     }, [loans]);
 
     const handleNotificationClick = (e: React.MouseEvent, loan: Loan) => {
