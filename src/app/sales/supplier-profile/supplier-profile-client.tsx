@@ -1,4 +1,3 @@
-
 // src/app/sales/supplier-profile/supplier-profile-client.tsx
 
 "use client";
@@ -271,13 +270,14 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 };
 
 
-export default function SupplierProfilePage() {
+export default function SupplierProfileClient() {
   const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
   const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
   
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
+  
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
-  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>();
@@ -481,7 +481,7 @@ export default function SupplierProfilePage() {
                     <CustomDropdown
                         options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedSupplierKey}
-                        onChange={(value: string | null) => setSelectedSupplierKey(value as string)}
+                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
                         placeholder="Search and select profile..."
                     />
                 </div>

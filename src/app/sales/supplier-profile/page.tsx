@@ -1,6 +1,6 @@
 // src/app/sales/supplier-profile/page.tsx
 
-import { SupplierProfileClient } from './supplier-profile-client';
+import SupplierProfileClient from './supplier-profile-client';
 
 export default function SupplierProfilePage() {
   return (
