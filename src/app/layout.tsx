@@ -55,11 +55,11 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                const companySettings = await getRtgsSettings();
-                setIsSetupComplete(!!companySettings?.companyName);
+    \t\t\t\t\tconst companySettings = await getRtgsSettings();
+    \t\t\t\t\tsetIsSetupComplete(!!companySettings?.companyName);
             } else {
-                setIsSetupComplete(null);
-            }
+      \t\t\t\tsetIsSetupComplete(null);
+          _content_}
             setAuthChecked(true);
         });
 
@@ -75,10 +75,22 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         }
     }, []);
 
-    if (!authChecked || isSetupComplete === null) {
+    useEffect(() => {
+        if (!authChecked) return;
+
+        if (user && isSetupComplete === false && pathname !== '/settings') {
+            router.replace('/settings');
+        }
+
+        if (user && isSetupComplete && (pathname === '/login' || pathname === '/')) {
+            router.replace('/dashboard-overview');
+        }
+    }, [user, isSetupComplete, authChecked, pathname, router]);
+
+    if (!authChecked || (user && isSetupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    \t\t\t\t\t<Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -91,8 +103,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         return <LoginPage />;
     }
 
-    if (user && !isSetupComplete && pathname !== '/settings') {
-        router.replace('/settings');
+    if (user && isSetupComplete === false && pathname !== '/settings') {
         return (
             <div className="flex h-screen w-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -101,7 +112,6 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     }
     
     if (user && isSetupComplete && (pathname === '/login' || pathname === '/')) {
-        router.replace('/dashboard-overview');
          return (
             <div className="flex h-screen w-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

@@ -2,98 +2,139 @@
 
 const CACHE_NAME = 'bizsuite-cache-v1';
 
-// A minimal list of URLs to cache when the service worker is installed.
-const urlsToCache = [
+// All of your application's pages/routes and assets
+const APP_SHELL_FILES = [
+  // Primary application files
   '/',
   '/manifest.json',
   '/favicon.ico',
+
+  // All of your application's pages/routes
+  '/cash-bank',
+  '/dashboard-overview',
+  '/data-capture',
+  '/expense-tracker',
+  '/finance/loan-management',
+  '/forgot-password',
+  '/hr/attendance-tracking',
+  '/hr/employee-database',
+  '/hr/payroll-management',
+  '/inventory/inventory-management',
+  '/inventory/purchase-orders',
+  '/inventory/supplier-information',
+  '/login',
+  '/marketing/analytics',
+  '/marketing/campaigns',
+  '/marketing/email-marketing',
+  '/projects/collaboration',
+  '/projects/dashboard',
+  '/projects/management',
+  '/projects/tasks',
+  '/sales/customer-entry',
+  '/sales/customer-management',
+  '/sales/customer-payments',
+  '/sales/customer-profile',
+  '/sales/daily-supplier-report',
+  '/sales/order-tracking',
+  '/sales/product-catalog',
+  '/sales/rtgs-report',
+  '/sales/sales-reports',
+  '/sales/supplier-entry',
+  '/sales/supplier-payments',
+  '/sales/supplier-profile',
+  '/settings',
+  '/settings/bank-management',
+  '/settings/printer',
+
+  // Static assets from your public directory
+  '/icons/icon-72x72.png',
+  '/icons/icon-96x96.png',
+  '/icons/icon-128x128.png',
+  '/icons/icon-144x144.png',
+  '/icons/icon-152x152.png',
+  '/icons/icon-192x192.png',
+  '/icons/icon-384x384.png',
+  '/icons/icon-512x512.png',
 ];
 
 // Install a service worker
 self.addEventListener('install', event => {
   console.log('[Service Worker] Install');
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
+    (async () => {
+      try {
+        const cache = await caches.open(CACHE_NAME);
         console.log('[Service Worker] Caching app shell');
-        // Use addAll with individual requests to handle failures gracefully.
-        const promises = urlsToCache.map(url => {
+        const promises = APP_SHELL_FILES.map(url => {
           return cache.add(url).catch(err => {
             console.warn(`[Service Worker] Failed to pre-cache: ${url}`, err);
           });
         });
-        return Promise.all(promises);
-      })
-      .then(() => self.skipWaiting()) // Activate worker immediately
+        await Promise.all(promises);
+      } catch (err) {
+        console.error('[Service Worker] Failed to open cache:', err);
+      }
+      self.skipWaiting();
+    })()
   );
 });
 
 // Activate the service worker
 self.addEventListener('activate', event => {
   console.log('[Service Worker] Activate');
-  // Remove old caches
+  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cache => {
-          if (cache !== CACHE_NAME) {
+          if (!cacheWhitelist.includes(cache)) {
             console.log('[Service Worker] Clearing old cache:', cache);
             return caches.delete(cache);
           }
         })
       );
-    }).then(() => self.clients.claim()) // Take control of all open clients
+    }).then(() => self.clients.claim())
   );
 });
 
-
-// Network first, then cache strategy
+// Fetch with a cache-first strategy
 self.addEventListener('fetch', (event) => {
-    // We only want to cache GET requests.
-    if (event.request.method !== 'GET') {
-        return;
-    }
-    
-    // For navigation requests, use network-first strategy.
-    if (event.request.mode === 'navigate') {
-        event.respondWith(
-            fetch(event.request)
-                .catch(() => caches.match('/')) // Fallback to the main app shell on network failure
-        );
-        return;
-    }
+  if (event.request.method !== 'GET') {
+    return;
+  }
 
-    // For other requests (CSS, JS, images), use a network-first strategy.
+  // Network-first for API calls to ensure fresh data
+  if (event.request.url.includes('/api/')) {
     event.respondWith(
-        fetch(event.request)
-            .then((response) => {
-                // Check if we received a valid response
-                if (!response || response.status !== 200 || response.type !== 'basic') {
-                    return response;
-                }
-
-                // IMPORTANT: Clone the response. A response is a stream
-                // and because we want the browser to consume the response
-                // as well as the cache consuming the response, we need
-                // to clone it so we have two streams.
-                const responseToCache = response.clone();
-
-                caches.open(CACHE_NAME)
-                    .then((cache) => {
-                        cache.put(event.request, responseToCache);
-                    });
-
-                return response; // Original response is returned to the browser
-            })
-            .catch(() => {
-                // If the network fails, try to serve from cache.
-                return caches.match(event.request).then((response) => {
-                    return response || new Response("You are offline. Some content may not be available.", {
-                        status: 503,
-                        statusText: "Service Unavailable",
-                        headers: new Headers({ 'Content-Type': 'text/plain' })
-                    });
-                });
-            })
+      fetch(event.request).catch(() => caches.match(event.request))
     );
+    return;
+  }
+
+  // Cache-first for all other assets and pages
+  event.respondWith(
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      // If nothing is in the cache, go to the network
+      return fetch(event.request).then((networkResponse) => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
+        }
+
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME)
+          .then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+
+        return networkResponse;
+      }).catch(() => {
+        // A fallback for the main app shell if both network and cache fail
+        return caches.match('/');
+      });
+    })
+  );
 });
