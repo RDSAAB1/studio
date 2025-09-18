@@ -1,6 +1,6 @@
 
 import { db, addToSyncQueue } from "./database";
-import { liveQuery } from 'dexie';
+import { liveQuery, type Observable } from 'dexie';
 import {
   collection,
   getDocs,
@@ -261,9 +261,7 @@ export async function deleteBankBranch(id: string): Promise<void> {
 
 
 // --- Bank Account Functions ---
-export function getBankAccountsRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray());
-}
+export const getBankAccountsRealtime = () => () => db.mainDataStore.where('collection').equals('bankAccounts').toArray();
 
 export async function addBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
     const docRef = doc(bankAccountsCollection, accountData.accountNumber);
@@ -285,11 +283,8 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 
 // --- Supplier Functions ---
-export function getSuppliersRealtime() {
-  return liveQuery(() => 
-      db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo')
-  );
-}
+export const getSuppliersRealtime = () => () => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo');
+
 
 export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
     const docRef = doc(suppliersCollection, supplierData.srNo);
@@ -352,11 +347,7 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
 
 
 // --- Customer Functions ---
-export function getCustomersRealtime() {
-  return liveQuery(() =>
-    db.mainDataStore.where('collection').equals('customers').sortBy('srNo')
-  );
-}
+export const getCustomersRealtime = () => () => db.mainDataStore.where('collection').equals('customers').sortBy('srNo');
 
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {
     const docRef = doc(customersCollection, customerData.srNo);
@@ -388,9 +379,7 @@ export async function deleteCustomer(id: string): Promise<void> {
 }
 
 // --- Inventory Item Functions ---
-export function getInventoryItems() {
-  return liveQuery(() => db.mainDataStore.where('collection').equals('inventoryItems').toArray());
-}
+export const getInventoryItems = () => () => db.mainDataStore.where('collection').equals('inventoryItems').toArray();
 export async function addInventoryItem(item: any) {
   const newId = doc(inventoryItemsCollection).id;
   const newItem = { ...item, id: newId, collection: 'inventoryItems' };
@@ -411,13 +400,10 @@ export async function deleteInventoryItem(id: string) {
 
 
 // --- Payment Functions ---
-export function getPaymentsRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date'));
-}
+export const getPaymentsRealtime = () => () => db.mainDataStore.where('collection').equals('payments').sortBy('date');
 
-export function getCustomerPaymentsRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date'));
-}
+export const getCustomerPaymentsRealtime = () => () => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date');
+
 
 export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   if (!srNo) return;
@@ -455,9 +441,7 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
 
 
 // --- Fund Transaction Functions ---
-export function getFundTransactionsRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').sortBy('date'));
-}
+export const getFundTransactionsRealtime = () => () => db.mainDataStore.where('collection').equals('fund_transactions').sortBy('date');
 
 export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId' | 'date'>): Promise<FundTransaction> {
   const dataWithDate = {
@@ -526,17 +510,13 @@ export async function deleteSubCategory(collectionName: "incomeCategories" | "ex
 
 // --- Attendance Functions ---
 
-export function getAttendanceForDateRealtime(date: string) {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('attendance').and(record => record.date === date).toArray());
-}
+export const getAttendanceForDateRealtime = (date: string) => () => db.mainDataStore.where('collection').equals('attendance').and(record => record.date === date).toArray();
 
 export async function getAttendanceForPeriod(employeeId: string, startDate: string, endDate: string): Promise<AttendanceEntry[]> {
-    return liveQuery(() => 
-        db.mainDataStore
-            .where('collection').equals('attendance')
-            .and(record => record.employeeId === employeeId && record.date >= startDate && record.date <= endDate)
-            .toArray()
-    )();
+    return db.mainDataStore
+        .where('collection').equals('attendance')
+        .and(record => record.employeeId === employeeId && record.date >= startDate && record.date <= endDate)
+        .toArray();
 }
 
 export async function setAttendance(entry: AttendanceEntry): Promise<void> {
@@ -546,9 +526,8 @@ export async function setAttendance(entry: AttendanceEntry): Promise<void> {
 }
 
 // --- Project Functions ---
-export function getProjectsRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('projects').toArray());
-}
+export const getProjectsRealtime = () => () => db.mainDataStore.where('collection').equals('projects').toArray();
+
 
 export async function addProject(projectData: Omit<Project, 'id'>): Promise<Project> {
     const docRef = doc(collection(firestoreDB, 'projects'));
@@ -570,9 +549,8 @@ export async function deleteProject(id: string): Promise<void> {
 
 
 // --- Loan Functions ---
-export function getLoansRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('loans').sortBy('startDate'));
-}
+export const getLoansRealtime = () => () => db.mainDataStore.where('collection').equals('loans').sortBy('startDate');
+
 
 export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
     const docRef = doc(loansCollection);
@@ -627,13 +605,10 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
 
 
 // --- Income and Expense specific functions ---
-export function getIncomeRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('incomes').sortBy('date'));
-}
+export const getIncomeRealtime = () => () => db.mainDataStore.where('collection').equals('incomes').sortBy('date');
 
-export function getExpensesRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('expenses').sortBy('date'));
-}
+export const getExpensesRealtime = () => () => db.mainDataStore.where('collection').equals('expenses').sortBy('date');
+
 
 export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
     const docRef = doc(incomesCollection);
@@ -712,9 +687,8 @@ export async function deleteAllSuppliers(): Promise<void> {
 
 
 // --- Employee Functions ---
-export function getEmployeesRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId'));
-}
+export const getEmployeesRealtime = () => () => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId');
+
 
 export async function addEmployee(employeeData: Partial<Omit<Employee, 'id'>>) {
     const docRef = doc(employeesCollection, employeeData.employeeId);
@@ -735,9 +709,8 @@ export async function deleteEmployee(id: string) {
 }
 
 // --- Payroll Functions ---
-export function getPayrollEntriesRealtime() {
-    return liveQuery(() => db.mainDataStore.where('collection').equals('payroll').sortBy('payPeriod'));
-}
+export const getPayrollEntriesRealtime = () => () => db.mainDataStore.where('collection').equals('payroll').sortBy('payPeriod');
+
 
 export async function addPayrollEntry(entryData: Omit<PayrollEntry, 'id'>) {
     const docRef = doc(payrollCollection);

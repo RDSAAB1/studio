@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/database";
 import type { Employee, AttendanceEntry } from "@/lib/definitions";
 import { getAttendanceForDateRealtime, setAttendance, getEmployeesRealtime } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
@@ -31,9 +31,9 @@ const StatCard = ({ title, value, icon }: { title: string; value: number | strin
 
 export default function AttendanceTrackingPage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-    const employees = useLiveQuery(getEmployeesRealtime) || [];
+    const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId')) || [];
     const dateStr = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
-    const attendanceRecordsToday = useLiveQuery(() => getAttendanceForDateRealtime(dateStr), [dateStr]) || [];
+    const attendanceRecordsToday = useLiveQuery(() => db.mainDataStore.where('collection').equals('attendance').and(record => record.date === dateStr).toArray(), [dateStr]) || [];
 
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);

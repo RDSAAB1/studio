@@ -19,10 +19,11 @@ import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 
 export default function ProjectManagementPage() {
-    const projects = useLiveQuery(getProjectsRealtime);
+    const projects = useLiveQuery(() => db.mainDataStore.where('collection').equals('projects').toArray());
     const [isClient, setIsClient] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProject, setCurrentProject] = useState<Partial<Project>>({});

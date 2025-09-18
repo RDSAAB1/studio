@@ -15,9 +15,10 @@ import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { Employee } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
 import { getEmployeesRealtime, addEmployee, updateEmployee, deleteEmployee } from '@/lib/firestore';
+import { db } from '@/lib/database';
 
 export default function EmployeeDatabasePage() {
-  const employees = useLiveQuery(getEmployeesRealtime);
+  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId'));
   const [isClient, setIsClient] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<Employee>>({});

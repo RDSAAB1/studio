@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -11,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { format, subDays, differenceInMonths } from 'date-fns';
 import { DonutChart, BarChart, AreaChart } from '@tremor/react';
 import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List, Bank, Percent } from 'lucide-react';
-import { getExpenseCategories, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getPaymentsRealtime, getLoansRealtime, getBankAccountsRealtime, getSuppliersRealtime, getCustomersRealtime } from "@/lib/firestore";
+import { db } from '@/lib/database';
+import { getExpenseCategories } from "@/lib/firestore";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm">
@@ -40,14 +42,14 @@ const BalanceCard = ({ title, value, icon, colorClass, description }: { title: s
 );
 
 export default function DashboardOverviewClient() {
-    const incomes = useLiveQuery(getIncomeRealtime) || [];
-    const expenses = useLiveQuery(getExpensesRealtime) || [];
-    const fundTransactions = useLiveQuery(getFundTransactionsRealtime) || [];
-    const payments = useLiveQuery(getPaymentsRealtime) || [];
-    const loans = useLiveQuery(getLoansRealtime) || [];
-    const bankAccounts = useLiveQuery(getBankAccountsRealtime) || [];
-    const suppliers = useLiveQuery(getSuppliersRealtime) || [];
-    const customers = useLiveQuery(getCustomersRealtime) || [];
+    const incomes = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').toArray()) || [];
+    const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').toArray()) || [];
+    const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray()) || [];
+    const payments = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
+    const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').toArray()) || [];
+    const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
+    const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
+    const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').toArray()) || [];
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [isClient, setIsClient] = useState(false);
 

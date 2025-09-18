@@ -11,6 +11,7 @@ import {
   deleteInventoryItem,
 } from '@/lib/firestore';
 import { InventoryItem } from '@/lib/definitions';
+import { db } from '@/lib/database';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
 
 export default function InventoryManagementPage() {
-  const inventoryItems = useLiveQuery(getInventoryItems);
+  const inventoryItems = useLiveQuery(() => db.mainDataStore.where('collection').equals('inventoryItems').toArray());
   const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentInventoryItem, setCurrentInventoryItem] = useState<Partial<InventoryItem>>({});

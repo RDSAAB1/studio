@@ -10,11 +10,12 @@ import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceip
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import { useLiveQuery } from "dexie-react-hooks";
+import { db } from '@/lib/database';
 
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -64,8 +65,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(getSuppliersRealtime);
-  const paymentHistory = useLiveQuery(getPaymentsRealtime) || [];
+  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -410,7 +411,7 @@ export default function SupplierEntryClient() {
   };
 
     const handleExport = () => {
-        const dataToExport = (suppliers || []).map(c => {
+        const dataToExport = suppliers.map(c => {
             const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
             return {
                 'SR NO.': c.srNo,
@@ -578,7 +579,7 @@ export default function SupplierEntryClient() {
     return null;
   }
 
-  if (!suppliers) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-200px)]">
         <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>

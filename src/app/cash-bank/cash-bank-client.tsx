@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { FundTransaction, Income, Expense, Loan, BankAccount } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,11 +60,11 @@ const initialLoanFormState: Partial<Loan> = {
 
 export default function CashBankClient() {
     
-    const fundTransactions = useLiveQuery(getFundTransactionsRealtime) || [];
-    const incomes = useLiveQuery(getIncomeRealtime) || [];
-    const expenses = useLiveQuery(getExpensesRealtime) || [];
-    const loans = useLiveQuery(getLoansRealtime) || [];
-    const bankAccounts = useLiveQuery(getBankAccountsRealtime) || [];
+    const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').sortBy('date')) || [];
+    const incomes = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').sortBy('date')) || [];
+    const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').sortBy('date')) || [];
+    const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').sortBy('startDate')) || [];
+    const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
     
     const [isClient, setIsClient] = useState(false);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);

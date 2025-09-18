@@ -16,6 +16,7 @@ import { format, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
 import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calendar as CalendarIcon, Calculator, TrendingUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/database";
 
 type AttendanceSummary = {
     present: number;
@@ -27,8 +28,8 @@ type AttendanceSummary = {
 };
 
 export default function PayrollManagementPage() {
-  const payrollEntries = useLiveQuery(getPayrollEntriesRealtime);
-  const employees = useLiveQuery(getEmployeesRealtime);
+  const payrollEntries = useLiveQuery(() => db.mainDataStore.where('collection').equals('payroll').sortBy('payPeriod'));
+  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId'));
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
