@@ -1,6 +1,7 @@
 
 
 import { db, addToSyncQueue } from "./database";
+import { liveQuery } from 'dexie';
 import {
   collection,
   getDocs,
@@ -285,17 +286,10 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 // --- Supplier Functions ---
 
-export function getSuppliersRealtime(callback: (suppliers: Customer[]) => void, onError: (error: Error) => void): () => void {
-  // First, get data from IndexedDB
-  db.mainDataStore.where('id').startsWith('S').toArray().then(callback);
-
-  // Then, listen for real-time updates from Firestore
-  const q = query(suppliersCollection, orderBy("srNo", "asc"));
-  return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-    db.mainDataStore.bulkPut(data); // Update local DB
-    callback(data);
-  }, onError);
+export function getSuppliersRealtime() {
+  return liveQuery(() => 
+      db.mainDataStore.where('id').startsWith('S').sortBy('srNo')
+  );
 }
 
 export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
@@ -365,20 +359,10 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
 
 // --- Customer Functions ---
 
-export function getCustomersRealtime(callback: (customers: Customer[]) => void, onError: (error: Error) => void): () => void {
-  // First, get data from IndexedDB
-  db.mainDataStore.where('id').startsWith('C').toArray().then(callback);
-  
-  // Then, listen for real-time updates from Firestore
-  const q = query(customersCollection, orderBy("srNo", "asc"));
-  return onSnapshot(q, (querySnapshot) => {
-    const customers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
-    db.mainDataStore.bulkPut(customers); // Update local DB
-    callback(customers);
-  }, (error) => {
-      console.error("Error fetching customers in real-time:", error);
-      onError(error);
-  });
+export function getCustomersRealtime() {
+  return liveQuery(() =>
+    db.mainDataStore.where('id').startsWith('C').sortBy('srNo')
+  );
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {

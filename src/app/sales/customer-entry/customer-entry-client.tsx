@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -8,6 +9,7 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from "dexie-react-hooks";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -80,12 +82,11 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const customers = useLiveQuery(getCustomersRealtime);
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
@@ -99,7 +100,6 @@ export default function CustomerEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
-  const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
@@ -141,25 +141,16 @@ export default function CustomerEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (!isClient) return;
+    if (customers && customers.length > 0) {
+      const nextSrNum = Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
+      const initialSrNo = formatSrNo(nextSrNum, 'C');
+      form.setValue('srNo', initialSrNo);
+      setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+    }
+  }, [customers, form]);
 
-    const unsubscribeCustomers = getCustomersRealtime((data: Customer[]) => {
-      setCustomers(data);
-      if (isInitialLoad.current) {
-          if (data) {
-              const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-              const initialSrNo = formatSrNo(nextSrNum, 'C');
-              form.setValue('srNo', initialSrNo);
-              setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
-          }
-          isInitialLoad.current = false;
-          setIsLoading(false);
-      }
-    }, (error) => {
-      console.error("Error fetching customers: ", error);
-      toast({ title: "Failed to load customer data", variant: "destructive" });
-      setIsLoading(false);
-    });
+  useEffect(() => {
+    if (!isClient) return;
 
     const unsubscribePayments = getCustomerPaymentsRealtime((data: CustomerPayment[]) => {
         setPaymentHistory(data);
@@ -194,7 +185,6 @@ export default function CustomerEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubscribeCustomers();
       unsubscribePayments();
       unsubVarieties();
       unsubPaymentTypes();
@@ -302,7 +292,7 @@ export default function CustomerEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
-    if (contactValue.length === 10) {
+    if (contactValue.length === 10 && customers) {
       const latestEntryForContact = customers
           .filter(c => c.contact === contactValue)
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
@@ -487,6 +477,7 @@ export default function CustomerEntryClient() {
   };
 
     const handleExport = () => {
+        if (!customers) return;
         const dataToExport = customers.map(c => ({
             srNo: c.srNo,
             date: c.date,
@@ -529,7 +520,7 @@ export default function CustomerEntryClient() {
                 const worksheet = workbook.Sheets[sheetName];
                 const json: any[] = XLSX.utils.sheet_to_json(worksheet);
                 
-                let nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+                let nextSrNum = (customers || []).length > 0 ? Math.max(...(customers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
                 for (const item of json) {
                     const customerData: Partial<Customer> = {
@@ -598,11 +589,7 @@ export default function CustomerEntryClient() {
     };
   }, [handleKeyboardShortcuts]);
 
-  if (!isClient) {
-    return null;
-  }
-
-  if (isLoading) {
+  if (!isClient || !customers) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-200px)]">
         <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>

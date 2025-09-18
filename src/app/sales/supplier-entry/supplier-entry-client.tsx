@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -8,10 +9,12 @@ import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from "dexie-react-hooks";
+
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, deleteMultipleSuppliers } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -61,13 +64,11 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const suppliers = useLiveQuery(getSuppliersRealtime);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, setIsDeleting] = useState(false);
   
   const [detailsSupplier, setDetailsSupplier] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
@@ -78,7 +79,6 @@ export default function SupplierEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
-  const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
@@ -119,26 +119,17 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
+    if (suppliers && suppliers.length > 0) {
+      const nextSrNum = Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
+      const initialSrNo = formatSrNo(nextSrNum, 'S');
+      form.setValue('srNo', initialSrNo);
+      setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+    }
+  }, [suppliers, form]);
+
+  useEffect(() => {
     if (!isClient) return;
-
-    const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
-      setSuppliers(data);
-      if (isInitialLoad.current) {
-          if (data && data.length > 0) {
-              const nextSrNum = Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
-              const initialSrNo = formatSrNo(nextSrNum, 'S');
-              form.setValue('srNo', initialSrNo);
-              setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-          }
-          isInitialLoad.current = false;
-          setIsLoading(false);
-      }
-    }, (error) => {
-      console.error("Error fetching suppliers: ", error);
-      toast({ title: "Failed to load supplier data", variant: "destructive" });
-      setIsLoading(false);
-    });
-
+    
     const unsubscribePayments = getPaymentsRealtime((data: Payment[]) => {
         setPaymentHistory(data);
     }, (error) => {
@@ -172,7 +163,6 @@ export default function SupplierEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubscribeSuppliers();
       unsubscribePayments();
       unsubVarieties();
       unsubPaymentTypes();
@@ -284,7 +274,7 @@ export default function SupplierEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
-    if (contactValue.length === 10) {
+    if (contactValue.length === 10 && suppliers) {
       const foundCustomer = suppliers.find(c => c.contact === contactValue);
       if (foundCustomer && foundCustomer.id !== currentSupplier.id) {
         form.setValue('name', foundCustomer.name);
@@ -428,7 +418,7 @@ export default function SupplierEntryClient() {
   };
 
     const handleExport = () => {
-        const dataToExport = suppliers.map(c => {
+        const dataToExport = (suppliers || []).map(c => {
             const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
             return {
                 'SR NO.': c.srNo,
@@ -476,7 +466,7 @@ export default function SupplierEntryClient() {
                 const worksheet = workbook.Sheets[sheetName];
                 const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
                 
-                let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+                let nextSrNum = (suppliers || []).length > 0 ? Math.max(...(suppliers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
                 for (const item of json) {
                      const supplierData: Customer = {
@@ -520,25 +510,6 @@ export default function SupplierEntryClient() {
             }
         };
         reader.readAsBinaryString(file);
-    };
-
-    const handleDeleteSelected = async () => {
-        if (selectedSupplierIds.size === 0) {
-            toast({ title: "No entries selected", variant: "destructive" });
-            return;
-        }
-        setIsDeleting(true);
-        try {
-            const srNosToDelete = Array.from(selectedSupplierIds).map(id => suppliers.find(s => s.id === id)?.srNo).filter(Boolean) as string[];
-            await deleteMultipleSuppliers(srNosToDelete);
-            toast({ title: `${selectedSupplierIds.size} entries deleted successfully`, variant: "success" });
-            setSelectedSupplierIds(new Set());
-        } catch (error) {
-            console.error("Error deleting selected entries:", error);
-            toast({ title: "Failed to delete selected entries", variant: "destructive" });
-        } finally {
-            setIsDeleting(false);
-        }
     };
   
     const handleDeleteAll = async () => {
@@ -615,7 +586,7 @@ export default function SupplierEntryClient() {
     return null;
   }
 
-  if (isLoading) {
+  if (!suppliers) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-200px)]">
         <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
@@ -653,8 +624,6 @@ export default function SupplierEntryClient() {
                 onImport={handleImport}
                 onExport={handleExport}
                 onDeleteAll={handleDeleteAll}
-                onDeleteSelected={handleDeleteSelected}
-                isDeleting={isDeleting}
             />
         </form>
       </FormProvider>      
@@ -705,5 +674,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
