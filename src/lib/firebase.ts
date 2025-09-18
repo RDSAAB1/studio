@@ -1,7 +1,7 @@
 
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { initializeFirestore, persistentLocalCache, setLogLevel } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, setLogLevel, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { 
     getAuth, 
@@ -46,7 +46,7 @@ if (typeof window !== 'undefined') {
 
 
 const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ cacheSizeBytes: 100 * 1024 * 1024 }) // Increased cache size to 100MB
+    localCache: persistentLocalCache({ cacheSizeBytes: CACHE_SIZE_UNLIMITED })
 });
 const storage = getStorage(app);
 
@@ -90,4 +90,5 @@ export {
     sendPasswordResetEmail,
     signInWithRedirect
 };
+
 
