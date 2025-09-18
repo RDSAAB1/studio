@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
 
 export default function InventoryManagementPage() {
-  const inventoryItems = useLiveQuery(getInventoryItems) || [];
+  const inventoryItems = useLiveQuery(getInventoryItems);
   const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentInventoryItem, setCurrentInventoryItem] = useState<Partial<InventoryItem>>({});
@@ -150,7 +150,8 @@ export default function InventoryManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inventoryItems.map((item) => (
+                  {inventoryItems === undefined && <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="animate-spin h-6 w-6 mx-auto" /></TableCell></TableRow>}
+                  {inventoryItems && inventoryItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{item.sku}</TableCell>
@@ -168,7 +169,7 @@ export default function InventoryManagementPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {inventoryItems.length === 0 && <TableRow><TableCell colSpan={7} className="text-center h-24">No items in inventory.</TableCell></TableRow>}
+                  {inventoryItems && inventoryItems.length === 0 && <TableRow><TableCell colSpan={7} className="text-center h-24">No items in inventory.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>

@@ -17,7 +17,7 @@ import { toTitleCase } from '@/lib/utils';
 import { getEmployeesRealtime, addEmployee, updateEmployee, deleteEmployee } from '@/lib/firestore';
 
 export default function EmployeeDatabasePage() {
-  const employees = useLiveQuery(getEmployeesRealtime) || [];
+  const employees = useLiveQuery(getEmployeesRealtime);
   const [isClient, setIsClient] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<Employee>>({});
@@ -36,7 +36,7 @@ export default function EmployeeDatabasePage() {
   }, []);
 
   const nextEmployeeId = useMemo(() => {
-    if (employees.length === 0) return 'EMP001';
+    if (!employees || employees.length === 0) return 'EMP001';
     const lastId = employees[employees.length - 1]?.employeeId || 'EMP000';
     const lastNumber = parseInt(lastId.replace('EMP', ''), 10);
     const newNumber = lastNumber + 1;
@@ -151,9 +151,8 @@ export default function EmployeeDatabasePage() {
             <Button onClick={openDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Employee</Button>
         </CardHeader>
         <CardContent>
-            {employees.length === 0 && !isClient ? (
-                 <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
-            ) : (
+            {employees === undefined && <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}
+            {employees && (
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader>

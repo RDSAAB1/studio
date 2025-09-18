@@ -40,6 +40,10 @@ const optionsCollection = collection(firestoreDB, "options");
 const usersCollection = collection(firestoreDB, "users");
 const attendanceCollection = collection(firestoreDB, "attendance");
 const projectsCollection = collection(firestoreDB, "projects");
+const employeesCollection = collection(firestoreDB, "employees");
+const payrollCollection = collection(firestoreDB, 'payroll');
+const inventoryItemsCollection = collection(firestoreDB, 'inventoryItems');
+
 
 // --- User Refresh Token Functions ---
 export async function saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
@@ -388,7 +392,7 @@ export function getInventoryItems() {
   return liveQuery(() => db.mainDataStore.where('collection').equals('inventoryItems').toArray());
 }
 export async function addInventoryItem(item: any) {
-  const newId = doc(collection(firestoreDB, "inventoryItems")).id;
+  const newId = doc(inventoryItemsCollection).id;
   const newItem = { ...item, id: newId, collection: 'inventoryItems' };
   
   await db.mainDataStore.put(newItem);
@@ -459,10 +463,9 @@ export async function addFundTransaction(transactionData: Omit<FundTransaction, 
   const dataWithDate = {
     ...transactionData,
     date: new Date().toISOString(),
-    collection: 'fund_transactions'
   };
   const docRef = await addDoc(fundTransactionsCollection, dataWithDate);
-  const newTransaction = { id: docRef.id, transactionId: '', ...dataWithDate };
+  const newTransaction = { id: docRef.id, transactionId: '', ...dataWithDate, collection: 'fund_transactions' };
   await db.mainDataStore.put(newTransaction);
   await addToSyncQueue({ action: 'create', payload: { collection: 'fund_transactions', data: newTransaction } });
   return newTransaction;
@@ -527,6 +530,15 @@ export function getAttendanceForDateRealtime(date: string) {
     return liveQuery(() => db.mainDataStore.where('collection').equals('attendance').and(record => record.date === date).toArray());
 }
 
+export async function getAttendanceForPeriod(employeeId: string, startDate: string, endDate: string): Promise<AttendanceEntry[]> {
+    return liveQuery(() => 
+        db.mainDataStore
+            .where('collection').equals('attendance')
+            .and(record => record.employeeId === employeeId && record.date >= startDate && record.date <= endDate)
+            .toArray()
+    )();
+}
+
 export async function setAttendance(entry: AttendanceEntry): Promise<void> {
     const newEntry = { ...entry, collection: 'attendance' };
     await db.mainDataStore.put(newEntry);
@@ -539,8 +551,8 @@ export function getProjectsRealtime() {
 }
 
 export async function addProject(projectData: Omit<Project, 'id'>): Promise<Project> {
-    const docRef = await addDoc(projectsCollection, projectData);
-    const newProject = { id: docRef.id, collection: 'projects', ...projectData };
+    const docRef = doc(collection(firestoreDB, 'projects'));
+    const newProject = { id: docRef.id, ...projectData, collection: 'projects' };
     await db.mainDataStore.put(newProject);
     await addToSyncQueue({ action: 'create', payload: { collection: 'projects', data: newProject } });
     return newProject;
@@ -563,25 +575,23 @@ export function getLoansRealtime() {
 }
 
 export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
-    return runTransaction(firestoreDB, async (transaction) => {
-        const newLoanRef = doc(loansCollection);
-        const newLoan = { id: newLoanRef.id, collection: 'loans', ...loanData };
+    const docRef = doc(loansCollection);
+    const newLoan = { id: docRef.id, ...loanData, collection: 'loans' };
+    
+    await db.mainDataStore.put(newLoan);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'loans', data: newLoan } });
 
-        await db.mainDataStore.put(newLoan);
-        await addToSyncQueue({ action: 'create', payload: { collection: 'loans', data: newLoan } });
-
-        if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
-            await addFundTransaction({
-                type: 'CapitalInflow',
-                source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
-                destination: loanData.depositTo,
-                amount: loanData.totalAmount,
-                description: `Capital inflow from ${loanData.loanName}`
-            });
-        }
-        
-        return newLoan;
-    });
+    if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
+        await addFundTransaction({
+            type: 'CapitalInflow',
+            source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
+            destination: loanData.depositTo,
+            amount: loanData.totalAmount,
+            description: `Capital inflow from ${loanData.loanName}`
+        });
+    }
+    
+    return newLoan;
 }
 
 export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<void> {
@@ -626,16 +636,16 @@ export function getExpensesRealtime() {
 }
 
 export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
-    const docRef = await addDoc(incomesCollection, incomeData);
-    const newIncome = { id: docRef.id, collection: 'incomes', ...incomeData };
+    const docRef = doc(incomesCollection);
+    const newIncome = { id: docRef.id, ...incomeData, collection: 'incomes' };
     await db.mainDataStore.put(newIncome);
     await addToSyncQueue({ action: 'create', payload: { collection: 'incomes', data: newIncome } });
     return newIncome;
 }
 
 export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
-    const docRef = await addDoc(expensesCollection, expenseData);
-    const newExpense = { id: docRef.id, collection: 'expenses', ...expenseData };
+    const docRef = doc(expensesCollection);
+    const newExpense = { id: docRef.id, ...expenseData, collection: 'expenses' };
     await db.mainDataStore.put(newExpense);
     await addToSyncQueue({ action: 'create', payload: { collection: 'expenses', data: newExpense } });
     return newExpense;
@@ -698,4 +708,51 @@ export async function deleteAllSuppliers(): Promise<void> {
   const idsToDelete = allSuppliers.map(s => s.id);
   await db.mainDataStore.bulkDelete(idsToDelete);
   await addToSyncQueue({ action: 'delete', payload: { collection: 'suppliers', changes: { all: true } }});
+}
+
+
+// --- Employee Functions ---
+export function getEmployeesRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId'));
+}
+
+export async function addEmployee(employeeData: Partial<Omit<Employee, 'id'>>) {
+    const docRef = doc(employeesCollection, employeeData.employeeId);
+    const newEmployee = { ...employeeData, id: docRef.id, collection: 'employees' };
+    await db.mainDataStore.put(newEmployee);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'employees', data: newEmployee } });
+    return newEmployee;
+}
+
+export async function updateEmployee(id: string, employeeData: Partial<Employee>) {
+    await db.mainDataStore.update(id, employeeData);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'employees', id, changes: employeeData } });
+}
+
+export async function deleteEmployee(id: string) {
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'employees', id } });
+}
+
+// --- Payroll Functions ---
+export function getPayrollEntriesRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('payroll').sortBy('payPeriod'));
+}
+
+export async function addPayrollEntry(entryData: Omit<PayrollEntry, 'id'>) {
+    const docRef = doc(payrollCollection);
+    const newEntry = { ...entryData, id: docRef.id, collection: 'payroll' };
+    await db.mainDataStore.put(newEntry);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'payroll', data: newEntry } });
+    return newEntry;
+}
+
+export async function updatePayrollEntry(id: string, entryData: Partial<PayrollEntry>) {
+    await db.mainDataStore.update(id, entryData);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'payroll', id, changes: entryData } });
+}
+
+export async function deletePayrollEntry(id: string) {
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'payroll', id } });
 }

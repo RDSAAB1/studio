@@ -22,7 +22,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 
 
 export default function ProjectManagementPage() {
-    const projects = useLiveQuery(getProjectsRealtime) || [];
+    const projects = useLiveQuery(getProjectsRealtime);
     const [isClient, setIsClient] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProject, setCurrentProject] = useState<Partial<Project>>({});
@@ -127,7 +127,8 @@ export default function ProjectManagementPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {projects.length > 0 ? projects.map((project) => (
+                                {projects === undefined && <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="animate-spin h-6 w-6 mx-auto" /></TableCell></TableRow>}
+                                {projects && projects.length > 0 ? projects.map((project) => (
                                     <TableRow key={project.id}>
                                         <TableCell className="font-medium">{project.name}</TableCell>
                                         <TableCell>{project.status}</TableCell>
@@ -139,7 +140,7 @@ export default function ProjectManagementPage() {
                                         </TableCell>
                                     </TableRow>
                                 )) : (
-                                    <TableRow>
+                                    projects && <TableRow>
                                         <TableCell colSpan={5} className="h-24 text-center">No projects found. Start by adding a new one.</TableCell>
                                     </TableRow>
                                 )}

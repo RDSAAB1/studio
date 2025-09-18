@@ -1,9 +1,11 @@
+
 import Dexie, { type Table } from 'dexie';
 import { db as firestoreDB } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
 export interface MainData {
   id: string;
+  collection?: string; // Add collection property to identify the data type
   [key: string]: any;
 }
 
@@ -25,8 +27,8 @@ class MyOfflineDB extends Dexie {
 
   constructor() {
     super('myOfflineDB');
-    this.version(1).stores({
-      mainDataStore: 'id',
+    this.version(2).stores({ // Incremented version for schema change
+      mainDataStore: 'id, collection', // Added 'collection' as an index
       syncQueueStore: '++id, timestamp',
     });
   }
@@ -100,19 +102,31 @@ export async function initialDataSync() {
             'suppliers', 
             'expenses', 
             'incomes', 
-            // Add all your collection names here
+            'loans',
+            'fund_transactions',
+            'bankAccounts',
+            'employees',
+            'payroll',
+            'attendance',
+            'projects',
+            'inventoryItems',
+            'payments',
+            'customer_payments'
         ];
+
+        const allData: MainData[] = [];
 
         for (const collectionName of collectionsToSync) {
             const querySnapshot = await getDocs(collection(firestoreDB, collectionName));
-            const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-            
-            // Clear existing data and then save new data
-            await db.mainDataStore.bulkPut(data);
-            console.log(`Synced ${data.length} items from ${collectionName}`);
+            const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, collection: collectionName } as MainData));
+            allData.push(...data);
+            console.log(`Fetched ${data.length} items from ${collectionName}`);
         }
-
-        console.log("Initial data sync completed.");
+        
+        // Clear existing data and then save new data
+        await db.mainDataStore.clear();
+        await db.mainDataStore.bulkPut(allData);
+        console.log(`Initial data sync completed. Total ${allData.length} items synced.`);
 
     } catch (error) {
         console.error("Initial data sync failed:", error);

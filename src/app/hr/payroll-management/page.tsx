@@ -27,8 +27,8 @@ type AttendanceSummary = {
 };
 
 export default function PayrollManagementPage() {
-  const payrollEntries = useLiveQuery(getPayrollEntriesRealtime) || [];
-  const employees = useLiveQuery(getEmployeesRealtime) || [];
+  const payrollEntries = useLiveQuery(getPayrollEntriesRealtime);
+  const employees = useLiveQuery(getEmployeesRealtime);
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -42,7 +42,7 @@ export default function PayrollManagementPage() {
   }, []);
 
   const calculateSalary = async () => {
-    if (!currentEntry.employeeId || !currentEntry.payPeriod) {
+    if (!currentEntry.employeeId || !currentEntry.payPeriod || !employees) {
         setAttendanceSummary(null);
         return;
     }
@@ -144,6 +144,7 @@ export default function PayrollManagementPage() {
   };
   
   const getEmployeeName = (employeeId: string) => {
+    if (!employees) return 'Unknown';
     const employee = employees.find(e => e.employeeId === employeeId);
     return employee ? employee.name : 'Unknown';
   }
@@ -178,13 +179,14 @@ export default function PayrollManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payrollEntries.length === 0 && !isClient ? (
+              {payrollEntries === undefined && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center h-24">
                     <Loader2 className="mx-auto h-8 w-8 animate-spin" />
                   </TableCell>
                 </TableRow>
-              ) : (
+              )}
+              {payrollEntries && payrollEntries.length > 0 && (
                 payrollEntries.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell>{getEmployeeName(entry.employeeId)} ({entry.employeeId})</TableCell>
@@ -201,7 +203,7 @@ export default function PayrollManagementPage() {
                   </TableRow>
                 ))
               )}
-               {payrollEntries.length === 0 && isClient && (
+               {payrollEntries && payrollEntries.length === 0 && isClient && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center h-24">No payroll entries found.</TableCell>
                 </TableRow>
@@ -225,7 +227,7 @@ export default function PayrollManagementPage() {
                   <SelectValue placeholder="Select Employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map(e => <SelectItem key={e.id} value={e.employeeId}>{e.name} ({e.employeeId})</SelectItem>)}
+                  {employees && employees.map(e => <SelectItem key={e.id} value={e.employeeId}>{e.name} ({e.employeeId})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
