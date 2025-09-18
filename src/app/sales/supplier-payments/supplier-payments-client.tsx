@@ -927,5 +927,3 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
