@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -48,7 +47,7 @@ type SortConfig = {
 
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.mainDataStore?.where('collection').equals('suppliers').sortBy('srNo'));
+  const suppliers = useLiveQuery(() => db.mainDataStore?.where('collection').equals('suppliers').sortBy('srNo')) || [];
   const paymentHistory = useLiveQuery(() => db.mainDataStore?.where('collection').equals('payments').sortBy('date')) || [];
   const incomes = useLiveQuery(() => db.mainDataStore?.where('collection').equals('incomes').toArray()) || [];
   const expenses = useLiveQuery(() => db.mainDataStore?.where('collection').equals('expenses').toArray()) || [];
@@ -937,11 +936,3 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-
