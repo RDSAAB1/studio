@@ -9,7 +9,6 @@ import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { getLoansRealtime } from "@/lib/firestore";
 import type { Loan } from "@/lib/definitions";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
@@ -101,7 +100,7 @@ const NetworkStatusIndicator = () => {
 
 
 const NotificationBell = () => {
-    const loans = useLiveQuery(getLoansRealtime);
+    const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').toArray());
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
     const router = useRouter();
