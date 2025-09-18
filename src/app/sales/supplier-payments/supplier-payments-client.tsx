@@ -31,6 +31,7 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 const suppliersCollection = collection(db, "suppliers");
 const expensesCollection = collection(db, "expenses");
+const incomesCollection = collection(db, "incomes");
 
 
 type PaymentOption = {
@@ -89,6 +90,7 @@ export default function SupplierPaymentsClient() {
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
@@ -227,6 +229,12 @@ export default function SupplierPaymentsClient() {
       setSelectedAccountId(lastUsedAccount);
     }
   }, []);
+
+  useEffect(() => {
+    if (suppliers !== undefined) {
+      setLoading(false);
+    }
+  }, [suppliers]);
 
   const handleSetSelectedAccount = (accountId: string) => {
     setSelectedAccountId(accountId);
@@ -749,7 +757,7 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient || suppliers === undefined) {
+    if (!isClient || loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -875,7 +883,7 @@ export default function SupplierPaymentsClient() {
                         onPrintRtgs={setRtgsReceiptData}
                     />
                     <TransactionTable
-                        suppliers={suppliers}
+                        suppliers={suppliers || []}
                         onShowDetails={setDetailsSupplierEntry}
                     />
                  </div>
@@ -886,12 +894,12 @@ export default function SupplierPaymentsClient() {
             isOpen={isOutstandingModalOpen}
             onOpenChange={setIsOutstandingModalOpen}
             customerName={toTitleCase(customerSummaryMap.get(selectedCustomerKey || '')?.name || '')}
-            entries={suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
+            entries={(suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
             selectedIds={selectedEntryIds}
             onSelect={handleEntrySelect}
             onSelectAll={(checked: boolean) => {
                 const newSet = new Set<string>();
-                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
+                const outstandingEntries = (suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
                 if(checked) outstandingEntries.forEach(e => newSet.add(e.id));
                 setSelectedEntryIds(newSet);
             }}
@@ -929,3 +937,11 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
+
+    
+
+    
+
+
