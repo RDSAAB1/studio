@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -15,7 +14,7 @@ import { db } from '@/lib/database';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -84,11 +83,12 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo')) || [];
   const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
@@ -102,6 +102,7 @@ export default function CustomerEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
+  const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
@@ -143,11 +144,15 @@ export default function CustomerEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (customers && customers.length > 0) {
-      const nextSrNum = Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
-      const initialSrNo = formatSrNo(nextSrNum, 'C');
-      form.setValue('srNo', initialSrNo);
-      setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+    if (customers !== undefined) {
+        setIsLoading(false);
+        if (isInitialLoad.current && customers) {
+            const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'C');
+            form.setValue('srNo', initialSrNo);
+            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+            isInitialLoad.current = false;
+        }
     }
   }, [customers, form]);
 
@@ -588,7 +593,7 @@ export default function CustomerEntryClient() {
     return null;
   }
 
-  if (customers === undefined) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-200px)]">
         <p className="text-muted-foreground flex items-center"><Hourglass className="w-5 h-5 mr-2 animate-spin"/>Loading data...</p>
