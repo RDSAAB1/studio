@@ -27,7 +27,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateIncome, updateExpense, updateLoan } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db as firestoreDB } from "@/lib/firebase"; 
 
@@ -270,10 +270,10 @@ export default function IncomeExpenseClient() {
   
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
-        bankAccounts.forEach(acc => balances.set(acc.id, 0));
+        (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
         balances.set('CashInHand', 0);
 
-        fundTransactions.forEach(t => {
+        (fundTransactions || []).forEach(t => {
              if (balances.has(t.source)) {
                 balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
             }
@@ -476,8 +476,8 @@ export default function IncomeExpenseClient() {
   }, [allTransactions, sortConfig]);
   
   const { totalIncome, totalExpense, netProfitLoss, totalTransactions } = useMemo(() => {
-    const incomeTotal = income.reduce((sum, t) => sum + t.amount, 0);
-    const expenseTotal = expenses.reduce((sum, t) => sum + t.amount, 0);
+    const incomeTotal = (income || []).reduce((sum, t) => sum + t.amount, 0);
+    const expenseTotal = (expenses || []).reduce((sum, t) => sum + t.amount, 0);
     return {
       totalIncome: incomeTotal,
       totalExpense: expenseTotal,
@@ -651,6 +651,41 @@ export default function IncomeExpenseClient() {
                            </InputWithIcon>
                           {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                       </div>
+                      
+                        <div className="space-y-1">
+                            <Label htmlFor="paymentMethod" className="text-xs">Payment Method</Label>
+                            <CustomDropdown
+                                options={[
+                                    { value: "Cash", label: "Cash" },
+                                    ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})` }))
+                                ]}
+                                value={selectedPaymentMethod === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === watch('bankAccountId'))?.id}
+                                onChange={(value) => {
+                                    if (value === 'Cash') {
+                                        setValue('paymentMethod', 'Cash');
+                                        setValue('bankAccountId', undefined);
+                                    } else {
+                                        const account = bankAccounts.find(acc => acc.id === value);
+                                        setValue('paymentMethod', account?.bankName || '');
+                                        setValue('bankAccountId', value);
+                                    }
+                                }}
+                                placeholder="Select Payment Method"
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="invoiceNumber" className="text-xs">Invoice Number</Label>
+                            <Controller
+                                name="invoiceNumber"
+                                control={control}
+                                render={({ field }) => (
+                                    <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                                        <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />
+                                    </InputWithIcon>
+                                )}
+                            />
+                        </div>
                     </div>
 
                     {isAdvanced && (
@@ -658,28 +693,6 @@ export default function IncomeExpenseClient() {
                             <h3 className="text-sm font-semibold mb-2">Advanced Options</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 
-                                 <div className="space-y-1">
-                                    <Label htmlFor="paymentMethod" className="text-xs">Payment Method</Label>
-                                    <CustomDropdown
-                                        options={[
-                                            { value: "Cash", label: "Cash" },
-                                            ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})` }))
-                                        ]}
-                                        value={selectedPaymentMethod === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === watch('bankAccountId'))?.id}
-                                        onChange={(value) => {
-                                            if (value === 'Cash') {
-                                                setValue('paymentMethod', 'Cash');
-                                                setValue('bankAccountId', undefined);
-                                            } else {
-                                                const account = bankAccounts.find(acc => acc.id === value);
-                                                setValue('paymentMethod', account?.bankName || '');
-                                                setValue('bankAccountId', value);
-                                            }
-                                        }}
-                                        placeholder="Select Payment Method"
-                                    />
-                                </div>
-
                                 <div className="space-y-1">
                                     <Label htmlFor="status" className="text-xs">Status</Label>
                                     <Controller
@@ -696,19 +709,6 @@ export default function IncomeExpenseClient() {
                                                 onChange={field.onChange}
                                                 placeholder="Select Status"
                                             />
-                                        )}
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <Label htmlFor="invoiceNumber" className="text-xs">Invoice Number</Label>
-                                    <Controller
-                                        name="invoiceNumber"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />
-                                            </InputWithIcon>
                                         )}
                                     />
                                 </div>
@@ -888,5 +888,7 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
 
     
