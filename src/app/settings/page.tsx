@@ -145,7 +145,7 @@ export default function SettingsPage() {
     const bankAccounts = useLiveQuery<BankAccount[]>(() => db.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
     const banks = useLiveQuery<Bank[]>(() => db.mainDataStore?.where('collection').equals('banks').toArray()) || [];
     const bankBranches = useLiveQuery<BankBranch[]>(() => db.mainDataStore?.where('collection').equals('bankBranches').toArray()) || [];
-
+    
     const [isBankAccountDialogOpen, setIsBankAccountDialogOpen] = useState(false);
     const [currentBankAccount, setCurrentBankAccount] = useState<Partial<BankAccount>>({});
     const [formatSettings, setFormatSettings] = useState<FormatSettings>({});
@@ -218,8 +218,13 @@ export default function SettingsPage() {
                 const fmtSettings = await getFormatSettings();
                 setFormatSettings(fmtSettings);
 
-                const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, console.error);
-                const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
+                // const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, console.error);
+                // const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
+
+                const varieties = await db.mainDataStore?.where('collection').equals('varieties').toArray();
+                setVarietyOptions(varieties || []);
+                const paymentTypes = await db.mainDataStore?.where('collection').equals('paymentTypes').toArray();
+                setPaymentTypeOptions(paymentTypes || []);
                 
                 // Get periodic sync status
                 navigator.serviceWorker.ready.then(async (registration) => {
@@ -234,8 +239,8 @@ export default function SettingsPage() {
 
                 setLoading(false);
                 return () => { 
-                    unsubVarieties(); 
-                    unsubPaymentTypes(); 
+                    // unsubVarieties(); 
+                    // unsubPaymentTypes(); 
                 };
             } else {
                 setUser(null);
@@ -811,3 +816,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    

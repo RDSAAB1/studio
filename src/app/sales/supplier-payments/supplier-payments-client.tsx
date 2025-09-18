@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getBanksRealtime, getBankBranchesRealtime, getReceiptSettings } from "@/lib/firestore";
+import { addBank, addBankBranch, getReceiptSettings } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -53,9 +53,9 @@ export default function SupplierPaymentsClient() {
   const expenses = useLiveQuery(() => db.mainDataStore?.where('collection').equals('expenses').toArray()) || [];
   const fundTransactions = useLiveQuery(() => db.mainDataStore?.where('collection').equals('fund_transactions').toArray()) || [];
   const bankAccounts = useLiveQuery(() => db.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
+  const banks = useLiveQuery(() => db.mainDataStore?.where('collection').equals('banks').toArray()) || [];
+  const bankBranches = useLiveQuery(() => db.mainDataStore?.where('collection').equals('bankBranches').toArray()) || [];
 
-  const [banks, setBanks] = useState<any[]>([]);
-  const [bankBranches, setBankBranches] = useState<any[]>([]);
   
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -251,14 +251,6 @@ export default function SupplierPaymentsClient() {
         setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
     }
     
-    const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
-      if(isSubscribed) console.error("Error fetching banks:", error);
-    });
-
-    const unsubscribeBankBranches = getBankBranchesRealtime(setBankBranches, (error) => {
-      if(isSubscribed) console.error("Error fetching bank branches:", error);
-    });
-    
     const fetchSettings = async () => {
         const settings = await getReceiptSettings();
         if (settings && isSubscribed) {
@@ -270,8 +262,6 @@ export default function SupplierPaymentsClient() {
 
     return () => {
       isSubscribed = false;
-      unsubscribeBanks();
-      unsubscribeBankBranches();
     };
   }, [isClient, editingPayment, paymentHistory, getNextPaymentId, getNextRtgsSrNo]);
   
@@ -757,7 +747,7 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient || loading) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -937,3 +927,5 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
