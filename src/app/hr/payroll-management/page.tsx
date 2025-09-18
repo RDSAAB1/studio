@@ -1,10 +1,11 @@
 
+
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase"; 
+import { useState, useEffect, useMemo } from "react";
+import { useLiveQuery } from 'dexie-react-hooks';
 import type { Employee, PayrollEntry, AttendanceEntry } from "@/lib/definitions"; 
+import { getPayrollEntriesRealtime, getEmployeesRealtime, getAttendanceForPeriod, addPayrollEntry, updatePayrollEntry, deletePayrollEntry } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,9 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { format, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
 import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calendar as CalendarIcon, Calculator, TrendingUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 type AttendanceSummary = {
     present: number;
@@ -28,10 +27,11 @@ type AttendanceSummary = {
 };
 
 export default function PayrollManagementPage() {
-  const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const payrollEntries = useLiveQuery(getPayrollEntriesRealtime) || [];
+  const employees = useLiveQuery(getEmployeesRealtime) || [];
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<Partial<PayrollEntry>>({});
@@ -39,27 +39,6 @@ export default function PayrollManagementPage() {
   
   useEffect(() => {
     setIsClient(true);
-    const qPayroll = query(collection(db, "payroll"));
-    const unsubscribePayroll = onSnapshot(qPayroll, (snapshot) => {
-      const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PayrollEntry[];
-      setPayrollEntries(entries);
-    }, (err) => {
-      console.error("Error fetching payroll data:", err);
-      setError("Failed to load payroll data.");
-    });
-
-    const qEmployees = query(collection(db, "employees"));
-    const unsubscribeEmployees = onSnapshot(qEmployees, (snapshot) => {
-      const employeesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Employee[];
-      setEmployees(employeesData);
-    }, (err) => {
-      console.error("Error fetching employee data:", err);
-    });
-
-    return () => {
-      unsubscribePayroll();
-      unsubscribeEmployees();
-    };
   }, []);
 
   const calculateSalary = async () => {
@@ -70,7 +49,7 @@ export default function PayrollManagementPage() {
 
     const employee = employees.find(e => e.employeeId === currentEntry.employeeId);
     if (!employee || !employee.baseSalary) {
-        alert("Employee not found or base salary not set.");
+        toast({ title: "Employee not found or base salary not set.", variant: "destructive" });
         return;
     }
 
@@ -83,15 +62,8 @@ export default function PayrollManagementPage() {
     const daysInMonth = getDaysInMonth(periodDate);
     const perDaySalary = employee.baseSalary / daysInMonth;
 
-    const qAttendance = query(collection(db, 'attendance'), 
-        where('employeeId', '==', employee.employeeId),
-        where('date', '>=', startDate),
-        where('date', '<=', endDate)
-    );
-    
     try {
-        const attendanceSnapshot = await getDocs(qAttendance);
-        const records = attendanceSnapshot.docs.map(doc => doc.data() as AttendanceEntry);
+        const records = await getAttendanceForPeriod(employee.employeeId, startDate, endDate);
         
         let present = 0;
         let absent = 0;
@@ -117,12 +89,13 @@ export default function PayrollManagementPage() {
     } catch(err) {
         console.error("Error calculating salary:", err);
         setError("Failed to calculate salary due to a database error.");
+        toast({ title: "Error calculating salary", variant: "destructive" });
     }
   };
 
   const handleSaveEntry = async () => {
     if (!currentEntry.employeeId || !currentEntry.payPeriod || currentEntry.amount === undefined) {
-      alert("Please fill required fields.");
+      toast({ title: "Please fill required fields.", variant: "destructive" });
       return;
     }
 
@@ -132,18 +105,18 @@ export default function PayrollManagementPage() {
             amount: Number(currentEntry.amount),
         };
         if(currentEntry.id) {
-            const entryRef = doc(db, "payroll", currentEntry.id);
-            await updateDoc(entryRef, { ...entryData, updatedAt: new Date() });
+            await updatePayrollEntry(currentEntry.id, entryData as PayrollEntry);
         } else {
-             await addDoc(collection(db, "payroll"), { ...entryData, createdAt: new Date() });
+             await addPayrollEntry(entryData as Omit<PayrollEntry, 'id'>);
         }
       
       setIsEditDialogOpen(false);
       setCurrentEntry({});
       setAttendanceSummary(null);
+      toast({ title: "Payroll entry saved.", variant: "success" });
     } catch (e) {
       console.error("Error saving payroll entry: ", e);
-      setError("Failed to save payroll entry.");
+      toast({ title: "Failed to save entry.", variant: "destructive" });
     }
   };
 
@@ -161,10 +134,11 @@ export default function PayrollManagementPage() {
   const handleDeleteEntry = async (id: string) => {
     if (confirm("Are you sure you want to delete this payroll entry?")) {
       try {
-        await deleteDoc(doc(db, "payroll", id));
+        await deletePayrollEntry(id);
+        toast({ title: "Entry deleted.", variant: "success" });
       } catch (e) {
         console.error("Error deleting payroll entry: ", e);
-        setError("Failed to delete payroll entry.");
+        toast({ title: "Failed to delete entry.", variant: "destructive" });
       }
     }
   };

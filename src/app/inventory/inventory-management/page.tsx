@@ -1,14 +1,16 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   getInventoryItems,
   addInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
-} from '@/lib/firestore'; // Assuming these functions exist in firestore.ts
-import { InventoryItem } from '@/lib/definitions'; // Assuming InventoryItem type is defined
+} from '@/lib/firestore';
+import { InventoryItem } from '@/lib/definitions';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +25,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
 
 export default function InventoryManagementPage() {
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const inventoryItems = useLiveQuery(getInventoryItems) || [];
   const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentInventoryItem, setCurrentInventoryItem] = useState<InventoryItem | null>(null);
+  const [currentInventoryItem, setCurrentInventoryItem] = useState<Partial<InventoryItem>>({});
   const [formData, setFormData] = useState<Omit<InventoryItem, 'id' | 'createdAt'>>({
     name: '',
     sku: '',
@@ -38,21 +40,7 @@ export default function InventoryManagementPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const unsubscribe = getInventoryItems(
-      (items) => {
-        setInventoryItems(items);
-      },
-      (error) => {
-        console.error("Error fetching inventory items:", error);
-        toast({
-          title: "Failed to load inventory",
-          variant: "destructive",
-        });
-      }
-    );
-
-    return () => unsubscribe();
-  }, [toast]);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -76,50 +64,26 @@ export default function InventoryManagementPage() {
             formElements[currentElementIndex + 1].focus();
         } else if (currentElementIndex === formElements.length - 1) {
              e.preventDefault();
-             if (currentInventoryItem) {
-                handleUpdateInventoryItem();
-            } else {
-                handleAddInventoryItem();
-            }
+             handleSaveItem();
         }
     }
   };
 
-  const handleAddInventoryItem = async () => {
+  const handleSaveItem = async () => {
     try {
-      await addInventoryItem({ ...formData, createdAt: new Date().toISOString() });
-      toast({
-        title: "Inventory item added",
-        variant: "success",
-      });
+        if(currentInventoryItem.id) {
+            await updateInventoryItem(currentInventoryItem.id, formData);
+            toast({ title: "Inventory item updated", variant: "success" });
+        } else {
+            await addInventoryItem({ ...formData, createdAt: new Date().toISOString() });
+            toast({ title: "Inventory item added", variant: "success" });
+        }
       setIsModalOpen(false);
+      setCurrentInventoryItem({});
       setFormData({ name: '', sku: '', stock: 0, unit: '', purchasePrice: 0, sellingPrice: 0 });
     } catch (error) {
-      console.error("Error adding inventory item:", error);
-      toast({
-        title: "Failed to add inventory item",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUpdateInventoryItem = async () => {
-    if (!currentInventoryItem?.id) return;
-    try {
-      await updateInventoryItem(currentInventoryItem.id, formData);
-      toast({
-        title: "Inventory item updated",
-        variant: "success",
-      });
-      setIsModalOpen(false);
-      setCurrentInventoryItem(null);
-      setFormData({ name: '', sku: '', stock: 0, unit: '', purchasePrice: 0, sellingPrice: 0 });
-    } catch (error) {
-      console.error("Error updating inventory item:", error);
-      toast({
-        title: "Failed to update item",
-        variant: "destructive",
-      });
+      console.error("Error saving inventory item:", error);
+      toast({ title: "Failed to save item", variant: "destructive" });
     }
   };
 
@@ -142,7 +106,7 @@ export default function InventoryManagementPage() {
   };
 
   const openAddModal = () => {
-    setCurrentInventoryItem(null);
+    setCurrentInventoryItem({});
     setFormData({ name: '', sku: '', stock: 0, unit: '', purchasePrice: 0, sellingPrice: 0 });
     setIsModalOpen(true);
   };
@@ -214,7 +178,7 @@ export default function InventoryManagementPage() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent onKeyDown={handleKeyDown}>
           <DialogHeader>
-            <DialogTitle>{currentInventoryItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
+            <DialogTitle>{currentInventoryItem.id ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
           </DialogHeader>
           <form>
           <ScrollArea className="max-h-[70vh] pr-6 -mr-6">
@@ -248,8 +212,8 @@ export default function InventoryManagementPage() {
           </form>
           <DialogFooter>
             <Button onClick={() => setIsModalOpen(false)} variant="outline">Cancel</Button>
-            <Button onClick={currentInventoryItem ? handleUpdateInventoryItem : handleAddInventoryItem}>
-              {currentInventoryItem ? 'Save Changes' : 'Add Item'}
+            <Button onClick={handleSaveItem}>
+              {currentInventoryItem.id ? 'Save Changes' : 'Add Item'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -14,7 +14,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, getSuppliersRealtime, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -65,7 +65,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 export default function SupplierEntryClient() {
   const { toast } = useToast();
   const suppliers = useLiveQuery(getSuppliersRealtime);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const paymentHistory = useLiveQuery(getPaymentsRealtime) || [];
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -130,12 +130,6 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (!isClient) return;
     
-    const unsubscribePayments = getPaymentsRealtime((data: Payment[]) => {
-        setPaymentHistory(data);
-    }, (error) => {
-        console.error("Error fetching payments: ", error);
-    });
-
     const fetchSettings = async () => {
         const settings = await getReceiptSettings();
         if (settings) {
@@ -143,7 +137,6 @@ export default function SupplierEntryClient() {
         }
     };
     fetchSettings();
-
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
@@ -163,7 +156,6 @@ export default function SupplierEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubscribePayments();
       unsubVarieties();
       unsubPaymentTypes();
     };

@@ -13,7 +13,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -83,7 +83,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 export default function CustomerEntryClient() {
   const { toast } = useToast();
   const customers = useLiveQuery(getCustomersRealtime);
-  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const paymentHistory = useLiveQuery(getCustomerPaymentsRealtime) || [];
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -152,12 +152,6 @@ export default function CustomerEntryClient() {
   useEffect(() => {
     if (!isClient) return;
 
-    const unsubscribePayments = getCustomerPaymentsRealtime((data: CustomerPayment[]) => {
-        setPaymentHistory(data);
-    }, (error) => {
-        console.error("Error fetching payments: ", error);
-    });
-
     const fetchSettings = async () => {
         const settings = await getReceiptSettings();
         if (settings) {
@@ -185,7 +179,6 @@ export default function CustomerEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubscribePayments();
       unsubVarieties();
       unsubPaymentTypes();
     };
@@ -684,5 +677,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-
-    

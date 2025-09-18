@@ -1,11 +1,11 @@
 
+
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { collection, query, onSnapshot, doc, setDoc, where } from "firebase/firestore";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import type { Employee, AttendanceEntry } from "@/lib/definitions";
-import { getAttendanceForDateRealtime, setAttendance } from "@/lib/firestore";
+import { getAttendanceForDateRealtime, setAttendance, getEmployeesRealtime } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { Calendar as CalendarIcon, CheckCircle, XCircle, FileText, UserCheck, UserX, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useLiveQuery } from "dexie-react-hooks";
 
 const StatCard = ({ title, value, icon }: { title: string; value: number | string; icon: React.ReactNode }) => (
     <Card className="flex-1">
@@ -30,41 +31,23 @@ const StatCard = ({ title, value, icon }: { title: string; value: number | strin
 
 export default function AttendanceTrackingPage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [attendanceRecords, setAttendanceRecords] = useState<Map<string, AttendanceEntry>>(new Map());
+    const employees = useLiveQuery(getEmployeesRealtime) || [];
+    const dateStr = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
+    const attendanceRecordsToday = useLiveQuery(() => getAttendanceForDateRealtime(dateStr), [dateStr]) || [];
+
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
-        const q = query(collection(db, "employees"));
-        const unsubscribeEmployees = onSnapshot(q, (snapshot) => {
-            const employeesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-            setEmployees(employeesData);
-        }, (error) => {
-            console.error("Error fetching employees: ", error);
-            toast({ title: "Failed to load employees", variant: "destructive" });
-        });
-
-        return () => unsubscribeEmployees();
-    }, [toast]);
-
-    useEffect(() => {
-        const dateStr = format(selectedDate, "yyyy-MM-dd");
-        const unsubscribeAttendance = getAttendanceForDateRealtime(dateStr, (records) => {
-            const recordsMap = new Map(records.map(r => [r.employeeId, r]));
-            setAttendanceRecords(recordsMap);
-        }, (error) => {
-            console.error("Error fetching attendance: ", error);
-            toast({ title: "Failed to load attendance records", variant: "destructive" });
-        });
-
-        return () => unsubscribeAttendance();
-    }, [selectedDate, toast]);
+    }, []);
+    
+    const attendanceMap = useMemo(() => {
+        return new Map(attendanceRecordsToday.map(r => [r.employeeId, r]));
+    }, [attendanceRecordsToday]);
     
     const handleStatusChange = async (employeeId: string, status: 'Present' | 'Absent' | 'Leave' | 'Half-day') => {
         try {
-            const dateStr = format(selectedDate, "yyyy-MM-dd");
             const entry: AttendanceEntry = {
                 id: `${dateStr}-${employeeId}`,
                 date: dateStr,
@@ -78,12 +61,12 @@ export default function AttendanceTrackingPage() {
         }
     };
 
-    const summary = {
-        present: Array.from(attendanceRecords.values()).filter(r => r.status === 'Present').length,
-        absent: Array.from(attendanceRecords.values()).filter(r => r.status === 'Absent').length,
-        leave: Array.from(attendanceRecords.values()).filter(r => r.status === 'Leave' || r.status === 'Half-day').length,
+    const summary = useMemo(() => ({
+        present: attendanceRecordsToday.filter(r => r.status === 'Present').length,
+        absent: attendanceRecordsToday.filter(r => r.status === 'Absent').length,
+        leave: attendanceRecordsToday.filter(r => r.status === 'Leave' || r.status === 'Half-day').length,
         total: employees.length
-    };
+    }), [attendanceRecordsToday, employees]);
     
     if (!isClient) {
         return null;
@@ -135,7 +118,7 @@ export default function AttendanceTrackingPage() {
                                     <TableRow><TableCell colSpan={2} className="h-24 text-center">No employees found. Add employees in the database.</TableCell></TableRow>
                                 ) : (
                                     employees.map((employee) => {
-                                        const currentStatus = attendanceRecords.get(employee.employeeId)?.status;
+                                        const currentStatus = attendanceMap.get(employee.employeeId)?.status;
                                         return (
                                             <TableRow key={employee.id}>
                                                 <TableCell>

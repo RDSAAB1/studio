@@ -1,5 +1,4 @@
 
-
 import { db, addToSyncQueue } from "./database";
 import { liveQuery } from 'dexie';
 import {
@@ -39,6 +38,8 @@ const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
 const settingsCollection = collection(firestoreDB, "settings");
 const optionsCollection = collection(firestoreDB, "options");
 const usersCollection = collection(firestoreDB, "users");
+const attendanceCollection = collection(firestoreDB, "attendance");
+const projectsCollection = collection(firestoreDB, "projects");
 
 // --- User Refresh Token Functions ---
 export async function saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
@@ -80,8 +81,6 @@ export async function addOption(collectionName: string, optionData: { name: stri
 
 
 export async function updateOption(collectionName: string, id: string, optionData: Partial<{ name: string }>): Promise<void> {
-    // Note: This is more complex if you need to rename, as you'd need the old value.
-    // This example assumes you might want to adjust something else, or handle rename logic in the component.
     console.warn("Updating option names is not directly supported via this function. Please implement rename logic carefully.");
 }
 
@@ -258,43 +257,39 @@ export async function deleteBankBranch(id: string): Promise<void> {
 
 
 // --- Bank Account Functions ---
-export function getBankAccountsRealtime(callback: (accounts: BankAccount[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(bankAccountsCollection, orderBy("bankName", "asc"));
-    return onSnapshot(q, (snapshot) => {
-        const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankAccount));
-        callback(accounts);
-    }, onError);
+export function getBankAccountsRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray());
 }
 
 export async function addBankAccount(accountData: Partial<Omit<BankAccount, 'id'>>): Promise<BankAccount> {
     const docRef = doc(bankAccountsCollection, accountData.accountNumber);
-    const newAccountData = { ...accountData, id: docRef.id };
-    await setDoc(docRef, newAccountData);
+    const newAccountData = { ...accountData, id: docRef.id, collection: 'bankAccounts' };
+    await db.mainDataStore.put(newAccountData);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'bankAccounts', data: newAccountData } });
     return newAccountData as BankAccount;
 }
 
 export async function updateBankAccount(id: string, accountData: Partial<BankAccount>): Promise<void> {
-    const docRef = doc(bankAccountsCollection, id);
-    await setDoc(docRef, accountData, { merge: true });
+    await db.mainDataStore.update(id, accountData);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'bankAccounts', id, changes: accountData } });
 }
 
 export async function deleteBankAccount(id: string): Promise<void> {
-    const docRef = doc(bankAccountsCollection, id);
-    await deleteDoc(docRef);
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'bankAccounts', id } });
 }
 
 
 // --- Supplier Functions ---
-
 export function getSuppliersRealtime() {
   return liveQuery(() => 
-      db.mainDataStore.where('id').startsWith('S').sortBy('srNo')
+      db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo')
   );
 }
 
 export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
-    const docRef = doc(firestoreDB, 'suppliers', supplierData.srNo);
-    const newSupplier = { ...supplierData, id: docRef.id };
+    const docRef = doc(suppliersCollection, supplierData.srNo);
+    const newSupplier = { ...supplierData, id: docRef.id, collection: 'suppliers' };
 
     await db.mainDataStore.put(newSupplier);
     await addToSyncQueue({ action: 'create', payload: { collection: 'suppliers', data: newSupplier } });
@@ -328,20 +323,16 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
     const paymentsBatch = writeBatch(firestoreDB);
 
     for (const srNo of srNos) {
-        // Delete the supplier entry
         const supplierDocRef = doc(suppliersCollection, srNo);
         batch.delete(supplierDocRef);
-
-        // Find and delete related payments
         const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo }));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         
         paymentsSnapshot.forEach(paymentDoc => {
             const payment = paymentDoc.data() as Payment;
-            // If the payment only contains this srNo, delete the whole payment
             if (payment.paidFor && payment.paidFor.length === 1 && payment.paidFor[0].srNo === srNo) {
                 paymentsBatch.delete(paymentDoc.ref);
-            } else { // Otherwise, just remove the srNo from the paidFor array
+            } else {
                 const updatedPaidFor = payment.paidFor?.filter(pf => pf.srNo !== srNo);
                 const amountToDeduct = payment.paidFor?.find(pf => pf.srNo === srNo)?.amount || 0;
                 paymentsBatch.update(paymentDoc.ref, { 
@@ -351,23 +342,21 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
             }
         });
     }
-
     await batch.commit();
     await paymentsBatch.commit();
 }
 
 
 // --- Customer Functions ---
-
 export function getCustomersRealtime() {
   return liveQuery(() =>
-    db.mainDataStore.where('id').startsWith('C').sortBy('srNo')
+    db.mainDataStore.where('collection').equals('customers').sortBy('srNo')
   );
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {
-    const docRef = doc(firestoreDB, 'customers', customerData.srNo);
-    const newCustomer = { ...customerData, id: docRef.id };
+    const docRef = doc(customersCollection, customerData.srNo);
+    const newCustomer = { ...customerData, id: docRef.id, collection: 'customers' };
     
     await db.mainDataStore.put(newCustomer);
     await addToSyncQueue({ action: 'create', payload: { collection: 'customers', data: newCustomer } });
@@ -395,16 +384,8 @@ export async function deleteCustomer(id: string): Promise<void> {
 }
 
 // --- Inventory Item Functions ---
-export function getInventoryItems(callback: (items: any[]) => void, onError: (error: Error) => void) {
-  // First, get data from IndexedDB
-  db.mainDataStore.where('collection').equals('inventoryItems').toArray().then(callback);
-
-  const q = query(collection(firestoreDB, "inventoryItems"), orderBy("createdAt", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const items = snapshot.docs.map(doc => ({ id: doc.id, collection: 'inventoryItems', ...doc.data() }));
-    db.mainDataStore.bulkPut(items);
-    callback(items);
-  }, onError);
+export function getInventoryItems() {
+  return liveQuery(() => db.mainDataStore.where('collection').equals('inventoryItems').toArray());
 }
 export async function addInventoryItem(item: any) {
   const newId = doc(collection(firestoreDB, "inventoryItems")).id;
@@ -426,111 +407,75 @@ export async function deleteInventoryItem(id: string) {
 
 
 // --- Payment Functions ---
-
-export function getPaymentsRealtime(callback: (payments: Payment[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(supplierPaymentsCollection, orderBy("date", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-    callback(payments);
-  }, onError);
+export function getPaymentsRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date'));
 }
 
-export function getCustomerPaymentsRealtime(callback: (payments: CustomerPayment[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(customerPaymentsCollection, orderBy("date", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
-    callback(payments);
-  }, onError);
+export function getCustomerPaymentsRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date'));
 }
 
 export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
-  if (!srNo) {
-    console.error("SR No. is required to delete payments.");
-    return;
-  }
-  
-  const paymentsSnapshot = await getDocs(query(supplierPaymentsCollection));
-  
-  const batch = writeBatch(firestoreDB);
-  let paymentsDeleted = 0;
-
-  paymentsSnapshot.forEach(paymentDoc => {
-    const payment = paymentDoc.data() as Payment;
-    const initialPaidFor = payment.paidFor || [];
-    const filteredPaidFor = initialPaidFor.filter(pf => pf.srNo !== srNo);
+  if (!srNo) return;
+  const paymentsToDelete = await db.syncQueueStore
+    .where('payload.collection').equals('payments')
+    .and(item => item.payload.data?.paidFor?.some((pf: any) => pf.srNo === srNo))
+    .toArray();
     
-    if (filteredPaidFor.length < initialPaidFor.length) {
-      if (filteredPaidFor.length === 0) {
-        batch.delete(paymentDoc.ref);
-      } else {
-        const originalAmountForSr = initialPaidFor.find(pf => pf.srNo === srNo)?.amount || 0;
-        const newTotalAmount = payment.amount - originalAmountForSr;
-        batch.update(paymentDoc.ref, { paidFor: filteredPaidFor, amount: newTotalAmount });
-      }
-      paymentsDeleted++;
-    }
-  });
-
-  if (paymentsDeleted > 0) {
-    await batch.commit();
+  for (const payment of paymentsToDelete) {
+      if (payment.id) await db.syncQueueStore.delete(payment.id);
   }
+  await addToSyncQueue({ action: 'delete', payload: { collection: 'payments', id: srNo, changes: { bySrNo: true } }});
 }
 
 export async function deleteAllPayments(): Promise<void> {
-    const q = query(supplierPaymentsCollection);
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(firestoreDB);
-    snapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-    });
-    await batch.commit();
+    const allPayments = await db.mainDataStore.where('collection').equals('payments').toArray();
+    for (const payment of allPayments) {
+        await db.mainDataStore.delete(payment.id);
+    }
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'payments', changes: { all: true } }});
 }
 
-
 export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
-  if (!srNo) {
-    console.error("SR No. is required to delete customer payments.");
-    return;
+  if (!srNo) return;
+  const paymentsToDelete = await db.syncQueueStore
+    .where('payload.collection').equals('customer_payments')
+    .and(item => item.payload.data?.paidFor?.some((pf: any) => pf.srNo === srNo))
+    .toArray();
+    
+  for (const payment of paymentsToDelete) {
+      if (payment.id) await db.syncQueueStore.delete(payment.id);
   }
-  const q = query(customerPaymentsCollection, where("paidFor", "array-contains", { srNo }));
-  const paymentsSnapshot = await getDocs(q);
-  
-  const batch = writeBatch(firestoreDB);
-  paymentsSnapshot.forEach(doc => {
-      batch.delete(doc.ref);
-  });
-
-  await batch.commit();
+  await addToSyncQueue({ action: 'delete', payload: { collection: 'customer_payments', id: srNo, changes: { bySrNo: true } }});
 }
 
 
 // --- Fund Transaction Functions ---
-
-export function getFundTransactionsRealtime(callback: (transactions: FundTransaction[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(fundTransactionsCollection, orderBy("date", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate ? doc.data().date.toDate().toISOString() : doc.data().date } as FundTransaction));
-    callback(transactions);
-  }, onError);
+export function getFundTransactionsRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').sortBy('date'));
 }
 
 export async function addFundTransaction(transactionData: Omit<FundTransaction, 'id' | 'transactionId' | 'date'>): Promise<FundTransaction> {
   const dataWithDate = {
     ...transactionData,
-    date: new Date().toISOString()
+    date: new Date().toISOString(),
+    collection: 'fund_transactions'
   };
   const docRef = await addDoc(fundTransactionsCollection, dataWithDate);
-  return { id: docRef.id, transactionId: '', ...dataWithDate };
+  const newTransaction = { id: docRef.id, transactionId: '', ...dataWithDate };
+  await db.mainDataStore.put(newTransaction);
+  await addToSyncQueue({ action: 'create', payload: { collection: 'fund_transactions', data: newTransaction } });
+  return newTransaction;
 }
 
 export async function updateFundTransaction(id: string, data: Partial<FundTransaction>): Promise<void> {
-    const docRef = doc(fundTransactionsCollection, id);
-    await updateDoc(docRef, data);
+    await db.mainDataStore.update(id, data);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'fund_transactions', id, changes: data } });
 }
 
 export async function deleteFundTransaction(id: string): Promise<void> {
-    const docRef = doc(fundTransactionsCollection, id);
-    await deleteDoc(docRef);
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'fund_transactions', id } });
 }
 
 
@@ -578,154 +523,142 @@ export async function deleteSubCategory(collectionName: "incomeCategories" | "ex
 
 // --- Attendance Functions ---
 
-export function getAttendanceForDateRealtime(
-  date: string, // YYYY-MM-DD format
-  callback: (records: AttendanceEntry[]) => void, 
-  onError: (error: Error) => void
-): () => void {
-    const q = query(collection(firestoreDB, "attendance"), where("date", "==", date));
-    return onSnapshot(q, (snapshot) => {
-        const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceEntry));
-        callback(records);
-    }, onError);
+export function getAttendanceForDateRealtime(date: string) {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('attendance').and(record => record.date === date).toArray());
 }
 
 export async function setAttendance(entry: AttendanceEntry): Promise<void> {
-    const docRef = doc(firestoreDB, "attendance", entry.id);
-    await setDoc(docRef, entry, { merge: true });
+    const newEntry = { ...entry, collection: 'attendance' };
+    await db.mainDataStore.put(newEntry);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'attendance', data: newEntry }});
 }
 
 // --- Project Functions ---
-const projectsCollection = collection(firestoreDB, "projects");
-
-export function getProjectsRealtime(callback: (projects: Project[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(projectsCollection, orderBy("startDate", "desc"));
-    return onSnapshot(q, (snapshot) => {
-        const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        callback(projects);
-    }, onError);
+export function getProjectsRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('projects').toArray());
 }
 
 export async function addProject(projectData: Omit<Project, 'id'>): Promise<Project> {
     const docRef = await addDoc(projectsCollection, projectData);
-    return { id: docRef.id, ...projectData };
+    const newProject = { id: docRef.id, collection: 'projects', ...projectData };
+    await db.mainDataStore.put(newProject);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'projects', data: newProject } });
+    return newProject;
 }
 
 export async function updateProject(id: string, projectData: Partial<Project>): Promise<void> {
-    const projectRef = doc(firestoreDB, "projects", id);
-    await updateDoc(projectRef, projectData);
+    await db.mainDataStore.update(id, projectData);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'projects', id, changes: projectData } });
 }
 
 export async function deleteProject(id: string): Promise<void> {
-    const projectRef = doc(firestoreDB, "projects", id);
-    await deleteDoc(projectRef);
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'projects', id } });
 }
 
 
 // --- Loan Functions ---
-export function getLoansRealtime(callback: (loans: Loan[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(loansCollection, orderBy("startDate", "desc"));
-    return onSnapshot(q, (snapshot) => {
-        const loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
-        callback(loans);
-    }, onError);
+export function getLoansRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('loans').sortBy('startDate'));
 }
 
 export async function addLoan(loanData: Omit<Loan, 'id'>): Promise<Loan> {
     return runTransaction(firestoreDB, async (transaction) => {
-        const newLoanRef = doc(collection(firestoreDB, "loans"));
-        transaction.set(newLoanRef, { ...loanData, id: newLoanRef.id });
+        const newLoanRef = doc(loansCollection);
+        const newLoan = { id: newLoanRef.id, collection: 'loans', ...loanData };
+
+        await db.mainDataStore.put(newLoan);
+        await addToSyncQueue({ action: 'create', payload: { collection: 'loans', data: newLoan } });
 
         if ((loanData.loanType === 'Bank' || loanData.loanType === 'Outsider') && loanData.totalAmount > 0) {
-            const capitalInflowData: Omit<FundTransaction, 'id' | 'date' > = {
+            await addFundTransaction({
                 type: 'CapitalInflow',
                 source: loanData.loanType === 'Bank' ? 'BankLoan' : 'ExternalLoan',
                 destination: loanData.depositTo,
                 amount: loanData.totalAmount,
                 description: `Capital inflow from ${loanData.loanName}`
-            };
-             await addFundTransaction(capitalInflowData);
+            });
         }
         
-        return { id: newLoanRef.id, ...loanData };
+        return newLoan;
     });
 }
 
 export async function updateLoan(id: string, loanData: Partial<Loan>): Promise<void> {
-    const loanRef = doc(firestoreDB, "loans", id);
-    await updateDoc(loanRef, loanData);
+    await db.mainDataStore.update(id, loanData);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'loans', id, changes: loanData } });
 }
 
 export async function deleteLoan(id: string): Promise<void> {
-    const loanRef = doc(firestoreDB, "loans", id);
-    await deleteDoc(loanRef);
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'loans', id } });
 }
 
 
 // --- Customer Payment Functions ---
 
 export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'>): Promise<CustomerPayment> {
-    const docRef = doc(firestoreDB, 'customer_payments', paymentData.paymentId);
-    await setDoc(docRef, { ...paymentData, id: docRef.id });
-    return { ...paymentData, id: docRef.id };
+    const docRef = doc(customerPaymentsCollection, paymentData.paymentId);
+    const newPayment = { ...paymentData, id: docRef.id, collection: 'customer_payments' };
+    await db.mainDataStore.put(newPayment);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'customer_payments', data: newPayment } });
+    return newPayment;
 }
 
 export async function deletePayment(id: string): Promise<void> {
-    const docRef = doc(firestoreDB, "payments", id);
-    await deleteDoc(docRef);
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'payments', id } });
 }
 
 export async function deleteCustomerPayment(id: string): Promise<void> {
-    const docRef = doc(firestoreDB, "customer_payments", id);
-    await deleteDoc(docRef);
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'customer_payments', id } });
 }
 
 
 // --- Income and Expense specific functions ---
-export function getIncomeRealtime(callback: (income: Income[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(incomesCollection, orderBy("date", "desc"));
-    return onSnapshot(q, (snapshot) => {
-        const incomeList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
-        callback(incomeList);
-    }, onError);
+export function getIncomeRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('incomes').sortBy('date'));
 }
 
-export function getExpensesRealtime(callback: (expenses: Expense[]) => void, onError: (error: Error) => void): () => void {
-    const q = query(expensesCollection, orderBy("date", "desc"));
-    return onSnapshot(q, (snapshot) => {
-        const expenseList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
-        callback(expenseList);
-    }, onError);
+export function getExpensesRealtime() {
+    return liveQuery(() => db.mainDataStore.where('collection').equals('expenses').sortBy('date'));
 }
 
 export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
     const docRef = await addDoc(incomesCollection, incomeData);
-    await updateDoc(docRef, { id: docRef.id });
-    return { id: docRef.id, ...incomeData };
+    const newIncome = { id: docRef.id, collection: 'incomes', ...incomeData };
+    await db.mainDataStore.put(newIncome);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'incomes', data: newIncome } });
+    return newIncome;
 }
 
 export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
     const docRef = await addDoc(expensesCollection, expenseData);
-    await updateDoc(docRef, { id: docRef.id });
-    return { id: docRef.id, ...expenseData };
+    const newExpense = { id: docRef.id, collection: 'expenses', ...expenseData };
+    await db.mainDataStore.put(newExpense);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'expenses', data: newExpense } });
+    return newExpense;
 }
 
 export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
-    const docRef = doc(incomesCollection, id);
-    await updateDoc(docRef, incomeData);
+    await db.mainDataStore.update(id, incomeData);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'incomes', id, changes: incomeData } });
 }
 
 export async function updateExpense(id: string, expenseData: Partial<Omit<Expense, 'id'>>): Promise<void> {
-    const docRef = doc(expensesCollection, id);
-    await updateDoc(docRef, expenseData);
+    await db.mainDataStore.update(id, expenseData);
+    await addToSyncQueue({ action: 'update', payload: { collection: 'expenses', id, changes: expenseData } });
 }
 
 export async function deleteIncome(id: string): Promise<void> {
-    await deleteDoc(doc(incomesCollection, id));
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'incomes', id } });
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-    await deleteDoc(doc(expensesCollection, id));
+    await db.mainDataStore.delete(id);
+    await addToSyncQueue({ action: 'delete', payload: { collection: 'expenses', id } });
 }
 
 // --- Format Settings Functions ---
@@ -761,13 +694,8 @@ export async function addTransaction(transactionData: Omit<Transaction, 'id'|'tr
     
 // --- Batch Deletion for All Suppliers ---
 export async function deleteAllSuppliers(): Promise<void> {
-  const q = query(suppliersCollection);
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return;
-
-  const batch = writeBatch(firestoreDB);
-  snapshot.docs.forEach(doc => {
-    batch.delete(doc.ref);
-  });
-  await batch.commit();
+  const allSuppliers = await db.mainDataStore.where('collection').equals('suppliers').toArray();
+  const idsToDelete = allSuppliers.map(s => s.id);
+  await db.mainDataStore.bulkDelete(idsToDelete);
+  await addToSyncQueue({ action: 'delete', payload: { collection: 'suppliers', changes: { all: true } }});
 }

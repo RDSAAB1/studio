@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -17,25 +18,19 @@ import { format } from "date-fns";
 import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 
 export default function ProjectManagementPage() {
-    const [projects, setProjects] = useState<Project[]>([]);
+    const projects = useLiveQuery(getProjectsRealtime) || [];
     const [isClient, setIsClient] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [currentProject, setCurrentProject] = useState<Partial<Project> | null>(null);
+    const [currentProject, setCurrentProject] = useState<Partial<Project>>({});
     const { toast } = useToast();
 
     useEffect(() => {
         setIsClient(true);
-        const unsubscribe = getProjectsRealtime((projectsData) => {
-            setProjects(projectsData);
-        }, (error) => {
-            console.error("Error fetching projects:", error);
-            toast({ title: "Failed to load projects", variant: "destructive" });
-        });
-        return () => unsubscribe();
-    }, [toast]);
+    }, []);
 
     const handleNewProject = () => {
         setCurrentProject({
@@ -72,7 +67,7 @@ export default function ProjectManagementPage() {
         }
 
         try {
-            const projectData = {
+            const projectData: Partial<Project> = {
                 ...currentProject,
                 name: toTitleCase(currentProject.name),
                 description: currentProject.description ? toTitleCase(currentProject.description) : '',
@@ -86,7 +81,7 @@ export default function ProjectManagementPage() {
                 toast({ title: "Project created", variant: "success" });
             }
             setIsDialogOpen(false);
-            setCurrentProject(null);
+            setCurrentProject({});
         } catch (error) {
             console.error("Error saving project:", error);
             toast({ title: "Failed to save project", variant: "destructive" });

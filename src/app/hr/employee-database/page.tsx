@@ -1,9 +1,9 @@
 
+
 "use client";
 
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, doc, setDoc, deleteDoc, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useState, useEffect, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,14 +14,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { Employee } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import { getEmployeesRealtime, addEmployee, updateEmployee, deleteEmployee } from '@/lib/firestore';
 
 export default function EmployeeDatabasePage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const employees = useLiveQuery(getEmployeesRealtime) || [];
   const [isClient, setIsClient] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [currentEmployee, setCurrentEmployee] = useState<Partial<Employee>>({});
   const [formData, setFormData] = useState<Omit<Employee, 'id'>>({
     name: '',
     employeeId: '',
@@ -34,23 +33,16 @@ export default function EmployeeDatabasePage() {
 
   useEffect(() => {
     setIsClient(true);
-    const q = query(collection(db, "employees"), orderBy("employeeId"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const employeesData: Employee[] = [];
-      snapshot.forEach((doc) => {
-        employeesData.push({ id: doc.id, ...doc.data() as Omit<Employee, 'id'> });
-      });
-      setEmployees(employeesData);
-    }, (error) => {
-      console.error("Error fetching employees: ", error);
-      toast({
-        title: "Failed to load employee data",
-        variant: "destructive",
-      });
-    });
+  }, []);
 
-    return () => unsubscribe();
-  }, [toast]);
+  const nextEmployeeId = useMemo(() => {
+    if (employees.length === 0) return 'EMP001';
+    const lastId = employees[employees.length - 1]?.employeeId || 'EMP000';
+    const lastNumber = parseInt(lastId.replace('EMP', ''), 10);
+    const newNumber = lastNumber + 1;
+    return `EMP${String(newNumber).padStart(3, '0')}`;
+  }, [employees]);
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -63,16 +55,6 @@ export default function EmployeeDatabasePage() {
     }));
   };
 
-  const generateNewEmployeeId = () => {
-    if (employees.length === 0) {
-      return 'EMP001';
-    }
-    const lastId = employees[employees.length - 1].employeeId;
-    const lastNumber = parseInt(lastId.replace('EMP', ''), 10);
-    const newNumber = lastNumber + 1;
-    return `EMP${String(newNumber).padStart(3, '0')}`;
-  };
-
   const handleSubmit = async () => {
     if (!formData.name || !formData.employeeId) {
         toast({ title: "Name and Employee ID are required", variant: "destructive" });
@@ -80,22 +62,19 @@ export default function EmployeeDatabasePage() {
     }
 
     try {
-        const dataToSave = { ...formData, name: toTitleCase(formData.name) };
+        const dataToSave: Partial<Employee> = { ...formData, name: toTitleCase(formData.name) };
 
-        if (currentEmployee) {
-            const employeeRef = doc(db, "employees", currentEmployee.id);
-            await setDoc(employeeRef, dataToSave, { merge: true });
+        if (currentEmployee.id) {
+            await updateEmployee(currentEmployee.id, dataToSave);
             toast({ title: "Employee updated successfully", variant: "success" });
         } else {
-            const newEmployeeId = formData.employeeId;
-            const employeeRef = doc(db, "employees", newEmployeeId);
-            await setDoc(employeeRef, dataToSave);
+            await addEmployee(dataToSave as Omit<Employee, 'id'>);
             toast({ title: "Employee added successfully", variant: "success" });
         }
         closeDialog();
     } catch (error) {
         console.error("Error saving employee: ", error);
-        toast({ title: `Failed to ${currentEmployee ? 'update' : 'add'} employee`, variant: "destructive" });
+        toast({ title: `Failed to ${currentEmployee.id ? 'update' : 'add'} employee`, variant: "destructive" });
     }
   };
   
@@ -120,7 +99,7 @@ export default function EmployeeDatabasePage() {
 
   const handleDeleteEmployee = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "employees", id));
+      await deleteEmployee(id);
       toast({
         title: "Employee deleted successfully",
         variant: "success",
@@ -135,9 +114,8 @@ export default function EmployeeDatabasePage() {
   };
 
   const openDialogForAdd = () => {
-    setCurrentEmployee(null);
-    const newEmployeeId = generateNewEmployeeId();
-    setFormData({ name: '', employeeId: newEmployeeId, position: '', contact: '', baseSalary: 0, monthlyLeaveAllowance: 0 });
+    setCurrentEmployee({});
+    setFormData({ name: '', employeeId: nextEmployeeId, position: '', contact: '', baseSalary: 0, monthlyLeaveAllowance: 0 });
     setIsDialogOpen(true);
   };
 
@@ -156,11 +134,11 @@ export default function EmployeeDatabasePage() {
   
   const closeDialog = () => {
     setIsDialogOpen(false);
-    setCurrentEmployee(null);
+    setCurrentEmployee({});
     setFormData({ name: '', employeeId: '', position: '', contact: '', baseSalary: 0, monthlyLeaveAllowance: 0 });
   }
   
-  if (!isClient) return null;
+  if (!isClient) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <div className="space-y-6">
@@ -214,7 +192,7 @@ export default function EmployeeDatabasePage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent onKeyDown={handleKeyDown}>
           <DialogHeader>
-            <DialogTitle>{currentEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
+            <DialogTitle>{currentEmployee.id ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
           </DialogHeader>
           <form>
           <div className="grid gap-4 py-4">
@@ -247,7 +225,7 @@ export default function EmployeeDatabasePage() {
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancel</Button>
             <Button onClick={handleSubmit}>
-              {currentEmployee ? 'Save Changes' : 'Add Employee'}
+              {currentEmployee.id ? 'Save Changes' : 'Add Employee'}
             </Button>
           </DialogFooter>
         </DialogContent>

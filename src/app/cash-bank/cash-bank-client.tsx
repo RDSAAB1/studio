@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -6,6 +7,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { FundTransaction, Income, Expense, Loan, BankAccount } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
+import { useLiveQuery } from 'dexie-react-hooks';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -57,11 +59,12 @@ const initialLoanFormState: Partial<Loan> = {
 
 export default function CashBankClient() {
     
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-    const [incomes, setIncomes] = useState<Income[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [loans, setLoans] = useState<Loan[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const fundTransactions = useLiveQuery(getFundTransactionsRealtime) || [];
+    const incomes = useLiveQuery(getIncomeRealtime) || [];
+    const expenses = useLiveQuery(getExpensesRealtime) || [];
+    const loans = useLiveQuery(getLoansRealtime) || [];
+    const bankAccounts = useLiveQuery(getBankAccountsRealtime) || [];
+    
     const [isClient, setIsClient] = useState(false);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
@@ -85,21 +88,6 @@ export default function CashBankClient() {
 
     useEffect(() => {
         setIsClient(true);
-        const unsubscribeFunds = getFundTransactionsRealtime(setFundTransactions, (e) => toast({ title: "Error loading fund transactions", variant: "destructive" }));
-        const unsubscribeIncomes = getIncomeRealtime(setIncomes, (e) => toast({ title: "Error loading income data", variant: "destructive" }));
-        const unsubscribeExpenses = getExpensesRealtime(setExpenses, (e) => toast({ title: "Error loading expense data", variant: "destructive" }));
-        const unsubscribeLoans = getLoansRealtime(setLoans, (e) => toast({ title: "Error loading loan data", variant: "destructive" }));
-        const unsubscribeBankAccounts = getBankAccountsRealtime(setBankAccounts, (e) => {
-            toast({ title: "Error loading bank accounts", variant: "destructive" });
-        });
-        
-        return () => {
-            unsubscribeFunds();
-            unsubscribeIncomes();
-            unsubscribeExpenses();
-            unsubscribeLoans();
-            unsubscribeBankAccounts();
-        };
     }, []);
 
     const transferForm = useForm<TransferValues>({ 
