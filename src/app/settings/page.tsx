@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, getBankAccountsRealtime, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
+import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, addBank, addBankBranch } from '@/lib/firestore';
 import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
@@ -15,6 +15,10 @@ import { onAuthStateChanged, signOut, signInWithRedirect } from 'firebase/auth';
 import { toTitleCase, cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/lib/database";
+import { bankNames } from '@/lib/data';
+
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -36,7 +40,6 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { bankNames } from '@/lib/data';
 
 
 // Schemas
@@ -139,12 +142,14 @@ export default function SettingsPage() {
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const bankAccounts = useLiveQuery<BankAccount[]>(() => db.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
+    const banks = useLiveQuery<Bank[]>(() => db.mainDataStore?.where('collection').equals('banks').toArray()) || [];
+    const bankBranches = useLiveQuery<BankBranch[]>(() => db.mainDataStore?.where('collection').equals('bankBranches').toArray()) || [];
+
     const [isBankAccountDialogOpen, setIsBankAccountDialogOpen] = useState(false);
     const [currentBankAccount, setCurrentBankAccount] = useState<Partial<BankAccount>>({});
     const [formatSettings, setFormatSettings] = useState<FormatSettings>({});
-    const [banks, setBanks] = useState<Bank[]>([]);
-    const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
+    
     const [autoSyncInterval, setAutoSyncInterval] = useState<string>('never');
 
 
@@ -215,9 +220,6 @@ export default function SettingsPage() {
 
                 const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, console.error);
                 const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
-                const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
-                const unsubBanks = getBanksRealtime(setBanks, console.error);
-                const unsubBankBranches = getBankBranchesRealtime(setBankBranches, console.error);
                 
                 // Get periodic sync status
                 navigator.serviceWorker.ready.then(async (registration) => {
@@ -234,9 +236,6 @@ export default function SettingsPage() {
                 return () => { 
                     unsubVarieties(); 
                     unsubPaymentTypes(); 
-                    unsubBankAccounts();
-                    unsubBanks();
-                    unsubBankBranches();
                 };
             } else {
                 setUser(null);
@@ -463,14 +462,16 @@ export default function SettingsPage() {
     };
     
     const allBankOptions = useMemo(() => {
-        const combinedNames = [...new Set([...bankNames, ...banks.map((b) => b.name)])];
+        const safeBanks = banks || [];
+        const combinedNames = [...new Set([...bankNames, ...safeBanks.map((b) => b.name)])];
         return combinedNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
     }, [banks]);
-
+    
     const availableBranchOptions = useMemo(() => {
+        const safeBankBranches = bankBranches || [];
         if (!currentBankAccount.bankName) return [];
         const uniqueBranches = new Map<string, { value: string; label: string }>();
-        bankBranches
+        safeBankBranches
             .filter(branch => branch.bankName === currentBankAccount.bankName)
             .forEach(branch => {
                 if (!uniqueBranches.has(branch.ifscCode)) {
@@ -490,7 +491,8 @@ export default function SettingsPage() {
     };
 
     const handleBranchSelect = (ifscCode: string | null) => {
-        const selectedBranch = bankBranches.find(b => b.ifscCode === ifscCode);
+        const safeBankBranches = bankBranches || [];
+        const selectedBranch = safeBankBranches.find(b => b.ifscCode === ifscCode);
         if (selectedBranch) {
             setCurrentBankAccount(prev => ({
                 ...prev,

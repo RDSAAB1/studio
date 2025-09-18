@@ -216,22 +216,6 @@ export async function updateReceiptSettings(settings: Partial<ReceiptSettings>):
 }
 
 // --- Bank & Branch Functions ---
-export function getBanksRealtime(callback: (banks: Bank[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(banksCollection, orderBy("name", "asc"));
-  return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bank));
-    callback(data);
-  }, onError);
-}
-
-export function getBankBranchesRealtime(callback: (branches: BankBranch[]) => void, onError: (error: Error) => void): () => void {
-  const q = query(bankBranchesCollection, orderBy("bankName", "asc"));
-  return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BankBranch));
-    callback(data);
-  }, onError);
-}
-
 export async function addBank(bankName: string): Promise<Bank> {
   const docRef = doc(firestoreDB, 'banks', bankName);
   await setDoc(docRef, { name: bankName });
