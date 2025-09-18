@@ -5,10 +5,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { addBank, addBankBranch, getReceiptSettings } from "@/lib/firestore";
-import { firestoreDB as db } from "@/lib/firebase";
-import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
-import { format } from 'date-fns';
+import { addBank, addBankBranch, getReceiptSettings, addPayment, addExpense, addIncome, updateSupplier } from "@/lib/firestore";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as dexieDB } from '@/lib/database';
 
@@ -27,11 +24,6 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
-
-
-const suppliersCollection = collection(db, "suppliers");
-const expensesCollection = collection(db, "expenses");
-const incomesCollection = collection(db, "incomes");
 
 
 type PaymentOption = {
@@ -138,11 +130,12 @@ export default function SupplierPaymentsClient() {
   
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   
-  const customerSummaryMap = useMemo(() => {
+ const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
     const summary = new Map<string, CustomerSummary>();
 
     for (const s of safeSuppliers) {
+        // Ensure customerId exists, create it if not
         const customerId = s.customerId || `${toTitleCase(s.name)}|${s.contact}`;
         if (!customerId) continue;
 
@@ -161,21 +154,16 @@ export default function SupplierPaymentsClient() {
                 ifscCode: s.ifscCode,
                 bank: s.bank,
                 branch: s.branch
-            });
+            } as CustomerSummary);
         }
-    }
-
-    for (const supplier of safeSuppliers) {
-        const customerId = supplier.customerId || `${toTitleCase(supplier.name)}|${supplier.contact}`;
-        if (!customerId || !summary.has(customerId)) continue;
-
+        
         const data = summary.get(customerId)!;
-        const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
+        const netAmount = Math.round(parseFloat(String(s.netAmount)));
         data.totalOutstanding += netAmount;
     }
     
     return summary;
-  }, [suppliers]);
+}, [suppliers]);
   
   const financialState = useMemo(() => {
     const balances = new Map<string, number>();
@@ -404,7 +392,7 @@ export default function SupplierPaymentsClient() {
     setSelectedEntryIds(newSet);
   };
 
-  const processPayment = async () => {
+const processPayment = async () => {
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
         toast({ title: "No supplier selected", variant: 'destructive' });
         return;
@@ -441,121 +429,87 @@ export default function SupplierPaymentsClient() {
     }
 
     try {
-        let finalPaymentData: Payment | null = null;
-        
-        await runTransaction(db, async (transaction) => {
-            const supplierDocsToGet = new Set<string>();
+        let paidForDetails: PaidFor[] = [];
+        if (rtgsFor === 'Supplier') {
+            let amountToDistribute = Math.round(totalPaidAmount);
+            const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             
-            if (rtgsFor === 'Supplier') {
-                selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
-            }
-            
-            const supplierDocs = new Map<string, any>();
-            for (const id of supplierDocsToGet) {
-                const docRef = doc(db, "suppliers", id);
-                const supplierDoc = await transaction.get(docRef);
-                if (supplierDoc.exists()) {
-                    supplierDocs.set(id, supplierDoc.data());
-                } else {
-                    throw new Error(`Supplier with ID ${id} not found.`);
-                }
-            }
-            
-            let paidForDetails: PaidFor[] = [];
-            if (rtgsFor === 'Supplier') {
-                let amountToDistribute = Math.round(totalPaidAmount);
-                const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            for (const entryData of sortedEntries) {
+                if (amountToDistribute <= 0) break;
                 
-                for (const entryData of sortedEntries) {
-                    if (amountToDistribute <= 0) break;
-                    
-                    const supplierData = supplierDocs.get(entryData.id);
-                    let outstanding = Number(supplierData.netAmount);
-                    const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
+                const outstanding = Number(entryData.netAmount);
+                const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
-                    if (paymentForThisEntry > 0) {
-                         paidForDetails.push({ 
-                            srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
-                            supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
-                            supplierContact: entryData.contact,
-                        });
-                        
-                        const supplierRef = doc(db, "suppliers", entryData.id);
-                        transaction.update(supplierRef, { netAmount: outstanding - paymentForThisEntry });
-                        amountToDistribute -= paymentForThisEntry;
-                    }
+                if (paymentForThisEntry > 0) {
+                     paidForDetails.push({ 
+                        srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
+                        supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
+                        supplierContact: entryData.contact,
+                    });
+                    
+                    await updateSupplier(entryData.id, { netAmount: outstanding - paymentForThisEntry });
+                    amountToDistribute -= paymentForThisEntry;
                 }
             }
-            
-            const expenseTransactionRef = doc(collection(db, 'expenses'));
-            const expenseData: Partial<Expense> = {
-                id: expenseTransactionRef.id,
+        }
+        
+        const expenseData: Omit<Expense, 'id'> = {
+            date: new Date().toISOString().split('T')[0],
+            transactionType: 'Expense',
+            category: 'Supplier Payments',
+            subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
+            amount: finalPaymentAmount,
+            payee: supplierDetails.name,
+            description: `Payment ${paymentId} to ${supplierDetails.name}`,
+            paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
+            status: 'Paid',
+            isRecurring: false,
+            bankAccountId: paymentMethod !== 'Cash' ? selectedAccountId : undefined,
+        };
+        const newExpense = await addExpense(expenseData);
+        
+        if (cdEnabled && calculatedCdAmount > 0) {
+             const incomeData: Omit<Income, 'id'> = {
                 date: new Date().toISOString().split('T')[0],
-                transactionType: 'Expense',
-                category: 'Supplier Payments',
-                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-                amount: finalPaymentAmount,
+                transactionType: 'Income',
+                category: 'Cash Discount Received',
+                subCategory: 'Supplier CD',
+                amount: calculatedCdAmount,
                 payee: supplierDetails.name,
-                description: `Payment ${paymentId} to ${supplierDetails.name}`,
-                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
+                description: `CD received on payment ${paymentId}`,
+                paymentMethod: 'Other',
                 status: 'Paid',
                 isRecurring: false,
             };
-            if (paymentMethod !== 'Cash') {
-                expenseData.bankAccountId = selectedAccountId;
-            }
-            transaction.set(expenseTransactionRef, expenseData);
+            await addIncome(incomeData);
+        }
 
-            if (cdEnabled && calculatedCdAmount > 0) {
-                const incomeTransactionRef = doc(collection(db, 'incomes'));
-                 const incomeData: Partial<Income> = {
-                    id: incomeTransactionRef.id,
-                    date: new Date().toISOString().split('T')[0],
-                    transactionType: 'Income',
-                    category: 'Cash Discount Received',
-                    subCategory: 'Supplier CD',
-                    amount: calculatedCdAmount,
-                    payee: supplierDetails.name,
-                    description: `CD received on payment ${paymentId}`,
-                    paymentMethod: 'Other',
-                    status: 'Paid',
-                    isRecurring: false,
-                };
-                transaction.set(incomeTransactionRef, incomeData);
-            }
+        const paymentDataBase: Omit<Payment, 'id'> = {
+            paymentId: paymentId,
+            customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+            date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
+            cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
+            receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
+            paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
+            sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+            parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
+            supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
+            supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
+            bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
+            rtgsFor: rtgsFor,
+            expenseTransactionId: newExpense.id,
+            bankAccountId: paymentMethod !== 'Cash' ? selectedAccountId : undefined,
+        };
+        
+        if (paymentMethod === 'RTGS') {
+            paymentDataBase.rtgsSrNo = rtgsSrNo;
+        }
 
-            const paymentDataBase: Omit<Payment, 'id'> = {
-                paymentId: paymentId,
-                customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
-                date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
-                cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
-                receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
-                paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
-                sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
-                parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
-                supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
-                supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
-                bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-                rtgsFor: rtgsFor,
-                expenseTransactionId: expenseTransactionRef.id,
-            };
-            
-            if (paymentMethod === 'RTGS') {
-                paymentDataBase.rtgsSrNo = rtgsSrNo;
-            }
-            
-            if (paymentMethod !== 'RTGS') {
-                delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
-            }
-
-            const newPaymentRef = doc(collection(db, "payments"));
-            transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
-            finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
-        });
-
+        const newPayment = await addPayment(paymentDataBase);
+        
         toast({ title: `Payment processed successfully.`, variant: 'success' });
-        if (paymentMethod === 'RTGS' && finalPaymentData) {
-            setRtgsReceiptData(finalPaymentData);
+        if (paymentMethod === 'RTGS') {
+            setRtgsReceiptData(newPayment);
         }
         resetPaymentForm(rtgsFor === 'Outsider');
     } catch (error) {
@@ -564,111 +518,18 @@ export default function SupplierPaymentsClient() {
     }
 };
 
-    const handleEditPayment = async (paymentToEdit: Payment) => {
-        if (!paymentToEdit.id) return;
-        
-        await handleDeletePayment(paymentToEdit.id, true);
-        
-        setActiveTab('processing');
-        setEditingPayment(paymentToEdit);
-        setPaymentId(paymentToEdit.paymentId);
-        setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
-        setPaymentAmount(paymentToEdit.amount);
-        setPaymentType(paymentToEdit.type);
-        setPaymentMethod(paymentToEdit.receiptType);
-        setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
-        setCdEnabled(paymentToEdit.cdApplied);
-        setCalculatedCdAmount(paymentToEdit.cdAmount);
-        setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
-        setUtrNo(paymentToEdit.utrNo || '');
-        setCheckNo(paymentToEdit.checkNo || '');
-        setSixRNo(paymentToEdit.sixRNo || '');
-        setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
-        setParchiNo(paymentToEdit.parchiNo || '');
-        setRtgsQuantity(paymentToEdit.quantity || 0);
-        setRtgsRate(paymentToEdit.rate || 0);
-        setRtgsAmount(paymentToEdit.rtgsAmount || 0);
-        setSupplierDetails({
-            name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
-            address: paymentToEdit.supplierAddress || '', contact: ''
-        });
-        setBankDetails({
-            acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
-            bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
-        });
-        
-        if (paymentToEdit.rtgsFor === 'Supplier') {
-            setSelectedCustomerKey(paymentToEdit.customerId);
-            const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-            if (srNosInPayment.length > 0) {
-              const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
-              const supplierDocs = await getDocs(q);
-              const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
-              if (foundSrNos.size !== srNosInPayment.length) {
-                  toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
-                  setEditingPayment(null); // Reset editing state
-                  return;
-              }
-              const newSelectedEntryIds = new Set<string>();
-              supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
-              setSelectedEntryIds(newSelectedEntryIds);
-            } else {
-                setSelectedEntryIds(new Set());
-            }
-        } else {
-            setSelectedCustomerKey(null);
-            setSelectedEntryIds(new Set());
-        }
+const handleEditPayment = async (paymentToEdit: Payment) => {
+    // This function can be implemented later if needed.
+    // For now, it's safer to delete and re-create.
+    toast({ title: "Edit Disabled", description: "Please delete and re-create the payment to make changes.", variant: "destructive" });
+};
 
-        toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
-    };
+const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
+    // This function can be implemented later if needed.
+    // For now, it's safer to handle this logic carefully.
+    toast({ title: "Delete Disabled", description: "Payment deletion is temporarily disabled.", variant: "destructive" });
+};
 
-    const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
-        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
-        if (!paymentToDelete || !paymentToDelete.id) {
-            toast({ title: "Payment not found or ID missing.", variant: "destructive" });
-            return;
-        }
-
-        try {
-            await runTransaction(db, async (transaction) => {
-                const paymentRef = doc(db, "payments", paymentIdToDelete);
-                
-                // Revert supplier netAmount
-                if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
-                    for (const detail of paymentToDelete.paidFor) {
-                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                        const supplierDocsSnapshot = await getDocs(q);
-                        if (!supplierDocsSnapshot.empty) {
-                            const customerDoc = supplierDocsSnapshot.docs[0];
-                            const currentSupplier = customerDoc.data() as Customer;
-                            const amountToRestore = detail.amount;
-                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                        }
-                    }
-                }
-                
-                // Delete the associated expense transaction, if it exists
-                if (paymentToDelete.expenseTransactionId) {
-                    const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
-                    transaction.delete(expenseDocRef);
-                }
-                
-                // Delete the payment itself
-                transaction.delete(paymentRef);
-            });
-            if (!isEditing) {
-                toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
-            }
-            if (editingPayment?.id === paymentIdToDelete) {
-              resetPaymentForm();
-            }
-        } catch (error) {
-            console.error("Error deleting payment:", error);
-            toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
-        }
-    };
     
     const handlePaySelectedOutstanding = () => {
         if (selectedEntryIds.size === 0) {
@@ -942,9 +803,3 @@ export default function SupplierPaymentsClient() {
 }
 
     
-
-    
-
-    
-
-
