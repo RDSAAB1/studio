@@ -136,6 +136,7 @@ export default function SupplierPaymentsClient() {
   
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
+    if (!Array.isArray(suppliers)) return summary;
     
     suppliers.forEach(s => {
         if (!s.customerId) return;
@@ -214,6 +215,8 @@ export default function SupplierPaymentsClient() {
       p.paidFor?.some(pf => pf.srNo === detailsSupplierEntry.srNo)
     );
   }, [detailsSupplierEntry, paymentHistory]);
+
+  const isLoadingInitial = loading && suppliers.length === 0;
   
   useEffect(() => {
     setIsClient(true);
@@ -232,17 +235,18 @@ export default function SupplierPaymentsClient() {
     if(!isClient) return;
     
     let isSubscribed = true;
+    setLoading(true);
 
     const unsubSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
       if (isSubscribed) {
           setSuppliers(fetchedSuppliers);
-          if (loading) setLoading(false);
+          setLoading(false);
       }
     }, (error) => {
         if(isSubscribed) {
             console.error("Error fetching suppliers:", error);
             stableToast({ title: "Failed to load supplier data.", variant: 'destructive' });
-            if (loading) setLoading(false);
+            setLoading(false);
         }
     });
 
@@ -281,6 +285,7 @@ export default function SupplierPaymentsClient() {
         }
     };
     fetchSettings();
+
 
     return () => {
       isSubscribed = false;
@@ -775,115 +780,137 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient) {
+    if (!isClient || isLoadingInitial) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-4 text-muted-foreground">Loading...</span>
+                <span className="ml-4 text-muted-foreground">Loading Supplier Data...</span>
             </div>
         );
     }
   
   return (
     <div className="space-y-3">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-             <Card>
-                <CardHeader className="p-0">
-                    <TabsList className="grid w-full grid-cols-2 rounded-t-lg rounded-b-none h-12">
-                        <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                        <TabsTrigger value="history">Full History</TabsTrigger>
-                    </TabsList>
-                </CardHeader>
-                <TabsContent value="processing" className="mt-0 p-4 space-y-3">
-                    <div className="flex items-center space-x-2">
-                        <Label>Payment Method:</Label>
-                        <Button variant={paymentMethod === 'Cash' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('Cash')}>Cash</Button>
-                        <Button variant={paymentMethod === 'Online' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('Online')}>Online</Button>
-                        <Button variant={paymentMethod === 'RTGS' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('RTGS')}>RTGS</Button>
+        <Tabs value={paymentMethod} onValueChange={setPaymentMethod}>
+            <TabsList className="grid w-full grid-cols-3 h-9"><TabsTrigger value="Cash">Cash</TabsTrigger><TabsTrigger value="Online">Online</TabsTrigger><TabsTrigger value="RTGS">RTGS</TabsTrigger></TabsList>
+        </Tabs>
+        
+        {paymentMethod === 'RTGS' && (
+             <div className="flex items-center space-x-2 p-2">
+                <button
+                    type="button"
+                    onClick={() => {
+                        const newType = rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier';
+                        setRtgsFor(newType);
+                        resetPaymentForm(newType === 'Outsider');
+                    }}
+                    className={cn(
+                        "relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'
+                    )}
+                >
+                    <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground')}>Supplier</span>
+                    <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground')}>Outsider</span>
+                    <div
+                        className={cn(
+                            "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform",
+                            rtgsFor === 'Supplier' ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'
+                        )}
+                    >
+                        <div className={cn(
+                            "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300",
+                            rtgsFor === 'Supplier' ? 'bg-secondary' : 'bg-primary'
+                        )}>
+                            <span className="text-sm font-bold text-primary-foreground">For</span>
+                        </div>
                     </div>
+                </button>
+            </div>
+        )}
 
-                    {paymentMethod === 'RTGS' && (
-                        <div className="flex items-center space-x-2">
-                            <Label>For:</Label>
-                            <Button variant={rtgsFor === 'Supplier' ? 'secondary' : 'ghost'} size="sm" onClick={() => { setRtgsFor('Supplier'); resetPaymentForm(); }}>Supplier</Button>
-                            <Button variant={rtgsFor === 'Outsider' ? 'secondary' : 'ghost'} size="sm" onClick={() => { setRtgsFor('Outsider'); resetPaymentForm(true); }}>Outsider</Button>
-                        </div>
-                    )}
-                    
-                    {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
-                        <div className="flex flex-col md:flex-row items-start md:items-center gap-2 border p-2 rounded-lg">
-                            <div className="flex flex-1 items-center gap-2">
-                                <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
-                                <CustomDropdown
-                                    options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
-                                    value={selectedCustomerKey}
-                                    onChange={handleCustomerSelect}
-                                    placeholder="Search and select supplier..."
-                                />
-                            </div>
-                            {selectedCustomerKey && (
-                                <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
-                                    <div className="flex items-center gap-1 text-xs">
-                                        <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                        <p className="font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
-                                    </div>
-                                    <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="processing">Payment Processing</TabsTrigger>
+                <TabsTrigger value="history">Full History</TabsTrigger>
+            </TabsList>
+            <TabsContent value="processing" className="space-y-3">
+                {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
+                    <Card>
+                        <CardContent className="p-3">
+                            <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+                                <div className="flex flex-1 items-center gap-2">
+                                    <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
+                                    <CustomDropdown
+                                        options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                                        value={selectedCustomerKey}
+                                        onChange={handleCustomerSelect}
+                                        placeholder="Search and select supplier..."
+                                    />
                                 </div>
-                            )}
-                        </div>
-                    )}
+                                {selectedCustomerKey && (
+                                    <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
+                                        <div className="flex items-center gap-1 text-xs">
+                                            <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
+                                            <p className="font-bold text-destructive">{formatCurrency(customerSummaryMap.get(selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                                        </div>
+                                        <Button variant="outline" size="sm" onClick={() => setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
-                    {(selectedCustomerKey || rtgsFor === 'Outsider') && (
-                        <PaymentForm
-                            paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails} setSupplierDetails={setSupplierDetails}
-                            isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
-                            bankDetails={bankDetails} setBankDetails={setBankDetails}
-                            banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                            handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
-                            paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
-                            setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
-                            cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                            setSixRNo={setSixRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
-                            setUtrNo={setUtrNo} 
-                            parchiNo={parchiNo} setParchiNo={setParchiNo}
-                            rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
-                            setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                            processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                            editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                            setCheckNo={setCheckNo}
-                            calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
-                            calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
-                            calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
-                            handleGeneratePaymentOptions={handleGeneratePaymentOptions}
-                            paymentOptions={paymentOptions}
-                            selectPaymentAmount={selectPaymentAmount}
-                            requestSort={requestSort}
-                            sortedPaymentOptions={sortedPaymentOptions}
-                            roundFigureToggle={roundFigureToggle}
-                            setRoundFigureToggle={setRoundFigureToggle}
-                            bankAccounts={bankAccounts}
-                            selectedAccountId={selectedAccountId}
-                            setSelectedAccountId={handleSetSelectedAccount}
-                            financialState={financialState}
-                        />
-                    )}
-                </TabsContent>
-                <TabsContent value="history">
-                     <div className="p-4 space-y-3">
-                        <PaymentHistory
-                            payments={paymentHistory}
-                            onEdit={handleEditPayment}
-                            onDelete={handleDeletePayment}
-                            onShowDetails={setSelectedPaymentForDetails}
-                            onPrintRtgs={setRtgsReceiptData}
-                        />
-                        <TransactionTable
-                            suppliers={suppliers}
-                            onShowDetails={setDetailsSupplierEntry}
-                        />
-                     </div>
-                </TabsContent>
-            </Card>
+                {(selectedCustomerKey || rtgsFor === 'Outsider') && (
+                    <PaymentForm
+                        paymentMethod={paymentMethod} rtgsFor={rtgsFor} supplierDetails={supplierDetails} setSupplierDetails={setSupplierDetails}
+                        isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
+                        bankDetails={bankDetails} setBankDetails={setBankDetails}
+                        banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
+                        handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
+                        setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
+                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        setUtrNo={setUtrNo} 
+                        parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
+                        setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
+                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
+                        calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
+                        calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
+                        calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
+                        handleGeneratePaymentOptions={handleGeneratePaymentOptions}
+                        paymentOptions={paymentOptions}
+                        selectPaymentAmount={selectPaymentAmount}
+                        requestSort={requestSort}
+                        sortedPaymentOptions={sortedPaymentOptions}
+                        roundFigureToggle={roundFigureToggle}
+                        setRoundFigureToggle={setRoundFigureToggle}
+                        bankAccounts={bankAccounts}
+                        selectedAccountId={selectedAccountId}
+                        setSelectedAccountId={handleSetSelectedAccount}
+                        financialState={financialState}
+                    />
+                )}
+            </TabsContent>
+            <TabsContent value="history">
+                 <div className="space-y-3">
+                    <PaymentHistory
+                        payments={paymentHistory}
+                        onEdit={handleEditPayment}
+                        onDelete={handleDeletePayment}
+                        onShowDetails={setSelectedPaymentForDetails}
+                        onPrintRtgs={setRtgsReceiptData}
+                    />
+                    <TransactionTable
+                        suppliers={suppliers}
+                        onShowDetails={setDetailsSupplierEntry}
+                    />
+                 </div>
+            </TabsContent>
         </Tabs>
       
         <OutstandingEntriesDialog
@@ -933,3 +960,9 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
+
+    
+
+    
