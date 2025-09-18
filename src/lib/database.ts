@@ -93,45 +93,63 @@ export async function syncData(): Promise<{ success: boolean; syncedCount: numbe
     return { success: true, syncedCount };
 }
 
-// New function for initial data sync
-export async function initialDataSync() {
-    try {
-        console.log("Starting initial data sync...");
-        const collectionsToSync = [
-            'customers', 
-            'suppliers', 
-            'expenses', 
-            'incomes', 
-            'loans',
-            'fund_transactions',
-            'bankAccounts',
-            'employees',
-            'payroll',
-            'attendance',
-            'projects',
-            'inventoryItems',
-            'payments',
-            'customer_payments'
-        ];
+let isSyncing = false;
+let lastSyncTime = 0;
+const SYNC_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 
-        const allData: MainData[] = [];
-
-        for (const collectionName of collectionsToSync) {
-            const querySnapshot = await getDocs(collection(firestoreDB, collectionName));
-            const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, collection: collectionName } as MainData));
-            allData.push(...data);
-            console.log(`Fetched ${data.length} items from ${collectionName}`);
-        }
-        
-        // Clear existing data and then save new data
-        await db.mainDataStore.clear();
-        await db.mainDataStore.bulkPut(allData);
-        console.log(`Initial data sync completed. Total ${allData.length} items synced.`);
-
-    } catch (error) {
-        console.error("Initial data sync failed:", error);
+export async function initialDataSync(): Promise<void> {
+    const now = Date.now();
+    if (isSyncing || (now - lastSyncTime < SYNC_COOLDOWN)) {
+        console.log("Initial data sync is already in progress or was completed recently. Skipping.");
+        return;
     }
+    
+    isSyncing = true;
+    
+    return new Promise(async (resolve, reject) => {
+        try {
+            console.log("Starting initial data sync...");
+            const collectionsToSync = [
+                'customers', 
+                'suppliers', 
+                'expenses', 
+                'incomes', 
+                'loans',
+                'fund_transactions',
+                'bankAccounts',
+                'employees',
+                'payroll',
+                'attendance',
+                'projects',
+                'inventoryItems',
+                'payments',
+                'customer_payments'
+            ];
+
+            const allData: MainData[] = [];
+
+            for (const collectionName of collectionsToSync) {
+                const querySnapshot = await getDocs(collection(firestoreDB, collectionName));
+                const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, collection: collectionName } as MainData));
+                allData.push(...data);
+                console.log(`Fetched ${data.length} items from ${collectionName}`);
+            }
+            
+            await db.mainDataStore.clear();
+            await db.mainDataStore.bulkPut(allData);
+            
+            lastSyncTime = Date.now();
+            console.log(`Initial data sync completed. Total ${allData.length} items synced.`);
+            resolve();
+        } catch (error) {
+            console.error("Initial data sync failed:", error);
+            reject(error);
+        } finally {
+            isSyncing = false;
+        }
+    });
 }
+
 
 // Listen for messages from the service worker
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {

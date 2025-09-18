@@ -44,16 +44,14 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const pathname = usePathname();
 
     useEffect(() => {
-        initialDataSync();
-    }, []);
-
-    useEffect(() => {
         const auth = getFirebaseAuth();
         getRedirectResult(auth).catch(console.error);
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
+                // Await the initial data sync before proceeding
+                await initialDataSync();
                 const companySettings = await getRtgsSettings();
                 setIsSetupComplete(!!companySettings?.companyName);
             } else {
@@ -85,11 +83,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
 
-    // Show a loading screen while auth is being checked
+    // Show a loading screen while auth is being checked or initial setup/sync is in progress
     if (!authChecked || (user && isSetupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                 <span className="ml-4 text-muted-foreground">Initializing...</span>
             </div>
         );
     }
