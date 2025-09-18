@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, subDays, differenceInMonths } from 'date-fns';
 import { DonutChart, BarChart, AreaChart } from '@tremor/react';
 import { PiggyBank, Landmark, HandCoins, DollarSign, Scale, TrendingUp, TrendingDown, Users, Truck, Home, List, Bank, Percent } from 'lucide-react';
-import { getExpenseCategories, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getPaymentsRealtime, getLoansRealtime, getBankAccountsRealtime, getSuppliersRealtime, getCustomersRealtime } from '@/lib/firestore';
+import { getExpenseCategories, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getPaymentsRealtime, getLoansRealtime, getBankAccountsRealtime, getSuppliersRealtime, getCustomersRealtime } from "@/lib/firestore";
 
 const StatCard = ({ title, value, icon, colorClass, description }: { title: string, value: string, icon: React.ReactNode, colorClass?: string, description?: string }) => (
     <Card className="bg-card/60 backdrop-blur-sm">
@@ -51,7 +51,7 @@ export default function DashboardOverviewClient() {
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [isClient, setIsClient] = useState(false);
 
-    const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
+    const allTransactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
 
     useEffect(() => {
         setIsClient(true);
@@ -62,11 +62,11 @@ export default function DashboardOverviewClient() {
     
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
-        bankAccounts.forEach(acc => balances.set(acc.id, 0));
+        (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
         balances.set('CashInHand', 0);
         balances.set('CashAtHome', 0);
 
-        fundTransactions.forEach(t => {
+        (fundTransactions || []).forEach(t => {
             if (balances.has(t.source)) balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
             if (balances.has(t.destination)) balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
         });
@@ -80,10 +80,10 @@ export default function DashboardOverviewClient() {
             }
         });
 
-        const totalSupplierDues = suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
-        const totalCustomerDues = customers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0);
+        const totalSupplierDues = (suppliers || []).reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
+        const totalCustomerDues = (customers || []).reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0);
         
-        const loanLiabilities = loans.reduce((sum, loan) => {
+        const loanLiabilities = (loans || []).reduce((sum, loan) => {
             const paidTransactions = allTransactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
             const totalPaidTowardsPrincipal = paidTransactions.reduce((subSum, t) => subSum + t.amount, 0);
 
@@ -102,7 +102,7 @@ export default function DashboardOverviewClient() {
 
         const totalLiabilities = loanLiabilities + totalSupplierDues;
         
-        const totalCdReceived = payments.filter(p => p.paymentId.startsWith('P')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        const totalCdReceived = (payments || []).filter(p => p.paymentId.startsWith('P')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalAssets = cashAndBankAssets + totalCustomerDues;
@@ -153,7 +153,7 @@ export default function DashboardOverviewClient() {
             { name: "Liabilities", "Amount": financialState.totalLiabilities }
         ];
 
-        const topCustomers = customers
+        const topCustomers = (customers || [])
             .filter(c => (c.netAmount || 0) > 0)
             .sort((a,b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
             .slice(0, 5)
@@ -192,7 +192,7 @@ export default function DashboardOverviewClient() {
                 </CardHeader>
                 <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
-                        const account = bankAccounts.find(acc => acc.id === key);
+                        const account = (bankAccounts || []).find(acc => acc.id === key);
                         if (account) {
                             return <BalanceCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={`${account.bankName} - ...${account.accountNumber.slice(-4)}`} />
                         }
