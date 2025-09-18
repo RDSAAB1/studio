@@ -2,6 +2,7 @@
 import Dexie, { type Table } from 'dexie';
 import { firestoreDB } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import type { Payment } from './definitions';
 
 export interface MainData {
   id: string;
@@ -152,6 +153,16 @@ export async function initialDataSync(): Promise<void> {
             isSyncing = false;
         }
     });
+}
+
+export async function addPayment(paymentData: Omit<Payment, 'id'>): Promise<Payment> {
+    const newId = `P${Date.now()}${Math.random().toString(36).substring(2, 8)}`;
+    const newPayment = { ...paymentData, id: newId, collection: 'payments' };
+
+    await db.mainDataStore.put(newPayment);
+    await addToSyncQueue({ action: 'create', payload: { collection: 'payments', data: newPayment } });
+
+    return newPayment as Payment;
 }
 
 

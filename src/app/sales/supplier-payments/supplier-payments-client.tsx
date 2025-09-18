@@ -5,9 +5,9 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { addBank, addBankBranch, getReceiptSettings, addPayment, addExpense, addIncome, updateSupplier } from "@/lib/firestore";
+import { addBank, addBankBranch, getReceiptSettings, addExpense, addIncome, updateSupplier, deletePayment as deletePaymentFromDB, } from "@/lib/firestore";
+import { addPayment, db as dexieDB } from '@/lib/database';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db as dexieDB } from '@/lib/database';
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -454,7 +454,7 @@ const processPayment = async () => {
             }
         }
         
-        const expenseData: Omit<Expense, 'id'> = {
+        const newExpense = await addExpense({
             date: new Date().toISOString().split('T')[0],
             transactionType: 'Expense',
             category: 'Supplier Payments',
@@ -466,11 +466,10 @@ const processPayment = async () => {
             status: 'Paid',
             isRecurring: false,
             bankAccountId: paymentMethod !== 'Cash' ? selectedAccountId : undefined,
-        };
-        const newExpense = await addExpense(expenseData);
+        });
         
         if (cdEnabled && calculatedCdAmount > 0) {
-             const incomeData: Omit<Income, 'id'> = {
+             await addIncome({
                 date: new Date().toISOString().split('T')[0],
                 transactionType: 'Income',
                 category: 'Cash Discount Received',
@@ -481,8 +480,7 @@ const processPayment = async () => {
                 paymentMethod: 'Other',
                 status: 'Paid',
                 isRecurring: false,
-            };
-            await addIncome(incomeData);
+            });
         }
 
         const paymentDataBase: Omit<Payment, 'id'> = {
@@ -808,5 +806,6 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
     
 
     
+
 
 
