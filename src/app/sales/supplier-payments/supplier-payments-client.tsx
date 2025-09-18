@@ -138,8 +138,9 @@ export default function SupplierPaymentsClient() {
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   
   const customerSummaryMap = useMemo(() => {
+    if (!suppliers) return new Map<string, CustomerSummary>();
+
     const summary = new Map<string, CustomerSummary>();
-    if (!suppliers) return summary;
 
     suppliers.forEach(s => {
         const customerId = s.customerId || `${s.name}|${s.contact}`;
@@ -151,13 +152,18 @@ export default function SupplierPaymentsClient() {
                 ifscCode: s.ifscCode, bank: s.bank, branch: s.branch
             });
         }
+    });
+
+    suppliers.forEach(supplier => {
+        const customerId = supplier.customerId || `${supplier.name}|${supplier.contact}`;
+        if (!summary.has(customerId)) return; // Should not happen with the loop above, but as a safeguard.
         const data = summary.get(customerId)!;
-        const netAmount = Math.round(parseFloat(String(s.netAmount)));
+        const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
         data.totalOutstanding += netAmount;
     });
     
     return summary;
-}, [suppliers]);
+  }, [suppliers]);
   
   const financialState = useMemo(() => {
     const balances = new Map<string, number>();
@@ -833,7 +839,7 @@ export default function SupplierPaymentsClient() {
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
