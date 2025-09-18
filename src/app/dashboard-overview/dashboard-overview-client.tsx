@@ -66,11 +66,11 @@ export default function DashboardOverviewClient() {
     
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
-        (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
+        (Array.isArray(bankAccounts) ? bankAccounts : []).forEach(acc => balances.set(acc.id, 0));
         balances.set('CashInHand', 0);
         balances.set('CashAtHome', 0);
 
-        (fundTransactions || []).forEach(t => {
+        (Array.isArray(fundTransactions) ? fundTransactions : []).forEach(t => {
             if (balances.has(t.source)) balances.set(t.source, (balances.get(t.source) || 0) - t.amount);
             if (balances.has(t.destination)) balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
         });
@@ -84,10 +84,10 @@ export default function DashboardOverviewClient() {
             }
         });
 
-        const totalSupplierDues = (suppliers || []).reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
-        const totalCustomerDues = (customers || []).reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0);
+        const totalSupplierDues = (Array.isArray(suppliers) ? suppliers : []).reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
+        const totalCustomerDues = (Array.isArray(customers) ? customers : []).reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0);
         
-        const loanLiabilities = (loans || []).reduce((sum, loan) => {
+        const loanLiabilities = (Array.isArray(loans) ? loans : []).reduce((sum, loan) => {
             const paidTransactions = allTransactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
             const totalPaidTowardsPrincipal = paidTransactions.reduce((subSum, t) => subSum + t.amount, 0);
 
@@ -106,7 +106,7 @@ export default function DashboardOverviewClient() {
 
         const totalLiabilities = loanLiabilities + totalSupplierDues;
         
-        const totalCdReceived = (payments || []).filter(p => p.paymentId.startsWith('P')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
+        const totalCdReceived = (Array.isArray(payments) ? payments : []).filter(p => p.paymentId.startsWith('P')).reduce((sum, p) => sum + (p.cdAmount || 0), 0);
         
         const cashAndBankAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalAssets = cashAndBankAssets + totalCustomerDues;
@@ -157,7 +157,7 @@ export default function DashboardOverviewClient() {
             { name: "Liabilities", "Amount": financialState.totalLiabilities }
         ];
 
-        const topCustomers = (customers || [])
+        const topCustomers = (Array.isArray(customers) ? customers : [])
             .filter(c => (c.netAmount || 0) > 0)
             .sort((a,b) => Number(b.netAmount || 0) - Number(a.netAmount || 0))
             .slice(0, 5)
@@ -196,7 +196,7 @@ export default function DashboardOverviewClient() {
                 </CardHeader>
                 <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
-                        const account = (bankAccounts || []).find(acc => acc.id === key);
+                        const account = (Array.isArray(bankAccounts) ? bankAccounts : []).find(acc => acc.id === key);
                         if (account) {
                             return <BalanceCard key={key} title={account.accountHolderName} value={formatCurrency(balance)} icon={<Landmark />} colorClass="text-blue-500" description={`${account.bankName} - ...${account.accountNumber.slice(-4)}`} />
                         }
@@ -303,5 +303,5 @@ export default function DashboardOverviewClient() {
             </div>
         </div>
     );
-}
 
+    
