@@ -51,13 +51,17 @@ export default function DashboardOverviewClient() {
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [isClient, setIsClient] = useState(false);
 
-    const allTransactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
+    const allTransactions = useMemo(() => [...(Array.isArray(incomes) ? incomes : []), ...(Array.isArray(expenses) ? expenses : [])], [incomes, expenses]);
 
     useEffect(() => {
         setIsClient(true);
         // Expense categories are not part of the offline-first sync yet, so we fetch them directly.
         const unsubExpenseCats = getExpenseCategories(setExpenseCategories, console.error);
-        return () => unsubExpenseCats();
+        return () => {
+            if (typeof unsubExpenseCats === 'function') {
+                unsubExpenseCats();
+            }
+        };
     }, []);
     
     const financialState = useMemo(() => {
@@ -300,3 +304,4 @@ export default function DashboardOverviewClient() {
         </div>
     );
 }
+
