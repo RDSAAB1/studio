@@ -59,7 +59,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 setIsSetupComplete(!!companySettings?.companyName);
             } else {
                 setIsSetupComplete(null);
-          T   }
+            }
             setAuthChecked(true);
         });
 
@@ -120,14 +120,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials"/>
                 <meta name="theme-color" content="#4F46E5" />
             </head>
-            <body className={cn(inter.variable, spaceGrotesk.variable, sourceCodePro.variable)}>
-      D           <StateProvider>
+            <body className={cn(inter.variable, spaceGrotesk.variable, sourceCodePro.variable)}>
+                <StateProvider>
                     <AuthWrapper>
                         {children}
                     </AuthWrapper>
-                    <Toaster />
-                </StateProvider>
-            </body>
-        </html>
+                    <Toaster />
+                </StateProvider>
+            </body>
+        </html>
     );
 }
