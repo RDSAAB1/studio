@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { addBank, addBankBranch, getReceiptSettings, addPayment, addExpense, addIncome, updateSupplier } from "@/lib/firestore";
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as dexieDB } from '@/lib/database';
+import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -803,3 +804,9 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
 }
 
     
+
+    
+
+    
+
+
