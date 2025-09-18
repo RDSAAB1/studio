@@ -106,7 +106,7 @@ export const CalculatedSummary = ({
                             </InputWithIcon>
                          )}
                          {onImport && (
-                            <Button asChild size="sm" variant="outline" className="h-8 relative" type="button">
+                            <Button asChild size="sm" variant="outline" className="h-8 relative cursor-pointer" type="button">
                                 <label htmlFor="import-file">
                                     <Upload className="mr-2 h-4 w-4"/> Import
                                     <input id="import-file" type="file" className="sr-only" onChange={onImport} accept=".xlsx, .xls"/>
