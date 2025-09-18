@@ -25,7 +25,7 @@ import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
 // Icons
-import { Users, Calendar as CalendarIcon, Download, Printer, Info, Scale, FileText, Banknote } from "lucide-react";
+import { Users, Calendar as CalendarIcon, Download, Printer, Info, Scale, FileText, Banknote, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
