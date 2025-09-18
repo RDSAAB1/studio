@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
+import { getRtgsSettings, updateRtgsSettings } from '@/lib/firestore';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
@@ -22,6 +22,8 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 
 interface RtgsReportRow {
@@ -46,8 +48,8 @@ interface RtgsReportRow {
 }
 
 export default function RtgsReportClient() {
-    const [reportRows, setReportRows] = useState<RtgsReportRow[]>([]);
-    const [isClient, setIsClient] = useState(false);
+    const payments = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
+    const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
@@ -64,62 +66,53 @@ export default function RtgsReportClient() {
     const [endDate, setEndDate] = useState<Date | undefined>();
 
     useEffect(() => {
-        setIsClient(true);
-        let currentSettings: RtgsSettings | null = null;
-        let unsubscribePayments: (() => void) | undefined;
-
-        const fetchSettingsAndData = async () => {
+        const fetchSettings = async () => {
             try {
                 const savedSettings = await getRtgsSettings();
-                if (savedSettings) {
-                    currentSettings = savedSettings;
-                    setSettings(savedSettings);
-
-                    // Now that settings are loaded, subscribe to payments
-                    unsubscribePayments = getPaymentsRealtime((payments) => {
-                        const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
-                        const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
-                            const srNo = p.rtgsSrNo || p.paymentId || '';
-                            return {
-                                paymentId: p.paymentId,
-                                date: p.date,
-                                checkNo: p.checkNo || '',
-                                type: p.type || (currentSettings?.type || 'SB'),
-                                srNo: srNo,
-                                supplierName: toTitleCase(p.supplierName || ''),
-                                fatherName: toTitleCase(p.supplierFatherName || ''),
-                                contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
-                                acNo: p.bankAcNo || '',
-                                ifscCode: p.bankIfsc || '',
-                                branch: toTitleCase(p.bankBranch || ''),
-                                bank: p.bankName || '',
-                                amount: p.rtgsAmount || p.amount || 0,
-                                rate: p.rate || 0,
-                                weight: p.quantity || 0,
-                                sixRNo: p.sixRNo || '',
-                                sixRDate: p.sixRDate || '',
-                                parchiNo: p.parchiNo || (p.paidFor?.map(pf => pf.srNo).join(', ') || ''),
-                            };
-                        });
-                        newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                        setReportRows(newReportRows);
-                    }, (error) => {
-                        console.error("Error fetching RTGS reports: ", error);
-                    });
-                }
+                setSettings(savedSettings);
             } catch (error) {
                 console.error("Error fetching initial settings: ", error);
             }
         };
-
-        fetchSettingsAndData();
-
-        return () => {
-            if (unsubscribePayments) {
-                unsubscribePayments();
-            }
-        };
+        fetchSettings();
     }, []);
+
+    useEffect(() => {
+        // Data is considered loaded when settings are fetched and payments are no longer undefined
+        if (settings !== null && payments !== undefined) {
+            setLoading(false);
+        }
+    }, [settings, payments]);
+
+    const reportRows = useMemo(() => {
+        if (!settings || !payments) return [];
+        const rtgsPayments = payments.filter(p => p.receiptType === 'RTGS');
+        const newReportRows: RtgsReportRow[] = rtgsPayments.map(p => {
+            const srNo = p.rtgsSrNo || p.paymentId || '';
+            return {
+                paymentId: p.paymentId,
+                date: p.date,
+                checkNo: p.checkNo || '',
+                type: p.type || (settings?.type || 'SB'),
+                srNo: srNo,
+                supplierName: toTitleCase(p.supplierName || ''),
+                fatherName: toTitleCase(p.supplierFatherName || ''),
+                contact: p.paidFor?.[0]?.supplierContact || p.supplierName || '',
+                acNo: p.bankAcNo || '',
+                ifscCode: p.bankIfsc || '',
+                branch: toTitleCase(p.bankBranch || ''),
+                bank: p.bankName || '',
+                amount: p.rtgsAmount || p.amount || 0,
+                rate: p.rate || 0,
+                weight: p.quantity || 0,
+                sixRNo: p.sixRNo || '',
+                sixRDate: p.sixRDate || '',
+                parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
+            };
+        });
+        return newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [payments, settings]);
+
 
     const filteredReportRows = useMemo(() => {
         let filtered = reportRows;
@@ -247,8 +240,8 @@ export default function RtgsReportClient() {
         XLSX.writeFile(workbook, `RTGS_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     };
 
-    if (!isClient) {
-        return null;
+    if (loading) {
+        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Loading RTGS Reports...</div>;
     }
     
     return (
@@ -321,7 +314,7 @@ export default function RtgsReportClient() {
                         <CardTitle>RTGS Payment Report</CardTitle>
                         <CardDescription>A detailed report of all payments made via RTGS.</CardDescription>
                     </div>
-                     {filteredReportRows.length > 0 && (
+                     {filteredReportRows.length > 0 && settings && (
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <Button onClick={() => setIsBankMailFormatOpen(true)} size="sm" variant="outline" className="w-full sm:w-auto">
                                 <Mail className="mr-2 h-4 w-4" /> Bank Mail Format
@@ -399,7 +392,7 @@ export default function RtgsReportClient() {
 
              <Dialog open={isPrintPreviewOpen} onOpenChange={setIsPrintPreviewOpen}>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                    <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />
+                    {settings && <ConsolidatedRtgsPrintFormat payments={filteredReportRows} settings={settings} />}
                 </DialogContent>
             </Dialog>
 
