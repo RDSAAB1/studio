@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Customer, RtgsSettings } from '@/lib/definitions';
-import { getSuppliersRealtime, getRtgsSettings } from '@/lib/firestore';
+import { getRtgsSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
@@ -15,6 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 
 const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { label: string; value: string; isHighlighted?: boolean }[]; icon: React.ReactNode }) => (
@@ -38,7 +40,7 @@ const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { lab
 
 
 export default function DailySupplierReportClient() {
-    const [suppliers, setSuppliers] = useState<Customer[]>([]);
+    const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -47,17 +49,9 @@ export default function DailySupplierReportClient() {
     const printRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const unsubscribe = getSuppliersRealtime(
-            (data) => {
-                setSuppliers(data);
-                setLoading(false);
-            },
-            (error) => {
-                console.error("Error fetching suppliers:", error);
-                toast({ title: "Failed to load supplier data.", variant: "destructive" });
-                setLoading(false);
-            }
-        );
+        if(suppliers !== undefined){
+            setLoading(false);
+        }
         
         const fetchSettings = async () => {
             const fetchedSettings = await getRtgsSettings();
@@ -65,10 +59,10 @@ export default function DailySupplierReportClient() {
         }
         fetchSettings();
 
-        return () => unsubscribe();
-    }, [toast]);
+    }, [suppliers]);
 
     const filteredSuppliers = useMemo(() => {
+        if (!suppliers) return [];
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
         return suppliers.filter(s => {
             const supplierDate = format(new Date(s.date), 'yyyy-MM-dd');

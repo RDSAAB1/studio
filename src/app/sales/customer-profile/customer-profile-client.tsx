@@ -5,10 +5,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/database";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -411,14 +411,13 @@ const CustomerProfileView = ({
 
 
 export default function CustomerProfileClient() {
-  const [customers, setCustomers] = useState<Supplier[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').toArray()) || [];
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').toArray()) || [];
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -426,30 +425,6 @@ export default function CustomerProfileClient() {
 
   useEffect(() => {
     setIsClient(true);
-    setLoading(true);
-
-    const unsubscribeCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
-        const fetchedCustomers: Supplier[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier));
-        setCustomers(fetchedCustomers);
-        setLoading(false);
-    }, (error) => {
-        console.error("Failed to load customers from Firestore", error);
-        setCustomers([]);
-        setLoading(false);
-    });
-
-    const unsubscribePayments = onSnapshot(collection(db, "customer_payments"), (snapshot) => {
-        const fetchedPayments: CustomerPayment[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
-        setPaymentHistory(fetchedPayments);
-    }, (error) => {
-        console.error("Failed to load customer payments from Firestore", error);
-        setPaymentHistory([]);
-    });
-
-    return () => { 
-        unsubscribeCustomers(); 
-        unsubscribePayments(); 
-    };
   }, []);
 
   const filteredData = useMemo(() => {
@@ -556,10 +531,10 @@ export default function CustomerProfileClient() {
 
   const selectedCustomerData = selectedCustomerKey ? customerSummaryMap.get(selectedCustomerKey) : null;
   
-  if (!isClient || loading) {
+  if (!isClient) {
     return (
         <div className="flex items-center justify-center h-64">
-            <p>Loading Profiles...</p>
+            <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
     );
   }

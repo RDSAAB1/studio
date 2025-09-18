@@ -1,7 +1,6 @@
 
-
 import Dexie, { type Table } from 'dexie';
-import { db as firestoreDB } from '@/lib/firebase';
+import { firestoreDB } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
 export interface MainData {
@@ -124,7 +123,11 @@ export async function initialDataSync(): Promise<void> {
                 'projects',
                 'inventoryItems',
                 'payments',
-                'customer_payments'
+                'customer_payments',
+                'banks',
+                'bankBranches',
+                'varieties',
+                'paymentTypes'
             ];
 
             const allData: MainData[] = [];

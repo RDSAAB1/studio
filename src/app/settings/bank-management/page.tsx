@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { db } from '@/lib/firebase';
-import { getBanksRealtime, getBankBranchesRealtime, addBank, addBankBranch, deleteBankBranch, updateBankBranch } from '@/lib/firestore';
+import { addBank, addBankBranch, deleteBankBranch, updateBankBranch } from '@/lib/firestore';
 import { Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -23,8 +24,8 @@ import { toTitleCase } from '@/lib/utils';
 
 export default function BankManagementPage() {
     const { toast } = useToast();
-    const [banks, setBanks] = useState<Bank[]>([]);
-    const [branches, setBranches] = useState<BankBranch[]>([]);
+    const banks = useLiveQuery(() => db.mainDataStore.where('collection').equals('banks').toArray()) || [];
+    const branches = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankBranches').toArray()) || [];
     const [loading, setLoading] = useState(true);
 
     const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
@@ -37,16 +38,10 @@ export default function BankManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        const unsubBanks = getBanksRealtime(setBanks, (err) => toast({ title: "Error", description: "Failed to load banks.", variant: "destructive" }));
-        const unsubBranches = getBankBranchesRealtime((data) => {
-            setBranches(data);
+        if(banks !== undefined && branches !== undefined) {
             setLoading(false);
-        }, (err) => {
-            toast({ title: "Error", description: "Failed to load branches.", variant: "destructive" });
-            setLoading(false);
-        });
-        return () => { unsubBanks(); unsubBranches(); };
-    }, [toast]);
+        }
+    }, [banks, branches]);
 
     const bankOptions = useMemo(() => [
         { value: 'all', label: 'All Banks' },
