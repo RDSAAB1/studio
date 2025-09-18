@@ -27,9 +27,9 @@ class MyOfflineDB extends Dexie {
 
   constructor() {
     super('myOfflineDB');
-    this.version(2).stores({ // Incremented version for schema change
+    this.version(3).stores({ // Incremented version for schema change
       mainDataStore: 'id, collection', // Added 'collection' as an index
-      syncQueueStore: '++id, timestamp',
+      syncQueueStore: '++id, timestamp, payload.collection', // Added index for payload.collection
     });
   }
 }
