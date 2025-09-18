@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -64,8 +65,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo'));
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
+  const suppliers = useLiveQuery(getSuppliersRealtime());
+  const paymentHistory = useLiveQuery(getPaymentsRealtime()) || [];
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -121,16 +122,16 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
-      if (suppliers !== undefined) {
-          setIsLoading(false);
-          if (isInitialLoad.current && suppliers) {
-              const nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-              const initialSrNo = formatSrNo(nextSrNum, 'S');
-              form.setValue('srNo', initialSrNo);
-              setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-              isInitialLoad.current = false;
-          }
-      }
+    if (suppliers !== undefined) {
+        setIsLoading(false);
+        if (isInitialLoad.current && suppliers) {
+            const nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'S');
+            form.setValue('srNo', initialSrNo);
+            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+            isInitialLoad.current = false;
+        }
+    }
   }, [suppliers, form]);
 
   useEffect(() => {
