@@ -1,7 +1,6 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { 
     getAuth, 
@@ -47,6 +46,19 @@ if (typeof window !== 'undefined') {
 
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+// Enable persistence
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db)
+    .catch((err) => {
+      if (err.code == 'failed-precondition') {
+        console.warn('Firestore persistence failed: Multiple tabs open?');
+      } else if (err.code == 'unimplemented') {
+        console.warn('Firestore persistence failed: Browser does not support it.');
+      }
+    });
+}
+
 
 // Use a function to get auth instance to ensure it's client-side
 let authInstance: Auth | null = null;
