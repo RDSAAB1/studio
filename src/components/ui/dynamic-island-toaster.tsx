@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import React, { useState, useEffect } from "react";
 
-export function DynamicIslandToaster() {
+export default function DynamicIslandToaster() {
   const { toasts } = useToast();
   const [isClient, setIsClient] = useState(false);
 

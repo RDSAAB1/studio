@@ -21,7 +21,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useToast } from "@/hooks/use-toast";
 
 const DynamicIslandToaster = dynamic(
-  () => import('../ui/dynamic-island-toaster').then(mod => mod.DynamicIslandToaster),
+  () => import('../ui/dynamic-island-toaster'),
   { ssr: false }
 );
 
