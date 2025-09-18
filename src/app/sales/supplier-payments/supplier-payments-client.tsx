@@ -9,6 +9,7 @@ import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getB
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,15 +46,16 @@ type SortConfig = {
 
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [incomes, setIncomes] = useState<Income[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const suppliers = useLiveQuery(getSuppliersRealtime());
+  const paymentHistory = useLiveQuery(getPaymentsRealtime());
+  const incomes = useLiveQuery(getIncomeRealtime());
+  const expenses = useLiveQuery(getExpensesRealtime());
+  const fundTransactions = useLiveQuery(getFundTransactionsRealtime());
+  const bankAccounts = useLiveQuery(getBankAccountsRealtime());
+
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-
+  
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   
@@ -104,7 +106,7 @@ export default function SupplierPaymentsClient() {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [roundFigureToggle, setRoundFigureToggle] = useState(false);
 
-  const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
+  const allTransactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
 
 
   const stableToast = useCallback(toast, []);
@@ -162,10 +164,10 @@ export default function SupplierPaymentsClient() {
   
   const financialState = useMemo(() => {
     const balances = new Map<string, number>();
-    bankAccounts.forEach(acc => balances.set(acc.id, 0));
+    (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
     balances.set('CashInHand', 0);
 
-    fundTransactions.forEach(t => {
+    (fundTransactions || []).forEach(t => {
         if (t.type === 'CapitalInflow') {
             if (balances.has(t.destination)) {
                 balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
@@ -195,6 +197,7 @@ export default function SupplierPaymentsClient() {
   }, [fundTransactions, allTransactions, bankAccounts]);
 
   const selectedEntries = useMemo(() => {
+    if (!Array.isArray(suppliers)) return [];
     return suppliers.filter(s => selectedEntryIds.has(s.id));
   }, [suppliers, selectedEntryIds]);
   
@@ -210,13 +213,13 @@ export default function SupplierPaymentsClient() {
   }, [selectedEntries]);
 
   const paymentsForDetailsEntry = useMemo(() => {
-    if (!detailsSupplierEntry) return [];
+    if (!detailsSupplierEntry || !paymentHistory) return [];
     return paymentHistory.filter(p => 
       p.paidFor?.some(pf => pf.srNo === detailsSupplierEntry.srNo)
     );
   }, [detailsSupplierEntry, paymentHistory]);
 
-  const isLoadingInitial = loading && suppliers.length === 0;
+  const isLoadingInitial = loading && (!suppliers || suppliers.length === 0);
   
   useEffect(() => {
     setIsClient(true);
@@ -230,45 +233,22 @@ export default function SupplierPaymentsClient() {
     setSelectedAccountId(accountId);
     localStorage.setItem('lastSelectedAccountId', accountId);
   }
+  
+  useEffect(() => {
+    if (suppliers !== undefined) {
+        setLoading(false);
+    }
+  }, [suppliers]);
 
   useEffect(() => {
     if(!isClient) return;
     
     let isSubscribed = true;
-    setLoading(true);
-
-    const unsubSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
-      if (isSubscribed) {
-          setSuppliers(fetchedSuppliers);
-          setLoading(false);
-      }
-    }, (error) => {
-        if(isSubscribed) {
-            console.error("Error fetching suppliers:", error);
-            stableToast({ title: "Failed to load supplier data.", variant: 'destructive' });
-            setLoading(false);
-        }
-    });
-
-    const unsubPayments = getPaymentsRealtime((fetchedPayments) => {
-      if(isSubscribed) {
-        setPaymentHistory(fetchedPayments);
-        if (!editingPayment) {
-          setPaymentId(getNextPaymentId(fetchedPayments));
-          setRtgsSrNo(getNextRtgsSrNo(fetchedPayments));
-        }
-      }
-    }, (error) => {
-        if(isSubscribed) {
-            console.error("Error fetching payments:", error);
-            stableToast({ title: "Failed to load payment history.", variant: 'destructive' });
-        }
-    });
     
-    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
-    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
-    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
-    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+    if (paymentHistory && !editingPayment) {
+        setPaymentId(getNextPaymentId(paymentHistory));
+        setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
+    }
     
     const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
       if(isSubscribed) console.error("Error fetching banks:", error);
@@ -289,16 +269,10 @@ export default function SupplierPaymentsClient() {
 
     return () => {
       isSubscribed = false;
-      unsubSuppliers();
-      unsubPayments();
-      unsubIncomes();
-      unsubExpenses();
-      unsubFunds();
-      unsubBankAccounts();
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
+  }, [isClient, editingPayment, paymentHistory, getNextPaymentId, getNextRtgsSrNo]);
   
   useEffect(() => {
     autoSetCDToggle();
@@ -325,7 +299,7 @@ export default function SupplierPaymentsClient() {
         const eligibleOutstanding = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
         let eligiblePaid = 0;
         const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-        const paymentsForSelectedEntries = paymentHistory.filter(p => 
+        const paymentsForSelectedEntries = (paymentHistory || []).filter(p => 
             p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
         );
 
@@ -378,8 +352,8 @@ export default function SupplierPaymentsClient() {
     setRtgsRate(0);
     setRtgsAmount(0);
     setPaymentOptions([]);
-    setPaymentId(getNextPaymentId(paymentHistory));
-    setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
+    setPaymentId(getNextPaymentId(paymentHistory || []));
+    setRtgsSrNo(getNextRtgsSrNo(paymentHistory || []));
     if (isOutsider) {
       setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
       setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -440,7 +414,7 @@ export default function SupplierPaymentsClient() {
     const availableBalance = financialState.balances.get(accountIdForPayment) || 0;
     
     if (finalPaymentAmount > availableBalance) {
-        const accountName = bankAccounts.find(acc => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
+        const accountName = (bankAccounts || []).find(acc => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
         toast({
             title: "Insufficient Balance",
             description: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.`,
@@ -644,7 +618,7 @@ export default function SupplierPaymentsClient() {
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
-        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
+        const paymentToDelete = (paymentHistory || []).find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
@@ -889,7 +863,7 @@ export default function SupplierPaymentsClient() {
                         sortedPaymentOptions={sortedPaymentOptions}
                         roundFigureToggle={roundFigureToggle}
                         setRoundFigureToggle={setRoundFigureToggle}
-                        bankAccounts={bankAccounts}
+                        bankAccounts={bankAccounts || []}
                         selectedAccountId={selectedAccountId}
                         setSelectedAccountId={handleSetSelectedAccount}
                         financialState={financialState}
@@ -899,14 +873,14 @@ export default function SupplierPaymentsClient() {
             <TabsContent value="history">
                  <div className="space-y-3">
                     <PaymentHistory
-                        payments={paymentHistory}
+                        payments={paymentHistory || []}
                         onEdit={handleEditPayment}
                         onDelete={handleDeletePayment}
                         onShowDetails={setSelectedPaymentForDetails}
                         onPrintRtgs={setRtgsReceiptData}
                     />
                     <TransactionTable
-                        suppliers={suppliers}
+                        suppliers={suppliers || []}
                         onShowDetails={setDetailsSupplierEntry}
                     />
                  </div>
@@ -917,12 +891,12 @@ export default function SupplierPaymentsClient() {
             isOpen={isOutstandingModalOpen}
             onOpenChange={setIsOutstandingModalOpen}
             customerName={toTitleCase(customerSummaryMap.get(selectedCustomerKey || '')?.name || '')}
-            entries={suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
+            entries={(suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
             selectedIds={selectedEntryIds}
             onSelect={handleEntrySelect}
             onSelectAll={(checked: boolean) => {
                 const newSet = new Set<string>();
-                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
+                const outstandingEntries = (suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
                 if(checked) outstandingEntries.forEach(e => newSet.add(e.id));
                 setSelectedEntryIds(newSet);
             }}
@@ -966,3 +940,4 @@ export default function SupplierPaymentsClient() {
     
 
     
+
