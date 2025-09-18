@@ -6,10 +6,11 @@ import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, Fund
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { addBank, addBankBranch, getReceiptSettings } from "@/lib/firestore";
-import { db } from "@/lib/firebase";
+import { db as firestoreDB } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,9 +29,9 @@ import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-se
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
 
 
-const suppliersCollection = collection(db, "suppliers");
-const expensesCollection = collection(db, "expenses");
-const incomesCollection = collection(db, "incomes");
+const suppliersCollection = collection(firestoreDB, "suppliers");
+const expensesCollection = collection(firestoreDB, "expenses");
+const incomesCollection = collection(firestoreDB, "incomes");
 
 
 type PaymentOption = {
@@ -138,29 +139,44 @@ export default function SupplierPaymentsClient() {
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   
   const customerSummaryMap = useMemo(() => {
-    if (!suppliers) return new Map<string, CustomerSummary>();
+    const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
+    if (safeSuppliers.length === 0) {
+        return new Map<string, CustomerSummary>();
+    }
 
     const summary = new Map<string, CustomerSummary>();
 
-    suppliers.forEach(s => {
-        const customerId = s.customerId || `${s.name}|${s.contact}`;
+    for (const s of safeSuppliers) {
+        const customerId = s.customerId || `${toTitleCase(s.name)}|${s.contact}`;
+        if (!customerId) continue;
+
         if (!summary.has(customerId)) {
             summary.set(customerId, {
-                name: s.name, contact: s.contact, so: s.so, address: s.address,
-                totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
-                totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
-                ifscCode: s.ifscCode, bank: s.bank, branch: s.branch
+                name: s.name,
+                contact: s.contact,
+                so: s.so,
+                address: s.address,
+                totalOutstanding: 0,
+                paymentHistory: [],
+                totalAmount: 0,
+                totalPaid: 0,
+                outstandingEntryIds: [],
+                acNo: s.acNo,
+                ifscCode: s.ifscCode,
+                bank: s.bank,
+                branch: s.branch
             });
         }
-    });
+    }
 
-    suppliers.forEach(supplier => {
-        const customerId = supplier.customerId || `${supplier.name}|${supplier.contact}`;
-        if (!summary.has(customerId)) return; // Should not happen with the loop above, but as a safeguard.
+    for (const supplier of safeSuppliers) {
+        const customerId = supplier.customerId || `${toTitleCase(supplier.name)}|${supplier.contact}`;
+        if (!customerId || !summary.has(customerId)) continue;
+
         const data = summary.get(customerId)!;
         const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
         data.totalOutstanding += netAmount;
-    });
+    }
     
     return summary;
   }, [suppliers]);
@@ -928,5 +944,3 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
