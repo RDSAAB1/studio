@@ -46,7 +46,7 @@ if (typeof window !== 'undefined') {
 
 
 const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({})
+    localCache: persistentLocalCache({ cacheSizeBytes: 100 * 1024 * 1024 }) // Increased cache size to 100MB
 });
 const storage = getStorage(app);
 
@@ -90,3 +90,4 @@ export {
     sendPasswordResetEmail,
     signInWithRedirect
 };
+
