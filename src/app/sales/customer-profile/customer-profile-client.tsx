@@ -410,7 +410,7 @@ const CustomerProfileView = ({
 };
 
 
-export function CustomerProfileClient() {
+export default function CustomerProfileClient() {
   const [customers, setCustomers] = useState<Supplier[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(MILL_OVERVIEW_KEY);
