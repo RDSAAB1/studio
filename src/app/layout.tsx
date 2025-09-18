@@ -66,31 +66,31 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     }, []);
     
     useEffect(() => {
-  	if (!authChecked) return;
+        if (!authChecked) return;
 
-  	const publicRoutes = ['/login', '/forgot-password', '/'];
-  	const isPublicPage = publicRoutes.includes(pathname);
-  	const isSettingsPage = pathname === '/settings';
+        const publicRoutes = ['/login', '/forgot-password', '/'];
+        const isPublicPage = publicRoutes.includes(pathname);
+        const isSettingsPage = pathname === '/settings';
 
-  	if (!user) {
-  		if (!isPublicPage) {
-  			router.replace('/login');
-  		}
-  	} else if (user) {
-  		if (isSetupComplete === false && !isSettingsPage) {
-  			router.replace('/settings');
-  		} else if (isSetupComplete === true && isPublicPage) {
-  			router.replace('/dashboard-overview');
-  		}
-  	}
-  }, [user, authChecked, isSetupComplete, pathname, router]);
+        if (!user) {
+            if (!isPublicPage) {
+                router.replace('/login');
+            }
+        } else if (user) {
+            if (isSetupComplete === false && !isSettingsPage) {
+                router.replace('/settings');
+            } else if (isSetupComplete === true && isPublicPage) {
+                router.replace('/dashboard-overview');
+            }
+        }
+    }, [user, authChecked, isSetupComplete, pathname, router]);
 
 
     // Show a loading screen while auth is being checked
     if (!authChecked || (user && isSetupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
-    T           	<Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -103,7 +103,9 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     // If authenticated, render the main app content.
     return (
         <AppLayoutWrapper>
-            {children}
+            <Suspense fallback={<div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                {children}
+            </Suspense>
         </AppLayoutWrapper>
     );
 };
@@ -130,36 +132,36 @@ export default function RootLayout({
     useEffect(() => {
         if ('serviceWorker' in navigator) {
             const handleServiceWorkerMessage = (event: MessageEvent) => {
-        	if (event.data && event.data.type === 'SW_ACTIVATED') {
-        		toast({
-        			title: "Application is ready for offline use.",
-        			variant: 'success',
-        		});
-        	}
-        	};
-        	
-    	navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-  	
-  	return () => {
-  		navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-  	};
-  }
-  }, [toast]);
+                if (event.data && event.data.type === 'SW_ACTIVATED') {
+                    toast({
+                        title: "Application is ready for offline use.",
+                        variant: 'success',
+                    });
+                }
+            };
+            
+            navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+            
+            return () => {
+                navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+            };
+        }
+    }, [toast]);
 
     return (
-        <html lang="en" suppressHydrationWarning>
-        	<head>
-        		<link rel="manifest" href="/manifest.json" />
-        		<meta name="theme-color" content="#4F46E5" />
-        	</head>
-        	<body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
-        		<StateProvider>
-        			<AuthWrapper>
-        				{children}
-        			</AuthWrapper>
-        		</StateProvider>
-        		<Toaster />
-        	</body>
-      	</html>
+        <html lang="en" suppressHydrationWarning>
+            <head>
+                <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials"/>
+                <meta name="theme-color" content="#4F46E5" />
+            </head>
+            <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
+                <StateProvider>
+                    <AuthWrapper>
+                        {children}
+                    </AuthWrapper>
+                </StateProvider>
+                <Toaster />
+            </body>
+        </html>
     );
 }
