@@ -8,6 +8,9 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from '@/lib/database';
+
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -57,6 +60,7 @@ export const formSchema = z.object({
     shippingGstin: z.string().optional(),
     shippingStateName: z.string().optional(),
     shippingStateCode: z.string().optional(),
+    advanceFreight: z.coerce.number().optional(),
 });
 
 export type FormValues = z.infer<typeof formSchema>;
@@ -73,14 +77,14 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
     kanta: 0, brokerage: 0, brokerageRate: 0, cd: 0, cdRate: 0, isBrokerageIncluded: false,
     netWeight: 0, originalNetAmount: 0, netAmount: 0, barcode: '',
     receiptType: 'Cash', paymentType: lastPaymentType || 'Full', customerId: '',
-    so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0,
+    so: '', kartaPercentage: 0, kartaWeight: 0, kartaAmount: 0, labouryRate: 0, labouryAmount: 0, advanceFreight: 0,
   };
 };
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -128,6 +132,7 @@ export default function CustomerEntryClient() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       ...getInitialFormState(lastVariety, lastPaymentType),
+      advanceFreight: 0,
     },
     shouldFocusError: false,
   });
@@ -139,30 +144,20 @@ export default function CustomerEntryClient() {
   }, []);
 
   useEffect(() => {
+    if (customers !== undefined) {
+        setIsLoading(false);
+        if (isInitialLoad.current && customers) {
+            const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'C');
+            form.setValue('srNo', initialSrNo);
+            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+            isInitialLoad.current = false;
+        }
+    }
+  }, [customers, form]);
+
+  useEffect(() => {
     if (!isClient) return;
-
-    setIsLoading(true);
-    const unsubscribeCustomers = getCustomersRealtime((data: Customer[]) => {
-      setCustomers(data);
-      if (isInitialLoad.current && data) {
-          const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-          const initialSrNo = formatSrNo(nextSrNum, 'C');
-          form.setValue('srNo', initialSrNo);
-          setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
-          isInitialLoad.current = false;
-      }
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching customers: ", error);
-      toast({ title: "Failed to load customer data", variant: "destructive" });
-      setIsLoading(false);
-    });
-
-    const unsubscribePayments = getCustomerPaymentsRealtime((data: CustomerPayment[]) => {
-        setPaymentHistory(data);
-    }, (error) => {
-        console.error("Error fetching payments: ", error);
-    });
 
     const fetchSettings = async () => {
         const settings = await getReceiptSettings();
@@ -191,8 +186,6 @@ export default function CustomerEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubscribeCustomers();
-      unsubscribePayments();
       unsubVarieties();
       unsubPaymentTypes();
     };
@@ -256,6 +249,7 @@ export default function CustomerEntryClient() {
       stateCode: customerState.stateCode || '',
       shippingStateName: customerState.shippingStateName || '',
       shippingStateCode: customerState.shippingStateCode || '',
+      advanceFreight: customerState.advanceFreight || 0,
     };
     setCurrentCustomer(customerState);
     form.reset(formValues);
@@ -298,23 +292,27 @@ export default function CustomerEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
-    if (contactValue.length === 10) {
-      const foundCustomer = customers.find(c => c.contact === contactValue);
-      if (foundCustomer && foundCustomer.id !== currentCustomer.id) {
-        form.setValue('name', foundCustomer.name);
-        form.setValue('companyName', foundCustomer.companyName || '');
-        form.setValue('address', foundCustomer.address);
-        form.setValue('gstin', foundCustomer.gstin || '');
-        form.setValue('stateName', foundCustomer.stateName || '');
-        form.setValue('stateCode', foundCustomer.stateCode || '');
-        form.setValue('shippingName', foundCustomer.shippingName || foundCustomer.name);
-        form.setValue('shippingCompanyName', foundCustomer.shippingCompanyName || '');
-        form.setValue('shippingAddress', foundCustomer.shippingAddress || foundCustomer.address);
-        form.setValue('shippingContact', foundCustomer.shippingContact || foundCustomer.contact);
-        form.setValue('shippingGstin', foundCustomer.shippingGstin || foundCustomer.gstin || '');
-        form.setValue('shippingStateName', foundCustomer.shippingStateName || foundCustomer.stateName || '');
-        form.setValue('shippingStateCode', foundCustomer.shippingStateCode || foundCustomer.stateCode || '');
-        toast({ title: "Customer Found: Details auto-filled." });
+    if (contactValue.length === 10 && customers) {
+      const latestEntryForContact = customers
+          .filter(c => c.contact === contactValue)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          
+      if (latestEntryForContact && latestEntryForContact.id !== currentCustomer.id) {
+          form.setValue('name', latestEntryForContact.name);
+          form.setValue('companyName', latestEntryForContact.companyName || '');
+          form.setValue('address', latestEntryForContact.address);
+          form.setValue('gstin', latestEntryForContact.gstin || '');
+          form.setValue('stateName', latestEntryForContact.stateName || '');
+          form.setValue('stateCode', latestEntryForContact.stateCode || '');
+          
+          form.setValue('shippingName', latestEntryForContact.shippingName || latestEntryForContact.name);
+          form.setValue('shippingCompanyName', latestEntryForContact.shippingCompanyName || latestEntryForContact.companyName || '');
+          form.setValue('shippingAddress', latestEntryForContact.shippingAddress || latestEntryForContact.address);
+          form.setValue('shippingContact', latestEntryForContact.shippingContact || latestEntryForContact.contact);
+          form.setValue('shippingGstin', latestEntryForContact.shippingGstin || latestEntryForContact.gstin || '');
+          form.setValue('shippingStateName', latestEntryForContact.shippingStateName || latestEntryForContact.stateName || '');
+          form.setValue('shippingStateCode', latestEntryForContact.shippingStateCode || latestEntryForContact.stateCode || '');
+          toast({ title: "Customer Found: Details auto-filled from last entry." });
       }
     }
   }
@@ -368,10 +366,11 @@ export default function CustomerEntryClient() {
         shippingName: toTitleCase(formValues.shippingName || ''),
         shippingCompanyName: toTitleCase(formValues.shippingCompanyName || ''),
         shippingAddress: toTitleCase(formValues.shippingAddress || ''),
-        shippingContact: formValues.shippingContact,
-        shippingGstin: formValues.shippingGstin,
-        shippingStateName: formValues.shippingStateName,
-        shippingStateCode: formValues.shippingStateCode,
+        shippingContact: formValues.shippingContact || '',
+        shippingGstin: formValues.shippingGstin || '',
+        shippingStateName: formValues.shippingStateName || '',
+        shippingStateCode: formValues.shippingStateCode || '',
+        advanceFreight: formValues.advanceFreight || 0,
         so: '',
         kartaPercentage: 0,
         kartaWeight: 0,
@@ -478,6 +477,7 @@ export default function CustomerEntryClient() {
   };
 
     const handleExport = () => {
+        if (!customers) return;
         const dataToExport = customers.map(c => ({
             srNo: c.srNo,
             date: c.date,
@@ -520,7 +520,7 @@ export default function CustomerEntryClient() {
                 const worksheet = workbook.Sheets[sheetName];
                 const json: any[] = XLSX.utils.sheet_to_json(worksheet);
                 
-                let nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+                let nextSrNum = (customers || []).length > 0 ? Math.max(...(customers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
                 for (const item of json) {
                     const customerData: Partial<Customer> = {

@@ -8,6 +8,9 @@ import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from '@/lib/database';
+
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -61,8 +64,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -118,31 +121,21 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (!isClient) return;
-
-    setIsLoading(true);
-    const unsubscribeSuppliers = getSuppliersRealtime((data: Customer[]) => {
-      setSuppliers(data);
-      if (isInitialLoad.current && data) {
-          const nextSrNum = data.length > 0 ? Math.max(...data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-          const initialSrNo = formatSrNo(nextSrNum, 'S');
-          form.setValue('srNo', initialSrNo);
-          setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-          isInitialLoad.current = false;
+      if (suppliers !== undefined) {
+          setIsLoading(false);
+          if (isInitialLoad.current && suppliers) {
+              const nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+              const initialSrNo = formatSrNo(nextSrNum, 'S');
+              form.setValue('srNo', initialSrNo);
+              setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+              isInitialLoad.current = false;
+          }
       }
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching suppliers: ", error);
-      toast({ title: "Failed to load supplier data", variant: "destructive" });
-      setIsLoading(false);
-    });
+  }, [suppliers, form]);
 
-    const unsubscribePayments = getPaymentsRealtime((data: Payment[]) => {
-        setPaymentHistory(data);
-    }, (error) => {
-        console.error("Error fetching payments: ", error);
-    });
-
+  useEffect(() => {
+    if (!isClient) return;
+    
     const fetchSettings = async () => {
         const settings = await getReceiptSettings();
         if (settings) {
@@ -150,7 +143,6 @@ export default function SupplierEntryClient() {
         }
     };
     fetchSettings();
-
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
@@ -170,8 +162,6 @@ export default function SupplierEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubscribeSuppliers();
-      unsubscribePayments();
       unsubVarieties();
       unsubPaymentTypes();
     };
@@ -282,7 +272,7 @@ export default function SupplierEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
-    if (contactValue.length === 10) {
+    if (contactValue.length === 10 && suppliers) {
       const foundCustomer = suppliers.find(c => c.contact === contactValue);
       if (foundCustomer && foundCustomer.id !== currentSupplier.id) {
         form.setValue('name', foundCustomer.name);
@@ -426,6 +416,7 @@ export default function SupplierEntryClient() {
   };
 
     const handleExport = () => {
+        if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
             const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
             return {
@@ -474,7 +465,7 @@ export default function SupplierEntryClient() {
                 const worksheet = workbook.Sheets[sheetName];
                 const json: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false });
                 
-                let nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+                let nextSrNum = (suppliers || []).length > 0 ? Math.max(...(suppliers || []).map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
 
                 for (const item of json) {
                      const supplierData: Customer = {
@@ -531,7 +522,7 @@ export default function SupplierEntryClient() {
             toast({ title: "Failed to delete all entries", variant: "destructive" });
         }
     };
-
+    
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
         if (e.key === 'Enter') {
             const activeElement = document.activeElement as HTMLElement;
