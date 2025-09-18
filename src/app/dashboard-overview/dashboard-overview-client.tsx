@@ -303,5 +303,4 @@ export default function DashboardOverviewClient() {
             </div>
         </div>
     );
-
-    
+}
