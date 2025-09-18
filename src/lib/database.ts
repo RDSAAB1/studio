@@ -1,10 +1,9 @@
-
 import Dexie, { type Table } from 'dexie';
+import { db as firestoreDB } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 export interface MainData {
   id: string;
-  // This is a generic interface for your main data.
-  // You can define more specific properties based on your application's needs.
   [key: string]: any;
 }
 
@@ -21,14 +20,14 @@ export interface SyncQueueItem {
 }
 
 class MyOfflineDB extends Dexie {
-  mainDataStore!: Table<MainData, string>; // Explicitly type the primary key as string
-  syncQueueStore!: Table<SyncQueueItem, number>; // Explicitly type the primary key as number
+  mainDataStore!: Table<MainData, string>;
+  syncQueueStore!: Table<SyncQueueItem, number>;
 
   constructor() {
     super('myOfflineDB');
     this.version(1).stores({
-      mainDataStore: 'id', // Primary key is 'id'
-      syncQueueStore: '++id, timestamp', // Auto-incrementing primary key, and index on timestamp
+      mainDataStore: 'id',
+      syncQueueStore: '++id, timestamp',
     });
   }
 }
@@ -81,17 +80,43 @@ export async function syncData(): Promise<{ success: boolean; syncedCount: numbe
             } else {
                 const errorData = await response.json();
                 console.error('Sync failed for action:', actionItem, 'Error:', errorData.message);
-                // Stop on first error to maintain order
                 return { success: false, syncedCount, error: `Sync failed: ${errorData.message}` };
             }
         } catch (error) {
             console.error('Network error during sync for action:', actionItem, error);
-            // Stop on first network error
             return { success: false, syncedCount, error: "A network error occurred during sync." };
         }
     }
 
     return { success: true, syncedCount };
+}
+
+// New function for initial data sync
+export async function initialDataSync() {
+    try {
+        console.log("Starting initial data sync...");
+        const collectionsToSync = [
+            'customers', 
+            'suppliers', 
+            'expenses', 
+            'incomes', 
+            // Add all your collection names here
+        ];
+
+        for (const collectionName of collectionsToSync) {
+            const querySnapshot = await getDocs(collection(firestoreDB, collectionName));
+            const data = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            
+            // Clear existing data and then save new data
+            await db.mainDataStore.bulkPut(data);
+            console.log(`Synced ${data.length} items from ${collectionName}`);
+        }
+
+        console.log("Initial data sync completed.");
+
+    } catch (error) {
+        console.error("Initial data sync failed:", error);
+    }
 }
 
 // Listen for messages from the service worker
