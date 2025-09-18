@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings } from "@/lib/firestore";
+import { getBanksRealtime, getBankBranchesRealtime, getReceiptSettings } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -142,9 +142,9 @@ export default function SupplierPaymentsClient() {
     if (!Array.isArray(suppliers)) return summary;
     
     suppliers.forEach(s => {
-        if (!s.customerId) return;
-        if (!summary.has(s.customerId)) {
-            summary.set(s.customerId, {
+        const customerId = `${s.name}|${s.contact}`;
+        if (!summary.has(customerId)) {
+            summary.set(customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
                 totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
@@ -154,8 +154,9 @@ export default function SupplierPaymentsClient() {
     });
 
     suppliers.forEach(supplier => {
-        if (!supplier.customerId) return;
-        const data = summary.get(supplier.customerId)!;
+        const customerId = `${supplier.name}|${supplier.contact}`;
+        if (!customerId) return;
+        const data = summary.get(customerId)!;
         const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
         data.totalOutstanding += netAmount;
     });
@@ -882,7 +883,7 @@ export default function SupplierPaymentsClient() {
                         onPrintRtgs={setRtgsReceiptData}
                     />
                     <TransactionTable
-                        suppliers={suppliers || []}
+                        suppliers={suppliers}
                         onShowDetails={setDetailsSupplierEntry}
                     />
                  </div>
@@ -893,12 +894,12 @@ export default function SupplierPaymentsClient() {
             isOpen={isOutstandingModalOpen}
             onOpenChange={setIsOutstandingModalOpen}
             customerName={toTitleCase(customerSummaryMap.get(selectedCustomerKey || '')?.name || '')}
-            entries={(suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
+            entries={suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
             selectedIds={selectedEntryIds}
             onSelect={handleEntrySelect}
             onSelectAll={(checked: boolean) => {
                 const newSet = new Set<string>();
-                const outstandingEntries = (suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
+                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
                 if(checked) outstandingEntries.forEach(e => newSet.add(e.id));
                 setSelectedEntryIds(newSet);
             }}
