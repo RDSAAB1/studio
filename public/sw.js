@@ -1,92 +1,99 @@
 // public/sw.js
 
-const CACHE_NAME = 'bizsuite-dataflow-cache-v2'; // Updated cache version
+const CACHE_NAME = 'bizsuite-cache-v1';
 
-// URLs to be pre-cached. Keep this list minimal for faster installation.
-const PRECACHE_URLS = [
-    '/',
-    '/dashboard-overview',
-    '/login',
-    '/manifest.json'
+// A minimal list of URLs to cache when the service worker is installed.
+const urlsToCache = [
+  '/',
+  '/manifest.json',
+  '/favicon.ico',
 ];
 
-self.addEventListener('install', (event) => {
-    console.log('[Service Worker] Install');
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('[Service Worker] Caching essential app shell assets');
-                return cache.addAll(PRECACHE_URLS);
-            })
-            .catch(error => {
-                console.error('[Service Worker] Pre-caching failed:', error);
-            })
-    );
-    self.skipWaiting();
+// Install a service worker
+self.addEventListener('install', event => {
+  console.log('[Service Worker] Install');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[Service Worker] Caching app shell');
+        // Use addAll with individual requests to handle failures gracefully.
+        const promises = urlsToCache.map(url => {
+          return cache.add(url).catch(err => {
+            console.warn(`[Service Worker] Failed to pre-cache: ${url}`, err);
+          });
+        });
+        return Promise.all(promises);
+      })
+      .then(() => self.skipWaiting()) // Activate worker immediately
+  );
 });
 
-self.addEventListener('activate', (event) => {
-    console.log('[Service Worker] Activate');
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cacheName) => {
-                    if (cacheName !== CACHE_NAME) {
-                        console.log('[Service Worker] Deleting old cache:', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        }).then(() => self.clients.claim())
-    );
+// Activate the service worker
+self.addEventListener('activate', event => {
+  console.log('[Service Worker] Activate');
+  // Remove old caches
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cache => {
+          if (cache !== CACHE_NAME) {
+            console.log('[Service Worker] Clearing old cache:', cache);
+            return caches.delete(cache);
+          }
+        })
+      );
+    }).then(() => self.clients.claim()) // Take control of all open clients
+  );
 });
 
+
+// Network first, then cache strategy
 self.addEventListener('fetch', (event) => {
-    // We only want to handle navigation requests with our network-first strategy
-    if (event.request.mode !== 'navigate') {
-        return; // Let the browser handle other requests (images, scripts, etc.)
+    // We only want to cache GET requests.
+    if (event.request.method !== 'GET') {
+        return;
+    }
+    
+    // For navigation requests, use network-first strategy.
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .catch(() => caches.match('/')) // Fallback to the main app shell on network failure
+        );
+        return;
     }
 
+    // For other requests (CSS, JS, images), use a network-first strategy.
     event.respondWith(
-        // Network-first strategy
         fetch(event.request)
-            .then(response => {
-                // If the fetch is successful, clone the response and cache it
-                if (response.ok) {
-                    const responseToCache = response.clone();
-                    caches.open(CACHE_NAME).then(cache => {
+            .then((response) => {
+                // Check if we received a valid response
+                if (!response || response.status !== 200 || response.type !== 'basic') {
+                    return response;
+                }
+
+                // IMPORTANT: Clone the response. A response is a stream
+                // and because we want the browser to consume the response
+                // as well as the cache consuming the response, we need
+                // to clone it so we have two streams.
+                const responseToCache = response.clone();
+
+                caches.open(CACHE_NAME)
+                    .then((cache) => {
                         cache.put(event.request, responseToCache);
                     });
-                }
-                return response;
+
+                return response; // Original response is returned to the browser
             })
             .catch(() => {
-                // If the network request fails, try to serve from the cache
-                return caches.match(event.request).then(cachedResponse => {
-                    if (cachedResponse) {
-                        return cachedResponse;
-                    }
-                    // If not in cache, you could return a fallback offline page
-                    // For now, we let the browser handle the error
-                    return new Response("You are offline and this page isn't cached.", {
+                // If the network fails, try to serve from cache.
+                return caches.match(event.request).then((response) => {
+                    return response || new Response("You are offline. Some content may not be available.", {
                         status: 503,
                         statusText: "Service Unavailable",
-                        headers: new Headers({ "Content-Type": "text/html" })
+                        headers: new Headers({ 'Content-Type': 'text/plain' })
                     });
                 });
             })
     );
-});
-
-self.addEventListener('sync', (event) => {
-    if (event.tag === 'background-sync') {
-        console.log('[Service Worker] Background sync triggered!');
-        event.waitUntil(
-             self.clients.matchAll().then(clients => {
-                clients.forEach(client => {
-                     client.postMessage({ type: 'SYNC_DATA' });
-                });
-            })
-        );
-    }
 });
