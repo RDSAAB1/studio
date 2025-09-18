@@ -143,7 +143,7 @@ export default function SupplierPaymentsClient() {
     
     suppliers.forEach(s => {
         const customerId = `${s.name}|${s.contact}`;
-        if (!summary.has(customerId)) {
+        if (customerId && !summary.has(customerId)) {
             summary.set(customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
@@ -155,7 +155,7 @@ export default function SupplierPaymentsClient() {
 
     suppliers.forEach(supplier => {
         const customerId = `${supplier.name}|${supplier.contact}`;
-        if (!customerId) return;
+        if (!customerId || !summary.has(customerId)) return;
         const data = summary.get(customerId)!;
         const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
         data.totalOutstanding += netAmount;
@@ -937,3 +937,13 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
+
+    
+
+    
+
+
+
+    
