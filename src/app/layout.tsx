@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, type ReactNode, Suspense } from 'react';
@@ -7,7 +6,6 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk, Source_Code_Pro } from 'next/font/google';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import { StateProvider } from '@/lib/state-store.tsx';
 import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
@@ -15,7 +13,6 @@ import { getRtgsSettings } from "@/lib/firestore";
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import LoginPage from './login/page';
 import { initialDataSync } from '@/lib/database';
-
 
 const inter = Inter({
   subsets: ['latin'],
@@ -35,7 +32,6 @@ const sourceCodePro = Source_Code_Pro({
   variable: '--font-source-code-pro',
 });
 
-// A separate component to handle all authentication and data loading logic
 const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
@@ -85,7 +81,6 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
 
-
     // Show a loading screen while auth is being checked
     if (!authChecked || (user && isSetupComplete === null)) {
         return (
@@ -103,9 +98,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     // If authenticated, render the main app content.
     return (
         <AppLayoutWrapper>
-            <Suspense fallback={<div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                {children}
-            </Suspense>
+            {children}
         </AppLayoutWrapper>
     );
 };
@@ -151,7 +144,7 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
-                <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials"/>
+                <link rel="manifest" href="/manifest.json" />
                 <meta name="theme-color" content="#4F46E5" />
             </head>
             <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
