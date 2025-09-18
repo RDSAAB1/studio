@@ -1,11 +1,16 @@
 {
-    "name": "BizSuite DataFlow",
-    "short_name": "BizSuite",
-    "description": "An integrated application for managing business data workflows, including sales, HR, and inventory.",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#1A1A2E",
-    "theme_color": "#4F46E5",
-    "orientation": "portrait-primary",
-    "icons": []
+  "name": "BizSuite DataFlow",
+  "short_name": "BizSuite",
+  "description": "A comprehensive business management suite.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#22272e",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }

@@ -1,81 +1,32 @@
-// public/sw.js
+// This is a basic service worker for a Progressive Web App (PWA).
 
-const CACHE_NAME = 'bizsuite-cache-v1';
-
-// All of your application's pages/routes and assets
-const APP_SHELL_FILES = [
-  // Primary application files
+const CACHE_NAME = 'bizsuite-dataflow-cache-v2';
+const urlsToCache = [
   '/',
   '/manifest.json',
   '/favicon.ico',
-
-  // All of your application's pages/routes
-  '/cash-bank',
-  '/dashboard-overview',
-  '/data-capture',
-  '/expense-tracker',
-  '/finance/loan-management',
-  '/forgot-password',
-  '/hr/attendance-tracking',
-  '/hr/employee-database',
-  '/hr/payroll-management',
-  '/inventory/inventory-management',
-  '/inventory/purchase-orders',
-  '/inventory/supplier-information',
-  '/login',
-  '/marketing/analytics',
-  '/marketing/campaigns',
-  '/marketing/email-marketing',
-  '/projects/collaboration',
-  '/projects/dashboard',
-  '/projects/management',
-  '/projects/tasks',
-  '/sales/customer-entry',
-  '/sales/customer-management',
-  '/sales/customer-payments',
-  '/sales/customer-profile',
-  '/sales/daily-supplier-report',
-  '/sales/order-tracking',
-  '/sales/product-catalog',
-  '/sales/rtgs-report',
-  '/sales/sales-reports',
-  '/sales/supplier-entry',
-  '/sales/supplier-payments',
-  '/sales/supplier-profile',
-  '/settings',
-  '/settings/bank-management',
-  '/settings/printer',
-
-  // Static assets from your public directory
-  '/icons/icon-72x72.png',
-  '/icons/icon-96x96.png',
-  '/icons/icon-128x128.png',
-  '/icons/icon-144x144.png',
-  '/icons/icon-152x152.png',
-  '/icons/icon-192x192.png',
-  '/icons/icon-384x384.png',
-  '/icons/icon-512x512.png',
+  '/icons/icon-512x512.png' // Only cache the icon that exists
 ];
 
 // Install a service worker
 self.addEventListener('install', event => {
   console.log('[Service Worker] Install');
   event.waitUntil(
-    (async () => {
-      try {
-        const cache = await caches.open(CACHE_NAME);
+    caches.open(CACHE_NAME)
+      .then(cache => {
         console.log('[Service Worker] Caching app shell');
-        const promises = APP_SHELL_FILES.map(url => {
+        const promises = urlsToCache.map(url => {
           return cache.add(url).catch(err => {
-            console.warn(`[Service Worker] Failed to pre-cache: ${url}`, err);
+            console.error(`[Service Worker] Failed to pre-cache: ${url}`, err);
           });
         });
-        await Promise.all(promises);
-      } catch (err) {
-        console.error('[Service Worker] Failed to open cache:', err);
-      }
-      self.skipWaiting();
-    })()
+        return Promise.all(promises);
+      })
+      .then(() => {
+        console.log('[Service Worker] All assets cached');
+        // Force the waiting service worker to become the active service worker.
+        return self.skipWaiting();
+      })
   );
 });
 
@@ -86,55 +37,52 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cache => {
-          if (!cacheWhitelist.includes(cache)) {
-            console.log('[Service Worker] Clearing old cache:', cache);
-            return caches.delete(cache);
+        cacheNames.map(cacheName => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+        console.log('[Service Worker] Claiming clients');
+        // Tell the active service worker to take immediate
+        // control of all of the clients under its scope.
+        return self.clients.claim();
+    })
   );
 });
 
-// Fetch with a cache-first strategy
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') {
-    return;
-  }
+// Network-first caching strategy
+self.addEventListener('fetch', event => {
+    // We only want to cache GET requests.
+    if (event.request.method !== 'GET') {
+        return;
+    }
 
-  // Network-first for API calls to ensure fresh data
-  if (event.request.url.includes('/api/')) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+        fetch(event.request)
+            .then(response => {
+                // If we get a valid response, we clone it and cache it.
+                if (response && response.status === 200) {
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME)
+                        .then(cache => {
+                            cache.put(event.request, responseToCache);
+                        });
+                }
+                return response;
+            })
+            .catch(() => {
+                // If the network request fails, try to get it from the cache.
+                return caches.match(event.request)
+                    .then(response => {
+                        if (response) {
+                            return response;
+                        }
+                        // If it's not in the cache, you could return a fallback page.
+                        // For this example, we'll just let the browser handle the error.
+                    });
+            })
     );
-    return;
-  }
-
-  // Cache-first for all other assets and pages
-  event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      // If nothing is in the cache, go to the network
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
-        }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME)
-          .then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-
-        return networkResponse;
-      }).catch(() => {
-        // A fallback for the main app shell if both network and cache fail
-        return caches.match('/');
-      });
-    })
-  );
 });
