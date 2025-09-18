@@ -116,6 +116,7 @@ export const ConsolidatedRtgsPrintFormat = ({ payments, settings }: Consolidated
                 }
                 .printable-area * {
                     border-color: #000 !important;
+                    color: #000 !important;
                 }
                 .print-header-bg {
                      background-color: #fce5d5 !important;

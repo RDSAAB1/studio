@@ -56,7 +56,7 @@ export const DetailsDialog = ({ isOpen, onOpenChange, customer, paymentHistory =
                         <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><X className="h-4 w-4"/></Button></DialogClose>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="flex-grow overflow-y-auto">
+                <ScrollArea className="max-h-[85vh]">
                     <div className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
                         {activeLayout === 'classic' && (
                         <div className="space-y-4">

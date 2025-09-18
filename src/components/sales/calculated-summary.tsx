@@ -205,7 +205,7 @@ export const CalculatedSummary = ({
                             </Button>
                         )}
 
-                        <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading}>
+                        <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
                             {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
                         </Button>
                         <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading} type="button">
