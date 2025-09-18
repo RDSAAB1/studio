@@ -695,3 +695,5 @@ export async function deletePayrollEntry(id: string) {
     await db.mainDataStore.delete(id);
     await addToSyncQueue({ action: 'delete', payload: { collection: 'payroll', id } });
 }
+
+    

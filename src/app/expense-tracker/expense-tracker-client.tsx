@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -6,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/lib/database";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,9 +27,9 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, getFundTransactionsRealtime, getLoansRealtime, updateLoan, getBankAccountsRealtime, addIncome, addExpense, getIncomeRealtime, getExpensesRealtime, deleteIncome, deleteExpense, updateIncome, updateExpense } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateIncome, updateExpense, updateLoan } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase"; 
+import { db as firestoreDB } from "@/lib/firebase"; 
 
 
 import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins } from "lucide-react";
@@ -123,9 +126,14 @@ const StatCard = ({ title, value, icon, colorClass, description }: { title: stri
 export default function IncomeExpenseClient() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const [income, setIncome] = useState<Income[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+
+  const income = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').toArray()) || [];
+  const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').toArray()) || [];
+  const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray()) || [];
+  const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').toArray()) || [];
+  const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
+  const projects = useLiveQuery(() => db.mainDataStore.where('collection').equals('projects').toArray()) || [];
+
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("form");
@@ -133,20 +141,23 @@ export default function IncomeExpenseClient() {
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+
+  useEffect(() => {
+    if(income !== undefined && expenses !== undefined) {
+      setLoading(false);
+    }
+  }, [income, expenses])
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: getInitialFormState(),
   });
 
-  const allTransactions: DisplayTransaction[] = useMemo(() => [...income, ...expenses], [income, expenses]);
+  const allTransactions: DisplayTransaction[] = useMemo(() => [...(income || []), ...(expenses || [])], [income, expenses]);
 
   const {
     watch,
@@ -248,30 +259,12 @@ export default function IncomeExpenseClient() {
   }, [selectedCategory, availableCategories, loans]);
 
   useEffect(() => {
-    const unsubIncome = getIncomeRealtime(data => setIncome(data), console.error);
-    const unsubExpenses = getExpensesRealtime(data => { setExpenses(data); setLoading(false); }, console.error);
-    
-    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
-    const unsubLoans = getLoansRealtime(setLoans, console.error);
     const unsubIncomeCats = getIncomeCategories(setIncomeCategories, console.error);
     const unsubExpenseCats = getExpenseCategories(setExpenseCategories, console.error);
-    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
     
-    const projectsQuery = query(collection(db, 'projects'), orderBy('name', 'asc'));
-    const unsubProjects = onSnapshot(projectsQuery, (snapshot) => {
-        const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as Project));
-        setProjects(projectsData);
-    }, console.error);
-
     return () => {
-      unsubIncome();
-      unsubExpenses();
-      unsubFunds();
       unsubIncomeCats();
       unsubExpenseCats();
-      unsubProjects();
-      unsubLoans();
-      unsubBankAccounts();
     };
   }, []);
   
@@ -492,6 +485,10 @@ export default function IncomeExpenseClient() {
       totalTransactions: allTransactions.length,
     };
   }, [income, expenses, allTransactions]);
+
+  if(loading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="space-y-6">
@@ -891,3 +888,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
