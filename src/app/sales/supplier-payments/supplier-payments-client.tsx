@@ -151,18 +151,13 @@ export default function SupplierPaymentsClient() {
                 ifscCode: s.ifscCode, bank: s.bank, branch: s.branch
             });
         }
-    });
-
-    suppliers.forEach(supplier => {
-        const customerId = supplier.customerId || `${supplier.name}|${supplier.contact}`;
-        if (!summary.has(customerId)) return;
         const data = summary.get(customerId)!;
-        const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
+        const netAmount = Math.round(parseFloat(String(s.netAmount)));
         data.totalOutstanding += netAmount;
     });
     
     return summary;
-  }, [suppliers]);
+}, [suppliers]);
   
   const financialState = useMemo(() => {
     const balances = new Map<string, number>();
@@ -747,7 +742,7 @@ export default function SupplierPaymentsClient() {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (loading) {
+    if (!isClient || loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -927,3 +922,5 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
+
+    
