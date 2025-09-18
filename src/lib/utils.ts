@@ -95,7 +95,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
 
     const originalNetAmount = Math.round(amount - labouryAmount - kanta - kartaAmount);
 
-    const totalPaidForThisEntry = (paymentHistory || [])
+    const totalPaidForThisEntry = (Array.isArray(paymentHistory) ? paymentHistory : [])
       .filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo))
       .reduce((sum, p) => {
           const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === values.srNo);
@@ -152,7 +152,7 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         originalNetAmount -= brokerageAmount;
     }
 
-    const totalPaidForThisEntry = (paymentHistory || [])
+    const totalPaidForThisEntry = (Array.isArray(paymentHistory) ? paymentHistory : [])
         .filter(p => p.paidFor?.some((pf: any) => pf.srNo === values.srNo))
         .reduce((sum, p) => {
             const paidForDetail = p.paidFor?.find((pf: any) => pf.srNo === values.srNo);
