@@ -90,13 +90,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     if (!authChecked || (user && isSetupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
-    \t\t\t\t\t<Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
 
     if (!user) {
-        // Allow access to forgot-password page even when not logged in
         if (pathname === '/forgot-password') {
             return <>{children}</>;
         }
@@ -132,11 +131,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </head>
             <body className={cn(inter.variable, spaceGrotesk.variable, sourceCodePro.variable)}>
                 <StateProvider>
-                    <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
-                        <AuthWrapper>
+                    <AuthWrapper>
+                         <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                             {children}
-                        </AuthWrapper>
-                    </Suspense>
+                        </Suspense>
+                    </AuthWrapper>
                     <Toaster />
                 </StateProvider>
             </body>
