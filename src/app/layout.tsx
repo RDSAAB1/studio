@@ -55,11 +55,11 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-    \t\t\t\t\tconst companySettings = await getRtgsSettings();
-    \t\t\t\t\tsetIsSetupComplete(!!companySettings?.companyName);
+                const companySettings = await getRtgsSettings();
+                setIsSetupComplete(!!companySettings?.companyName);
             } else {
-      \t\t\t\tsetIsSetupComplete(null);
-          _content_}
+                setIsSetupComplete(null);
+            }
             setAuthChecked(true);
         });
 
@@ -132,9 +132,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </head>
             <body className={cn(inter.variable, spaceGrotesk.variable, sourceCodePro.variable)}>
                 <StateProvider>
-                    <AuthWrapper>
-                        {children}
-                    </AuthWrapper>
+                    <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                        <AuthWrapper>
+                            {children}
+                        </AuthWrapper>
+                    </Suspense>
                     <Toaster />
                 </StateProvider>
             </body>

@@ -83,12 +83,10 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     <div className={cn("wrapper", isSidebarActive && "active")}>
         <CustomSidebar onTabSelect={handleOpenTab} isSidebarActive={isSidebarActive} toggleSidebar={toggleSidebar}>
           <div className="flex flex-col flex-grow min-h-0 h-screen overflow-hidden">
-            <Suspense>
-              <div className="sticky top-0 z-30 flex-shrink-0">
-                <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
-                <Header toggleSidebar={toggleSidebar} />
-              </div>
-            </Suspense>
+            <div className="sticky top-0 z-30 flex-shrink-0">
+              <TabBar openTabs={openTabs} activeTabId={activeTabId} setActiveTabId={handleTabSelect} closeTab={handleTabClose} />
+              <Header toggleSidebar={toggleSidebar} />
+            </div>
             <div className="flex-grow relative overflow-y-auto">
               {openTabs.map(tab => {
                 const isTabActive = tab.id === pageId;
@@ -96,9 +94,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   <div key={tab.id} className={cn("absolute inset-0", isTabActive ? "z-10" : "z-0 invisible")}>
                     {isTabActive && (
                       <main className="p-4 sm:p-6">
-                        <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                          {children}
-                        </Suspense>
+                        {children}
                       </main>
                     )}
                   </div>
