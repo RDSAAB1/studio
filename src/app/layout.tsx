@@ -15,7 +15,6 @@ import { getRtgsSettings } from "@/lib/firestore";
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import LoginPage from './login/page';
 import { initialDataSync } from '@/lib/database';
-import { cn } from '@/lib/utils';
 
 
 const inter = Inter({
@@ -45,7 +44,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const pathname = usePathname();
 
     useEffect(() => {
-        initialDataSync(); // This will run once when AuthWrapper mounts
+        initialDataSync();
     }, []);
 
     useEffect(() => {
@@ -55,90 +54,112 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                const companySettings = await getRtgsSettings();
-                setIsSetupComplete(!!companySettings?.companyName);
+                const companySettings = await getRtgsSettings();
+                setIsSetupComplete(!!companySettings?.companyName);
             } else {
-                setIsSetupComplete(null);
-            }
+                setIsSetupComplete(null);
+            }
             setAuthChecked(true);
         });
 
         return () => unsubscribe();
     }, []);
+    
+    useEffect(() => {
+  	if (!authChecked) return;
 
-    useEffect(() => {
-        if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').then(
-                (registration) => console.log('Service Worker registration successful. ✅'),
-                (error) => console.error('Service Worker registration failed. ❌', error),
-            );
-        }
-    }, []);
+  	const publicRoutes = ['/login', '/forgot-password', '/'];
+  	const isPublicPage = publicRoutes.includes(pathname);
+  	const isSettingsPage = pathname === '/settings';
 
-    useEffect(() => {
-        if (!authChecked) return;
+  	if (!user) {
+  		if (!isPublicPage) {
+  			router.replace('/login');
+  		}
+  	} else if (user) {
+  		if (isSetupComplete === false && !isSettingsPage) {
+  			router.replace('/settings');
+  		} else if (isSetupComplete === true && isPublicPage) {
+  			router.replace('/dashboard-overview');
+  		}
+  	}
+  }, [user, authChecked, isSetupComplete, pathname, router]);
 
-        if (user && isSetupComplete === false && pathname !== '/settings') {
-            router.replace('/settings');
-        }
 
-        if (user && isSetupComplete && (pathname === '/login' || pathname === '/')) {
-            router.replace('/dashboard-overview');
-        }
-    }, [user, isSetupComplete, authChecked, pathname, router]);
-
+    // Show a loading screen while auth is being checked
     if (!authChecked || (user && isSetupComplete === null)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    T           	<Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
-
+    
+    // If not authenticated, render the login page.
     if (!user) {
-        if (pathname === '/forgot-password') {
-            return <>{children}</>;
-        }
         return <LoginPage />;
     }
 
-    if (user && isSetupComplete === false && pathname !== '/settings') {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-    
-    if (user && isSetupComplete && (pathname === '/login' || pathname === '/')) {
-         return (
-            <div className="flex h-screen w-screen items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    return <AppLayoutWrapper>{children}</AppLayoutWrapper>;
+    // If authenticated, render the main app content.
+    return (
+        <AppLayoutWrapper>
+            {children}
+        </AppLayoutWrapper>
+    );
 };
 
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+    const { toast } = useToast();
+
+    // The Service Worker registration is now simplified
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('Service Worker registered successfully. ✅');
+            }).catch(err => {
+                console.error('Service Worker registration failed. ❌', err);
+            });
+        }
+    }, []);
+ 
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            const handleServiceWorkerMessage = (event: MessageEvent) => {
+        	if (event.data && event.data.type === 'SW_ACTIVATED') {
+        		toast({
+        			title: "Application is ready for offline use.",
+        			variant: 'success',
+        		});
+        	}
+        	};
+        	
+    	navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+  	
+  	return () => {
+  		navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+  	};
+  }
+  }, [toast]);
+
     return (
-        <html lang="en" suppressHydrationWarning>
-            <head>
-                <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials"/>
-                <meta name="theme-color" content="#4F46E5" />
-            </head>
-            <body className={cn(inter.variable, spaceGrotesk.variable, sourceCodePro.variable)}>
-                <StateProvider>
-                    <AuthWrapper>
-                         <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
-                            {children}
-                        </Suspense>
-                    </AuthWrapper>
-                    <Toaster />
-                </StateProvider>
-            </body>
-        </html>
+        <html lang="en" suppressHydrationWarning>
+        	<head>
+        		<link rel="manifest" href="/manifest.json" />
+        		<meta name="theme-color" content="#4F46E5" />
+        	</head>
+        	<body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
+        		<StateProvider>
+        			<AuthWrapper>
+        				{children}
+        			</AuthWrapper>
+        		</StateProvider>
+        		<Toaster />
+        	</body>
+      	</html>
     );
 }
