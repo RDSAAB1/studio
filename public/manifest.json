@@ -1,16 +1,9 @@
 {
   "name": "BizSuite DataFlow",
   "short_name": "BizSuite",
-  "description": "A comprehensive business management suite.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#22272e",
-  "theme_color": "#8b5cf6",
-  "icons": [
-    {
-      "src": "/icons/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "background_color": "#212936",
+  "theme_color": "#6D28D9",
+  "icons": []
 }

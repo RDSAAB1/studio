@@ -147,7 +147,8 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
           <head>
-            <meta name="theme-color" content="#4F46E5" />
+            <meta name="theme-color" content="#212936" />
+            <link rel="manifest" href="/manifest.json" />
           </head>
           <body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}>
               <StateProvider>
