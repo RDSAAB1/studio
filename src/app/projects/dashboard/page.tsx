@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { PageProps } from '@/app/types';
 import { useEffect, useState } from 'react';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase'; // Assuming you have initialized Firestore in firebase.ts
@@ -63,7 +62,7 @@ const initialDashboardData: DashboardData = {
 };
 
 
-export default function ProjectDashboardPage({ params, searchParams }: PageProps) {
+export default function ProjectDashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData>(initialDashboardData);
   const [isClient, setIsClient] = useState(false);
 
