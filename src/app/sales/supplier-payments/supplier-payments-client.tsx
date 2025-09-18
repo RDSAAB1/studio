@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome } from "@/lib/firestore";
+import { addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { collection, runTransaction, doc, getDocs, query, where, addDoc, deleteDoc, limit } from "firebase/firestore";
 import { format } from 'date-fns';
@@ -46,12 +47,12 @@ type SortConfig = {
 
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(getSuppliersRealtime());
-  const paymentHistory = useLiveQuery(getPaymentsRealtime());
-  const incomes = useLiveQuery(getIncomeRealtime());
-  const expenses = useLiveQuery(getExpensesRealtime());
-  const fundTransactions = useLiveQuery(getFundTransactionsRealtime());
-  const bankAccounts = useLiveQuery(getBankAccountsRealtime());
+  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo')) || [];
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
+  const incomes = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').toArray()) || [];
+  const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').toArray()) || [];
+  const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray()) || [];
+  const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
 
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
@@ -352,8 +353,10 @@ export default function SupplierPaymentsClient() {
     setRtgsRate(0);
     setRtgsAmount(0);
     setPaymentOptions([]);
-    setPaymentId(getNextPaymentId(paymentHistory || []));
-    setRtgsSrNo(getNextRtgsSrNo(paymentHistory || []));
+    if (paymentHistory) {
+      setPaymentId(getNextPaymentId(paymentHistory));
+      setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
+    }
     if (isOutsider) {
       setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
       setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -618,7 +621,7 @@ export default function SupplierPaymentsClient() {
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
-        const paymentToDelete = (paymentHistory || []).find(p => p.id === paymentIdToDelete);
+        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
             toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
@@ -863,7 +866,7 @@ export default function SupplierPaymentsClient() {
                         sortedPaymentOptions={sortedPaymentOptions}
                         roundFigureToggle={roundFigureToggle}
                         setRoundFigureToggle={setRoundFigureToggle}
-                        bankAccounts={bankAccounts || []}
+                        bankAccounts={bankAccounts}
                         selectedAccountId={selectedAccountId}
                         setSelectedAccountId={handleSetSelectedAccount}
                         financialState={financialState}
@@ -873,14 +876,14 @@ export default function SupplierPaymentsClient() {
             <TabsContent value="history">
                  <div className="space-y-3">
                     <PaymentHistory
-                        payments={paymentHistory || []}
+                        payments={paymentHistory}
                         onEdit={handleEditPayment}
                         onDelete={handleDeletePayment}
                         onShowDetails={setSelectedPaymentForDetails}
                         onPrintRtgs={setRtgsReceiptData}
                     />
                     <TransactionTable
-                        suppliers={suppliers || []}
+                        suppliers={suppliers}
                         onShowDetails={setDetailsSupplierEntry}
                     />
                  </div>
@@ -891,12 +894,12 @@ export default function SupplierPaymentsClient() {
             isOpen={isOutstandingModalOpen}
             onOpenChange={setIsOutstandingModalOpen}
             customerName={toTitleCase(customerSummaryMap.get(selectedCustomerKey || '')?.name || '')}
-            entries={(suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
+            entries={suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
             selectedIds={selectedEntryIds}
             onSelect={handleEntrySelect}
             onSelectAll={(checked: boolean) => {
                 const newSet = new Set<string>();
-                const outstandingEntries = (suppliers || []).filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
+                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
                 if(checked) outstandingEntries.forEach(e => newSet.add(e.id));
                 setSelectedEntryIds(newSet);
             }}
@@ -934,10 +937,3 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
-
-    
-
-    
-

@@ -14,11 +14,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { Employee } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
-import { getEmployeesRealtime, addEmployee, updateEmployee, deleteEmployee } from '@/lib/firestore';
+import { addEmployee, updateEmployee, deleteEmployee } from '@/lib/firestore';
 import { db } from '@/lib/database';
 
 export default function EmployeeDatabasePage() {
-  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId'));
+  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId')) || [];
   const [isClient, setIsClient] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<Employee>>({});
@@ -37,7 +37,7 @@ export default function EmployeeDatabasePage() {
   }, []);
 
   const nextEmployeeId = useMemo(() => {
-    if (!employees || employees.length === 0) return 'EMP001';
+    if (employees.length === 0) return 'EMP001';
     const lastId = employees[employees.length - 1]?.employeeId || 'EMP000';
     const lastNumber = parseInt(lastId.replace('EMP', ''), 10);
     const newNumber = lastNumber + 1;

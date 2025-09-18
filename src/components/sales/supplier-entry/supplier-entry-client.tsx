@@ -15,7 +15,7 @@ import { db } from '@/lib/database';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, getSuppliersRealtime, updateSupplier, getPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -65,8 +65,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(getSuppliersRealtime());
-  const paymentHistory = useLiveQuery(getPaymentsRealtime()) || [];
+  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo')) || [];
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);

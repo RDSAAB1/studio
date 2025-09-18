@@ -2,17 +2,17 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/database";
 import type { Employee, AttendanceEntry } from "@/lib/definitions";
-import { getAttendanceForDateRealtime, setAttendance, getEmployeesRealtime } from "@/lib/firestore";
+import { setAttendance } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, CheckCircle, XCircle, FileText, UserCheck, UserX, Users } from "lucide-react";
+import { Calendar as CalendarIcon, UserCheck, UserX, FileText, Users, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -69,7 +69,7 @@ export default function AttendanceTrackingPage() {
     }), [attendanceRecordsToday, employees]);
     
     if (!isClient) {
-        return null;
+        return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 
     return (

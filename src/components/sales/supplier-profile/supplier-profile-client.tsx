@@ -1,27 +1,32 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { Customer as Supplier, CustomerSummary, Payment } from "@/lib/definitions";
+import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
+import { db } from "@/lib/database";
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+// UI Components
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from 'date-fns';
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
-import { useToast } from '@/hooks/use-toast';
-import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
-import { DetailsDialog } from "@/components/sales/details-dialog";
-import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Users, Calendar as CalendarIcon, Download, Printer, Search, ChevronDown, ChevronUp, X } from "lucide-react";
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { DetailsDialog } from "@/components/sales/details-dialog";
+import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
+import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
+
+
+// Icons
+import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "lucide-react";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -265,15 +270,15 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 };
 
 
-export default function SupplierProfilePage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+export function SupplierProfileClient() {
+  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
+  
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
-  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -281,30 +286,6 @@ export default function SupplierProfilePage() {
 
   useEffect(() => {
     setIsClient(true);
-    setLoading(true);
-
-    const unsubscribeSuppliers = onSnapshot(collection(db, "suppliers"), (snapshot) => {
-        const fetchedSuppliers: Supplier[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier));
-        setSuppliers(fetchedSuppliers);
-        setLoading(false);
-    }, (error) => {
-        console.error("Failed to load suppliers from Firestore", error);
-        setSuppliers([]);
-        setLoading(false);
-    });
-
-    const unsubscribePayments = onSnapshot(collection(db, "payments"), (snapshot) => {
-        const fetchedPayments: Payment[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-        setPaymentHistory(fetchedPayments);
-    }, (error) => {
-        console.error("Failed to load payments from Firestore", error);
-        setPaymentHistory([]);
-    });
-
-    return () => { 
-        unsubscribeSuppliers(); 
-        unsubscribePayments(); 
-    };
   }, []);
 
   const filteredData = useMemo(() => {
@@ -312,27 +293,18 @@ export default function SupplierProfilePage() {
     let filteredPayments = paymentHistory;
 
     if (startDate || endDate) {
-        const start = startDate ? new Date(startDate) : null;
-        if(start) start.setHours(0,0,0,0);
-
-        const end = endDate ? new Date(endDate) : null;
-        if(end) end.setHours(23,59,59,999);
-
-        filteredSuppliers = suppliers.filter(s => {
-            const sDate = new Date(s.date);
-            if (start && end) return sDate >= start && sDate <= end;
-            if (start) return sDate >= start;
-            if (end) return sDate <= end;
+        const start = startDate ? new Date(startDate.setHours(0, 0, 0, 0)) : null;
+        const end = endDate ? new Date(endDate.setHours(23, 59, 59, 999)) : null;
+    
+        const filterByDate = (date: Date) => {
+            if (start && end) return date >= start && date <= end;
+            if (start) return date >= start;
+            if (end) return date <= end;
             return true;
-        });
-
-        filteredPayments = paymentHistory.filter(p => {
-            const pDate = new Date(p.date);
-            if (start && end) return pDate >= start && pDate <= end;
-            if (start) return pDate >= start;
-            if (end) return pDate <= end;
-            return true;
-        });
+        };
+    
+        filteredSuppliers = suppliers.filter(s => filterByDate(new Date(s.date)));
+        filteredPayments = paymentHistory.filter(p => filterByDate(new Date(p.date)));
     }
 
     return { filteredSuppliers, filteredPayments };
@@ -342,6 +314,7 @@ export default function SupplierProfilePage() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
+    // Initialize map with all unique suppliers
     filteredSuppliers.forEach(s => {
         if (s.customerId && !summary.has(s.customerId)) {
             summary.set(s.customerId, {
@@ -402,8 +375,7 @@ export default function SupplierProfilePage() {
     summary.forEach((data, key) => {
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
-        data.outstandingEntryIds = (data.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).map(t => t.id);
-        data.totalOutstandingTransactions = data.outstandingEntryIds.length;
+        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
         const rates = supplierRateSum[key];
@@ -414,28 +386,28 @@ export default function SupplierProfilePage() {
     });
 
     const millSummary: CustomerSummary = Array.from(summary.values()).reduce((acc, s) => {
-        acc.totalAmount += s.totalAmount;
-        acc.totalOriginalAmount += s.totalOriginalAmount;
-        acc.totalPaid += s.totalPaid;
-        acc.totalGrossWeight! += s.totalGrossWeight!;
-        acc.totalTeirWeight! += s.totalTeirWeight!;
-        acc.totalFinalWeight! += s.totalFinalWeight!;
-        acc.totalKartaWeight! += s.totalKartaWeight!;
-        acc.totalNetWeight! += s.totalNetWeight!;
-        acc.totalKartaAmount! += s.totalKartaAmount!;
-        acc.totalLabouryAmount! += s.totalLabouryAmount!;
-        acc.totalKanta! += s.totalKanta!;
-        acc.totalOtherCharges! += s.totalOtherCharges!;
-        acc.totalCdAmount! += s.totalCdAmount!;
-        return acc;
-    }, {
-        name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
-        paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
-        totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
-        allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
-    });
-    
+         acc.totalAmount += s.totalAmount;
+         acc.totalOriginalAmount += s.totalOriginalAmount;
+         acc.totalPaid += s.totalPaid;
+         acc.totalGrossWeight! += s.totalGrossWeight!;
+         acc.totalTeirWeight! += s.totalTeirWeight!;
+         acc.totalFinalWeight! += s.totalFinalWeight!;
+         acc.totalKartaWeight! += s.totalKartaWeight!;
+         acc.totalNetWeight! += s.totalNetWeight!;
+         acc.totalKartaAmount! += s.totalKartaAmount!;
+         acc.totalLabouryAmount! += s.totalLabouryAmount!;
+         acc.totalKanta! += s.totalKanta!;
+         acc.totalOtherCharges! += s.totalOtherCharges!;
+         acc.totalCdAmount! += s.totalCdAmount!;
+         return acc;
+     }, {
+         name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
+         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
+         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
+         allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
+     });
+     
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid - millSummary.totalCdAmount!;
     millSummary.totalTransactions = filteredSuppliers.length;
@@ -443,23 +415,23 @@ export default function SupplierProfilePage() {
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
     millSummary.averageOriginalPrice = millSummary.totalNetWeight! > 0 ? millSummary.totalOriginalAmount / millSummary.totalNetWeight! : 0;
     const totalRateData = filteredSuppliers.reduce((acc, s) => {
-        if(s.rate > 0) {
-            acc.karta += s.kartaPercentage;
-            acc.laboury += s.labouryRate;
-            acc.count++;
-        }
-        return acc;
-    }, { karta: 0, laboury: 0, count: 0 });
+         if(s.rate > 0) {
+             acc.karta += s.kartaPercentage;
+             acc.laboury += s.labouryRate;
+             acc.count++;
+         }
+         return acc;
+     }, { karta: 0, laboury: 0, count: 0 });
     if(totalRateData.count > 0) {
-        millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
-        millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
+         millSummary.averageKartaPercentage = totalRateData.karta / totalRateData.count;
+         millSummary.averageLabouryRate = totalRateData.laboury / totalRateData.count;
     }
     millSummary.transactionsByVariety = filteredSuppliers.reduce((acc, s) => {
-        const variety = toTitleCase(s.variety) || 'Unknown';
-        acc[variety] = (acc[variety] || 0) + 1;
-        return acc;
-    }, {} as {[key: string]: number});
-    
+         const variety = toTitleCase(s.variety) || 'Unknown';
+         acc[variety] = (acc[variety] || 0) + 1;
+         return acc;
+     }, {} as {[key: string]: number});
+     
     const finalSummaryMap = new Map<string, CustomerSummary>();
     finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
     summary.forEach((value, key) => finalSummaryMap.set(key, value));
@@ -469,10 +441,10 @@ export default function SupplierProfilePage() {
 
   const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
   
-  if (!isClient || loading) {
+  if (!isClient) {
     return (
         <div className="flex items-center justify-center h-64">
-            <p>Loading Profiles...</p>
+            <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
     );
   }
@@ -509,7 +481,7 @@ export default function SupplierProfilePage() {
                     <CustomDropdown
                         options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedSupplierKey}
-                        onChange={setSelectedSupplierKey}
+                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
                         placeholder="Search and select profile..."
                     />
                 </div>

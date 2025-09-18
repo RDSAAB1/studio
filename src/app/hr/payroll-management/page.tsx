@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Employee, PayrollEntry, AttendanceEntry } from "@/lib/definitions"; 
-import { getPayrollEntriesRealtime, getEmployeesRealtime, getAttendanceForPeriod, addPayrollEntry, updatePayrollEntry, deletePayrollEntry } from "@/lib/firestore";
+import { getAttendanceForPeriod, addPayrollEntry, updatePayrollEntry, deletePayrollEntry } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
-import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calendar as CalendarIcon, Calculator, TrendingUp } from "lucide-react";
+import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calculator, TrendingUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/database";
@@ -28,8 +28,8 @@ type AttendanceSummary = {
 };
 
 export default function PayrollManagementPage() {
-  const payrollEntries = useLiveQuery(() => db.mainDataStore.where('collection').equals('payroll').sortBy('payPeriod'));
-  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId'));
+  const payrollEntries = useLiveQuery(() => db.mainDataStore.where('collection').equals('payroll').sortBy('payPeriod')) || [];
+  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId')) || [];
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -154,7 +154,7 @@ export default function PayrollManagementPage() {
     return <div className="text-center text-destructive">{error}</div>;
   }
   
-  if (!isClient) return null;
+  if (!isClient) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <div className="space-y-6">

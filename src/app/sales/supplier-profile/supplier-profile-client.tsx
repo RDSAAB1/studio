@@ -1,3 +1,4 @@
+
 // src/app/sales/supplier-profile/supplier-profile-client.tsx
 
 "use client";
@@ -5,17 +6,17 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/database";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -26,7 +27,7 @@ import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profi
 
 
 // Icons
-import { Users, Calendar as CalendarIcon, Download, Printer } from "lucide-react";
+import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "lucide-react";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
 
@@ -270,15 +271,14 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 };
 
 
-export function SupplierProfileClient() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
-  const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
+export default function SupplierProfilePage() {
+  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
   
+  const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
-  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -286,30 +286,6 @@ export function SupplierProfileClient() {
 
   useEffect(() => {
     setIsClient(true);
-    setLoading(true);
-
-    const unsubscribeSuppliers = onSnapshot(collection(db, "suppliers"), (snapshot) => {
-        const fetchedSuppliers: Supplier[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier));
-        setSuppliers(fetchedSuppliers);
-        setLoading(false);
-    }, (error) => {
-        console.error("Failed to load suppliers from Firestore", error);
-        setSuppliers([]);
-        setLoading(false);
-    });
-
-    const unsubscribePayments = onSnapshot(collection(db, "payments"), (snapshot) => {
-        const fetchedPayments: Payment[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-        setPaymentHistory(fetchedPayments);
-    }, (error) => {
-        console.error("Failed to load payments from Firestore", error);
-        setPaymentHistory([]);
-    });
-
-    return () => { 
-        unsubscribeSuppliers(); 
-        unsubscribePayments(); 
-    };
   }, []);
 
   const filteredData = useMemo(() => {
@@ -345,12 +321,12 @@ export function SupplierProfileClient() {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
-                paymentHistory: [], allTransactions: [], allPayments: [], transactionsByVariety: {},
-                totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0,
-                totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0,
-                totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, averageOriginalPrice: 0,
-                totalTransactions: 0, totalOutstandingTransactions: 0, averageKartaPercentage: 0,
-                averageLabouryRate: 0, totalDeductions: 0,
+                paymentHistory: [], outstandingEntryIds: [], allTransactions: [], allPayments: [],
+                transactionsByVariety: {}, totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, 
+                totalKartaWeight: 0, totalNetWeight: 0, totalKartaAmount: 0, totalLabouryAmount: 0, 
+                totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, 
+                averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
+                averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
             });
         }
     });
@@ -465,10 +441,10 @@ export function SupplierProfileClient() {
 
   const selectedSupplierData = selectedSupplierKey ? supplierSummaryMap.get(selectedSupplierKey) : null;
   
-  if (!isClient || loading) {
+  if (!isClient) {
     return (
         <div className="flex items-center justify-center h-64">
-            <p>Loading Profiles...</p>
+            <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
     );
   }
@@ -505,7 +481,7 @@ export function SupplierProfileClient() {
                     <CustomDropdown
                         options={Array.from(supplierSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
                         value={selectedSupplierKey}
-                        onChange={(value: string | null) => setSelectedSupplierKey(value)}
+                        onChange={(value: string | null) => setSelectedSupplierKey(value as string)}
                         placeholder="Search and select profile..."
                     />
                 </div>
@@ -531,7 +507,7 @@ export function SupplierProfileClient() {
       
       <DetailsDialog 
           isOpen={!!detailsCustomer}
-          onOpenChange={(open: boolean) => !open && setDetailsCustomer(null)}
+          onOpenChange={(open) => !open && setDetailsCustomer(null)}
           customer={detailsCustomer}
           paymentHistory={paymentHistory}
       />
