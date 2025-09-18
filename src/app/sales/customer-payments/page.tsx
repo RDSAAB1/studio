@@ -27,30 +27,32 @@ import { Info, Pen, Printer, Trash2, Loader2, ChevronsUpDown, Check, RefreshCw, 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-import { collection, query, onSnapshot, orderBy, writeBatch, doc, runTransaction, getDocs, where, deleteDoc, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, runTransaction, doc, getDocs, where, limit } from "firebase/firestore";
+import { db as firestoreDB } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
-import { getReceiptSettings, getBankAccountsRealtime, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getCustomerPaymentsRealtime, addCustomerPayment, deleteCustomerPayment } from "@/lib/firestore";
+import { getReceiptSettings, addCustomerPayment, deleteCustomerPayment } from "@/lib/firestore";
 import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { OutstandingEntriesDialog } from "@/components/sales/supplier-payments/outstanding-entries-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 
-const customersCollection = collection(db, "customers");
-const incomesCollection = collection(db, "incomes");
-const expensesCollection = collection(db, "expenses");
+const customersCollection = collection(firestoreDB, "customers");
+const incomesCollection = collection(firestoreDB, "incomes");
+const expensesCollection = collection(firestoreDB, "expenses");
 
 
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [incomes, setIncomes] = useState<Income[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').toArray()) || [];
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').toArray()) || [];
+  const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
+  const incomes = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').toArray()) || [];
+  const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').toArray()) || [];
+  const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray()) || [];
   
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -114,30 +116,17 @@ export default function CustomerPaymentsPage() {
       }, 0);
       return formatSrNo(lastNum + 1, 'R');
   }, []);
+  
+  useEffect(() => {
+      if(customers.length > 0) setLoading(false);
+  }, [customers]);
 
   useEffect(() => {
-    setLoading(true);
-    const customersQuery = query(collection(db, "customers"), orderBy("date", "desc"));
-
-    const unsubCustomers = onSnapshot(customersQuery, (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
-      setLoading(false);
-    }, (error) => toast({ variant: 'destructive', title: "Error", description: "Failed to load customer data." }));
-    
-    const unsubPayments = getCustomerPaymentsRealtime((paymentsData) => {
-        setPaymentHistory(paymentsData);
-        if (!editingPayment) setReceiptNo(getNextReceiptNo(paymentsData));
-    }, (error) => toast({ variant: 'destructive', title: "Error", description: "Failed to load payment history." }));
-
-    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
-    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
-    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
-    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
-
     getReceiptSettings().then(setReceiptSettings);
-
-    return () => { unsubCustomers(); unsubPayments(); unsubBankAccounts(); unsubIncomes(); unsubExpenses(); unsubFunds(); };
-  }, [toast, getNextReceiptNo, editingPayment]);
+    if (paymentHistory && !editingPayment) {
+        setReceiptNo(getNextReceiptNo(paymentHistory));
+    }
+  }, [paymentHistory, getNextReceiptNo, editingPayment]);
   
   const handleCustomerSelect = (key: string | null) => {
     setSelectedCustomerKey(key);
@@ -168,7 +157,7 @@ export default function CustomerPaymentsPage() {
     }
 
     try {
-        await runTransaction(db, async (transaction) => {
+        await runTransaction(firestoreDB, async (transaction) => {
             const paymentData: Omit<CustomerPayment, 'id'> = {
                 paymentId: editingPayment ? editingPayment.paymentId : receiptNo,
                 customerId: selectedCustomerKey!, 
@@ -183,7 +172,7 @@ export default function CustomerPaymentsPage() {
             let remainingPayment = paymentAmount;
             for (const entry of selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {
                 if (remainingPayment <= 0) break;
-                const customerDocRef = doc(db, "customers", entry.id);
+                const customerDocRef = doc(firestoreDB, "customers", entry.id);
                 const receivable = parseFloat(String(entry.netAmount)) || 0;
                 const paymentForThisEntry = Math.min(receivable, remainingPayment);
                 transaction.update(customerDocRef, { netAmount: receivable - paymentForThisEntry });
@@ -201,17 +190,17 @@ export default function CustomerPaymentsPage() {
                 status: 'Paid', isRecurring: false
             };
             
-            const newTransactionRef = doc(collection(db, 'incomes'));
+            const newTransactionRef = doc(collection(firestoreDB, 'incomes'));
             transaction.set(newTransactionRef, {...incomeTransaction, id: newTransactionRef.id});
             paymentData.incomeTransactionId = newTransactionRef.id;
             paymentData.bankAccountId = selectedAccountId === 'CashInHand' ? undefined : selectedAccountId;
             
             if (editingPayment && editingPayment.id) {
-                const paymentRef = doc(db, "customer_payments", editingPayment.id);
+                const paymentRef = doc(firestoreDB, "customer_payments", editingPayment.id);
                 transaction.set(paymentRef, paymentData);
             } else {
-                const newPaymentRef = doc(collection(db, "customer_payments"));
-                transaction.set(newPaymentRef, {...paymentData, id: newPaymentRef.id});
+                const newPaymentRef = doc(collection(firestoreDB, "customer_payments"));
+                await addCustomerPayment({...paymentData, id: newPaymentRef.id});
             }
         });
 
@@ -265,8 +254,8 @@ export default function CustomerPaymentsPage() {
         }
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const paymentRef = doc(db, "customer_payments", paymentIdToDelete);
+            await runTransaction(firestoreDB, async (transaction) => {
+                const paymentRef = doc(firestoreDB, "customer_payments", paymentIdToDelete);
                 
                 if (paymentToDelete.paidFor) {
                     for (const detail of paymentToDelete.paidFor) {
@@ -287,7 +276,7 @@ export default function CustomerPaymentsPage() {
                     transaction.delete(incomeDocRef);
                 }
                 
-                transaction.delete(paymentRef);
+                await deleteCustomerPayment(paymentIdToDelete);
             });
 
             toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success' });
@@ -303,6 +292,10 @@ export default function CustomerPaymentsPage() {
     };
   
   const customerPayments = selectedCustomerKey ? paymentHistory.filter(p => p.customerId === selectedCustomerKey) : [];
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
   
   return (
     <div className="space-y-6">
@@ -413,3 +406,6 @@ export default function CustomerPaymentsPage() {
     
 
 
+
+
+    
