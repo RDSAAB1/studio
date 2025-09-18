@@ -101,15 +101,10 @@ const NetworkStatusIndicator = () => {
 
 
 const NotificationBell = () => {
-    const [loans, setLoans] = useState<Loan[]>([]);
+    const loans = useLiveQuery(getLoansRealtime) || [];
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
     const router = useRouter();
-
-    useEffect(() => {
-        const unsubscribe = getLoansRealtime(setLoans, console.error);
-        return () => unsubscribe();
-    }, []);
 
     useEffect(() => {
         const today = new Date();
