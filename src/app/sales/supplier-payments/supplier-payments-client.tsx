@@ -139,11 +139,11 @@ export default function SupplierPaymentsClient() {
   
   const customerSummaryMap = useMemo(() => {
     const summary = new Map<string, CustomerSummary>();
-    if (!Array.isArray(suppliers)) return summary;
-    
+    if (!suppliers) return summary;
+
     suppliers.forEach(s => {
-        const customerId = `${s.name}|${s.contact}`;
-        if (customerId && !summary.has(customerId)) {
+        const customerId = s.customerId || `${s.name}|${s.contact}`;
+        if (!summary.has(customerId)) {
             summary.set(customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
@@ -154,8 +154,8 @@ export default function SupplierPaymentsClient() {
     });
 
     suppliers.forEach(supplier => {
-        const customerId = `${supplier.name}|${supplier.contact}`;
-        if (!customerId || !summary.has(customerId)) return;
+        const customerId = supplier.customerId || `${supplier.name}|${supplier.contact}`;
+        if (!summary.has(customerId)) return;
         const data = summary.get(customerId)!;
         const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
         data.totalOutstanding += netAmount;
@@ -937,13 +937,3 @@ export default function SupplierPaymentsClient() {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-
-
-    
