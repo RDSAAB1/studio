@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, type ReactNode, Suspense } from 'react';
@@ -14,6 +15,7 @@ import { getRtgsSettings } from "@/lib/firestore";
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import LoginPage from './login/page';
 import { initialDataSync } from '@/lib/database';
+import { cn } from '@/lib/utils';
 
 
 const inter = Inter({
@@ -63,88 +65,69 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
         return () => unsubscribe();
     }, []);
-    
-    useEffect(() => {
-        if (!authChecked) return;
 
-        const publicRoutes = ['/login', '/forgot-password', '/'];
-        const isPublicPage = publicRoutes.includes(pathname);
-        const isSettingsPage = pathname === '/settings';
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(
+                (registration) => console.log('Service Worker registration successful. ✅'),
+                (error) => console.error('Service Worker registration failed. ❌', error),
+            );
+        }
+    }, []);
 
-        if (!user) {
-            if (!isPublicPage) {
-                router.replace('/login');
-            }
-        } else if (user) {
-            if (isSetupComplete === false && !isSettingsPage) {
-                router.replace('/settings');
-            } else if (isSetupComplete === true && isPublicPage) {
-                router.replace('/dashboard-overview');
-            }
-        }
-    }, [user, authChecked, isSetupComplete, pathname, router]);
-
-    // Show a loading screen while auth is being checked
-    if (!authChecked || (user && isSetupComplete === null)) {
+    if (!authChecked || isSetupComplete === null) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
-    
-    // If not authenticated, render the login page.
+
     if (!user) {
+        // Allow access to forgot-password page even when not logged in
+        if (pathname === '/forgot-password') {
+            return <>{children}</>;
+        }
         return <LoginPage />;
     }
 
-    // If authenticated, render the main app content.
-    return (
-        <AppLayoutWrapper>
-            {children}
-        </AppLayoutWrapper>
-    );
+    if (user && !isSetupComplete && pathname !== '/settings') {
+        router.replace('/settings');
+        return (
+            <div className="flex h-screen w-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    if (user && isSetupComplete && (pathname === '/login' || pathname === '/')) {
+        router.replace('/dashboard-overview');
+         return (
+            <div className="flex h-screen w-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    return <AppLayoutWrapper>{children}</AppLayoutWrapper>;
 };
 
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-    const { toast } = useToast();
-
-    // The Service Worker registration is now simplified
-    useEffect(() => {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').then(registration => {
-                console.log('Service Worker registered successfully. ✅');
-            }).catch(err => {
-                console.error('Service Worker registration failed. ❌', err);
-            });
-        }
-    }, []);
- 
-    useEffect(() => {
-        if ('serviceWorker' in navigator) {
-            const handleServiceWorkerMessage = (event: MessageEvent) => {
-                if (event.data && event.data.type === 'SW_ACTIVATED') {
-                    toast({
-                        title: "Application is ready for offline use.",
-                        variant: 'success',
-                    });
-                }
-            };
-            
-            navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-            
-            return () => {
-                navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-            };
-        }
-    }, [toast]);
-
+export default function RootLayout({ children }: { children: ReactNode }) {
     return (
-<html lang="en" suppressHydrationWarning><head><link rel="manifest" href="/manifest.json" /><meta name="theme-color" content="#4F46E5" /></head><body className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable} font-body antialiased`}><StateProvider><AuthWrapper>{children}</AuthWrapper></StateProvider><Toaster /></body></html>
+        <html lang="en" suppressHydrationWarning>
+            <head>
+                <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials"/>
+                <meta name="theme-color" content="#4F46E5" />
+            </head>
+            <body className={cn(inter.variable, spaceGrotesk.variable, sourceCodePro.variable)}>
+                <StateProvider>
+                    <AuthWrapper>
+                        {children}
+                    </AuthWrapper>
+                    <Toaster />
+                </StateProvider>
+            </body>
+        </html>
     );
 }
