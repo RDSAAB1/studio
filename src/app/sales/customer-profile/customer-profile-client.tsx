@@ -1,4 +1,3 @@
-
 // src/app/sales/customer-profile/customer-profile-client.tsx
 
 "use client";
@@ -413,7 +412,7 @@ const CustomerProfileView = ({
 
 export default function CustomerProfileClient() {
   const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').toArray()) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').toArray()) || [];
+  const customerPayments = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').toArray()) || [];
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
@@ -430,7 +429,7 @@ export default function CustomerProfileClient() {
 
   const filteredData = useMemo(() => {
     let filteredCustomers = customers;
-    let filteredPayments = paymentHistory;
+    let filteredCustomerPayments = customerPayments;
 
     if (startDate || endDate) {
         const start = startDate ? new Date(startDate.setHours(0, 0, 0, 0)) : null;
@@ -444,14 +443,14 @@ export default function CustomerProfileClient() {
         };
     
         filteredCustomers = customers.filter(c => filterByDate(new Date(c.date)));
-        filteredPayments = paymentHistory.filter(p => filterByDate(new Date(p.date)));
+        filteredCustomerPayments = customerPayments.filter(p => filterByDate(new Date(p.date)));
     }
 
-    return { filteredCustomers, filteredPayments };
-  }, [customers, paymentHistory, startDate, endDate]);
+    return { filteredCustomers, filteredCustomerPayments };
+  }, [customers, customerPayments, startDate, endDate]);
 
   const customerSummaryMap = useMemo(() => {
-    const { filteredCustomers, filteredPayments } = filteredData;
+    const { filteredCustomers, filteredCustomerPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
     filteredCustomers.forEach(s => {
@@ -484,7 +483,7 @@ export default function CustomerProfileClient() {
         data.allTransactions!.push(s);
     });
 
-    filteredPayments.forEach(p => {
+    filteredCustomerPayments.forEach(p => {
         if (p.customerId && summary.has(p.customerId)) {
             const data = summary.get(p.customerId)!;
             data.totalPaid += p.amount;
@@ -508,15 +507,13 @@ export default function CustomerProfileClient() {
         acc.totalNetWeight! += s.totalNetWeight!;
         acc.totalTransactions! += s.totalTransactions!;
         acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
-        acc.allTransactions = [...(acc.allTransactions || []), ...(s.allTransactions || [])];
-        acc.allPayments = [...(acc.allPayments || []), ...(s.allPayments || [])];
         return acc;
     }, {
         name: 'Mill (Total Customers)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
-        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: [], 
-        allPayments: [], transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
+        averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredCustomers, 
+        allPayments: filteredCustomerPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
     });
     
     millSummary.totalAmount = millSummary.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -588,7 +585,7 @@ export default function CustomerProfileClient() {
       <CustomerDetailsDialog
           customer={detailsCustomer}
           onOpenChange={(open: boolean) => !open && setDetailsCustomer(null)}
-          paymentHistory={paymentHistory}
+          paymentHistory={customerPayments}
           onPrint={() => {}} // Pass a dummy function or implement if needed
       />
       
