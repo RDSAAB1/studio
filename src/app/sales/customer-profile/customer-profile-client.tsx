@@ -258,8 +258,8 @@ export default function CustomerProfileClient() {
         data.totalBrokerage! += s.brokerage || 0;
         data.totalCd! += s.cd || 0;
         data.totalOtherCharges! += s.advanceFreight || 0;
-        data.totalGrossWeight! += s.grossWeight || 0;
-        data.totalTeirWeight! += s.teirWeight || 0;
+        data.totalGrossWeight = (data.totalGrossWeight || 0) + (s.grossWeight || 0);
+        data.totalTeirWeight = (data.totalTeirWeight || 0) + (s.teirWeight || 0);
         data.totalFinalWeight! += s.weight || 0;
         data.totalNetWeight! += s.netWeight || 0;
         data.totalTransactions! += 1;
