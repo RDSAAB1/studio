@@ -192,11 +192,17 @@ export default function SupplierEntryClient() {
       const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
+        let title = 'Date Warning';
         let description = warning;
-        if(suggestedTerm) {
-            description += ` Consider changing term to ${suggestedTerm} days.`;
+        if (warning.includes('holiday')) {
+            title = 'Holiday on Due Date';
+            description = `Try Term: ${suggestedTerm} days`;
+        } else if (warning.includes('limit')) {
+            title = 'Daily Limit Reached';
+            description = `Try Term: ${suggestedTerm} days`;
         }
-        toast({ title: 'Date Warning', description, variant: 'destructive', duration: 7000 });
+        
+        toast({ title, description, variant: 'destructive', duration: 7000 });
       }
   }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
   
@@ -688,5 +694,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
