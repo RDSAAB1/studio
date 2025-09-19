@@ -78,8 +78,13 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     let warning = '';
     const isHoliday = (d: Date) => isSunday(d) || holidays.some(h => new Date(h.date).toDateString() === d.toDateString());
 
-    while (isHoliday(newDueDate)) {
-        newDueDate = addDays(newDueDate, 1);
+    if (isHoliday(newDueDate)) {
+        let shiftedDate = new Date(newDueDate);
+        while (isHoliday(shiftedDate)) {
+            shiftedDate = addDays(shiftedDate, 1);
+        }
+        warning = `Due date was on a holiday/Sunday. It has been shifted to ${shiftedDate.toLocaleDateString()}.`;
+        newDueDate = shiftedDate;
     }
     
     // Check daily payment limit
@@ -94,13 +99,11 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
         });
 
         if (dailyTotal > dailyPaymentLimit) {
-            warning = `Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${formatCurrency(dailyTotal)} for ${newDueDate.toLocaleDateString()} reached. Consider changing the date.`;
-            // Suggest next available date
             let suggestedDate = addDays(newDueDate, 1);
             while (isHoliday(suggestedDate)) {
                  suggestedDate = addDays(suggestedDate, 1);
             }
-             warning += ` Next available date is ${suggestedDate.toLocaleDateString()}`;
+            warning += ` Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${newDueDate.toLocaleDateString()} reached. Consider changing the date. Next available date is ${suggestedDate.toLocaleDateString()}`;
         }
     }
 

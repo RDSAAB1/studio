@@ -189,10 +189,10 @@ export default function SupplierEntryClient() {
   }
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
-      const calculatedState = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
+      const { warning, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
-      if (calculatedState.warning) {
-        toast({ title: 'Date Warning', description: calculatedState.warning, variant: 'destructive', duration: 5000 });
+      if (warning) {
+        toast({ title: 'Date Warning', description: warning, variant: 'destructive', duration: 5000 });
       }
   }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
   
