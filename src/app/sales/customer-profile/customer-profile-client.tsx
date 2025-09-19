@@ -1,3 +1,4 @@
+
 // src/app/sales/customer-profile/customer-profile-client.tsx
 
 "use client";
@@ -274,8 +275,8 @@ const CustomerProfileView = ({
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Brokerage</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalDeductions || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">CD</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Brokerage</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalBrokerage || 0)}`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">CD</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalCd || 0)}`}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Other Charges</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
                              <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
@@ -465,6 +466,7 @@ export default function CustomerProfileClient() {
                 totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, averageRate: 0, 
                 averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0,
                 averageKartaPercentage: 0, averageLabouryRate: 0, totalDeductions: 0,
+                totalBrokerage: 0, totalCd: 0,
             });
         }
     });
@@ -475,6 +477,8 @@ export default function CustomerProfileClient() {
         data.totalOriginalAmount += Number(s.originalNetAmount) || 0;
         data.totalAmount += s.amount || 0;
         data.totalKanta! += s.kanta || 0;
+        data.totalBrokerage! += s.brokerage || 0;
+        data.totalCd! += s.cd || 0;
         data.totalGrossWeight! += s.grossWeight || 0;
         data.totalTeirWeight! += s.teirWeight || 0;
         data.totalFinalWeight! += s.weight || 0;
@@ -507,16 +511,20 @@ export default function CustomerProfileClient() {
         acc.totalNetWeight! += s.totalNetWeight!;
         acc.totalTransactions! += s.totalTransactions!;
         acc.totalOutstandingTransactions! += s.totalOutstandingTransactions!;
+        acc.totalAmount += s.totalAmount;
+        acc.totalBrokerage! += s.totalBrokerage!;
+        acc.totalCd! += s.totalCd!;
+        acc.totalOtherCharges! += s.totalOtherCharges!;
         return acc;
     }, {
         name: 'Mill (Total Customers)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredCustomers, 
-        allPayments: filteredCustomerPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
+        allPayments: filteredCustomerPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0,
+        totalBrokerage: 0, totalCd: 0,
     });
     
-    millSummary.totalAmount = millSummary.allTransactions!.reduce((sum, t) => sum + (t.amount || 0), 0);
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
 
