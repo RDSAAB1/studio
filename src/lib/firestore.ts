@@ -21,7 +21,7 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
-import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense } from "@/lib/definitions";
+import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
@@ -680,4 +680,28 @@ export async function deletePayrollEntry(id: string) {
     await addToSyncQueue({ action: 'delete', payload: { collection: 'payroll', id } });
 }
 
-    
+// --- Holiday Functions ---
+export async function getHolidays(): Promise<Holiday[]> {
+    const querySnapshot = await getDocs(collection(firestoreDB, "holidays"));
+    return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Holiday));
+}
+
+export async function addHoliday(date: string, name: string): Promise<void> {
+    const docRef = doc(firestoreDB, "holidays", date);
+    await setDoc(docRef, { date, name });
+}
+
+export async function deleteHoliday(id: string): Promise<void> {
+    const docRef = doc(firestoreDB, "holidays", id);
+    await deleteDoc(docRef);
+}
+
+// --- Daily Payment Limit ---
+export async function getDailyPaymentLimit(): Promise<number> {
+    const docRef = doc(settingsCollection, "companyDetails");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && docSnap.data().dailyPaymentLimit) {
+        return docSnap.data().dailyPaymentLimit;
+    }
+    return 800000; // Default limit
+}
