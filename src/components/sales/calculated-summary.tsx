@@ -76,12 +76,18 @@ export const CalculatedSummary = ({
     const isLoading = !customer || !customer.srNo;
     const isPrintActionForSelected = selectedIdsCount > 0;
     
+    const averageBagWeight = useMemo(() => {
+        if (!customer || !customer.weight || !customer.bags) return 0;
+        return (customer.weight / customer.bags) * 100;
+    }, [customer]);
+    
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
             <CardContent className="p-3 space-y-3">
                  <div className="flex items-center justify-around gap-x-4 gap-y-2 flex-wrap">
                     {!isCustomerForm && <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />}
                     <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
+                    {isCustomerForm && <SummaryItem label="Avg Bags Wt" value={`${averageBagWeight.toFixed(2)} kg`} />}
                     {!isCustomerForm && <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />}
                     <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
                     {!isCustomerForm && <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />}

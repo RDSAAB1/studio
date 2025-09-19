@@ -1,9 +1,10 @@
+
 // src/app/sales/customer-profile/customer-profile-client.tsx
 
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 import { db } from "@/lib/database";
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Badge } from "@/components/ui/badge"; 
-import { DetailsDialog } from "@/components/sales/details-dialog";
+import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
 // Icons
@@ -53,7 +54,7 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             date: p.date,
             particulars: `Payment (ID# ${p.paymentId})`,
             debit: 0,
-            credit: (p.amount || 0) + (p.cdAmount || 0),
+            credit: (p.amount || 0),
         }));
 
         const combined = [...mappedTransactions, ...mappedPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -199,7 +200,7 @@ const CustomerProfileView = ({
 }: {
     selectedSupplierData: CustomerSummary | null;
     isMillSelected: boolean;
-    onShowDetails: (supplier: Supplier) => void;
+    onShowDetails: (supplier: Customer) => void;
     onShowPaymentDetails: (payment: Payment | CustomerPayment) => void;
     onGenerateStatement: () => void;
 }) => {
@@ -207,7 +208,7 @@ const CustomerProfileView = ({
     const financialPieChartData = useMemo(() => {
         if (!selectedSupplierData) return [];
         return [
-          { name: 'Total Paid', value: selectedSupplierData.totalPaid + (selectedSupplierData.totalCdAmount || 0) },
+          { name: 'Total Received', value: selectedSupplierData.totalPaid },
           { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
         ];
     }, [selectedSupplierData]);
@@ -415,7 +416,7 @@ export default function CustomerProfileClient() {
   const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').toArray()) || [];
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
-  const [detailsCustomer, setDetailsCustomer] = useState<Supplier | null>(null);
+  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | CustomerPayment | null>(null);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -511,7 +512,7 @@ export default function CustomerProfileClient() {
         acc.allPayments = [...(acc.allPayments || []), ...(s.allPayments || [])];
         return acc;
     }, {
-        name: 'Mill (Total Overview)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
+        name: 'Mill (Total Customers)', contact: '', totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
         paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
         totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
         averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: [], 
@@ -584,16 +585,16 @@ export default function CustomerProfileClient() {
         </DialogContent>
       </Dialog>
       
-      <DetailsDialog 
-          isOpen={!!detailsCustomer}
-          onOpenChange={(open: boolean) => !open && setDetailsCustomer(null)}
+      <CustomerDetailsDialog
           customer={detailsCustomer}
+          onOpenChange={(open: boolean) => !open && setDetailsCustomer(null)}
           paymentHistory={paymentHistory}
+          onPrint={() => {}} // Pass a dummy function or implement if needed
       />
       
       <PaymentDetailsDialog
         payment={selectedPaymentForDetails}
-        suppliers={customers}
+        suppliers={customers} // It expects suppliers, but customers have a similar structure for display
         onOpenChange={() => setSelectedPaymentForDetails(null)}
         onShowEntryDetails={setDetailsCustomer}
       />
