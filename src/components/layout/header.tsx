@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import type { Loan, Holiday } from "@/lib/definitions";
-import { format, addDays } from "date-fns";
+import { format, addDays, isSunday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
