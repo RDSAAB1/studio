@@ -17,7 +17,7 @@ interface BillOfSupplyProps {
         hsnCode: string;
         taxRate: number;
         isGstIncluded: boolean;
-        sixRNo: string;
+        nineRNo: string;
         gatePassNo: string;
         grNo: string;
         grDate: string;
@@ -183,7 +183,7 @@ export const BillOfSupply: React.FC<BillOfSupplyProps> = ({ customer, settings, 
                  </div>
                  
                  <div className="border border-gray-200 p-3 rounded-lg mt-4 text-xs grid grid-cols-4 gap-x-4 gap-y-1">
-                    <div className="flex gap-2"><span className="font-semibold text-gray-600">6R No:</span><span>{invoiceDetails.sixRNo}</span></div>
+                    <div className="flex gap-2"><span className="font-semibold text-gray-600">9R No:</span><span>{invoiceDetails.nineRNo}</span></div>
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">Gate Pass No:</span><span>{invoiceDetails.gatePassNo}</span></div>
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. No:</span><span>{invoiceDetails.grNo}</span></div>
                     <div className="flex gap-2"><span className="font-semibold text-gray-600">G.R. Date:</span><span>{invoiceDetails.grDate}</span></div>

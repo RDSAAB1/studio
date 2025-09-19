@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -65,7 +66,7 @@ export default function SupplierPaymentsClient() {
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
   const [isPayeeEditing, setIsPayeeEditing] = useState(false);
   
-  const [sixRNo, setSixRNo] = useState('');
+  const [nineRNo, setNineRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
@@ -339,7 +340,7 @@ export default function SupplierPaymentsClient() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
-    setSixRNo('');
+    setNineRNo('');
     setParchiNo('');
     setRtgsQuantity(0);
     setRtgsRate(0);
@@ -490,7 +491,7 @@ const processPayment = async () => {
             cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
             receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
             paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
-            sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+            nineRNo: nineRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
             parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
             supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
             supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
@@ -710,8 +711,8 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
-                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
+                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} nineRNo={nineRNo}
+                        setNineRNo={setNineRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
@@ -806,6 +807,3 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
     
 
     
-
-
-

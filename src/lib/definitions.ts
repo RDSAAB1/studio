@@ -39,7 +39,7 @@ export type Customer = {
   ifscCode?: string;
   bank?: string;
   branch?: string;
-  sixRNo?: string;
+  nineRNo?: string;
   sixRDate?: string;
   parchiNo?: string;
   checkNo?: string;
@@ -163,7 +163,7 @@ export type SupplierPayment = {
     receiptType: string; 
     notes?: string;
     paidFor?: PaidFor[];
-    sixRNo?: string;
+    nineRNo?: string;
     sixRDate?: string;
     parchiNo?: string;
     checkNo?: string;

@@ -50,7 +50,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         hsnCode: '1006',
         taxRate: 5,
         isGstIncluded: false,
-        sixRNo: '',
+        nineRNo: '',
         gatePassNo: '',
         grNo: '',
         grDate: '',
@@ -69,7 +69,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             );
              setInvoiceDetails(prev => ({
                 ...prev,
-                sixRNo: customer.sixRNo || '',
+                nineRNo: customer.nineRNo || '',
                 gatePassNo: customer.gatePassNo || '',
                 grNo: customer.grNo || '',
                 grDate: customer.grDate || '',
@@ -118,7 +118,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         if (customer) {
             const finalDataToSave: Partial<Customer> = { 
                 ...editableInvoiceDetails,
-                sixRNo: invoiceDetails.sixRNo,
+                nineRNo: invoiceDetails.nineRNo,
                 gatePassNo: invoiceDetails.gatePassNo,
                 grNo: invoiceDetails.grNo,
                 grDate: invoiceDetails.grDate,
@@ -293,7 +293,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                              <Card>
                                 <CardHeader className="p-3"><CardTitle className="text-base">Additional Details</CardTitle></CardHeader>
                                 <CardContent className="p-3 grid grid-cols-2 gap-3">
-                                    <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={invoiceDetails.sixRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, sixRNo: e.target.value})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1"><Label className="text-xs">9R No.</Label><Input value={invoiceDetails.nineRNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, nineRNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">Gate Pass No.</Label><Input value={invoiceDetails.gatePassNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, gatePassNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">G.R. No.</Label><Input value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">G.R. Date</Label><Input type="date" value={invoiceDetails.grDate} onChange={(e) => setInvoiceDetails({...invoiceDetails, grDate: e.target.value})} className="h-8 text-xs" /></div>
