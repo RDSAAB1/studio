@@ -28,7 +28,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers }: any) => {
+export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTermBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers }: any) => {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -105,7 +105,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         <div className="space-y-1">
                             <Label htmlFor="term" className="text-xs">Term (Days)</Label>
                                 <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
-                                <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} className="h-8 text-sm pl-10" />
+                                <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} onBlur={handleTermBlur} className="h-8 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
@@ -252,3 +252,5 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         </>
     );
 };
+
+    

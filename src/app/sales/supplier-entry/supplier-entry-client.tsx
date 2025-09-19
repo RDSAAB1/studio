@@ -188,17 +188,21 @@ export default function SupplierEntryClient() {
     }
   }
 
-  const performCalculations = useCallback((data: Partial<FormValues>) => {
-      const { warning, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
+  const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
-      if (warning) {
-        toast({ title: 'Date Warning', description: warning, variant: 'destructive', duration: 5000 });
+      if (showWarning && warning) {
+        let description = warning;
+        if(suggestedTerm) {
+            description += ` Consider changing term to ${suggestedTerm} days.`;
+        }
+        toast({ title: 'Date Warning', description, variant: 'destructive', duration: 7000 });
       }
   }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>);
+        performCalculations(value as Partial<FormValues>, false);
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
@@ -235,7 +239,7 @@ export default function SupplierEntryClient() {
 
     setCurrentSupplier(customerState);
     form.reset(formValues);
-    performCalculations(formValues);
+    performCalculations(formValues, false);
   }, [form, performCalculations]);
 
   const handleNew = useCallback(() => {
@@ -611,6 +615,7 @@ export default function SupplierEntryClient() {
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
                 handleContactBlur={handleContactBlur}
+                handleTermBlur={() => performCalculations(form.getValues(), true)}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
@@ -683,3 +688,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    

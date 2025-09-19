@@ -71,11 +71,13 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
 };
 
 export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
-    const date = values.date;
+    const date = values.date ? new Date(values.date) : new Date();
     const termDays = Number(values.term) || 0;
-    let newDueDate = date ? addDays(new Date(date), termDays) : new Date();
+    let newDueDate = addDays(date, termDays);
 
     let warning = '';
+    let suggestedTerm: number | null = null;
+    
     const isHoliday = (d: Date) => isSunday(d) || holidays.some(h => new Date(h.date).toDateString() === d.toDateString());
 
     if (isHoliday(newDueDate)) {
@@ -83,11 +85,11 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
         while (isHoliday(shiftedDate)) {
             shiftedDate = addDays(shiftedDate, 1);
         }
-        warning = `Due date was on a holiday/Sunday. It has been shifted to ${shiftedDate.toLocaleDateString()}.`;
+        warning = `Due date was on a holiday/Sunday.`;
         newDueDate = shiftedDate;
+        suggestedTerm = differenceInCalendarDays(newDueDate, date);
     }
     
-    // Check daily payment limit
     if (allSuppliers && allSuppliers.length > 0) {
         let dailyTotal = 0;
         const dueDateString = newDueDate.toISOString().split('T')[0];
@@ -99,11 +101,13 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
         });
 
         if (dailyTotal > dailyPaymentLimit) {
-            let suggestedDate = addDays(newDueDate, 1);
-            while (isHoliday(suggestedDate)) {
-                 suggestedDate = addDays(suggestedDate, 1);
+            let nextAvailableDate = addDays(newDueDate, 1);
+            while (isHoliday(nextAvailableDate)) {
+                 nextAvailableDate = addDays(nextAvailableDate, 1);
             }
-            warning += ` Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${newDueDate.toLocaleDateString()} reached. Consider changing the date. Next available date is ${suggestedDate.toLocaleDateString()}`;
+            warning += ` Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${newDueDate.toLocaleDateString()} reached.`;
+            newDueDate = nextAvailableDate;
+            suggestedTerm = differenceInCalendarDays(newDueDate, date);
         }
     }
 
@@ -148,7 +152,8 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
       kanta: kanta, 
       originalNetAmount: originalNetAmount,
       netAmount: netAmount,
-      warning: warning
+      warning: warning,
+      suggestedTerm: suggestedTerm,
     };
 };
 
@@ -213,3 +218,5 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         netAmount: netAmount,
     }
 }
+
+    
