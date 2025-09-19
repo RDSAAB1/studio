@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Badge } from "@/components/ui/badge"; 
-import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
+import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 
 // Icons
