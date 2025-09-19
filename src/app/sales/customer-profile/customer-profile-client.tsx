@@ -1,4 +1,3 @@
-
 // src/app/sales/customer-profile/customer-profile-client.tsx
 
 "use client";
@@ -255,11 +254,11 @@ export default function CustomerProfileClient() {
         const data = summary.get(s.customerId)!;
         data.totalOriginalAmount += Number(s.originalNetAmount) || 0;
         data.totalAmount += s.amount || 0;
-        data.totalBrokerage! += s.brokerage || 0;
-        data.totalCd! += s.cd || 0;
+        data.totalBrokerage! += Number(s.brokerage) || 0;
+        data.totalCd! += Number(s.cd) || 0;
         data.totalOtherCharges! += s.advanceFreight || 0;
-        data.totalGrossWeight = (data.totalGrossWeight || 0) + (s.grossWeight || 0);
-        data.totalTeirWeight = (data.totalTeirWeight || 0) + (s.teirWeight || 0);
+        data.totalGrossWeight! += parseFloat(String(s.grossWeight)) || 0;
+        data.totalTeirWeight! += parseFloat(String(s.teirWeight)) || 0;
         data.totalFinalWeight! += s.weight || 0;
         data.totalNetWeight! += s.netWeight || 0;
         data.totalTransactions! += 1;
