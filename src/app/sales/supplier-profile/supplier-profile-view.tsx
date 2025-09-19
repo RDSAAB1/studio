@@ -115,11 +115,11 @@ export const SupplierProfileView = ({
                             <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} Qtl`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} Qtl`}</span></div>
+                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} Qtl`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
-                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
+                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} Qtl`}</span></div>
                             <Separator className="my-2"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
                             <Separator className="my-2"/>
@@ -281,4 +281,5 @@ export const SupplierProfileView = ({
             </div>
         </div>
     );
-};
+
+    
