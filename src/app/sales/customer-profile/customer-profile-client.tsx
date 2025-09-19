@@ -16,24 +16,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { Badge } from "@/components/ui/badge"; 
 import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
+import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
+
 
 // Icons
-import { Users, Calendar as CalendarIcon, Download, Printer, Info, Scale, FileText, Banknote, Loader2 } from "lucide-react";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Users, Calendar as CalendarIcon, Download, Printer, Loader2 } from "lucide-react";
 
 const MILL_OVERVIEW_KEY = 'mill-overview';
-const PIE_CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-// --- Sub-component 1: The Statement Preview ---
-const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
+export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
     const { toast } = useToast();
     const statementRef = React.useRef<HTMLDivElement>(null);
 
@@ -180,233 +178,12 @@ const StatementPreview = ({ data }: { data: CustomerSummary | null }) => {
             </div>
         </div>
         <DialogFooter className="p-4 border-t no-print">
-            <Button variant="outline" asChild><DialogDescription asChild><Button variant="outline">Close</Button></DialogDescription></Button>
+            <Button variant="outline" onClick={() => (document.querySelector('.printable-statement-container [aria-label="Close"]') as HTMLElement)?.click()}>Close</Button>
             <div className="flex-grow" />
             <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
             <Button onClick={handlePrint}><Download className="mr-2 h-4 w-4"/> Download PDF</Button>
         </DialogFooter>
     </>
-    );
-};
-
-
-// --- Sub-component 2: The Profile View ---
-const CustomerProfileView = ({
-    selectedSupplierData,
-    isMillSelected,
-    onShowDetails,
-    onShowPaymentDetails,
-    onGenerateStatement
-}: {
-    selectedSupplierData: CustomerSummary | null;
-    isMillSelected: boolean;
-    onShowDetails: (supplier: Customer) => void;
-    onShowPaymentDetails: (payment: Payment | CustomerPayment) => void;
-    onGenerateStatement: () => void;
-}) => {
-    
-    const financialPieChartData = useMemo(() => {
-        if (!selectedSupplierData) return [];
-        return [
-          { name: 'Total Received', value: selectedSupplierData.totalPaid },
-          { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
-        ];
-    }, [selectedSupplierData]);
-    
-    const varietyPieChartData = useMemo(() => {
-        if (!selectedSupplierData?.transactionsByVariety) return [];
-        return Object.entries(selectedSupplierData.transactionsByVariety).map(([name, value]) => ({ name, value }));
-    }, [selectedSupplierData]);
-
-    const currentPaymentHistory = useMemo<(Payment | CustomerPayment)[]>(() => {
-        if (!selectedSupplierData) return [];
-        if (isMillSelected) {
-            return selectedSupplierData.allPayments || [];
-        }
-        return selectedSupplierData.paymentHistory || [];
-    }, [selectedSupplierData, isMillSelected]);
-
-    if (!selectedSupplierData) {
-        return (
-            <Card className="flex items-center justify-center h-64">
-                <CardContent className="text-center text-muted-foreground">
-                    <p>Please select a profile to view details.</p>
-                </CardContent>
-            </Card>
-        )
-    }
-
-    return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                        <div>
-                            <CardTitle>{toTitleCase(selectedSupplierData.name)}</CardTitle>
-                            <CardDescription>
-                                {isMillSelected ? "A complete financial and transactional overview of all customers." : `Company: ${toTitleCase(selectedSupplierData.companyName || '')} | Contact: ${selectedSupplierData.contact}`}
-                            </CardDescription>
-                        </div>
-                        <Button onClick={onGenerateStatement} size="sm">Generate Statement</Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                     <Card>
-                        <CardHeader className="p-4 pb-2">
-                             <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalGrossWeight)) || 0).toFixed(2)} Qtl`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalTeirWeight)) || 0).toFixed(2)} Qtl`}</span></div>
-                            <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalFinalWeight)) || 0).toFixed(2)} Qtl`}</span></div>
-                             <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(parseFloat(String(selectedSupplierData.totalNetWeight)) || 0).toFixed(2)} Qtl`}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Average Rate</span><span className="font-semibold">{formatCurrency(selectedSupplierData.averageRate || 0)}</span></div>
-                            <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Transactions</span><span className="font-semibold">{`${selectedSupplierData.totalTransactions} Entries`}</span></div>
-                             <div className="flex justify-between font-bold text-destructive"><span>Outstanding Entries</span><span>{`${selectedSupplierData.totalOutstandingTransactions} Entries`}</span></div>
-                        </CardContent>
-                    </Card>
-
-                     <Card>
-                        <CardHeader className="p-4 pb-2">
-                             <CardTitle className="text-base flex items-center gap-2"><FileText size={16}/> Deduction Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Brokerage</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalBrokerage || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">CD</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalCd || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Other Charges</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                            <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Total Receivable</p>
-                                <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                     <Card>
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Receivable</span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
-                             <Separator className="my-2"/>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Received</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Outstanding</p>
-                                <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Visual Overview</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', fontSize: '12px', borderRadius: 'var(--radius)' }} formatter={(value: number) => formatCurrency(value)} />
-                            <Pie data={financialPieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8">
-                                {financialPieChartData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} /> ))}
-                            </Pie>
-                            <Legend wrapperStyle={{ fontSize: '12px' }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                 <div className="grid grid-cols-1 gap-6">
-                  <Card>
-                      <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
-                      <CardContent>
-                          <ScrollArea className="h-[14rem]">
-                            <div className="overflow-x-auto">
-                              <Table>
-                                  <TableHeader>
-                                      <TableRow>
-                                          <TableHead>SR No</TableHead>
-                                          <TableHead>Amount</TableHead>
-                                          <TableHead>Status</TableHead>
-                                          <TableHead className="text-right">Actions</TableHead>
-                                      </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                      {(selectedSupplierData.allTransactions || []).map(entry => (
-                                          <TableRow key={entry.id}>
-                                              <TableCell className="font-mono">{entry.srNo}</TableCell>
-                                              <TableCell className="font-semibold">{formatCurrency(parseFloat(String(entry.originalNetAmount)))}</TableCell>
-                                              <TableCell>
-                                                  <Badge variant={parseFloat(String(entry.netAmount)) < 1 ? "secondary" : "destructive"}>
-                                                  {parseFloat(String(entry.netAmount)) < 1 ? "Paid" : "Outstanding"}
-                                                  </Badge>
-                                              </TableCell>
-                                              <TableCell className="text-right">
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(entry)}>
-                                                      <Info className="h-4 w-4" />
-                                                  </Button>
-                                              </TableCell>
-                                          </TableRow>
-                                      ))}
-                                      {(selectedSupplierData.allTransactions || []).length === 0 && (
-                                          <TableRow>
-                                              <TableCell colSpan={4} className="text-center text-muted-foreground">No transactions found.</TableCell>
-                                          </TableRow>
-                                      )}
-                                  </TableBody>
-                              </Table>
-                            </div>
-                          </ScrollArea>
-                      </CardContent>
-                  </Card>
-                   <Card>
-                      <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-                      <CardContent>
-                          <ScrollArea className="h-[14rem]">
-                             <div className="overflow-x-auto">
-                              <Table>
-                                  <TableHeader>
-                                      <TableRow>
-                                          <TableHead>ID</TableHead>
-                                          <TableHead>Date</TableHead>
-                                          <TableHead>Paid For (SR No.)</TableHead>
-                                          <TableHead className="text-right">Amount</TableHead>
-                                          <TableHead className="text-right">Actions</TableHead>
-                                      </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                      {currentPaymentHistory.map(payment => (
-                                          <TableRow key={payment.id}>
-                                              <TableCell className="font-mono">{payment.paymentId}</TableCell>
-                                              <TableCell>{format(new Date(payment.date), "PPP")}</TableCell>
-                                              <TableCell className="text-xs">{(payment.paidFor || []).map(p => p.srNo).join(', ')}</TableCell>
-                                              <TableCell className="font-semibold text-right">{formatCurrency(payment.amount)}</TableCell>
-                                               <TableCell className="text-right">
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowPaymentDetails(payment)}>
-                                                      <Info className="h-4 w-4" />
-                                                  </Button>
-                                              </TableCell>
-                                          </TableRow>
-                                      ))}
-                                       {currentPaymentHistory.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center text-muted-foreground">No payments found.</TableCell>
-                                        </TableRow>
-                                    )}
-                                  </TableBody>
-                              </Table>
-                             </div>
-                          </ScrollArea>
-                      </CardContent>
-                  </Card>
-                </div>
-            </div>
-        </div>
     );
 };
 
@@ -471,26 +248,39 @@ export default function CustomerProfileClient() {
         }
     });
 
+    let customerRateSum: { [key: string]: { rate: number, count: number } } = {};
+
     filteredCustomers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
         data.totalOriginalAmount += Number(s.originalNetAmount) || 0;
         data.totalAmount += s.amount || 0;
-        data.totalKanta! += s.kanta || 0;
         data.totalBrokerage! += s.brokerage || 0;
         data.totalCd! += s.cd || 0;
+        data.totalOtherCharges! += s.advanceFreight || 0;
         data.totalGrossWeight! += s.grossWeight || 0;
         data.totalTeirWeight! += s.teirWeight || 0;
         data.totalFinalWeight! += s.weight || 0;
         data.totalNetWeight! += s.netWeight || 0;
         data.totalTransactions! += 1;
+        
+        if (!customerRateSum[s.customerId]) {
+            customerRateSum[s.customerId] = { rate: 0, count: 0 };
+        }
+        if (s.rate > 0) {
+            customerRateSum[s.customerId].rate += s.rate;
+            customerRateSum[s.customerId].count++;
+        }
         data.allTransactions!.push(s);
+        const variety = toTitleCase(s.variety) || 'Unknown';
+        data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
     });
 
     filteredCustomerPayments.forEach(p => {
         if (p.customerId && summary.has(p.customerId)) {
             const data = summary.get(p.customerId)!;
             data.totalPaid += p.amount;
+            data.paymentHistory.push(p);
             data.allPayments!.push(p);
         }
     });
@@ -527,7 +317,12 @@ export default function CustomerProfileClient() {
     
     millSummary.totalOutstanding = millSummary.totalOriginalAmount - millSummary.totalPaid;
     millSummary.averageRate = millSummary.totalFinalWeight! > 0 ? millSummary.totalAmount / millSummary.totalFinalWeight! : 0;
-
+    millSummary.transactionsByVariety = filteredCustomers.reduce((acc, s) => {
+         const variety = toTitleCase(s.variety) || 'Unknown';
+         acc[variety] = (acc[variety] || 0) + 1;
+         return acc;
+     }, {} as {[key: string]: number});
+     
     const finalSummaryMap = new Map<string, CustomerSummary>();
     finalSummaryMap.set(MILL_OVERVIEW_KEY, millSummary);
     summary.forEach((value, key) => finalSummaryMap.set(key, value));
@@ -574,12 +369,13 @@ export default function CustomerProfileClient() {
         </CardContent>
       </Card>
 
-      <CustomerProfileView
+      <SupplierProfileView
         selectedSupplierData={selectedCustomerData}
         isMillSelected={selectedCustomerKey === MILL_OVERVIEW_KEY}
         onShowDetails={setDetailsCustomer}
         onShowPaymentDetails={setSelectedPaymentForDetails}
         onGenerateStatement={() => setIsStatementOpen(true)}
+        isCustomerView={true}
       />
       
       <Dialog open={isStatementOpen} onOpenChange={setIsStatementOpen}>
