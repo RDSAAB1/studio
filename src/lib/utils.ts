@@ -1,7 +1,8 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Customer, Payment } from './definitions';
+import type { Customer, Payment, Holiday } from './definitions';
+import { isSunday, addDays, differenceInCalendarDays } from 'date-fns';
 
 interface SupplierFormValues {
     date: Date;
@@ -69,12 +70,39 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
   return `${prefix}${String(newNumber).padStart(padding, '0')}`;
 };
 
-
-export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory: any[]) => {
+export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
     const date = values.date;
     const termDays = Number(values.term) || 0;
-    const newDueDate = date ? new Date(date) : new Date();
-    if (date) newDueDate.setDate(newDueDate.getDate() + termDays);
+    let newDueDate = date ? addDays(new Date(date), termDays) : new Date();
+
+    let warning = '';
+    const isHoliday = (d: Date) => isSunday(d) || holidays.some(h => new Date(h.date).toDateString() === d.toDateString());
+
+    while (isHoliday(newDueDate)) {
+        newDueDate = addDays(newDueDate, 1);
+    }
+    
+    // Check daily payment limit
+    if (allSuppliers && allSuppliers.length > 0) {
+        let dailyTotal = 0;
+        const dueDateString = newDueDate.toISOString().split('T')[0];
+        
+        allSuppliers.forEach(supplier => {
+            if (supplier.dueDate === dueDateString) {
+                dailyTotal += Number(supplier.netAmount) || 0;
+            }
+        });
+
+        if (dailyTotal > dailyPaymentLimit) {
+            warning = `Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${formatCurrency(dailyTotal)} for ${newDueDate.toLocaleDateString()} reached. Consider changing the date.`;
+            // Suggest next available date
+            let suggestedDate = addDays(newDueDate, 1);
+            while (isHoliday(suggestedDate)) {
+                 suggestedDate = addDays(suggestedDate, 1);
+            }
+             warning += ` Next available date is ${suggestedDate.toLocaleDateString()}`;
+        }
+    }
 
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
@@ -87,7 +115,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     
     const netWeight = weight - kartaWeight;
     
-    const amount = Math.round(weight * rate); // Changed from netWeight to weight as per user request
+    const amount = Math.round(weight * rate); 
 
     const labouryRate = values.labouryRate || 0;
     const labouryAmount = Math.round(weight * labouryRate);
@@ -117,6 +145,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
       kanta: kanta, 
       originalNetAmount: originalNetAmount,
       netAmount: netAmount,
+      warning: warning
     };
 };
 

@@ -6,8 +6,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, addBank, addBankBranch } from '@/lib/firestore';
-import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch } from '@/lib/definitions';
+import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, addBank, addBankBranch, getHolidays, addHoliday, deleteHoliday } from '@/lib/firestore';
+import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch, Holiday } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck } from 'lucide-react';
+import { Loader2, Save, Building, Mail, Phone, Banknote, ShieldCheck, KeyRound, ExternalLink, AlertCircle, LogOut, Trash2, Settings, List, Plus, Pen, UserCircle, Landmark, FileText, LogIn, CheckCheck, Calendar as CalendarIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,6 +40,9 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { format } from "date-fns";
+import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
+import { Calendar } from "../ui/calendar";
 
 
 // Schemas
@@ -56,6 +59,7 @@ const companySchema = z.object({
   bankHeaderLine1: z.string().optional(),
   bankHeaderLine2: z.string().optional(),
   bankHeaderLine3: z.string().optional(),
+  dailyPaymentLimit: z.coerce.number().min(0).optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -150,6 +154,9 @@ export default function SettingsPage() {
     const [currentBankAccount, setCurrentBankAccount] = useState<Partial<BankAccount>>({});
     const [formatSettings, setFormatSettings] = useState<FormatSettings>({});
     
+    const [holidays, setHolidays] = useState<Holiday[]>([]);
+    const [newHoliday, setNewHoliday] = useState<{ date: Date | undefined, name: string }>({ date: undefined, name: '' });
+    
     const [autoSyncInterval, setAutoSyncInterval] = useState<string>('never');
 
 
@@ -217,16 +224,15 @@ export default function SettingsPage() {
                 
                 const fmtSettings = await getFormatSettings();
                 setFormatSettings(fmtSettings);
-
-                // const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, console.error);
-                // const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
+                
+                const fetchedHolidays = await getHolidays();
+                setHolidays(fetchedHolidays);
 
                 const varieties = await db.mainDataStore?.where('collection').equals('varieties').toArray();
                 setVarietyOptions(varieties || []);
                 const paymentTypes = await db.mainDataStore?.where('collection').equals('paymentTypes').toArray();
                 setPaymentTypeOptions(paymentTypes || []);
                 
-                // Get periodic sync status
                 navigator.serviceWorker.ready.then(async (registration) => {
                     if ('periodicSync' in registration) {
                         const tags = await (registration as any).periodicSync.getTags();
@@ -238,10 +244,6 @@ export default function SettingsPage() {
                 });
 
                 setLoading(false);
-                return () => { 
-                    // unsubVarieties(); 
-                    // unsubPaymentTypes(); 
-                };
             } else {
                 setUser(null);
                 setLoading(false);
@@ -255,7 +257,6 @@ export default function SettingsPage() {
         try {
             const registration = await navigator.serviceWorker.ready;
             if ('periodicSync' in registration) {
-                 // First, unregister all periodic sync tags to avoid duplicates
                 await (registration as any).periodicSync.unregister('periodic-sync-6h');
                 await (registration as any).periodicSync.unregister('periodic-sync-12h');
                 await (registration as any).periodicSync.unregister('periodic-sync-24h');
@@ -509,6 +510,22 @@ export default function SettingsPage() {
         }
     };
     
+    const handleAddHoliday = async () => {
+        if (newHoliday.date && newHoliday.name) {
+            const formattedDate = format(newHoliday.date, 'yyyy-MM-dd');
+            await addHoliday(formattedDate, newHoliday.name);
+            setHolidays(prev => [...prev, { id: formattedDate, date: formattedDate, name: newHoliday.name }]);
+            setNewHoliday({ date: undefined, name: '' });
+            toast({ title: "Holiday added.", variant: "success" });
+        }
+    };
+    
+    const handleDeleteHoliday = async (id: string) => {
+        await deleteHoliday(id);
+        setHolidays(prev => prev.filter(h => h.id !== id));
+        toast({ title: "Holiday removed.", variant: "success" });
+    };
+    
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
     const stateCodeOptions = statesAndCodes.map(s => ({ value: s.code, label: s.code }));
 
@@ -536,6 +553,7 @@ export default function SettingsPage() {
                                    <div className="space-y-1"><Label>Company Name</Label><Input {...companyForm.register("companyName")} onChange={handleCapitalizeOnChange} /></div>
                                    <div className="space-y-1"><Label>Contact Number</Label><Input {...companyForm.register("contactNo")} /></div>
                                    <div className="space-y-1"><Label>Email</Label><Input {...companyForm.register("gmail")} /></div>
+                                   <div className="space-y-1"><Label>Daily Payment Limit</Label><Input type="number" {...companyForm.register("dailyPaymentLimit")} /></div>
                                    <div className="space-y-1"><Label>Address Line 1</Label><Input {...companyForm.register("companyAddress1")} onChange={handleCapitalizeOnChange} /></div>
                                    <div className="space-y-1 sm:col-span-2"><Label>Address Line 2</Label><Input {...companyForm.register("companyAddress2")} onChange={handleCapitalizeOnChange}/></div>
                                    <div className="space-y-1">
@@ -728,9 +746,32 @@ export default function SettingsPage() {
                                 ))}
                             </div>
                         </SettingsCard>
-                        <div className="grid grid-cols-1 gap-6">
+                        <div className="space-y-6">
                             <OptionsManager type="variety" options={varietyOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
                             <OptionsManager type="paymentType" options={paymentTypeOptions} onAdd={addOption} onUpdate={updateOption} onDelete={deleteOption} />
+                             <SettingsCard title="Holiday Management" description="Add or remove holidays. Due dates will automatically skip these days and Sundays.">
+                                <div className="flex gap-2 mb-4">
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-8 text-sm", !newHoliday.date && "text-muted-foreground")}>
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {newHoliday.date ? format(newHoliday.date, "PPP") : <span>Pick a date</span>}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={newHoliday.date} onSelect={(d) => setNewHoliday(p => ({...p, date: d}))} /></PopoverContent>
+                                    </Popover>
+                                    <Input value={newHoliday.name} onChange={(e) => setNewHoliday(p => ({...p, name: e.target.value}))} placeholder="Holiday Name" className="h-8 text-sm"/>
+                                    <Button size="sm" onClick={handleAddHoliday} className="h-8"><Plus className="mr-2 h-4 w-4"/>Add</Button>
+                                </div>
+                                <ScrollArea className="h-40 border rounded-md p-2">
+                                    {holidays.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(holiday => (
+                                        <div key={holiday.id} className="flex items-center justify-between p-2 text-sm hover:bg-muted/50 rounded-md">
+                                            <span>{format(new Date(holiday.date), 'dd MMM, yyyy')} - <strong>{holiday.name}</strong></span>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteHoliday(holiday.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                        </div>
+                                    ))}
+                                </ScrollArea>
+                            </SettingsCard>
                         </div>
                      </div>
                  </TabsContent>
