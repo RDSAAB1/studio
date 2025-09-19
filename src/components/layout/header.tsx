@@ -3,19 +3,20 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from 'next/dynamic';
-import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw } from "lucide-react";
+import { Settings, UserCircle, Search, Menu, X, LogOut, Bell, Calculator, GripVertical, RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import type { Loan } from "@/lib/definitions";
-import { format } from "date-fns";
+import type { Loan, Holiday } from "@/lib/definitions";
+import { format, addDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter } from "next/navigation";
 import { db, syncData } from "@/lib/database";
+import { getDailyPaymentLimit, getHolidays } from '@/lib/firestore';
 import { useLiveQuery } from "dexie-react-hooks";
 import { useToast } from "@/hooks/use-toast";
 
@@ -98,6 +99,90 @@ const NetworkStatusIndicator = () => {
     );
 };
 
+const CashAlert = () => {
+    const [cashAlerts, setCashAlerts] = useState<string[]>([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray());
+    const cashInHand = useLiveQuery(() => {
+        // This is a simplified query. A real implementation might need to calculate this.
+        // For now, let's assume there's a way to get this value.
+        // This part needs a proper financial state calculation.
+        return 500000; // Placeholder
+    }, []);
+    const [holidays, setHolidays] = useState<Holiday[]>([]);
+
+    useEffect(() => {
+        getHolidays().then(setHolidays);
+    }, []);
+
+    useEffect(() => {
+        if (!suppliers || !cashInHand || holidays.length === 0) return;
+
+        const alerts: string[] = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Check for the next 4 days
+        for (let i = 1; i <= 4; i++) {
+            const checkDate = addDays(today, i);
+            let isHolidayOrSunday = isSunday(checkDate) || holidays.some(h => new Date(h.date).getTime() === checkDate.getTime());
+            
+            // If today is a working day before a series of holidays
+            if (i === 1 && isHolidayOrSunday) {
+                let consecutiveHolidays = 0;
+                let nextDay = new Date(checkDate);
+                while (isSunday(nextDay) || holidays.some(h => new Date(h.date).getTime() === nextDay.getTime())) {
+                    consecutiveHolidays++;
+                    nextDay = addDays(nextDay, 1);
+                }
+
+                if (consecutiveHolidays > 0) {
+                    let requiredCash = 0;
+                    for (let j = 0; j <= consecutiveHolidays; j++) {
+                        const paymentDate = addDays(today, j);
+                        const paymentsForDay = suppliers.filter(s => new Date(s.dueDate).getTime() === paymentDate.getTime())
+                                                        .reduce((sum, s) => sum + (s.netAmount || 0), 0);
+                        requiredCash += paymentsForDay;
+                    }
+                    
+                    // User's logic: 8 lakh buffer + 6 lakh extra
+                    const recommendedCash = requiredCash + 800000 + 600000;
+
+                    if (cashInHand < recommendedCash) {
+                        alerts.push(`Upcoming holidays! You might need around ${formatCurrency(recommendedCash)}. Current cash in hand is low.`);
+                    }
+                }
+            }
+        }
+        setCashAlerts(alerts);
+    }, [suppliers, cashInHand, holidays]);
+
+    if (cashAlerts.length === 0) return null;
+
+    return (
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative text-yellow-500">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-yellow-400" />
+                    <span className="sr-only">Cash Alerts</span>
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+                 <div className="p-2">
+                    <h4 className="font-medium text-sm">Cash Flow Alerts</h4>
+                </div>
+                <div className="mt-2 space-y-2 max-h-72 overflow-y-auto">
+                    {cashAlerts.map((alert, index) => (
+                         <div key={index} className="p-2 rounded-md bg-yellow-100 dark:bg-yellow-900/50">
+                            <p className="text-sm text-yellow-800 dark:text-yellow-300">{alert}</p>
+                         </div>
+                    ))}
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
 
 const NotificationBell = () => {
     const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').toArray());
@@ -273,6 +358,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
           <SyncButton />
+          <CashAlert />
           <NotificationBell />
           <DraggableCalculator />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>

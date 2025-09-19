@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
+import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import { useLiveQuery } from "dexie-react-hooks";
@@ -14,8 +14,8 @@ import { db } from '@/lib/database';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
-import { format } from "date-fns";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
+import { format, addDays, isSunday } from "date-fns";
 import { Hourglass } from "lucide-react";
 
 import { SupplierForm } from "@/components/sales/supplier-form";
@@ -89,6 +89,9 @@ export default function SupplierEntryClient() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
+
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
   
   const filteredSuppliers = useMemo(() => {
@@ -141,6 +144,10 @@ export default function SupplierEntryClient() {
         if (settings) {
             setReceiptSettings(settings);
         }
+        const fetchedHolidays = await getHolidays();
+        setHolidays(fetchedHolidays);
+        const limit = await getDailyPaymentLimit();
+        setDailyPaymentLimit(limit);
     };
     fetchSettings();
 
@@ -182,9 +189,12 @@ export default function SupplierEntryClient() {
   }
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
-      const calculatedState = calculateSupplierEntry(data, paymentHistory);
+      const calculatedState = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
-  }, [paymentHistory]);
+      if (calculatedState.warning) {
+        toast({ title: 'Date Warning', description: calculatedState.warning, variant: 'destructive', duration: 5000 });
+      }
+  }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
@@ -307,7 +317,7 @@ export default function SupplierEntryClient() {
         ...values,
         id: values.srNo, // Use srNo as ID
         date: values.date.toISOString().split("T")[0],
-        dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
+        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
         customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
@@ -418,7 +428,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, holidays, dailyPaymentLimit, suppliers);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,

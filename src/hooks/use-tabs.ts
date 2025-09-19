@@ -40,6 +40,7 @@ import {
   HandCoins,
   CircleDollarSign,
   PieChart,
+  CalendarClock,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -92,6 +93,7 @@ export const allMenuItems: MenuItem[] = [
     name: "Reports",
     icon: PieChart,
     subMenus: [
+        { id: "sales/daily-payments", name: "Daily Payments", icon: CalendarClock },
         { id: "sales/rtgs-report", name: "RTGS Report", icon: Banknote },
         { id: "sales/daily-supplier-report", name: "Daily Supplier Report", icon: Truck },
     ]
