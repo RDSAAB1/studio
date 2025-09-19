@@ -50,20 +50,22 @@ export const SupplierProfileView = ({
     isMillSelected,
     onShowDetails,
     onShowPaymentDetails,
-    onGenerateStatement
+    onGenerateStatement,
+    isCustomerView = false
 }: {
     selectedSupplierData: CustomerSummary | null;
     isMillSelected: boolean;
     onShowDetails: (supplier: Supplier) => void;
     onShowPaymentDetails: (payment: Payment | CustomerPayment) => void;
     onGenerateStatement: () => void;
+    isCustomerView?: boolean;
 }) => {
     const [selectedChart, setSelectedChart] = useState<ChartType>('financial');
 
     const financialPieChartData = useMemo(() => {
         if (!selectedSupplierData) return [];
         return [
-          { name: 'Total Paid', value: selectedSupplierData.totalPaid + selectedSupplierData.totalCdAmount! },
+          { name: 'Total Paid', value: selectedSupplierData.totalPaid + (selectedSupplierData.totalCdAmount || 0) },
           { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
         ];
       }, [selectedSupplierData]);
@@ -92,7 +94,7 @@ export const SupplierProfileView = ({
                     <p>Please select a profile to view details.</p>
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     return (
@@ -134,12 +136,22 @@ export const SupplierProfileView = ({
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/kg)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
-                             <Separator className="my-2"/>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Total Karta <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Other</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
-                             <Separator className="my-2"/>
+                            <Separator className="my-2"/>
+                            {isCustomerView ? (
+                                <>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">Brokerage</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalBrokerage || 0)}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">CD</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalCd || 0)}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">Advance</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Karta <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKartaAmount || 0)}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Laboury <span className="text-xs">{`(@${(selectedSupplierData.averageLabouryRate || 0).toFixed(2)})`}</span></span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalLabouryAmount || 0)}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Kanta</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalKanta || 0)}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Other</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
+                                </>
+                            )}
+                            <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
                                 <p className="font-semibold text-muted-foreground">Total Original Amount</p>
                                 <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
@@ -281,5 +293,4 @@ export const SupplierProfileView = ({
             </div>
         </div>
     );
-
-    
+};
