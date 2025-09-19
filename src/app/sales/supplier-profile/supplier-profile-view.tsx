@@ -66,7 +66,7 @@ export const SupplierProfileView = ({
         if (!selectedSupplierData) return [];
         return [
           { name: 'Total Paid', value: selectedSupplierData.totalPaid + (selectedSupplierData.totalCdAmount || 0) },
-          { name: 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
+          { name: 'Total Receivable', value: selectedSupplierData.totalOutstanding },
         ];
       }, [selectedSupplierData]);
     
@@ -117,8 +117,8 @@ export const SupplierProfileView = ({
                             <CardTitle className="text-base flex items-center gap-2"><Scale size={16}/> Operational Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalGrossWeight || 0).toFixed(2)} Qtl`}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalTeirWeight || 0).toFixed(2)} Qtl`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Gross Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalGrossWeight)) || 0).toFixed(2)} Qtl`}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Teir Wt</span><span className="font-semibold">{`${(parseFloat(String(selectedSupplierData.totalTeirWeight)) || 0).toFixed(2)} Qtl`}</span></div>
                             <div className="flex justify-between font-bold"><span>Final Wt</span><span className="font-semibold">{`${(selectedSupplierData.totalFinalWeight || 0).toFixed(2)} Qtl`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Karta Wt <span className="text-xs">{`(@${(selectedSupplierData.averageKartaPercentage || 0).toFixed(2)}%)`}</span></span><span className="font-semibold">{`${(selectedSupplierData.totalKartaWeight || 0).toFixed(2)} Qtl`}</span></div>
                              <div className="flex justify-between font-bold text-primary"><span>Net Wt</span><span>{`${(selectedSupplierData.totalNetWeight || 0).toFixed(2)} Qtl`}</span></div>
@@ -141,7 +141,7 @@ export const SupplierProfileView = ({
                                 <>
                                     <div className="flex justify-between"><span className="text-muted-foreground">Brokerage</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalBrokerage || 0)}`}</span></div>
                                     <div className="flex justify-between"><span className="text-muted-foreground">CD</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalCd || 0)}`}</span></div>
-                                    <div className="flex justify-between"><span className="text-muted-foreground">Advance</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-muted-foreground">Advance</span><span className="font-semibold">{`+ ${formatCurrency(selectedSupplierData.totalOtherCharges || 0)}`}</span></div>
                                 </>
                             ) : (
                                 <>
@@ -153,7 +153,7 @@ export const SupplierProfileView = ({
                             )}
                             <Separator className="my-2"/>
                             <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Total Original Amount</p>
+                                <p className="font-semibold text-muted-foreground">{isCustomerView ? 'Total Receivable' : 'Total Original Amount'}</p>
                                 <p className="font-bold text-lg text-primary">{`${formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}`}</p>
                             </div>
                         </CardContent>
@@ -164,13 +164,13 @@ export const SupplierProfileView = ({
                             <CardTitle className="text-base flex items-center gap-2"><Banknote size={16}/> Financial Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Net Payable <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/Qtl)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">{isCustomerView ? 'Total Receivable' : 'Total Net Payable'} <span className="text-xs">{`(Avg: ${formatCurrency(selectedSupplierData.averageOriginalPrice || 0)}/Qtl)`}</span></span><span className="font-semibold">{formatCurrency(selectedSupplierData.totalOriginalAmount || 0)}</span></div>
                              <Separator className="my-2"/>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Paid</span><span className="font-semibold text-green-600">{`${formatCurrency(selectedSupplierData.totalPaid || 0)}`}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Total CD Granted</span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalCdAmount || 0)}`}</span></div>
                              <Separator className="my-2"/>
                              <div className="flex justify-between items-center text-base pt-1">
-                                <p className="font-semibold text-muted-foreground">Outstanding</p>
+                                <p className="font-semibold text-muted-foreground">{isCustomerView ? 'Receivable' : 'Outstanding'}</p>
                                 <p className="font-bold text-lg text-destructive">{`${formatCurrency(selectedSupplierData.totalOutstanding)}`}</p>
                             </div>
                         </CardContent>

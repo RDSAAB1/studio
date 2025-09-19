@@ -252,10 +252,10 @@ export default function CustomerProfileClient() {
     filteredCustomers.forEach(s => {
         if (!s.customerId) return;
         const data = summary.get(s.customerId)!;
-        data.totalOriginalAmount += Number(s.originalNetAmount) || 0;
+        data.totalOriginalAmount += parseFloat(String(s.originalNetAmount)) || 0;
         data.totalAmount += s.amount || 0;
-        data.totalBrokerage! += Number(s.brokerage) || 0;
-        data.totalCd! += Number(s.cd) || 0;
+        data.totalBrokerage! += parseFloat(String(s.brokerage)) || 0;
+        data.totalCd! += parseFloat(String(s.cd)) || 0;
         data.totalOtherCharges! += s.advanceFreight || 0;
         data.totalGrossWeight! += parseFloat(String(s.grossWeight)) || 0;
         data.totalTeirWeight! += parseFloat(String(s.teirWeight)) || 0;
