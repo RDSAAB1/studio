@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { format, addDays, isSunday } from "date-fns";
-import { Hourglass, Loader2 } from "lucide-react";
+import { Hourglass } from "lucide-react";
 
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -67,7 +67,6 @@ export default function SupplierEntryClient() {
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   
   const [detailsSupplier, setDetailsSupplier] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
@@ -318,7 +317,6 @@ export default function SupplierEntryClient() {
       toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
       return;
     }
-    setIsSaving(true);
     try {
       await deleteSupplier(id);
       await deletePaymentsForSrNo(currentSupplier.srNo);
@@ -329,13 +327,10 @@ export default function SupplierEntryClient() {
     } catch (error) {
       console.error("Error deleting supplier and payments: ", error);
       toast({ title: "Failed to delete entry.", variant: "destructive" });
-    } finally {
-        setIsSaving(false);
     }
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    setIsSaving(true);
     const localDate = new Date(values.date.getTime() - values.date.getTimezoneOffset() * 60000);
     const dateString = localDate.toISOString().split('T')[0];
 
@@ -369,8 +364,6 @@ export default function SupplierEntryClient() {
     } catch (error) {
         console.error("Error saving supplier:", error);
         toast({ title: "Failed to save entry.", variant: "destructive" });
-    } finally {
-        setIsSaving(false);
     }
   };
 
@@ -457,7 +450,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, holidays, dailyPaymentLimit, suppliers);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -551,7 +544,6 @@ export default function SupplierEntryClient() {
     };
   
     const handleDeleteAll = async () => {
-        setIsSaving(true);
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
@@ -560,8 +552,6 @@ export default function SupplierEntryClient() {
         } catch (error) {
             console.error("Error deleting all entries:", error);
             toast({ title: "Failed to delete all entries", variant: "destructive" });
-        } finally {
-            setIsSaving(false);
         }
     };
     
@@ -666,7 +656,6 @@ export default function SupplierEntryClient() {
                 onImport={handleImport}
                 onExport={handleExport}
                 onDeleteAll={handleDeleteAll}
-                isDeleting={isSaving}
             />
         </form>
       </FormProvider>      
@@ -718,3 +707,4 @@ export default function SupplierEntryClient() {
   );
 }
 
+    
