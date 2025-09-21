@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState } from "react";
@@ -263,15 +262,15 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         </InputWithIcon>
                     </div>
                     <div className="space-y-1">
-                        <Label htmlFor="cd" className="text-xs">CD %</Label>
+                        <Label htmlFor="cdRate" className="text-xs">CD %</Label>
                         <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="cd" control={form.control} render={({ field }) => (<Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                            <Controller name="cdRate" control={form.control} render={({ field }) => (<Input id="cdRate" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                         </InputWithIcon>
                     </div>
                     <div className="space-y-1">
-                        <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
+                        <Label htmlFor="brokerageRate" className="text-xs">Brokerage Rate</Label>
                         <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                            <Controller name="brokerageRate" control={form.control} render={({ field }) => (<Input id="brokerageRate" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                         </InputWithIcon>
                     </div>
                     <div className="space-y-1">
