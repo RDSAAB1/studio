@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Project, ExpenseCategory } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories } from "@/lib/firestore";
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory } from '@/lib/definitions';
+import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Land
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
+import { Button } from '@/components/ui/button';
 
 const StatCard = ({ title, value, description, icon, colorClass, isLoading, onClick }: { title: string, value: string, description?: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean, onClick?: () => void }) => (
     <Card className={cn("shadow-sm hover:shadow-md transition-shadow", onClick && "cursor-pointer")} onClick={onClick}>
@@ -32,6 +32,8 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading, onCl
     </Card>
 );
 
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
 export default function DashboardClient() {
     const router = useRouter();
     const [isClient, setIsClient] = useState(false);
@@ -40,22 +42,27 @@ export default function DashboardClient() {
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+    const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const [level1, setLevel1] = useState<string | null>(null);
+    const [level2, setLevel2] = useState<string | null>(null);
+    const [level3, setLevel3] = useState<string | null>(null);
+    
     useEffect(() => {
         setIsClient(true);
-        
         const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
         const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
         const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
-        const unsubExpCats = getExpenseCategories(setExpenseCategories, console.error);
+        const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, console.error);
+        const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, console.error);
         
         const unsubIncomes = getIncomeRealtime((data) => { setIncomes(data); }, console.error);
         const unsubExpenses = getExpensesRealtime((data) => { 
@@ -66,7 +73,7 @@ export default function DashboardClient() {
         return () => {
             unsubSuppliers(); unsubCustomers(); unsubFunds();
             unsubAccounts(); unsubIncomes(); unsubExpenses();
-            unsubLoans(); unsubProjects(); unsubExpCats();
+            unsubLoans(); unsubProjects(); unsubExpCats(); unsubIncCats();
         };
     }, []);
 
@@ -100,30 +107,69 @@ export default function DashboardClient() {
         
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalLiabilities = loans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
-
         
         return { balances, totalAssets, totalLiabilities };
     }, [fundTransactions, allTransactions, bankAccounts, loans]);
 
-    const incomeExpenseData = useMemo(() => {
+    // --- Chart Data Calculation ---
+    const level1Data = useMemo(() => {
         const totalIncome = incomes.reduce((sum, item) => sum + item.amount, 0);
         const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
-        return [
-            { name: 'Income', value: totalIncome },
-            { name: 'Expenses', value: totalExpense },
-        ];
+        return [{ name: 'Income', value: totalIncome }, { name: 'Expenses', value: totalExpense }];
     }, [incomes, expenses]);
 
-    const expenseBreakdownData = useMemo(() => {
-        const permanent = expenses.filter(e => e.expenseNature === 'Permanent').reduce((sum, item) => sum + item.amount, 0);
-        const seasonal = expenses.filter(e => e.expenseNature === 'Seasonal').reduce((sum, item) => sum + item.amount, 0);
-        return [
-            { name: 'Permanent', value: permanent },
-            { name: 'Seasonal', value: seasonal },
-        ];
-    }, [expenses]);
+    const level2Data = useMemo(() => {
+        if (!level1) return [];
+        if (level1 === 'Expenses') {
+            const permanent = expenses.filter(e => e.expenseNature === 'Permanent').reduce((sum, item) => sum + item.amount, 0);
+            const seasonal = expenses.filter(e => e.expenseNature === 'Seasonal').reduce((sum, item) => sum + item.amount, 0);
+            return [{ name: 'Permanent', value: permanent }, { name: 'Seasonal', value: seasonal }];
+        }
+        if (level1 === 'Income') {
+            return groupDataByField(incomes, 'category');
+        }
+        return [];
+    }, [level1, expenses, incomes]);
+
+    const level3Data = useMemo(() => {
+        if (!level1 || !level2) return [];
+        let sourceData: (Income | Expense)[] = [];
+        if (level1 === 'Expenses') {
+            sourceData = expenses.filter(e => e.expenseNature === level2);
+        } else if (level1 === 'Income' && incomeCategories.some(c => c.name === level2)) {
+             sourceData = incomes.filter(i => i.category === level2);
+             return groupDataByField(sourceData, 'subCategory');
+        }
+        return groupDataByField(sourceData, 'category');
+    }, [level1, level2, expenses, incomes, incomeCategories]);
     
-    const COLORS = ['#22c55e', '#f97316', '#f59e0b']; // Green for Income, Orange for Permanent, Yellow for Seasonal
+    const level4Data = useMemo(() => {
+        if (!level1 || !level2 || !level3) return [];
+        let sourceData = expenses.filter(e => e.expenseNature === level2 && e.category === level3);
+        return groupDataByField(sourceData, 'subCategory');
+    }, [level1, level2, level3, expenses]);
+
+
+    function groupDataByField(data: (Income | Expense)[], field: 'category' | 'subCategory') {
+        const grouped = data.reduce((acc, item) => {
+            const key = item[field] || 'Uncategorized';
+            acc[key] = (acc[key] || 0) + item.amount;
+            return acc;
+        }, {} as { [key: string]: number });
+
+        return Object.entries(grouped).map(([name, value]) => ({ name, value }));
+    }
+
+    const breadcrumbs = ['Overview'];
+    if (level1) breadcrumbs.push(level1);
+    if (level2) breadcrumbs.push(level2);
+    if (level3) breadcrumbs.push(level3);
+
+    const handleBreadcrumbClick = (index: number) => {
+        if (index < 3) setLevel3(null);
+        if (index < 2) setLevel2(null);
+        if (index < 1) setLevel1(null);
+    };
 
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -154,54 +200,105 @@ export default function DashboardClient() {
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Based on loans" />
                 </CardContent>
             </Card>
-
+            
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <PieChartIcon className="h-5 w-5 text-primary"/>
-                        Income vs. Expenses
+                        Financial Breakdown
                     </CardTitle>
-                    <CardDescription>
-                        A visual breakdown of your total income compared to your total expenses, with a further breakdown of expense types.
-                    </CardDescription>
+                     <div className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                        {breadcrumbs.map((crumb, index) => (
+                            <React.Fragment key={crumb}>
+                                <Button
+                                    variant="link"
+                                    onClick={() => handleBreadcrumbClick(index)}
+                                    className="p-0 h-auto text-sm text-muted-foreground hover:text-primary disabled:text-foreground disabled:no-underline"
+                                    disabled={index === breadcrumbs.length - 1}
+                                >
+                                    {toTitleCase(crumb)}
+                                </Button>
+                                {index < breadcrumbs.length - 1 && <ChevronsRight size={14} />}
+                            </React.Fragment>
+                        ))}
+                    </div>
                 </CardHeader>
-                <CardContent className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                <CardContent className="h-96">
+                   <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)' }}/>
+
+                            {/* Level 1: Innermost - Income vs Expense */}
                             <Pie
-                                data={incomeExpenseData}
+                                data={level1Data}
                                 dataKey="value"
                                 cx="50%"
                                 cy="50%"
-                                outerRadius={80}
-                                label={({ name, value }) => `${name}: ${formatCurrency(value)}`}
+                                outerRadius={60}
+                                onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}
+                                stroke="hsl(var(--card))"
+                                strokeWidth={4}
                             >
-                                <Cell key="cell-income" fill={COLORS[0]} />
-                                <Cell key="cell-expense" fill={'transparent'} /> 
-                            </Pie>
-                             <Pie
-                                data={expenseBreakdownData}
-                                dataKey="value"
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={90}
-                                outerRadius={120}
-                                labelLine={false}
-                                label={({ name, value }) => value > 0 ? `${name}: ${formatCurrency(value)}` : ''}
-                            >
-                                {expenseBreakdownData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index + 1]} />
+                                {level1Data.map((entry, index) => (
+                                    <Cell key={`cell-0-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip
-                                formatter={(value: number) => formatCurrency(value)}
-                                contentStyle={{
-                                    backgroundColor: 'hsl(var(--background))',
-                                    borderColor: 'hsl(var(--border))',
-                                    borderRadius: 'var(--radius)',
-                                }}
-                            />
-                            <Legend />
+                            
+                            {/* Level 2: Permanent vs Seasonal or Income Categories */}
+                            {level1 && <Pie
+                                data={level2Data}
+                                dataKey="value"
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={70}
+                                outerRadius={90}
+                                onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
+                                labelLine={false}
+                                label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                stroke="hsl(var(--card))"
+                                strokeWidth={4}
+                            >
+                                {level2Data.map((entry, index) => (
+                                    <Cell key={`cell-1-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>}
+                            
+                             {/* Level 3: Expense Categories or Income Sub-categories */}
+                            {level2 && <Pie
+                                data={level3Data}
+                                dataKey="value"
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={100}
+                                outerRadius={120}
+                                onClick={(data) => setLevel3(data.name)}
+                                labelLine={false}
+                                label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                stroke="hsl(var(--card))"
+                                strokeWidth={4}
+                            >
+                                {level3Data.map((entry, index) => (
+                                    <Cell key={`cell-2-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>}
+                            
+                            {/* Level 4: Expense Sub-categories */}
+                            {level3 && <Pie
+                                data={level4Data}
+                                dataKey="value"
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={130}
+                                outerRadius={150}
+                                labelLine={false}
+                                label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                stroke="hsl(var(--card))"
+                                strokeWidth={4}
+                            >
+                                {level4Data.map((entry, index) => (
+                                    <Cell key={`cell-3-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>}
                         </PieChart>
                     </ResponsiveContainer>
                 </CardContent>
