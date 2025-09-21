@@ -1,0 +1,41 @@
+
+"use client";
+
+import React from 'react';
+import { Tab } from './tab';
+
+const TabBar: React.FC<any> = ({ openTabs, activeTabId, setActiveTabId, closeTab }) => {
+
+  if (!openTabs) return null;
+
+  return (
+    <div className="tab-bar-container h-9 bg-card border-b border-border flex items-end">
+      <div className="flex items-end pl-2 overflow-x-auto scrollbar-hide">
+        {openTabs.map((tab: any) => {
+            const isActive = tab.id === activeTabId;
+            const iconElement = tab.icon ? React.createElement(tab.icon, { className: "h-4 w-4" }) : null;
+
+            return (
+              <Tab
+                key={tab.id}
+                icon={iconElement}
+                title={tab.name}
+                isActive={isActive}
+                onClick={() => {
+                   setActiveTabId(tab.id);
+                }}
+                onClose={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  closeTab(tab.id);
+                }}
+                isClosable={tab.id !== 'dashboard-overview'} // Dashboard is not closable
+              />
+            )
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default TabBar;
