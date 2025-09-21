@@ -177,7 +177,6 @@ export default function DashboardClient() {
                                 }}
                                 outerRadius={120}
                                 innerRadius={80}
-                                fill="#8884d8"
                                 dataKey="value"
                                 stroke="hsl(var(--background))"
                                 strokeWidth={4}
