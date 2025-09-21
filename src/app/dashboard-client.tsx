@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Transaction, Loan, FundTransaction, Income, Expense } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getIncomeAndExpensesRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime } from "@/lib/firestore";
+import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime } from "@/lib/firestore";
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
 
@@ -45,25 +45,42 @@ export default function DashboardClient() {
     const [expenses, setExpenses] = useState<Expense[] | undefined>(undefined);
     const [loans, setLoans] = useState<Loan[] | undefined>(undefined);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[] | undefined>(undefined);
+    const [isLoading, setIsLoading] = useState(true);
 
+    // Initial data fetch for primary dashboard stats
     useEffect(() => {
         setIsClient(true);
-        const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
-        const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
-        const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
-        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
-        const unsubLoans = getLoansRealtime(setLoans, console.error);
-        const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
+        const unsubIncomes = getIncomeRealtime((data) => {
+            setIncomes(data);
+            if (expenses !== undefined) setIsLoading(false);
+        }, console.error);
+        const unsubExpenses = getExpensesRealtime((data) => {
+            setExpenses(data);
+            if (incomes !== undefined) setIsLoading(false);
+        }, console.error);
 
         return () => {
-            unsubSuppliers();
-            unsubCustomers();
             unsubIncomes();
             unsubExpenses();
-            unsubLoans();
-            unsubFundTransactions();
         };
     }, []);
+
+    // Fetch secondary data after initial load
+    useEffect(() => {
+        if (!isLoading) {
+            const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
+            const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+            const unsubLoans = getLoansRealtime(setLoans, console.error);
+            const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
+
+            return () => {
+                unsubSuppliers();
+                unsubCustomers();
+                unsubLoans();
+                unsubFundTransactions();
+            };
+        }
+    }, [isLoading]);
 
     const transactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
 
@@ -75,7 +92,7 @@ export default function DashboardClient() {
         const totalPayable = (suppliers || []).reduce((sum, s) => sum + Number(s.netAmount), 0);
         const totalReceivable = (customers || []).reduce((sum, c) => sum + Number(c.netAmount), 0);
         
-        const totalLiabilities = (loans || []).reduce((sum, l) => sum + l.remainingAmount, 0);
+        const totalLiabilities = (loans || []).reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
         
         const capitalInflow = (fundTransactions || []).filter(t => t.type === 'CapitalInflow').reduce((sum, t) => sum + t.amount, 0);
 
@@ -111,8 +128,6 @@ export default function DashboardClient() {
         return (transactions || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
     }, [transactions]);
 
-    const isLoading = !isClient || !suppliers || !customers || !incomes || !expenses || !loans || !fundTransactions;
-
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -145,7 +160,7 @@ export default function DashboardClient() {
                     value={formatCurrency(summaryStats?.capitalInflow ?? 0)} 
                     description="Owner & Loan Capital"
                     icon={<PiggyBank className="h-4 w-4 text-muted-foreground" />} 
-                    isLoading={isLoading}
+                    isLoading={isLoading || fundTransactions === undefined}
                 />
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
@@ -155,16 +170,20 @@ export default function DashboardClient() {
                         <CardDescription>Income vs. Expense over the last 7 days.</CardDescription>
                     </CardHeader>
                     <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(Number(value))}/>
-                                <Tooltip formatter={(value: number, name: string) => [formatCurrency(value), toTitleCase(name)]}/>
-                                <Area type="monotone" dataKey="income" stackId="1" stroke="#16a34a" fill="#16a34a" fillOpacity={0.2} />
-                                <Area type="monotone" dataKey="expense" stackId="1" stroke="#dc2626" fill="#dc2626" fillOpacity={0.2} />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        {isLoading ? (
+                             <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(Number(value))}/>
+                                    <Tooltip formatter={(value: number, name: string) => [formatCurrency(value), toTitleCase(name)]}/>
+                                    <Area type="monotone" dataKey="income" stackId="1" stroke="#16a34a" fill="#16a34a" fillOpacity={0.2} />
+                                    <Area type="monotone" dataKey="expense" stackId="1" stroke="#dc2626" fill="#dc2626" fillOpacity={0.2} />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -172,9 +191,15 @@ export default function DashboardClient() {
                  <Card>
                     <CardHeader><CardTitle>Financial Position</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between"><span>Total Payable (Suppliers)</span><span className="font-bold">{formatCurrency(summaryStats?.totalPayable ?? 0)}</span></div>
-                        <div className="flex items-center justify-between"><span>Total Receivable (Customers)</span><span className="font-bold">{formatCurrency(summaryStats?.totalReceivable ?? 0)}</span></div>
-                        <div className="flex items-center justify-between"><span>Total Liabilities (Loans)</span><span className="font-bold">{formatCurrency(summaryStats?.totalLiabilities ?? 0)}</span></div>
+                        {suppliers === undefined || customers === undefined || loans === undefined ? (
+                             <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between"><span>Total Payable (Suppliers)</span><span className="font-bold">{formatCurrency(summaryStats?.totalPayable ?? 0)}</span></div>
+                                <div className="flex items-center justify-between"><span>Total Receivable (Customers)</span><span className="font-bold">{formatCurrency(summaryStats?.totalReceivable ?? 0)}</span></div>
+                                <div className="flex items-center justify-between"><span>Total Liabilities (Loans)</span><span className="font-bold">{formatCurrency(summaryStats?.totalLiabilities ?? 0)}</span></div>
+                            </>
+                        )}
                     </CardContent>
                  </Card>
                  <Card className="lg:col-span-2">
@@ -186,26 +211,33 @@ export default function DashboardClient() {
                         <Button variant="outline" size="sm" onClick={() => router.push('/expense-tracker')}>View All</Button>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead>Payee/Payer</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {recentTransactions.map(t => (
-                                    <TableRow key={t.id}>
-                                        <TableCell>{format(new Date(t.date), "dd-MMM")}</TableCell>
-                                        <TableCell>{t.subCategory}</TableCell>
-                                        <TableCell>{t.payee}</TableCell>
-                                        <TableCell className={`text-right font-medium ${t.transactionType === 'Income' ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(t.amount)}</TableCell>
+                         {isLoading ? (
+                             <div className="flex h-40 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                         ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead>Payee/Payer</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {recentTransactions.map(t => (
+                                        <TableRow key={t.id}>
+                                            <TableCell>{format(new Date(t.date), "dd-MMM")}</TableCell>
+                                            <TableCell>{t.subCategory}</TableCell>
+                                            <TableCell>{t.payee}</TableCell>
+                                            <TableCell className={`text-right font-medium ${t.transactionType === 'Income' ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(t.amount)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                     {recentTransactions.length === 0 && (
+                                        <TableRow><TableCell colSpan={4} className="text-center h-24">No recent transactions.</TableCell></TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        )}
                     </CardContent>
                 </Card>
             </div>
