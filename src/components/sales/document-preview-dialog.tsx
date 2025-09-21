@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getBankAccountsRealtime } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
-import { runTransaction, doc, collection } from 'firebase/firestore';
+import { runTransaction, doc, collection, getDoc } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 
 
@@ -57,34 +57,51 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     });
     
      useEffect(() => {
-        if (customer) {
-            setEditableInvoiceDetails(customer);
-             setIsSameAsBilling(
-                (!customer.shippingName || customer.shippingName === customer.name) &&
-                (!customer.shippingAddress || customer.shippingAddress === customer.address) &&
-                (!customer.shippingContact || customer.shippingContact === customer.contact) &&
-                (!customer.shippingGstin || customer.shippingGstin === customer.gstin)
-            );
-             setInvoiceDetails(prev => ({
-                ...prev,
-                nineRNo: customer.nineRNo || '',
-                gatePassNo: customer.gatePassNo || '',
-                grNo: customer.grNo || '',
-                grDate: customer.grDate || '',
-                transport: customer.transport || '',
-                advanceFreight: customer.advanceFreight || 0,
-                advancePaymentMethod: customer.advancePaymentMethod || 'CashInHand'
-            }));
-        }
-        if (receiptSettings) {
-            setInvoiceDetails(prev => ({
-                ...prev,
-                companyGstin: receiptSettings.companyGstin || prev.companyGstin,
-                companyStateName: receiptSettings.companyStateName || prev.companyStateName,
-                companyStateCode: receiptSettings.companyStateCode || prev.companyStateCode,
-            }));
-        }
-        
+        if (!isOpen) return;
+
+        const initialize = async () => {
+            if (customer) {
+                 // Verify expense ID exists before setting state
+                let verifiedExpenseId = customer.advanceExpenseId;
+                if (customer.advanceExpenseId) {
+                    const expenseRef = doc(firestoreDB, "expenses", customer.advanceExpenseId);
+                    const expenseSnap = await getDoc(expenseRef);
+                    if (!expenseSnap.exists()) {
+                        console.warn("Stale expense ID found, clearing advance payment.");
+                        verifiedExpenseId = undefined;
+                         setInvoiceDetails(prev => ({ ...prev, advanceFreight: 0, advancePaymentMethod: 'CashInHand'}));
+                    }
+                }
+
+                setEditableInvoiceDetails({ ...customer, advanceExpenseId: verifiedExpenseId });
+                setIsSameAsBilling(
+                    (!customer.shippingName || customer.shippingName === customer.name) &&
+                    (!customer.shippingAddress || customer.shippingAddress === customer.address) &&
+                    (!customer.shippingContact || customer.shippingContact === customer.contact) &&
+                    (!customer.shippingGstin || customer.shippingGstin === customer.gstin)
+                );
+                setInvoiceDetails(prev => ({
+                    ...prev,
+                    nineRNo: customer.nineRNo || '',
+                    gatePassNo: customer.gatePassNo || '',
+                    grNo: customer.grNo || '',
+                    grDate: customer.grDate || '',
+                    transport: customer.transport || '',
+                    advanceFreight: verifiedExpenseId ? customer.advanceFreight || 0 : 0,
+                    advancePaymentMethod: verifiedExpenseId ? customer.advancePaymentMethod || 'CashInHand' : 'CashInHand'
+                }));
+            }
+            if (receiptSettings) {
+                setInvoiceDetails(prev => ({
+                    ...prev,
+                    companyGstin: receiptSettings.companyGstin || prev.companyGstin,
+                    companyStateName: receiptSettings.companyStateName || prev.companyStateName,
+                    companyStateCode: receiptSettings.companyStateCode || prev.companyStateCode,
+                }));
+            }
+        };
+
+        initialize();
         const unsub = getBankAccountsRealtime(setBankAccounts, console.error);
         return () => unsub();
 
@@ -125,7 +142,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 const customerRef = doc(firestoreDB, "customers", customer.id);
                 
                 const newAdvanceAmount = invoiceDetails.advanceFreight;
-                let currentExpenseId = customer.advanceExpenseId;
+                let currentExpenseId = editableInvoiceDetails.advanceExpenseId;
 
                 // --- Expense Management ---
                 const expenseData: Partial<Expense> = {
@@ -147,17 +164,14 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
                 if (newAdvanceAmount > 0) {
                     if (currentExpenseId) {
-                        // Update existing expense
                         const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
                         transaction.update(expenseRef, expenseData);
                     } else {
-                        // Create new expense
                         const newExpenseRef = doc(collection(firestoreDB, "expenses"));
                         transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id });
-                        currentExpenseId = newExpenseRef.id; // Get the new ID to save on the customer
+                        currentExpenseId = newExpenseRef.id;
                     }
                 } else if (newAdvanceAmount === 0 && currentExpenseId) {
-                    // Delete existing expense if amount is zeroed out
                     const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
                     transaction.delete(expenseRef);
                     currentExpenseId = undefined; 
@@ -176,7 +190,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     ...customer,
                     ...editableInvoiceDetails,
                     ...calculated,
-                    advanceExpenseId: currentExpenseId, // Use the potentially new or cleared ID
+                    advanceExpenseId: currentExpenseId,
                     advancePaymentMethod: invoiceDetails.advancePaymentMethod,
                     nineRNo: invoiceDetails.nineRNo,
                     gatePassNo: invoiceDetails.gatePassNo,
@@ -195,7 +209,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     dataToSave.shippingStateCode = dataToSave.stateCode;
                 }
                 
-                // Explicitly remove the field if the ID is undefined to prevent Firestore error
+                // Firestore does not allow 'undefined' values.
                 if (dataToSave.advanceExpenseId === undefined) {
                     delete dataToSave.advanceExpenseId;
                 }
