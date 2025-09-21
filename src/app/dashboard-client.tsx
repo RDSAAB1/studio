@@ -251,7 +251,6 @@ export default function DashboardClient() {
                                 onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
-                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
                                 labelLine={false}
                             >
                                 {level1Data.map((entry, index) => (
@@ -271,7 +270,6 @@ export default function DashboardClient() {
                                 onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
-                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
                                 labelLine={false}
                             >
                                 {level2Data.map((entry, index) => (
@@ -291,7 +289,6 @@ export default function DashboardClient() {
                                 onClick={(data) => setLevel3(data.name)}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
-                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
                                 labelLine={false}
                             >
                                 {level3Data.map((entry, index) => (
@@ -310,7 +307,6 @@ export default function DashboardClient() {
                                 outerRadius={150}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
-                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
                                 labelLine={false}
                             >
                                 {level4Data.map((entry, index) => (
