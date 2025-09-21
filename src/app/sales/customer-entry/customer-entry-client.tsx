@@ -8,13 +8,10 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
-
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -83,8 +80,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -170,6 +167,8 @@ export default function CustomerEntryClient() {
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+    const unsubCustomers = getCustomersRealtime(setCustomers, (err) => console.error("Error fetching customers:", err));
+    const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, (err) => console.error("Error fetching customer payments:", err));
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -188,6 +187,8 @@ export default function CustomerEntryClient() {
     return () => {
       unsubVarieties();
       unsubPaymentTypes();
+      unsubCustomers();
+      unsubPayments();
     };
   }, [isClient, form, toast]);
   
@@ -703,5 +704,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-
-    
