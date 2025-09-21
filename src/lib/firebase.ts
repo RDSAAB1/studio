@@ -16,7 +16,7 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyB_E525fFgnvktS0I31v55sI2i3rHRx8wM",
   authDomain: "bizsuite-dataflow.firebaseapp.com",
   projectId: "bizsuite-dataflow",
   storageBucket: "bizsuite-dataflow.appspot.com",
