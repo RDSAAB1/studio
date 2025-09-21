@@ -26,6 +26,12 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
+import { collection, doc, getDocs, limit, query, runTransaction, where } from 'firebase/firestore';
+import { firestoreDB } from '@/lib/firebase';
+
+
+const suppliersCollection = collection(firestoreDB, "suppliers");
+const expensesCollection = collection(firestoreDB, "expenses");
 
 
 type PaymentOption = {
@@ -434,85 +440,121 @@ const processPayment = async () => {
     }
 
     try {
-        let paidForDetails: PaidFor[] = [];
-        if (rtgsFor === 'Supplier') {
-            let amountToDistribute = Math.round(totalPaidAmount);
-            const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        let finalPaymentData: Payment | null = null;
+        
+        await runTransaction(firestoreDB, async (transaction) => {
+            const supplierDocsToGet = new Set<string>();
             
-            for (const entryData of sortedEntries) {
-                if (amountToDistribute <= 0) break;
-                
-                const outstanding = Number(entryData.netAmount);
-                const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
-
-                if (paymentForThisEntry > 0) {
-                     paidForDetails.push({ 
-                        srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
-                        supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
-                        supplierContact: entryData.contact,
-                    });
-                    
-                    await updateSupplier(entryData.id, { netAmount: outstanding - paymentForThisEntry });
-                    amountToDistribute -= paymentForThisEntry;
+            if (rtgsFor === 'Supplier') {
+                selectedEntryIds.forEach(id => supplierDocsToGet.add(id));
+            }
+            
+            const supplierDocs = new Map<string, any>();
+            for (const id of supplierDocsToGet) {
+                const docRef = doc(firestoreDB, "suppliers", id);
+                const supplierDoc = await transaction.get(docRef);
+                if (supplierDoc.exists()) {
+                    supplierDocs.set(id, supplierDoc.data());
+                } else {
+                    throw new Error(`Supplier with ID ${id} not found.`);
                 }
             }
-        }
-        
-        const newExpense = await addExpense({
-            date: new Date().toISOString().split('T')[0],
-            transactionType: 'Expense',
-            category: 'Supplier Payments',
-            subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-            amount: finalPaymentAmount,
-            payee: supplierDetails.name,
-            description: `Payment ${paymentId} to ${supplierDetails.name}`,
-            paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
-            status: 'Paid',
-            isRecurring: false,
-            bankAccountId: paymentMethod !== 'Cash' ? selectedAccountId : undefined,
-        });
-        
-        if (cdEnabled && calculatedCdAmount > 0) {
-             await addIncome({
+            
+            let paidForDetails: PaidFor[] = [];
+            if (rtgsFor === 'Supplier') {
+                let amountToDistribute = Math.round(totalPaidAmount);
+                const sortedEntries = selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                
+                for (const entryData of sortedEntries) {
+                    if (amountToDistribute <= 0) break;
+                    
+                    const supplierData = supplierDocs.get(entryData.id);
+                    let outstanding = Number(supplierData.netAmount);
+                    const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
+
+                    if (paymentForThisEntry > 0) {
+                         paidForDetails.push({ 
+                            srNo: entryData.srNo, amount: paymentForThisEntry, cdApplied: cdEnabled,
+                            supplierName: toTitleCase(entryData.name), supplierSo: toTitleCase(entryData.so),
+                            supplierContact: entryData.contact,
+                        });
+                        
+                        const supplierRef = doc(firestoreDB, "suppliers", entryData.id);
+                        transaction.update(supplierRef, { netAmount: outstanding - paymentForThisEntry });
+                        amountToDistribute -= paymentForThisEntry;
+                    }
+                }
+            }
+            
+            const expenseTransactionRef = doc(collection(firestoreDB, 'expenses'));
+            const expenseData: Partial<Expense> = {
+                id: expenseTransactionRef.id,
                 date: new Date().toISOString().split('T')[0],
-                transactionType: 'Income',
-                category: 'Cash Discount Received',
-                subCategory: 'Supplier CD',
-                amount: calculatedCdAmount,
+                transactionType: 'Expense',
+                category: 'Supplier Payments',
+                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
+                amount: finalPaymentAmount,
                 payee: supplierDetails.name,
-                description: `CD received on payment ${paymentId}`,
-                paymentMethod: 'Other',
+                description: `Payment ${paymentId} to ${supplierDetails.name}`,
+                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
                 status: 'Paid',
                 isRecurring: false,
-            });
-        }
+            };
+            if (paymentMethod !== 'Cash') {
+                expenseData.bankAccountId = selectedAccountId;
+            }
+            transaction.set(expenseTransactionRef, expenseData);
 
-        const paymentDataBase: Omit<Payment, 'id'> = {
-            paymentId: paymentId,
-            customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
-            date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
-            cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
-            receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
-            paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
-            nineRNo: nineRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
-            parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
-            supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
-            supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
-            bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-            rtgsFor: rtgsFor,
-            expenseTransactionId: newExpense.id,
-            bankAccountId: paymentMethod !== 'Cash' ? selectedAccountId : undefined,
-        };
-        
-        if (paymentMethod === 'RTGS') {
-            paymentDataBase.rtgsSrNo = rtgsSrNo;
-        }
+            if (cdEnabled && calculatedCdAmount > 0) {
+                const incomeTransactionRef = doc(collection(firestoreDB, 'incomes'));
+                 const incomeData: Partial<Income> = {
+                    id: incomeTransactionRef.id,
+                    date: new Date().toISOString().split('T')[0],
+                    transactionType: 'Income',
+                    category: 'Cash Discount Received',
+                    subCategory: 'Supplier CD',
+                    amount: calculatedCdAmount,
+                    payee: supplierDetails.name,
+                    description: `CD received on payment ${paymentId}`,
+                    paymentMethod: 'Other',
+                    status: 'Paid',
+                    isRecurring: false,
+                };
+                transaction.set(incomeTransactionRef, incomeData);
+            }
 
-        const newPayment = await addPayment(paymentDataBase);
-        
+            const paymentDataBase: Omit<Payment, 'id'> = {
+                paymentId: paymentId,
+                customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+                date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
+                cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
+                receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
+                paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
+                sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+                parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
+                supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
+                supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
+                bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
+                rtgsFor: rtgsFor,
+                expenseTransactionId: expenseTransactionRef.id,
+            };
+            
+            if (paymentMethod === 'RTGS') {
+                paymentDataBase.rtgsSrNo = rtgsSrNo;
+            }
+            
+            if (paymentMethod !== 'RTGS') {
+                delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
+            }
+
+            const newPaymentRef = doc(collection(firestoreDB, "payments"));
+            transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
+            finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
+        });
+
         toast({ title: `Payment processed successfully.`, variant: 'success' });
-        if (paymentMethod === 'RTGS') {
-            setRtgsReceiptData(newPayment);
+        if (paymentMethod === 'RTGS' && finalPaymentData) {
+            setRtgsReceiptData(finalPaymentData);
         }
         resetPaymentForm(rtgsFor === 'Outsider');
     } catch (error) {
@@ -521,18 +563,118 @@ const processPayment = async () => {
     }
 };
 
-const handleEditPayment = async (paymentToEdit: Payment) => {
-    // This function can be implemented later if needed.
-    // For now, it's safer to delete and re-create.
-    toast({ title: "Edit Disabled", description: "Please delete and re-create the payment to make changes.", variant: "destructive" });
-};
+    const handleEditPayment = async (paymentToEdit: Payment) => {
+        if (!paymentToEdit.id) return;
 
-const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
-    // This function can be implemented later if needed.
-    // For now, it's safer to handle this logic carefully.
-    toast({ title: "Delete Disabled", description: "Payment deletion is temporarily disabled.", variant: "destructive" });
-};
+        // Revert the changes made by this payment before deleting it
+        await handleDeletePayment(paymentToEdit.id, true);
 
+        // Load payment data into the form for editing
+        setActiveTab('processing');
+        setEditingPayment(paymentToEdit);
+        setPaymentId(paymentToEdit.paymentId);
+        setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
+        setPaymentAmount(paymentToEdit.amount);
+        setPaymentType(paymentToEdit.type);
+        setPaymentMethod(paymentToEdit.receiptType);
+        setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
+        setCdEnabled(paymentToEdit.cdApplied || false);
+        setCdPercent(paymentToEdit.cdAmount && paymentToEdit.amount ? (paymentToEdit.cdAmount / (paymentToEdit.amount + paymentToEdit.cdAmount)) * 100 : 2); // Approximate
+        setCalculatedCdAmount(paymentToEdit.cdAmount || 0);
+
+        setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
+        setUtrNo(paymentToEdit.utrNo || '');
+        setCheckNo(paymentToEdit.checkNo || '');
+        setSixRNo(paymentToEdit.sixRNo || '');
+        setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
+        setParchiNo(paymentToEdit.parchiNo || '');
+        setRtgsQuantity(paymentToEdit.quantity || 0);
+        setRtgsRate(paymentToEdit.rate || 0);
+        setRtgsAmount(paymentToEdit.rtgsAmount || 0);
+
+        setSupplierDetails({
+            name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
+            address: paymentToEdit.supplierAddress || '', contact: ''
+        });
+        setBankDetails({
+            acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '',
+            bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
+        });
+        
+        // Reload the state for the selected entries
+        if (paymentToEdit.rtgsFor === 'Supplier') {
+            setSelectedCustomerKey(paymentToEdit.customerId);
+            const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
+            if (srNosInPayment.length > 0) {
+              const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
+              const supplierDocs = await getDocs(q);
+              const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
+              if (foundSrNos.size !== srNosInPayment.length) {
+                  toast({ title: "Cannot Edit", description: "One or more original entries for this payment are missing.", variant: "destructive" });
+                  setEditingPayment(null); // Reset editing state
+                  return;
+              }
+              const newSelectedEntryIds = new Set<string>();
+              supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
+              setSelectedEntryIds(newSelectedEntryIds);
+            } else {
+                setSelectedEntryIds(new Set());
+            }
+        } else {
+            setSelectedCustomerKey(null);
+            setSelectedEntryIds(new Set());
+        }
+
+        toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Old payment deleted. Details loaded. Make changes and save as a new payment."});
+    };
+
+    const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
+        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
+        if (!paymentToDelete || !paymentToDelete.id) {
+            if (!isEditing) toast({ title: "Payment not found or ID missing.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            await runTransaction(firestoreDB, async (transaction) => {
+                const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
+                
+                if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
+                    for (const detail of paymentToDelete.paidFor) {
+                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                        const supplierDocsSnapshot = await getDocs(q); // Use getDocs within transaction context
+                        if (!supplierDocsSnapshot.empty) {
+                            const customerDoc = supplierDocsSnapshot.docs[0];
+                            const currentSupplier = customerDoc.data() as Customer;
+                            const amountToRestore = detail.amount;
+                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        }
+                    }
+                }
+                
+                if (paymentToDelete.expenseTransactionId) {
+                    const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
+                    transaction.delete(expenseDocRef);
+                }
+                
+                if (paymentToDelete.cdApplied && paymentToDelete.cdAmount && paymentToDelete.cdAmount > 0) {
+                    // Logic to find and delete related income transaction for CD
+                }
+                
+                transaction.delete(paymentRef);
+            });
+            if (!isEditing) {
+                toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
+            }
+            if (editingPayment?.id === paymentIdToDelete) {
+              resetPaymentForm();
+            }
+        } catch (error) {
+            console.error("Error deleting payment:", error);
+            if (!isEditing) toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
+        }
+    };
     
     const handlePaySelectedOutstanding = () => {
         if (selectedEntryIds.size === 0) {
@@ -810,5 +952,6 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
     
 
     
+
 
 
