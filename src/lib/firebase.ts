@@ -16,7 +16,7 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCV3C_824a7aPtdc2w50a2524j5845S_5A",
+  apiKey: "AIzaSyCxqbx1KpLRo7GG0BsjQC3A6ANIS_1x_KU",
   authDomain: "bizsuite-dataflow.firebaseapp.com",
   projectId: "bizsuite-dataflow",
   storageBucket: "bizsuite-dataflow.appspot.com",
@@ -89,4 +89,3 @@ export {
     sendPasswordResetEmail,
     signInWithRedirect
 };
-
