@@ -385,15 +385,18 @@ export default function IncomeExpenseClient() {
   
     setLoading(true);
     try {
-      const transactionData = {
+      const transactionData: Partial<TransactionFormValues> = {
         ...values,
         date: format(values.date, "yyyy-MM-dd"), 
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
         projectId: values.projectId === 'none' ? '' : values.projectId,
         nextDueDate: values.isRecurring && values.nextDueDate ? format(values.nextDueDate, "yyyy-MM-dd") : undefined,
-        bankAccountId: values.paymentMethod === 'Cash' ? undefined : values.bankAccountId,
       };
+
+      if (values.paymentMethod === 'Cash') {
+          delete transactionData.bankAccountId;
+      }
 
       if (isEditing) {
         if (values.transactionType === 'Income') {

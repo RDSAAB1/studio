@@ -518,6 +518,8 @@ const processPayment = async () => {
             };
             if (paymentMethod !== 'Cash') {
                 expenseData.bankAccountId = selectedAccountId;
+            } else {
+                delete expenseData.bankAccountId;
             }
             transaction.set(expenseTransactionRef, expenseData);
 
@@ -955,4 +957,3 @@ const processPayment = async () => {
     </div>
   );
 }
-

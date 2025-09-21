@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -127,11 +126,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
         let expenseId = customer.advanceExpenseId;
         const newAdvanceAmount = invoiceDetails.advanceFreight;
-        const oldAdvanceAmount = customer.advanceFreight || 0;
-
+        
         // Handle expense creation/update/deletion
         if (newAdvanceAmount > 0) {
-            const expenseData: Omit<Expense, 'id'> = {
+            const expenseData: Partial<Expense> = {
                 transactionType: 'Expense',
                 date: new Date().toISOString(),
                 category: 'Logistics',
@@ -140,17 +138,22 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 payee: `Driver - ${customer.vehicleNo || 'N/A'}`,
                 description: `Advance for SR #${customer.srNo}`,
                 paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
-                bankAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
                 status: 'Paid',
                 isRecurring: false,
             };
+
+            if (invoiceDetails.advancePaymentMethod !== 'CashInHand') {
+                expenseData.bankAccountId = invoiceDetails.advancePaymentMethod;
+            } else {
+                delete expenseData.bankAccountId;
+            }
 
             if (expenseId) {
                 // Update existing expense
                 await updateExpense(expenseId, expenseData);
             } else {
                 // Create new expense and get its ID
-                const newExpense = await addExpense(expenseData);
+                const newExpense = await addExpense(expenseData as Omit<Expense, 'id'>);
                 expenseId = newExpense.id;
             }
         } else if (newAdvanceAmount === 0 && expenseId) {
@@ -165,6 +168,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             ...editableInvoiceDetails,
             advanceFreight: newAdvanceAmount,
         };
+        
         const calculated = calculateCustomerEntry(formValuesForCalc, []);
         
         const finalDataToSave: Partial<Customer> = { 
@@ -173,7 +177,6 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             ...calculated,
             advanceExpenseId: expenseId,
             advancePaymentMethod: invoiceDetails.advancePaymentMethod,
-            advancePaymentAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
             nineRNo: invoiceDetails.nineRNo,
             gatePassNo: invoiceDetails.gatePassNo,
             grNo: invoiceDetails.grNo,
