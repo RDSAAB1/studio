@@ -90,12 +90,6 @@ export default function SupplierEntryClient() {
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
 
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
-
-  const nextSupplierSrNo = useMemo(() => {
-    if (safeSuppliers.length === 0) return formatSrNo(1, 'S');
-    const lastNum = Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0));
-    return formatSrNo(lastNum + 1, 'S');
-  }, [safeSuppliers]);
   
   const filteredSuppliers = useMemo(() => {
     if (!debouncedSearchTerm) {
@@ -175,15 +169,16 @@ export default function SupplierEntryClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
+    const nextSrNum = safeSuppliers.length > 0 ? Math.max(0, ...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = nextSupplierSrNo;
+    newState.srNo = formatSrNo(nextSrNum, 'S');
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
-  }, [lastVariety, lastPaymentType, resetFormToState, form, nextSupplierSrNo]);
+  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -294,7 +289,8 @@ export default function SupplierEntryClient() {
         if (isEditing) {
             setIsEditing(false);
             const currentId = currentSupplier.srNo;
-            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || nextSupplierSrNo, id: currentId };
+            const nextSrNum = safeSuppliers.length > 0 ? Math.max(0, ...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
             resetFormToState(newState);
         }
     }
@@ -331,11 +327,15 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    const localDate = new Date(values.date);
+    const timezoneOffset = localDate.getTimezoneOffset() * 60000;
+    const correctedDate = new Date(localDate.getTime() - timezoneOffset);
+
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
-        date: values.date.toISOString().split("T")[0],
+        date: correctedDate.toISOString().split("T")[0],
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
@@ -703,5 +703,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
