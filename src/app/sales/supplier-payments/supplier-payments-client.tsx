@@ -72,7 +72,7 @@ export default function SupplierPaymentsClient() {
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
   const [isPayeeEditing, setIsPayeeEditing] = useState(false);
   
-  const [nineRNo, setNineRNo] = useState('');
+  const [sixRNo, setSixRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
@@ -349,7 +349,7 @@ export default function SupplierPaymentsClient() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
-    setNineRNo('');
+    setSixRNo('');
     setParchiNo('');
     setRtgsQuantity(0);
     setRtgsRate(0);
@@ -565,11 +565,9 @@ const processPayment = async () => {
 
     const handleEditPayment = async (paymentToEdit: Payment) => {
         if (!paymentToEdit.id) return;
-
-        // Revert the changes made by this payment before deleting it
+        
         await handleDeletePayment(paymentToEdit.id, true);
-
-        // Load payment data into the form for editing
+        
         setActiveTab('processing');
         setEditingPayment(paymentToEdit);
         setPaymentId(paymentToEdit.paymentId);
@@ -579,7 +577,6 @@ const processPayment = async () => {
         setPaymentMethod(paymentToEdit.receiptType);
         setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
         setCdEnabled(paymentToEdit.cdApplied || false);
-        setCdPercent(paymentToEdit.cdAmount && paymentToEdit.amount ? (paymentToEdit.cdAmount / (paymentToEdit.amount + paymentToEdit.cdAmount)) * 100 : 2); // Approximate
         setCalculatedCdAmount(paymentToEdit.cdAmount || 0);
 
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
@@ -601,7 +598,6 @@ const processPayment = async () => {
             bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '',
         });
         
-        // Reload the state for the selected entries
         if (paymentToEdit.rtgsFor === 'Supplier') {
             setSelectedCustomerKey(paymentToEdit.customerId);
             const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
@@ -610,7 +606,7 @@ const processPayment = async () => {
               const supplierDocs = await getDocs(q);
               const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
               if (foundSrNos.size !== srNosInPayment.length) {
-                  toast({ title: "Cannot Edit", description: "One or more original entries for this payment are missing.", variant: "destructive" });
+                  toast({ title: "Cannot Edit: Original entry missing.", variant: "destructive" });
                   setEditingPayment(null); // Reset editing state
                   return;
               }
@@ -625,13 +621,13 @@ const processPayment = async () => {
             setSelectedEntryIds(new Set());
         }
 
-        toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Old payment deleted. Details loaded. Make changes and save as a new payment."});
+        toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
         const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
-            if (!isEditing) toast({ title: "Payment not found or ID missing.", variant: "destructive" });
+            toast({ title: "Payment not found or ID missing.", variant: "destructive" });
             return;
         }
 
@@ -639,10 +635,11 @@ const processPayment = async () => {
             await runTransaction(firestoreDB, async (transaction) => {
                 const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
                 
+                // Revert supplier netAmount
                 if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
                     for (const detail of paymentToDelete.paidFor) {
                         const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                        const supplierDocsSnapshot = await getDocs(q); // Use getDocs within transaction context
+                        const supplierDocsSnapshot = await getDocs(q);
                         if (!supplierDocsSnapshot.empty) {
                             const customerDoc = supplierDocsSnapshot.docs[0];
                             const currentSupplier = customerDoc.data() as Customer;
@@ -653,15 +650,13 @@ const processPayment = async () => {
                     }
                 }
                 
+                // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
                 }
                 
-                if (paymentToDelete.cdApplied && paymentToDelete.cdAmount && paymentToDelete.cdAmount > 0) {
-                    // Logic to find and delete related income transaction for CD
-                }
-                
+                // Delete the payment itself
                 transaction.delete(paymentRef);
             });
             if (!isEditing) {
@@ -672,7 +667,7 @@ const processPayment = async () => {
             }
         } catch (error) {
             console.error("Error deleting payment:", error);
-            if (!isEditing) toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
+            toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
         }
     };
     
@@ -856,8 +851,9 @@ const processPayment = async () => {
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
-                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} nineRNo={nineRNo}
-                        setNineRNo={setNineRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} 
+                        sixRNo={sixRNo} setSixRNo={setSixRNo}
+                        sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
@@ -952,6 +948,7 @@ const processPayment = async () => {
     
 
     
+
 
 
 
