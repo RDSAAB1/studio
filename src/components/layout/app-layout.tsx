@@ -21,14 +21,15 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
     const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
     if (dashboardTab && openTabs.length === 0) {
       setOpenTabs([dashboardTab]);
-      if (pathname === '/') {
-        router.push('/dashboard-overview');
+      setActiveTabId('dashboard-overview');
+      if (pathname !== '/') {
+         router.push('/');
       }
     }
   }, [openTabs.length, pathname, router]);
 
   useEffect(() => {
-    const currentPathId = pathname.substring(1);
+    const currentPathId = pathname === '/' ? 'dashboard-overview' : pathname.substring(1);
     if (currentPathId && currentPathId !== activeTabId) {
       const menuItem = allMenuItems.flatMap(i => i.subMenus ? i.subMenus : i).find(item => item.id === currentPathId);
       if (menuItem) {
@@ -42,7 +43,8 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
 
   const handleTabSelect = (tabId: string) => {
     setActiveTabId(tabId);
-    router.push(`/${tabId}`);
+    const path = tabId === 'dashboard-overview' ? '/' : `/${tabId}`;
+    router.push(path);
   };
 
   const handleTabClose = (tabIdToClose: string) => {
@@ -56,13 +58,16 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       const newActiveTab = newTabs[tabIndex - 1] || newTabs[0];
       if (newActiveTab) {
         setActiveTabId(newActiveTab.id);
-        router.push(`/${newActiveTab.id}`);
+        const path = newActiveTab.id === 'dashboard-overview' ? '/' : `/${newActiveTab.id}`;
+        router.push(path);
       } else {
+        // This case should ideally not happen if dashboard is always present
+        // but as a fallback, go to dashboard
         const dashboardTab = allMenuItems.find(item => item.id === 'dashboard-overview');
         if (dashboardTab) {
-          setOpenTabs([dashboardTab]);
-          setActiveTabId(dashboardTab.id);
-          router.push(`/${dashboardTab.id}`);
+            setOpenTabs([dashboardTab]);
+            setActiveTabId(dashboardTab.id);
+            router.push('/');
         }
       }
     }
@@ -73,7 +78,8 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
       setOpenTabs(prev => [...prev, menuItem]);
     }
     setActiveTabId(menuItem.id);
-    router.push(`/${menuItem.id}`);
+    const path = menuItem.id === 'dashboard-overview' ? '/' : `/${menuItem.id}`;
+    router.push(path);
   };
 
   const toggleSidebar = () => setIsSidebarActive(prev => !prev);
