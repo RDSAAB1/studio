@@ -278,7 +278,6 @@ export default function DashboardClient() {
                         dataKey="value"
                         ratio={4 / 3}
                         stroke="#fff"
-                        fill="#8884d8"
                         content={<CustomizedContent colors={COLORS} />}
                         onClick={handleSunburstClick}
                         aspectRatio={1}
