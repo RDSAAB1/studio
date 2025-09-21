@@ -192,25 +192,28 @@ export default function DashboardClient() {
         const totalL3 = level3Data.reduce((sum, i) => sum + i.value, 0);
         const totalL4 = level4Data.reduce((sum, i) => sum + i.value, 0);
 
-        const renderNode = (item: {name: string, value: number}, level: number, total: number, onClick: () => void, isSelected: boolean) => (
-            <div 
-                key={item.name} 
-                onClick={onClick} 
-                className={cn(
-                    "p-2 rounded-md cursor-pointer hover:bg-accent/50", 
-                    isSelected && "bg-accent font-semibold",
-                    `ml-${level * 4}`
-                )}
-            >
-                <div className="flex justify-between items-center text-sm">
-                    <span>{toTitleCase(item.name)}</span>
-                    <div className="text-right">
-                        <p>{formatCurrency(item.value)}</p>
-                        <p className="text-xs text-muted-foreground">{((item.value / total) * 100).toFixed(1)}%</p>
+        const renderNode = (item: {name: string, value: number}, level: number, total: number, onClick: () => void, isSelected: boolean) => {
+            const paddingLeft = `${level * 1}rem`;
+            return (
+                <div 
+                    key={item.name} 
+                    onClick={onClick} 
+                    className={cn(
+                        "p-2 rounded-md cursor-pointer hover:bg-accent/50", 
+                        isSelected && "bg-accent font-semibold",
+                    )}
+                    style={{ paddingLeft }}
+                >
+                    <div className="flex justify-between items-center text-sm">
+                        <span>{toTitleCase(item.name)}</span>
+                        <div className="text-right">
+                            <p>{formatCurrency(item.value)}</p>
+                            <p className="text-xs text-muted-foreground">{total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}%</p>
+                        </div>
                     </div>
                 </div>
-            </div>
-        );
+            )
+        };
 
         return (
             <div className="space-y-1">
@@ -218,17 +221,20 @@ export default function DashboardClient() {
                     <div key={l1Item.name}>
                         {renderNode(l1Item, 0, totalL1, () => setLevel1(l1Item.name), level1 === l1Item.name)}
                         {level1 === l1Item.name && level2Data.length > 0 && (
-                            <div className="pl-4 border-l-2 border-primary/20">
+                            <div className="relative pl-4">
+                                 <div className="absolute left-4 top-0 bottom-0 w-px bg-primary/20"></div>
                                 {level2Data.map(l2Item => (
                                      <div key={l2Item.name}>
                                         {renderNode(l2Item, 1, totalL2, () => setLevel2(l2Item.name), level2 === l2Item.name)}
                                         {level2 === l2Item.name && level3Data.length > 0 && (
-                                            <div className="pl-4 border-l-2 border-green-500/20">
+                                            <div className="relative pl-4">
+                                                <div className="absolute left-8 top-0 bottom-0 w-px bg-green-500/20"></div>
                                                 {level3Data.map(l3Item => (
                                                     <div key={l3Item.name}>
                                                          {renderNode(l3Item, 2, totalL3, () => setLevel3(l3Item.name), level3 === l3Item.name)}
                                                          {level3 === l3Item.name && level4Data.length > 0 && (
-                                                            <div className="pl-4 border-l-2 border-red-500/20">
+                                                            <div className="relative pl-4">
+                                                                 <div className="absolute left-12 top-0 bottom-0 w-px bg-red-500/20"></div>
                                                                  {level4Data.map(l4Item => renderNode(l4Item, 3, totalL4, () => {}, false))}
                                                             </div>
                                                          )}
