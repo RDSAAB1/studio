@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount } from '@/lib/definitions';
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime } from "@/lib/firestore";
 import { formatCurrency, toTitleCase } from '@/lib/utils';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -43,7 +43,7 @@ const ChartCard = ({ title, description, children }: { title: string, descriptio
     </Card>
 );
 
-const PIE_CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F'];
+const PIE_CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 export default function DashboardClient() {
     const router = useRouter();
@@ -52,35 +52,34 @@ export default function DashboardClient() {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [loans, setLoans] = useState<Loan[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         setIsClient(true);
+        
         const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
         const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
-        const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         
         const unsubIncomes = getIncomeRealtime((data) => {
             setIncomes(data);
-            if(expenses.length > 0) setIsLoading(false);
+            setIsLoading(false);
         }, console.error);
         const unsubExpenses = getExpensesRealtime((data) => {
             setExpenses(data);
-            if(incomes.length > 0) setIsLoading(false);
+            setIsLoading(false);
         }, console.error);
 
         return () => {
-            unsubSuppliers(); unsubCustomers(); unsubLoans(); unsubFunds();
+            unsubSuppliers(); unsubCustomers(); unsubFunds();
             unsubAccounts(); unsubIncomes(); unsubExpenses();
         };
-    }, [incomes.length, expenses.length]);
+    }, []);
 
-    const allTransactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
+    const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -113,7 +112,7 @@ export default function DashboardClient() {
         return { balances, totalAssets };
     }, [fundTransactions, allTransactions, bankAccounts]);
 
-    const chartData = useMemo(() => {
+    const weeklyChartData = useMemo(() => {
         const data: { [key: string]: { date: string, income: number, expense: number } } = {};
         const today = new Date();
         for (let i = 6; i >= 0; i--) {
@@ -129,17 +128,41 @@ export default function DashboardClient() {
         });
         return Object.values(data);
     }, [allTransactions]);
+
+    const expenseByCategoryData = useMemo(() => {
+        const expenseMap = new Map<string, number>();
+        expenses.forEach(e => {
+            const currentAmount = expenseMap.get(e.category) || 0;
+            expenseMap.set(e.category, currentAmount + e.amount);
+        });
+        return Array.from(expenseMap.entries()).map(([name, value]) => ({ name, value }));
+    }, [expenses]);
     
-    // Placeholder data for new charts
-    const pieData = [{name: 'Group A', value: 400}, {name: 'Group B', value: 300}, {name: 'Group C', value: 300}, {name: 'Group D', value: 200}];
-    const barData = [
-      {name: 'Jan', uv: 4000, pv: 2400, amt: 2400},
-      {name: 'Feb', uv: 3000, pv: 1398, amt: 2210},
-      {name: 'Mar', uv: 2000, pv: 9800, amt: 2290},
-      {name: 'Apr', uv: 2780, pv: 3908, amt: 2000},
-      {name: 'May', uv: 1890, pv: 4800, amt: 2181},
-      {name: 'Jun', uv: 2390, pv: 3800, amt: 2500},
-    ];
+    const topSuppliersData = useMemo(() => {
+        const supplierPaymentMap = new Map<string, number>();
+        suppliers.forEach(s => {
+            const totalPaid = s.originalNetAmount - s.netAmount;
+            const currentTotal = supplierPaymentMap.get(s.name) || 0;
+            supplierPaymentMap.set(s.name, currentTotal + totalPaid);
+        });
+        return Array.from(supplierPaymentMap.entries())
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+    }, [suppliers]);
+
+    const topCustomersData = useMemo(() => {
+        const customerPaymentMap = new Map<string, number>();
+        customers.forEach(c => {
+             const totalPaid = c.originalNetAmount - c.netAmount;
+            const currentTotal = customerPaymentMap.get(c.name) || 0;
+            customerPaymentMap.set(c.name, currentTotal + totalPaid);
+        });
+        return Array.from(customerPaymentMap.entries())
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+    }, [customers]);
 
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -170,54 +193,60 @@ export default function DashboardClient() {
                 </CardContent>
             </Card>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[...Array(8)].map((_, i) => (
-                    <ChartCard key={`pie-${i}`} title={`Pie Chart ${i + 1}`} description="Category distribution">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={pieData} cx="50%" cy="50%" outerRadius={60} dataKey="value">
-                                     {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />)}
-                                </Pie>
-                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                <Legend iconSize={10} wrapperStyle={{fontSize: '12px'}}/>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </ChartCard>
-                ))}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                 <ChartCard title="Weekly Income vs Expense" description="Trend of income and expenses over the last 7 days.">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={weeklyChartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(Number(value))}/>
+                            <Tooltip formatter={(value: number, name: string) => [formatCurrency(value), toTitleCase(name)]}/>
+                            <Legend iconSize={10} />
+                            <Area type="monotone" dataKey="income" stackId="1" stroke="#16a34a" fill="#16a34a" fillOpacity={0.2} />
+                            <Area type="monotone" dataKey="expense" stackId="1" stroke="#dc2626" fill="#dc2626" fillOpacity={0.2} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </ChartCard>
+
+                 <ChartCard title="Expense by Category" description="Distribution of expenses across different categories.">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie data={expenseByCategoryData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => { const radius = innerRadius + (outerRadius - innerRadius) * 0.5; const x = cx + radius * Math.cos(-midAngle * Math.PI / 180); const y = cy + radius * Math.sin(-midAngle * Math.PI / 180); return (percent > 0.05) ? <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12}> {`${(percent * 100).toFixed(0)}%`} </text> : null; }}>
+                                    {expenseByCategoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend iconSize={10} wrapperStyle={{fontSize: '12px'}}/>
+                        </PieChart>
+                    </ResponsiveContainer>
+                </ChartCard>
+            </div>
+            
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                 <ChartCard title="Top 5 Suppliers by Payment" description="Suppliers who received the most payments.">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={topSuppliersData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(Number(value))}/>
+                            <YAxis type="category" dataKey="name" fontSize={12} tickLine={false} axisLine={false} width={80} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} cursor={{fill: 'hsl(var(--muted))'}}/>
+                            <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </ChartCard>
+
+                 <ChartCard title="Top 5 Customers by Sales" description="Customers with the highest sales value.">
+                    <ResponsiveContainer width="100%" height="100%">
+                       <BarChart data={topCustomersData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(Number(value))}/>
+                            <YAxis type="category" dataKey="name" fontSize={12} tickLine={false} axisLine={false} width={80} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} cursor={{fill: 'hsl(var(--muted))'}}/>
+                            <Bar dataKey="value" fill="#82ca9d" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </ChartCard>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                 {[...Array(4)].map((_, i) => (
-                    <ChartCard key={`bar-${i}`} title={`Bar Chart ${i + 1}`} description="Monthly data comparison">
-                        <ResponsiveContainer width="100%" height="100%">
-                           <BarChart data={barData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(Number(value))}/>
-                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                <Bar dataKey="pv" fill="#8884d8" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </ChartCard>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {[...Array(4)].map((_, i) => (
-                     <ChartCard key={`area-${i}`} title={`Area Graph ${i + 1}`} description="Data trend over time">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(Number(value))}/>
-                                <Tooltip formatter={(value: number, name: string) => [formatCurrency(value), toTitleCase(name)]}/>
-                                <Area type="monotone" dataKey="income" stackId="1" stroke="#16a34a" fill="#16a34a" fillOpacity={0.2} />
-                                <Area type="monotone" dataKey="expense" stackId="1" stroke="#dc2626" fill="#dc2626" fillOpacity={0.2} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </ChartCard>
-                 ))}
-            </div>
         </div>
     );
 }
