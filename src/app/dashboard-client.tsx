@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Project, Transaction, ExpenseCategory } from '@/lib/definitions';
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Project, ExpenseCategory } from '@/lib/definitions';
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
@@ -32,7 +32,7 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading, onCl
     </Card>
 );
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', '#FFBB28'];
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onBreadcrumbClick }: any) => {
     return (
@@ -63,9 +63,14 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                         fill="#8884d8"
                         onClick={(e) => onNatureClick(e.name)}
                         className="cursor-pointer"
+                         activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
+                            <g>
+                                <path d={RechartsPrimitive.Sector({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
+                            </g>
+                        )}
                     >
                         {data.level1.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell key={`cell-l1-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                     </Pie>
 
@@ -82,9 +87,14 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                             fill="#82ca9d"
                             onClick={(e) => onCategoryClick(e.name)}
                             className="cursor-pointer"
+                             activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
+                                <g>
+                                    <path d={RechartsPrimitive.Sector({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
+                                </g>
+                            )}
                         >
                             {data.level2.map((entry: any, index: number) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                <Cell key={`cell-l2-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>
                     )}
@@ -102,10 +112,15 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                             fill="#ffc658"
                             labelLine={false}
                             label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
-                             className="cursor-pointer"
+                            className="cursor-pointer"
+                             activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
+                                <g>
+                                    <path d={RechartsPrimitive.Sector({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
+                                </g>
+                            )}
                         >
                             {data.level3.map((entry: any, index: number) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                <Cell key={`cell-l3-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>
                     )}
