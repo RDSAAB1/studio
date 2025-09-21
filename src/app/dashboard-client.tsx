@@ -114,7 +114,7 @@ export default function DashboardClient() {
         ];
     }, [incomes, expenses]);
     
-    const COLORS = ['#16a34a', '#dc2626'];
+    const COLORS = ['#22c55e', '#ef4444'];
 
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
