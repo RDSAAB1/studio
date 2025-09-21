@@ -185,7 +185,66 @@ export default function DashboardClient() {
         }
         return null;
     };
+    
+    const DetailTree = () => {
+        const totalL1 = level1Data.reduce((sum, i) => sum + i.value, 0);
+        const totalL2 = level2Data.reduce((sum, i) => sum + i.value, 0);
+        const totalL3 = level3Data.reduce((sum, i) => sum + i.value, 0);
+        const totalL4 = level4Data.reduce((sum, i) => sum + i.value, 0);
 
+        const renderNode = (item: {name: string, value: number}, level: number, total: number, onClick: () => void, isSelected: boolean) => (
+            <div 
+                key={item.name} 
+                onClick={onClick} 
+                className={cn(
+                    "p-2 rounded-md cursor-pointer hover:bg-accent/50", 
+                    isSelected && "bg-accent font-semibold",
+                    `ml-${level * 4}`
+                )}
+            >
+                <div className="flex justify-between items-center text-sm">
+                    <span>{toTitleCase(item.name)}</span>
+                    <div className="text-right">
+                        <p>{formatCurrency(item.value)}</p>
+                        <p className="text-xs text-muted-foreground">{((item.value / total) * 100).toFixed(1)}%</p>
+                    </div>
+                </div>
+            </div>
+        );
+
+        return (
+            <div className="space-y-1">
+                {level1Data.map(l1Item => (
+                    <div key={l1Item.name}>
+                        {renderNode(l1Item, 0, totalL1, () => setLevel1(l1Item.name), level1 === l1Item.name)}
+                        {level1 === l1Item.name && level2Data.length > 0 && (
+                            <div className="pl-4 border-l-2 border-primary/20">
+                                {level2Data.map(l2Item => (
+                                     <div key={l2Item.name}>
+                                        {renderNode(l2Item, 1, totalL2, () => setLevel2(l2Item.name), level2 === l2Item.name)}
+                                        {level2 === l2Item.name && level3Data.length > 0 && (
+                                            <div className="pl-4 border-l-2 border-green-500/20">
+                                                {level3Data.map(l3Item => (
+                                                    <div key={l3Item.name}>
+                                                         {renderNode(l3Item, 2, totalL3, () => setLevel3(l3Item.name), level3 === l3Item.name)}
+                                                         {level3 === l3Item.name && level4Data.length > 0 && (
+                                                            <div className="pl-4 border-l-2 border-red-500/20">
+                                                                 {level4Data.map(l4Item => renderNode(l4Item, 3, totalL4, () => {}, false))}
+                                                            </div>
+                                                         )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                     </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        )
+    }
 
     return (
         <div className="space-y-6">
@@ -235,86 +294,83 @@ export default function DashboardClient() {
                         ))}
                     </div>
                 </CardHeader>
-                <CardContent className="h-96">
-                   <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Tooltip content={customTooltip} />
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div className="h-96">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Tooltip content={customTooltip} />
 
-                            {/* Level 1: Innermost - Income vs Expense */}
-                            <Pie
-                                data={level1Data}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={60}
-                                onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}
-                                stroke="hsl(var(--card))"
-                                strokeWidth={4}
-                                labelLine={false}
-                            >
-                                {level1Data.map((entry, index) => (
-                                    <Cell key={`cell-0-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            
-                            {/* Level 2: Permanent vs Seasonal or Income Categories */}
-                            {level1 && <Pie
-                                data={level2Data}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={70}
-                                outerRadius={90}
-                                onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
-                                stroke="hsl(var(--card))"
-                                strokeWidth={4}
-                                labelLine={false}
-                            >
-                                {level2Data.map((entry, index) => (
-                                    <Cell key={`cell-1-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>}
-                            
-                             {/* Level 3: Expense Categories or Income Sub-categories */}
-                            {level2 && <Pie
-                                data={level3Data}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={100}
-                                outerRadius={120}
-                                onClick={(data) => setLevel3(data.name)}
-                                stroke="hsl(var(--card))"
-                                strokeWidth={4}
-                                labelLine={false}
-                            >
-                                {level3Data.map((entry, index) => (
-                                    <Cell key={`cell-2-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>}
-                            
-                            {/* Level 4: Expense Sub-categories */}
-                            {level3 && <Pie
-                                data={level4Data}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={130}
-                                outerRadius={150}
-                                stroke="hsl(var(--card))"
-                                strokeWidth={4}
-                                labelLine={false}
-                            >
-                                {level4Data.map((entry, index) => (
-                                    <Cell key={`cell-3-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>}
-                        </PieChart>
-                    </ResponsiveContainer>
+                                <Pie
+                                    data={level1Data}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={60}
+                                    onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}
+                                    stroke="hsl(var(--card))"
+                                    strokeWidth={4}
+                                >
+                                    {level1Data.map((entry, index) => (
+                                        <Cell key={`cell-0-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                
+                                {level1 && <Pie
+                                    data={level2Data}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={70}
+                                    outerRadius={90}
+                                    onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
+                                    stroke="hsl(var(--card))"
+                                    strokeWidth={4}
+                                >
+                                    {level2Data.map((entry, index) => (
+                                        <Cell key={`cell-1-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>}
+                                
+                                {level2 && <Pie
+                                    data={level3Data}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={100}
+                                    outerRadius={120}
+                                    onClick={(data) => setLevel3(data.name)}
+                                    stroke="hsl(var(--card))"
+                                    strokeWidth={4}
+                                >
+                                    {level3Data.map((entry, index) => (
+                                        <Cell key={`cell-2-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>}
+                                
+                                {level3 && <Pie
+                                    data={level4Data}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={130}
+                                    outerRadius={150}
+                                    stroke="hsl(var(--card))"
+                                    strokeWidth={4}
+                                >
+                                    {level4Data.map((entry, index) => (
+                                        <Cell key={`cell-3-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>}
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div>
+                        <DetailTree />
+                    </div>
                 </CardContent>
             </Card>
         </div>
