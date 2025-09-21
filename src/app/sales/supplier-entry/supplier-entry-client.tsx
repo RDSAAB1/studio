@@ -117,6 +117,60 @@ export default function SupplierEntryClient() {
     shouldFocusError: false,
   });
 
+  const resetFormToState = useCallback((customerState: Customer) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let formDate;
+    try {
+        formDate = customerState.date ? new Date(customerState.date) : today;
+        if (isNaN(formDate.getTime())) formDate = today;
+    } catch {
+        formDate = today;
+    }
+    
+    const formValues: FormValues = {
+        srNo: customerState.srNo,
+        date: formDate,
+        term: Number(customerState.term) || 0,
+        name: customerState.name,
+        so: customerState.so,
+        address: customerState.address,
+        contact: customerState.contact,
+        vehicleNo: customerState.vehicleNo,
+        variety: customerState.variety,
+        grossWeight: customerState.grossWeight || 0,
+        teirWeight: customerState.teirWeight || 0,
+        rate: customerState.rate || 0,
+        kartaPercentage: customerState.kartaPercentage,
+        labouryRate: customerState.labouryRate,
+        kanta: customerState.kanta,
+        paymentType: customerState.paymentType || 'Full',
+    };
+
+    setCurrentSupplier(customerState);
+    form.reset(formValues);
+    performCalculations(formValues, false);
+  }, [form, performCalculations]);
+
+  const handleNew = useCallback(() => {
+    setIsEditing(false);
+    let nextSrNum = 1;
+    if (safeSuppliers.length > 0) {
+        const lastSr = safeSuppliers[safeSuppliers.length - 1]?.srNo;
+        if(lastSr) {
+            nextSrNum = (parseInt(lastSr.substring(1)) || 0) + 1;
+        }
+    }
+    const newState = getInitialFormState(lastVariety, lastPaymentType);
+    newState.srNo = formatSrNo(nextSrNum, 'S');
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    newState.date = today.toISOString().split('T')[0];
+    newState.dueDate = today.toISOString().split('T')[0];
+    resetFormToState(newState);
+    setTimeout(() => form.setFocus('srNo'), 50);
+  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsClient(true);
@@ -125,21 +179,13 @@ export default function SupplierEntryClient() {
 
   useEffect(() => {
     if (suppliers !== undefined) {
-      setIsLoading(false);
-      if (isInitialLoad.current && suppliers && suppliers.length > 0) {
-        const nextSrNum = Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
-        const initialSrNo = formatSrNo(nextSrNum, 'S');
-        form.setValue('srNo', initialSrNo);
-        setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-        isInitialLoad.current = false;
-      } else if (isInitialLoad.current && suppliers && suppliers.length === 0) {
-        const initialSrNo = formatSrNo(1, 'S');
-        form.setValue('srNo', initialSrNo);
-        setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-        isInitialLoad.current = false;
-      }
+        setIsLoading(false);
+        if (isInitialLoad.current && suppliers) {
+            handleNew();
+            isInitialLoad.current = false;
+        }
     }
-}, [suppliers, form]);
+}, [suppliers, handleNew]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -217,54 +263,6 @@ export default function SupplierEntryClient() {
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
-
-  const resetFormToState = useCallback((customerState: Customer) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let formDate;
-    try {
-        formDate = customerState.date ? new Date(customerState.date) : today;
-        if (isNaN(formDate.getTime())) formDate = today;
-    } catch {
-        formDate = today;
-    }
-    
-    const formValues: FormValues = {
-        srNo: customerState.srNo,
-        date: formDate,
-        term: Number(customerState.term) || 0,
-        name: customerState.name,
-        so: customerState.so,
-        address: customerState.address,
-        contact: customerState.contact,
-        vehicleNo: customerState.vehicleNo,
-        variety: customerState.variety,
-        grossWeight: customerState.grossWeight || 0,
-        teirWeight: customerState.teirWeight || 0,
-        rate: customerState.rate || 0,
-        kartaPercentage: customerState.kartaPercentage,
-        labouryRate: customerState.labouryRate,
-        kanta: customerState.kanta,
-        paymentType: customerState.paymentType || 'Full',
-    };
-
-    setCurrentSupplier(customerState);
-    form.reset(formValues);
-    performCalculations(formValues, false);
-  }, [form, performCalculations]);
-
-  const handleNew = useCallback(() => {
-    setIsEditing(false);
-    const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-    const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum, 'S');
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    newState.date = today.toISOString().split('T')[0];
-    newState.dueDate = today.toISOString().split('T')[0];
-    resetFormToState(newState);
-    setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeSuppliers.find(c => c.id === id);
