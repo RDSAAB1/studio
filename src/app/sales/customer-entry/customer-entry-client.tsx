@@ -8,12 +8,9 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { getCustomersRealtime, getCustomerPaymentsRealtime } from "@/lib/firestore";
-
-
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -347,7 +344,7 @@ export default function CustomerEntryClient() {
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
-    const dataToSave: Omit<Customer, 'id'> = {
+    const dataToSave: Partial<Customer> = {
         ...currentCustomer,
         srNo: formValues.srNo,
         date: formValues.date.toISOString().split('T')[0],
@@ -380,9 +377,6 @@ export default function CustomerEntryClient() {
         shippingStateName: formValues.shippingStateName || '',
         shippingStateCode: formValues.shippingStateCode || '',
         advanceFreight: formValues.advanceFreight || 0,
-        advanceExpenseId: currentCustomer.advanceExpenseId,
-        advancePaymentAccountId: currentCustomer.advancePaymentAccountId,
-        advancePaymentMethod: currentCustomer.advancePaymentMethod,
         so: '',
         kartaPercentage: 0,
         kartaWeight: 0,
@@ -392,8 +386,15 @@ export default function CustomerEntryClient() {
         barcode: '',
         receiptType: 'Cash',
         cdRate: formValues.cdRate,
-        brokerageRate: formValues.brokerageRate
+        brokerageRate: formValues.brokerageRate,
+        advanceExpenseId: currentCustomer.advanceExpenseId,
+        advancePaymentMethod: currentCustomer.advancePaymentMethod,
+        advancePaymentAccountId: currentCustomer.advancePaymentAccountId
     };
+
+    if (dataToSave.advanceExpenseId === undefined) {
+        delete dataToSave.advanceExpenseId;
+    }
     
     try {
         if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
@@ -702,3 +703,5 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+
+    
