@@ -174,10 +174,7 @@ export default function SupplierEntryClient() {
     setIsEditing(false);
     let nextSrNum = 1;
     if (safeSuppliers.length > 0) {
-        const lastSr = safeSuppliers[safeSuppliers.length - 1]?.srNo;
-        if(lastSr) {
-            nextSrNum = (parseInt(lastSr.substring(1)) || 0) + 1;
-        }
+      nextSrNum = Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
     }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'S');
@@ -198,9 +195,12 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (suppliers !== undefined) {
         setIsLoading(false);
-        if (isInitialLoad.current && suppliers) {
+        if (isInitialLoad.current && suppliers && suppliers.length > 0) {
             handleNew();
             isInitialLoad.current = false;
+        } else if (isInitialLoad.current && suppliers && suppliers.length === 0) {
+             handleNew(); // Also call handleNew when there are no suppliers
+             isInitialLoad.current = false;
         }
     }
 }, [suppliers, handleNew]);
@@ -697,3 +697,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    
