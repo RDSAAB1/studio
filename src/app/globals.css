@@ -24,11 +24,11 @@
   --input: 217 33% 22%;
   --ring: var(--primary);
   --radius: 0.75rem;
-  --chart-1: hsl(259 96% 67%);
-  --chart-2: hsl(0 72% 51%);
-  --chart-3: hsl(142 71% 45%);
-  --chart-4: hsl(48 96% 50%);
-  --chart-5: hsl(200 96% 50%);
+  --chart-1: hsl(205 90% 40%);
+  --chart-2: hsl(30 90% 50%);
+  --chart-3: hsl(160 80% 35%);
+  --chart-4: hsl(45 95% 55%);
+  --chart-5: hsl(340 85% 60%);
 }
 
 body {
