@@ -124,7 +124,6 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
      const handleActualPrint = async (id: string) => {
         if (customer) {
-            
             const formValuesForCalc: Partial<Customer> = {
                 ...customer,
                 ...editableInvoiceDetails,
@@ -134,7 +133,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             };
 
             const calculated = calculateCustomerEntry(formValuesForCalc, []);
-
+            
             const finalDataToSave: Partial<Customer> = { 
                 ...customer,
                 ...editableInvoiceDetails,
@@ -231,7 +230,14 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         const finalCustomerData: Customer = {
             ...customer,
             ...editableInvoiceDetails,
-            advanceFreight: invoiceDetails.advanceFreight,
+            ...calculateCustomerEntry(
+                {
+                    ...customer,
+                    ...editableInvoiceDetails,
+                    advanceFreight: invoiceDetails.advanceFreight,
+                }, 
+                [] // We don't need payment history for this calculation
+            ),
         };
 
         if (isSameAsBilling) {
