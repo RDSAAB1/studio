@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -120,6 +119,9 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 ...customer,
                 ...editableInvoiceDetails,
                 advanceFreight: invoiceDetails.totalAdvance,
+                // Ensure correct rate/percentage is used for recalculation
+                brokerageRate: customer.brokerageRate || customer.brokerage,
+                cdRate: customer.cdRate || customer.cd,
              };
             
             if(isSameAsBilling) {
