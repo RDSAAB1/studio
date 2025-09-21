@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -8,10 +9,13 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from '@/lib/database';
+
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getCustomersRealtime, getCustomerPaymentsRealtime } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -43,8 +47,8 @@ export const formSchema = z.object({
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
     rate: z.coerce.number().min(0),
-    cd: z.coerce.number().min(0),
-    brokerage: z.coerce.number().min(0),
+    cdRate: z.coerce.number().min(0),
+    brokerageRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
     isBrokerageIncluded: z.boolean(),
@@ -80,8 +84,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -109,12 +113,6 @@ export default function CustomerEntryClient() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
-
-  const nextCustomerSrNo = useMemo(() => {
-    if (safeCustomers.length === 0) return formatSrNo(1, 'C');
-    const lastNum = Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0));
-    return formatSrNo(lastNum + 1, 'C');
-  }, [safeCustomers]);
   
   const filteredCustomers = useMemo(() => {
     if (!debouncedSearchTerm) {
@@ -147,20 +145,17 @@ export default function CustomerEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (customers && customers.length > 0 && isInitialLoad.current) {
-        form.setValue('srNo', nextCustomerSrNo);
-        setCurrentCustomer(prev => ({ ...prev, srNo: nextCustomerSrNo }));
-        isInitialLoad.current = false;
+    if (customers !== undefined) {
         setIsLoading(false);
-    } else if (customers) {
-        setIsLoading(false);
-        if (isInitialLoad.current) {
-            form.setValue('srNo', nextCustomerSrNo);
-            setCurrentCustomer(prev => ({ ...prev, srNo: nextCustomerSrNo }));
+        if (isInitialLoad.current && customers) {
+            const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'C');
+            form.setValue('srNo', initialSrNo);
+            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
             isInitialLoad.current = false;
         }
     }
-  }, [customers, form, nextCustomerSrNo]);
+  }, [customers, form]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -173,8 +168,7 @@ export default function CustomerEntryClient() {
     };
     fetchSettings();
 
-    const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
-    const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, console.error);
+
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
 
@@ -193,8 +187,6 @@ export default function CustomerEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubCustomers();
-      unsubPayments();
       unsubVarieties();
       unsubPaymentTypes();
     };
@@ -242,8 +234,8 @@ export default function CustomerEntryClient() {
       contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, 
-      cd: customerState.cdRate || customerState.cd || 0,
-      brokerage: customerState.brokerageRate || customerState.brokerage || 0,
+      cdRate: customerState.cdRate || 0,
+      brokerageRate: customerState.brokerageRate || 0,
       kanta: customerState.kanta || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
@@ -267,15 +259,16 @@ export default function CustomerEntryClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
+    const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = nextCustomerSrNo;
+    newState.srNo = formatSrNo(nextSrNum, 'C');
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
-  }, [nextCustomerSrNo, lastVariety, lastPaymentType, resetFormToState, form]);
+  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);
@@ -346,15 +339,12 @@ export default function CustomerEntryClient() {
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
-    const localDate = new Date(formValues.date.getTime() - formValues.date.getTimezoneOffset() * 60000);
-    const dateString = localDate.toISOString().split('T')[0];
-
     const dataToSave: Omit<Customer, 'id'> = {
         ...currentCustomer,
         srNo: formValues.srNo,
-        date: dateString,
+        date: formValues.date.toISOString().split('T')[0],
         term: '0', 
-        dueDate: dateString,
+        dueDate: formValues.date.toISOString().split('T')[0],
         name: toTitleCase(formValues.name),
         companyName: toTitleCase(formValues.companyName || ''),
         address: toTitleCase(formValues.address),
@@ -699,5 +689,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-
-    

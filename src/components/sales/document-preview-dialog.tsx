@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,11 +16,11 @@ import { Printer, ChevronsUpDown, Trash2, Plus } from "lucide-react";
 import { TaxInvoice } from "@/components/print-formats/tax-invoice";
 import { BillOfSupply } from "@/components/print-formats/bill-of-supply";
 import { Challan } from "@/components/print-formats/challan";
-import { cn } from "@/lib/utils";
+import { cn, calculateCustomerEntry } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getBankAccountsRealtime, addExpense, updateCustomer } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
-import { formatCurrency, calculateCustomerEntry } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
 
 
@@ -42,6 +43,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     const { toast } = useToast();
     const [editableInvoiceDetails, setEditableInvoiceDetails] = useState<Partial<Customer>>({});
     const [isSameAsBilling, setIsSameAsBilling] = useState(true);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    
     const [invoiceDetails, setInvoiceDetails] = useState({
         companyGstin: '',
         companyStateName: '',
@@ -54,7 +57,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         grNo: '',
         grDate: '',
         transport: '',
-        totalAdvance: 0,
+        advanceFreight: 0,
+        advancePaymentMethod: 'CashInHand',
     });
     
      useEffect(() => {
@@ -73,7 +77,8 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 grNo: customer.grNo || '',
                 grDate: customer.grDate || '',
                 transport: customer.transport || '',
-                totalAdvance: customer.advanceFreight || 0,
+                advanceFreight: customer.advanceFreight || 0,
+                advancePaymentMethod: customer.advancePaymentMethod || 'CashInHand'
             }));
         }
         if (receiptSettings) {
@@ -84,6 +89,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 companyStateCode: receiptSettings.companyStateCode || prev.companyStateCode,
             }));
         }
+        
+        const unsub = getBankAccountsRealtime(setBankAccounts, console.error);
+        return () => unsub();
+
     }, [customer, receiptSettings, isOpen]);
     
 
@@ -115,10 +124,24 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
      const handleActualPrint = async (id: string) => {
         if (customer) {
+            
+            const formValuesForCalc: Partial<Customer> = {
+                ...customer,
+                ...editableInvoiceDetails,
+                // These are just for calculation, not part of the final saved object directly
+                brokerageRate: customer.brokerageRate, 
+                cdRate: customer.cdRate,
+            };
+
+            const calculated = calculateCustomerEntry(formValuesForCalc, []);
+
             const finalDataToSave: Partial<Customer> = { 
                 ...customer,
                 ...editableInvoiceDetails,
-                advanceFreight: invoiceDetails.totalAdvance,
+                ...calculated,
+                advanceFreight: invoiceDetails.advanceFreight,
+                advancePaymentMethod: invoiceDetails.advancePaymentMethod,
+                advancePaymentAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
                 nineRNo: invoiceDetails.nineRNo,
                 gatePassNo: invoiceDetails.gatePassNo,
                 grNo: invoiceDetails.grNo,
@@ -136,13 +159,21 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 finalDataToSave.shippingStateCode = finalDataToSave.stateCode;
             }
 
-            const newOriginalNetAmount = Math.round((finalDataToSave.amount || 0) + (finalDataToSave.kanta || 0) + (finalDataToSave.bagAmount || 0) - (finalDataToSave.cd || 0) + (finalDataToSave.advanceFreight || 0));
-            if (!finalDataToSave.isBrokerageIncluded) {
-                finalDataToSave.originalNetAmount = newOriginalNetAmount - (finalDataToSave.brokerage || 0);
-            } else {
-                finalDataToSave.originalNetAmount = newOriginalNetAmount;
+            if (invoiceDetails.advanceFreight > 0) {
+                 await addExpense({
+                    transactionType: 'Expense',
+                    date: new Date().toISOString(),
+                    category: 'Logistics',
+                    subCategory: 'Advance Freight',
+                    amount: invoiceDetails.advanceFreight,
+                    payee: `Driver - ${finalDataToSave.vehicleNo}`,
+                    description: `Advance for SR #${finalDataToSave.srNo}`,
+                    paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
+                    bankAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
+                    status: 'Paid',
+                    isRecurring: false,
+                 });
             }
-            finalDataToSave.netAmount = finalDataToSave.originalNetAmount;
             
             await updateCustomer(customer.id, finalDataToSave);
         }
@@ -201,7 +232,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         const finalCustomerData: Customer = {
             ...customer,
             ...editableInvoiceDetails,
-            advanceFreight: invoiceDetails.totalAdvance,
+            advanceFreight: invoiceDetails.advanceFreight,
         };
 
         if (isSameAsBilling) {
@@ -216,7 +247,6 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         
         const finalInvoiceDetails = {
             ...invoiceDetails,
-            totalAdvance: invoiceDetails.totalAdvance,
         };
 
         switch(documentType) {
@@ -306,7 +336,15 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                                     <div className="space-y-1"><Label className="text-xs">G.R. No.</Label><Input value={invoiceDetails.grNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, grNo: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1"><Label className="text-xs">G.R. Date</Label><Input type="date" value={invoiceDetails.grDate} onChange={(e) => setInvoiceDetails({...invoiceDetails, grDate: e.target.value})} className="h-8 text-xs" /></div>
                                     <div className="space-y-1 col-span-2"><Label className="text-xs">Transport</Label><Input value={invoiceDetails.transport} onChange={(e) => setInvoiceDetails({...invoiceDetails, transport: e.target.value})} className="h-8 text-xs" /></div>
-                                    <div className="space-y-1 col-span-2"><Label className="text-xs">Advance/Freight</Label><Input type="number" value={invoiceDetails.totalAdvance} onChange={(e) => setInvoiceDetails({...invoiceDetails, totalAdvance: Number(e.target.value)})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1"><Label className="text-xs">Advance/Freight</Label><Input type="number" value={invoiceDetails.advanceFreight} onChange={(e) => setInvoiceDetails({...invoiceDetails, advanceFreight: Number(e.target.value)})} className="h-8 text-xs" /></div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Advance Paid Via</Label>
+                                        <CustomDropdown 
+                                            options={[{value: "CashInHand", label: "Cash In Hand"}, ...bankAccounts.map(acc => ({ value: acc.id, label: acc.accountHolderName }))]} 
+                                            value={invoiceDetails.advancePaymentMethod}
+                                            onChange={(v) => v && setInvoiceDetails(prev => ({ ...prev, advancePaymentMethod: v }))} 
+                                        />
+                                    </div>
                                 </CardContent>
                             </Card>
                             <Card>

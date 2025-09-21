@@ -75,6 +75,8 @@ export type Customer = {
   // New field
   otherCharges?: number;
   advanceFreight?: number;
+  advancePaymentMethod?: string;
+  advancePaymentAccountId?: string;
   gatePassNo?: string;
   grNo?: string;
   grDate?: string;
@@ -446,3 +448,4 @@ export type FormatSettings = {
     
 
     
+

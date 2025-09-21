@@ -1,4 +1,5 @@
 
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Customer, Payment, Holiday } from './definitions';
@@ -171,10 +172,10 @@ export const calculateCustomerEntry = (values: Partial<Customer>, paymentHistory
     const rate = values.rate || 0;
     const amount = Math.round(netWeight * rate);
     
-    const brokerageRate = Number(values.brokerage) || 0;
+    const brokerageRate = Number(values.brokerageRate) || 0;
     const brokerageAmount = Math.round(netWeight * brokerageRate);
 
-    const cdPercentage = Number(values.cd) || 0;
+    const cdPercentage = Number(values.cdRate) || 0;
     const cdAmount = Math.round((netWeight * rate * cdPercentage) / 100);
     
     const kanta = Number(values.kanta) || 0;
@@ -182,9 +183,7 @@ export const calculateCustomerEntry = (values: Partial<Customer>, paymentHistory
     const bagRate = Number(values.bagRate) || 0;
     const bagAmount = Math.round(bags * bagRate);
 
-    const advanceFreight = Number(values.advanceFreight) || 0;
-
-    let originalNetAmount = Math.round(amount + kanta + bagAmount - cdAmount + advanceFreight);
+    let originalNetAmount = Math.round(amount + kanta + bagAmount - cdAmount);
     if (!values.isBrokerageIncluded) {
         originalNetAmount -= brokerageAmount;
     }
@@ -208,12 +207,9 @@ export const calculateCustomerEntry = (values: Partial<Customer>, paymentHistory
         netWeight: netWeight,
         amount: amount,
         brokerage: brokerageAmount,
-        brokerageRate: brokerageRate,
         cd: cdAmount,
-        cdRate: cdPercentage,
         kanta: kanta,
         bagAmount: bagAmount,
-        advanceFreight: advanceFreight,
         originalNetAmount: originalNetAmount,
         netAmount: netAmount,
     }
