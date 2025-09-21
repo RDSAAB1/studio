@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Customer, ReceiptSettings, DocumentType, BankAccount, Transaction, Expense } from "@/lib/definitions";
+import type { Customer, ReceiptSettings, DocumentType, BankAccount, Expense } from "@/lib/definitions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -18,11 +18,10 @@ import { BillOfSupply } from "@/components/print-formats/bill-of-supply";
 import { Challan } from "@/components/print-formats/challan";
 import { cn, calculateCustomerEntry } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getBankAccountsRealtime, addExpense, updateCustomer, updateExpense, deleteExpense } from "@/lib/firestore";
+import { getBankAccountsRealtime } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
-import { formatCurrency } from "@/lib/utils";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
-import { runTransaction, doc, collection, writeBatch } from 'firebase/firestore';
+import { runTransaction, doc, collection } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
 
 
@@ -33,12 +32,6 @@ interface DocumentPreviewDialogProps {
     documentType: DocumentType;
     setDocumentType: (type: DocumentType) => void;
     receiptSettings: ReceiptSettings | null;
-}
-
-interface AdvancePayment {
-    id: number;
-    amount: number;
-    accountId: string;
 }
 
 export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentType, setDocumentType, receiptSettings }: DocumentPreviewDialogProps) => {
@@ -124,7 +117,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     };
 
 
-     const handleActualPrint = async (id: string) => {
+    const handleActualPrint = async (id: string) => {
         if (!customer) return;
 
         try {
@@ -134,36 +127,43 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 const newAdvanceAmount = invoiceDetails.advanceFreight;
                 let currentExpenseId = customer.advanceExpenseId;
 
-                // Handle expense management
-                if (newAdvanceAmount > 0) {
-                    const expenseData: Partial<Expense> = {
-                        transactionType: 'Expense',
-                        date: new Date().toISOString(),
-                        category: 'Logistics',
-                        subCategory: 'Advance Freight',
-                        amount: newAdvanceAmount,
-                        payee: `Driver - ${customer.vehicleNo || 'N/A'}`,
-                        description: `Advance for SR #${customer.srNo}`,
-                        paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
-                        status: 'Paid',
-                        isRecurring: false,
-                        bankAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
-                    };
+                // --- Expense Management ---
+                const expenseData: Partial<Expense> = {
+                    date: new Date().toISOString(),
+                    transactionType: 'Expense',
+                    category: 'Logistics',
+                    subCategory: 'Advance Freight',
+                    amount: newAdvanceAmount,
+                    payee: `Driver - ${customer.vehicleNo || 'N/A'}`,
+                    description: `Advance for SR #${customer.srNo}`,
+                    paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
+                    status: 'Paid',
+                    isRecurring: false,
+                };
+                
+                if (invoiceDetails.advancePaymentMethod !== 'CashInHand') {
+                    expenseData.bankAccountId = invoiceDetails.advancePaymentMethod;
+                }
 
+                if (newAdvanceAmount > 0) {
                     if (currentExpenseId) {
+                        // Update existing expense
                         const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
                         transaction.update(expenseRef, expenseData);
                     } else {
+                        // Create new expense
                         const newExpenseRef = doc(collection(firestoreDB, "expenses"));
                         transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id });
-                        currentExpenseId = newExpenseRef.id;
+                        currentExpenseId = newExpenseRef.id; // Get the new ID to save on the customer
                     }
                 } else if (newAdvanceAmount === 0 && currentExpenseId) {
+                    // Delete existing expense if amount is zeroed out
                     const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
                     transaction.delete(expenseRef);
-                    currentExpenseId = undefined; // Clear the ID
+                    currentExpenseId = undefined; 
                 }
 
+                // --- Customer Document Update ---
                 const formValuesForCalc: Partial<Customer> = {
                     ...customer,
                     ...editableInvoiceDetails,
@@ -185,7 +185,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     transport: invoiceDetails.transport,
                  };
 
-                if(isSameAsBilling) {
+                if (isSameAsBilling) {
                     dataToSave.shippingName = dataToSave.name;
                     dataToSave.shippingCompanyName = dataToSave.companyName;
                     dataToSave.shippingAddress = dataToSave.address;
@@ -195,11 +195,11 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     dataToSave.shippingStateCode = dataToSave.stateCode;
                 }
                 
-                // Remove undefined fields before updating
+                // Explicitly remove the field if the ID is undefined to prevent Firestore error
                 if (dataToSave.advanceExpenseId === undefined) {
                     delete dataToSave.advanceExpenseId;
                 }
-                
+
                 transaction.update(customerRef, dataToSave);
             });
 
