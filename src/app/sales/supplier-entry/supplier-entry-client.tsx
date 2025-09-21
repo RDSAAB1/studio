@@ -195,15 +195,21 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (suppliers !== undefined) {
         setIsLoading(false);
-        if (isInitialLoad.current && suppliers && suppliers.length > 0) {
-            handleNew();
+        if (isInitialLoad.current && suppliers.length > 0) {
+            const nextSrNum = Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'S');
+            form.setValue('srNo', initialSrNo);
+            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
             isInitialLoad.current = false;
-        } else if (isInitialLoad.current && suppliers && suppliers.length === 0) {
-             handleNew(); // Also call handleNew when there are no suppliers
-             isInitialLoad.current = false;
+        } else if (isInitialLoad.current && suppliers.length === 0) {
+            const initialSrNo = formatSrNo(1, 'S');
+            form.setValue('srNo', initialSrNo);
+            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+            isInitialLoad.current = false;
         }
     }
-}, [suppliers, handleNew]);
+  }, [suppliers, form]);
+
 
   useEffect(() => {
     if (!isClient) return;
@@ -697,5 +703,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
