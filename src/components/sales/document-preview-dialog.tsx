@@ -22,6 +22,8 @@ import { getBankAccountsRealtime, addExpense, updateCustomer, updateExpense, del
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { formatCurrency } from "@/lib/utils";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
+import { runTransaction, doc, collection, writeBatch } from 'firebase/firestore';
+import { firestoreDB } from '@/lib/firebase';
 
 
 interface DocumentPreviewDialogProps {
@@ -125,115 +127,129 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
      const handleActualPrint = async (id: string) => {
         if (!customer) return;
 
-        let expenseId = customer.advanceExpenseId;
-        const newAdvanceAmount = invoiceDetails.advanceFreight;
-        const finalCustomerData: Partial<Customer> = { ...customer, ...editableInvoiceDetails };
+        try {
+            await runTransaction(firestoreDB, async (transaction) => {
+                const customerRef = doc(firestoreDB, "customers", customer.id);
+                
+                const newAdvanceAmount = invoiceDetails.advanceFreight;
+                let currentExpenseId = customer.advanceExpenseId;
 
-        // Handle expense creation/update/deletion
-        if (newAdvanceAmount > 0) {
-            const expenseData: Partial<Expense> = {
-                transactionType: 'Expense',
-                date: new Date().toISOString(),
-                category: 'Logistics',
-                subCategory: 'Advance Freight',
-                amount: newAdvanceAmount,
-                payee: `Driver - ${customer.vehicleNo || 'N/A'}`,
-                description: `Advance for SR #${customer.srNo}`,
-                paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
-                status: 'Paid',
-                isRecurring: false,
-            };
+                // Handle expense management
+                if (newAdvanceAmount > 0) {
+                    const expenseData: Partial<Expense> = {
+                        transactionType: 'Expense',
+                        date: new Date().toISOString(),
+                        category: 'Logistics',
+                        subCategory: 'Advance Freight',
+                        amount: newAdvanceAmount,
+                        payee: `Driver - ${customer.vehicleNo || 'N/A'}`,
+                        description: `Advance for SR #${customer.srNo}`,
+                        paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
+                        status: 'Paid',
+                        isRecurring: false,
+                        bankAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
+                    };
 
-            if (invoiceDetails.advancePaymentMethod !== 'CashInHand') {
-                expenseData.bankAccountId = invoiceDetails.advancePaymentMethod;
+                    if (currentExpenseId) {
+                        const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
+                        transaction.update(expenseRef, expenseData);
+                    } else {
+                        const newExpenseRef = doc(collection(firestoreDB, "expenses"));
+                        transaction.set(newExpenseRef, { ...expenseData, id: newExpenseRef.id });
+                        currentExpenseId = newExpenseRef.id;
+                    }
+                } else if (newAdvanceAmount === 0 && currentExpenseId) {
+                    const expenseRef = doc(firestoreDB, "expenses", currentExpenseId);
+                    transaction.delete(expenseRef);
+                    currentExpenseId = undefined; // Clear the ID
+                }
+
+                const formValuesForCalc: Partial<Customer> = {
+                    ...customer,
+                    ...editableInvoiceDetails,
+                    advanceFreight: newAdvanceAmount,
+                };
+                
+                const calculated = calculateCustomerEntry(formValuesForCalc, []);
+                
+                const dataToSave: Partial<Customer> = { 
+                    ...customer,
+                    ...editableInvoiceDetails,
+                    ...calculated,
+                    advanceExpenseId: currentExpenseId, // Use the potentially new or cleared ID
+                    advancePaymentMethod: invoiceDetails.advancePaymentMethod,
+                    nineRNo: invoiceDetails.nineRNo,
+                    gatePassNo: invoiceDetails.gatePassNo,
+                    grNo: invoiceDetails.grNo,
+                    grDate: invoiceDetails.grDate,
+                    transport: invoiceDetails.transport,
+                 };
+
+                if(isSameAsBilling) {
+                    dataToSave.shippingName = dataToSave.name;
+                    dataToSave.shippingCompanyName = dataToSave.companyName;
+                    dataToSave.shippingAddress = dataToSave.address;
+                    dataToSave.shippingContact = dataToSave.contact;
+                    dataToSave.shippingGstin = dataToSave.gstin;
+                    dataToSave.shippingStateName = dataToSave.stateName;
+                    dataToSave.shippingStateCode = dataToSave.stateCode;
+                }
+                
+                // Remove undefined fields before updating
+                if (dataToSave.advanceExpenseId === undefined) {
+                    delete dataToSave.advanceExpenseId;
+                }
+                
+                transaction.update(customerRef, dataToSave);
+            });
+
+            // ----- PRINTING LOGIC -----
+            const receiptNode = document.getElementById(id);
+            if (!receiptNode) return;
+
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'absolute';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+            
+            const iframeDoc = iframe.contentWindow?.document;
+            if (!iframeDoc) {
+                toast({ title: "Print Error", description: "Could not create print window.", variant: "destructive" });
+                document.body.removeChild(iframe);
+                return;
             }
 
-            if (expenseId) {
-                await updateExpense(expenseId, expenseData);
-            } else {
-                const newExpense = await addExpense(expenseData as Omit<Expense, 'id'>);
-                expenseId = newExpense.id;
-            }
-        } else if (newAdvanceAmount === 0 && expenseId) {
-            await deleteExpense(expenseId);
-            expenseId = undefined; // Clear the ID after deletion
+            iframeDoc.open();
+            iframeDoc.write('<html><head><title>Print Document</title>');
+
+            Array.from(document.styleSheets).forEach(styleSheet => {
+                try {
+                    const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                    const style = iframeDoc.createElement('style');
+                    style.appendChild(iframeDoc.createTextNode(cssText));
+                    style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
+                    iframeDoc.head.appendChild(style);
+                } catch (e) {
+                    console.warn("Could not copy stylesheet:", e);
+                }
+            });
+
+            iframeDoc.write('</head><body></body></html>');
+            iframeDoc.body.innerHTML = receiptNode.innerHTML;
+            iframeDoc.close();
+
+            setTimeout(() => {
+                iframe.contentWindow?.focus();
+                iframe.contentWindow?.print();
+                document.body.removeChild(iframe);
+            }, 500);
+
+        } catch (error) {
+            console.error("Transaction failed: ", error);
+            toast({ title: "Save Failed", description: "The changes could not be saved due to an error.", variant: "destructive" });
         }
-
-        const formValuesForCalc: Partial<Customer> = {
-            ...customer,
-            ...editableInvoiceDetails,
-            advanceFreight: newAdvanceAmount,
-        };
-        
-        const calculated = calculateCustomerEntry(formValuesForCalc, []);
-        
-        const dataToSave: Partial<Customer> = { 
-            ...finalCustomerData,
-            ...calculated,
-            advanceExpenseId: expenseId,
-            advancePaymentMethod: invoiceDetails.advancePaymentMethod,
-            nineRNo: invoiceDetails.nineRNo,
-            gatePassNo: invoiceDetails.gatePassNo,
-            grNo: invoiceDetails.grNo,
-            grDate: invoiceDetails.grDate,
-            transport: invoiceDetails.transport,
-         };
-
-        if(isSameAsBilling) {
-            dataToSave.shippingName = dataToSave.name;
-            dataToSave.shippingCompanyName = dataToSave.companyName;
-            dataToSave.shippingAddress = dataToSave.address;
-            dataToSave.shippingContact = dataToSave.contact;
-            dataToSave.shippingGstin = dataToSave.gstin;
-            dataToSave.shippingStateName = dataToSave.stateName;
-            dataToSave.shippingStateCode = dataToSave.stateCode;
-        }
-        
-        await updateCustomer(customer.id, dataToSave);
-        
-
-        // ----- PRINTING LOGIC -----
-        const receiptNode = document.getElementById(id);
-        if (!receiptNode) return;
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) {
-            toast({ title: "Print Error", description: "Could not create print window.", variant: "destructive" });
-            document.body.removeChild(iframe);
-            return;
-        }
-
-        iframeDoc.open();
-        iframeDoc.write('<html><head><title>Print Document</title>');
-
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            try {
-                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                const style = iframeDoc.createElement('style');
-                style.appendChild(iframeDoc.createTextNode(cssText));
-                style.appendChild(iframeDoc.createTextNode('body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }'));
-                iframeDoc.head.appendChild(style);
-            } catch (e) {
-                console.warn("Could not copy stylesheet:", e);
-            }
-        });
-
-        iframeDoc.write('</head><body></body></html>');
-        iframeDoc.body.innerHTML = receiptNode.innerHTML;
-        iframeDoc.close();
-
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            document.body.removeChild(iframe);
-        }, 500);
     };
     
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
