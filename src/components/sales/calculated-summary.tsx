@@ -80,6 +80,11 @@ export const CalculatedSummary = ({
         if (!customer || !customer.weight || !customer.bags) return 0;
         return (customer.weight / customer.bags) * 100;
     }, [customer]);
+
+    const totalBagWeight = useMemo(() => {
+        if (!customer || !customer.bags || !customer.bagWeightKg) return 0;
+        return customer.bags * customer.bagWeightKg;
+    }, [customer]);
     
     return (
         <Card className="bg-card/70 backdrop-blur-sm border-primary/20 shadow-lg">
@@ -88,6 +93,7 @@ export const CalculatedSummary = ({
                     {!isCustomerForm && <SummaryItem label="Due Date" value={isLoading ? '-' : format(new Date(customer.dueDate), "dd-MMM-yy")} />}
                     <SummaryItem label="Final Wt" value={`${(customer.weight || 0).toFixed(2)} Qtl`} />
                     {isCustomerForm && <SummaryItem label="Avg Bags Wt" value={`${averageBagWeight.toFixed(2)} kg`} />}
+                    {isCustomerForm && <SummaryItem label="Total Bag Wt" value={`${totalBagWeight.toFixed(2)} kg`} />}
                     {!isCustomerForm && <SummaryItem label="Karta Wt" value={`${(customer.kartaWeight || 0).toFixed(2)} Qtl`} />}
                     <SummaryItem label="Net Wt" value={`${(customer.netWeight || 0).toFixed(2)} Qtl`} />
                     {!isCustomerForm && <SummaryItem label="Laboury" value={formatCurrency(customer.labouryAmount || 0)} />}
@@ -95,6 +101,7 @@ export const CalculatedSummary = ({
                     {isCustomerForm && <SummaryItem label="Brokerage" value={formatCurrency(customer.brokerage || 0)} />}
                     {isCustomerForm && <SummaryItem label="CD" value={formatCurrency(customer.cd || 0)} />}
                     <SummaryItem label="Amount" value={formatCurrency(customer.amount || 0)} />
+                    {isCustomerForm && <SummaryItem label="Total Bag Amt" value={formatCurrency(customer.bagAmount || 0)} />}
                     <SummaryItem label="Net Payable" value={formatCurrency(Number(customer.originalNetAmount) || 0)} isHighlighted />
                 </div>
                 
