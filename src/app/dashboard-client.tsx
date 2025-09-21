@@ -178,7 +178,7 @@ export default function DashboardClient() {
                                 outerRadius={120}
                                 innerRadius={80}
                                 dataKey="value"
-                                stroke="hsl(var(--background))"
+                                stroke="hsl(var(--card))"
                                 strokeWidth={4}
                             >
                                 {incomeExpenseData.map((entry, index) => (
