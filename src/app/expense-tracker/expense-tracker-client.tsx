@@ -391,8 +391,13 @@ export default function IncomeExpenseClient() {
         payee: toTitleCase(values.payee),
         mill: toTitleCase(values.mill || ''),
         projectId: values.projectId === 'none' ? '' : values.projectId,
-        nextDueDate: values.isRecurring && values.nextDueDate ? format(values.nextDueDate, "yyyy-MM-dd") : undefined,
       };
+
+      if (values.isRecurring && values.nextDueDate) {
+          transactionData.nextDueDate = format(values.nextDueDate, "yyyy-MM-dd");
+      } else {
+          delete transactionData.nextDueDate;
+      }
 
       if (values.paymentMethod === 'Cash') {
           delete transactionData.bankAccountId;
