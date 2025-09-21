@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -81,7 +82,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[] | undefined>(undefined);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
@@ -136,6 +137,8 @@ export default function CustomerEntryClient() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       ...getInitialFormState(lastVariety, lastPaymentType),
+      cdRate: 0,
+      brokerageRate: 0,
       advanceFreight: 0,
     },
     shouldFocusError: false,
@@ -384,7 +387,9 @@ export default function CustomerEntryClient() {
         labouryRate: 0,
         labouryAmount: 0,
         barcode: '',
-        receiptType: 'Cash'
+        receiptType: 'Cash',
+        cdRate: formValues.cdRate,
+        brokerageRate: formValues.brokerageRate
     };
     
     try {
@@ -656,7 +661,7 @@ export default function CustomerEntryClient() {
         customer={detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
         onPrint={handleOpenPrintPreview}
-        paymentHistory={paymentHistory}
+        paymentHistory={paymentHistory as CustomerPayment[]}
       />
         
       <DocumentPreviewDialog
@@ -694,3 +699,4 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+

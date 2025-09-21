@@ -25,8 +25,8 @@ interface CustomerFormValues {
     bags?: number;
     bagWeightKg?: number;
     rate?: number;
-    brokerage?: number;
-    cd?: number;
+    brokerageRate?: number;
+    cdRate?: number;
     kanta?: number;
     bagRate?: number;
     isBrokerageIncluded?: boolean;
@@ -158,7 +158,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     };
 };
 
-export const calculateCustomerEntry = (values: Partial<Customer>, paymentHistory: any[]) => {
+export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paymentHistory: any[]) => {
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
