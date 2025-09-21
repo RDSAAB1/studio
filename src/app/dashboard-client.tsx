@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const StatCard = ({ title, value, description, icon, colorClass, isLoading, onClick }: { title: string, value: string, description?: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean, onClick?: () => void }) => (
     <Card className={cn("shadow-sm hover:shadow-md transition-shadow", onClick && "cursor-pointer")} onClick={onClick}>
@@ -186,19 +187,20 @@ export default function DashboardClient() {
         return null;
     };
     
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }: any) => {
-        if (percent < 0.02) return null;
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
+        if (percent < 0.05) return null; // Don't render label for small slices
         const RADIAN = Math.PI / 180;
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
         return (
-            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-bold">
+            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-bold pointer-events-none">
                 {`${(percent * 100).toFixed(0)}%`}
             </text>
         );
     };
+
 
     const DetailTree = () => {
         const totalL1 = level1Data.reduce((sum, i) => sum + i.value, 0);
@@ -207,7 +209,7 @@ export default function DashboardClient() {
         const totalL4 = level4Data.reduce((sum, i) => sum + i.value, 0);
 
         const renderNode = (item: {name: string, value: number}, level: number, total: number, onClick: () => void, isSelected: boolean) => {
-            const paddingLeft = `${level * 1.5}rem`;
+            const paddingLeft = `${level * 1}rem`;
             return (
                 <div 
                     key={item.name} 
@@ -228,36 +230,38 @@ export default function DashboardClient() {
         };
 
         return (
-            <div className="space-y-1">
-                {level1Data.map(l1Item => (
-                    <div key={l1Item.name}>
-                        {renderNode(l1Item, 0, totalL1, () => setLevel1(l1Item.name), level1 === l1Item.name)}
-                        {level1 === l1Item.name && level2Data.length > 0 && (
-                            <div className="border-l border-primary/20 ml-4">
-                                {level2Data.map(l2Item => (
-                                     <div key={l2Item.name}>
-                                        {renderNode(l2Item, 1, totalL2, () => setLevel2(l2Item.name), level2 === l2Item.name)}
-                                        {level2 === l2Item.name && level3Data.length > 0 && (
-                                            <div className="border-l border-green-500/20 ml-4">
-                                                {level3Data.map(l3Item => (
-                                                    <div key={l3Item.name}>
-                                                         {renderNode(l3Item, 2, totalL3, () => setLevel3(l3Item.name), level3 === l3Item.name)}
-                                                         {level3 === l3Item.name && level4Data.length > 0 && (
-                                                            <div className="border-l border-red-500/20 ml-4">
-                                                                 {level4Data.map(l4Item => renderNode(l4Item, 3, totalL4, () => {}, false))}
-                                                            </div>
-                                                         )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+            <ScrollArea className="h-96">
+                <div className="space-y-1 p-1">
+                    {level1Data.map(l1Item => (
+                        <div key={l1Item.name}>
+                            {renderNode(l1Item, 0, totalL1, () => setLevel1(l1Item.name), level1 === l1Item.name)}
+                            {level1 === l1Item.name && level2Data.length > 0 && (
+                                <div className="border-l border-primary/20 ml-4">
+                                    {level2Data.map(l2Item => (
+                                        <div key={l2Item.name}>
+                                            {renderNode(l2Item, 1, totalL2, () => setLevel2(l2Item.name), level2 === l2Item.name)}
+                                            {level2 === l2Item.name && level3Data.length > 0 && (
+                                                <div className="border-l border-green-500/20 ml-4">
+                                                    {level3Data.map(l3Item => (
+                                                        <div key={l3Item.name}>
+                                                            {renderNode(l3Item, 2, totalL3, () => setLevel3(l3Item.name), level3 === l3Item.name)}
+                                                            {level3 === l3Item.name && level4Data.length > 0 && (
+                                                                <div className="border-l border-red-500/20 ml-4">
+                                                                    {level4Data.map(l4Item => renderNode(l4Item, 3, totalL4, () => {}, false))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
         )
     }
 
@@ -321,7 +325,7 @@ export default function DashboardClient() {
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    outerRadius={50}
+                                    outerRadius={60}
                                     labelLine={false}
                                     label={renderCustomizedLabel}
                                     onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}
@@ -339,8 +343,8 @@ export default function DashboardClient() {
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={90}
+                                    innerRadius={70}
+                                    outerRadius={100}
                                     labelLine={false}
                                     label={renderCustomizedLabel}
                                     onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
@@ -358,8 +362,8 @@ export default function DashboardClient() {
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={100}
-                                    outerRadius={130}
+                                    innerRadius={110}
+                                    outerRadius={140}
                                     labelLine={false}
                                     label={renderCustomizedLabel}
                                     onClick={(data) => setLevel3(data.name)}
@@ -377,8 +381,8 @@ export default function DashboardClient() {
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={140}
-                                    outerRadius={170}
+                                    innerRadius={150}
+                                    outerRadius={180}
                                     labelLine={false}
                                     label={renderCustomizedLabel}
                                     stroke="hsl(var(--card))"
@@ -399,3 +403,5 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+    
