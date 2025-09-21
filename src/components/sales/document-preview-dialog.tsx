@@ -115,37 +115,34 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
      const handleActualPrint = async (id: string) => {
         if (customer) {
-             const formValuesForCalc = {
+            const finalDataToSave: Partial<Customer> = { 
                 ...customer,
                 ...editableInvoiceDetails,
                 advanceFreight: invoiceDetails.totalAdvance,
-                // Ensure correct rate/percentage is used for recalculation
-                brokerageRate: customer.brokerageRate || customer.brokerage,
-                cdRate: customer.cdRate || customer.cd,
-             };
-            
-            if(isSameAsBilling) {
-                formValuesForCalc.shippingName = formValuesForCalc.name;
-                formValuesForCalc.shippingCompanyName = formValuesForCalc.companyName;
-                formValuesForCalc.shippingAddress = formValuesForCalc.address;
-                formValuesForCalc.shippingContact = formValuesForCalc.contact;
-                formValuesForCalc.shippingGstin = formValuesForCalc.gstin;
-                formValuesForCalc.shippingStateName = formValuesForCalc.stateName;
-                formValuesForCalc.shippingStateCode = formValuesForCalc.stateCode;
-            }
-
-            // Recalculate financial fields before saving
-            const calculatedData = calculateCustomerEntry(formValuesForCalc, []); // Passing empty payments as we only want to recalc totals, not affect payments.
-            
-            const finalDataToSave: Partial<Customer> = { 
-                ...formValuesForCalc,
-                ...calculatedData, // Apply all recalculated values
                 nineRNo: invoiceDetails.nineRNo,
                 gatePassNo: invoiceDetails.gatePassNo,
                 grNo: invoiceDetails.grNo,
                 grDate: invoiceDetails.grDate,
                 transport: invoiceDetails.transport,
              };
+
+            if(isSameAsBilling) {
+                finalDataToSave.shippingName = finalDataToSave.name;
+                finalDataToSave.shippingCompanyName = finalDataToSave.companyName;
+                finalDataToSave.shippingAddress = finalDataToSave.address;
+                finalDataToSave.shippingContact = finalDataToSave.contact;
+                finalDataToSave.shippingGstin = finalDataToSave.gstin;
+                finalDataToSave.shippingStateName = finalDataToSave.stateName;
+                finalDataToSave.shippingStateCode = finalDataToSave.stateCode;
+            }
+
+            const newOriginalNetAmount = Math.round((finalDataToSave.amount || 0) + (finalDataToSave.kanta || 0) + (finalDataToSave.bagAmount || 0) - (finalDataToSave.cd || 0) + (finalDataToSave.advanceFreight || 0));
+            if (!finalDataToSave.isBrokerageIncluded) {
+                finalDataToSave.originalNetAmount = newOriginalNetAmount - (finalDataToSave.brokerage || 0);
+            } else {
+                finalDataToSave.originalNetAmount = newOriginalNetAmount;
+            }
+            finalDataToSave.netAmount = finalDataToSave.originalNetAmount;
             
             await updateCustomer(customer.id, finalDataToSave);
         }
@@ -365,3 +362,5 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
+
+    
