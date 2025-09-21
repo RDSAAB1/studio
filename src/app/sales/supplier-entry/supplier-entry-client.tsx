@@ -187,18 +187,12 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (suppliers.length > 0) {
-        setIsLoading(false);
-        if (isInitialLoad.current) {
-            handleNew(); 
-            isInitialLoad.current = false;
-        }
-    } else if (suppliers) { // suppliers is defined but empty
-        setIsLoading(false);
-        if (isInitialLoad.current) {
-            handleNew();
-            isInitialLoad.current = false;
-        }
+    if (suppliers !== undefined) {
+      setIsLoading(false);
+      if (isInitialLoad.current) {
+        handleNew();
+        isInitialLoad.current = false;
+      }
     }
   }, [suppliers, handleNew]);
 
