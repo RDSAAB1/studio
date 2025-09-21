@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory } from '@/lib/definitions';
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project } from '@/lib/definitions';
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
@@ -254,7 +254,7 @@ export default function DashboardClient() {
                                 outerRadius={90}
                                 onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
                                 labelLine={false}
-                                label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                label={({ name, percent }) => percent > 0.05 ? name : ''}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
                             >
@@ -273,7 +273,7 @@ export default function DashboardClient() {
                                 outerRadius={120}
                                 onClick={(data) => setLevel3(data.name)}
                                 labelLine={false}
-                                label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                label={({ name, percent }) => percent > 0.05 ? name : ''}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
                             >
@@ -291,7 +291,7 @@ export default function DashboardClient() {
                                 innerRadius={130}
                                 outerRadius={150}
                                 labelLine={false}
-                                label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                label={({ name, percent }) => percent > 0.05 ? name : ''}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
                             >
@@ -306,3 +306,5 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+    
