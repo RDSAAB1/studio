@@ -80,8 +80,7 @@ export default function SupplierEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
-  const isInitialLoad = useRef(true);
-
+  
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
   const [updateAction, setUpdateAction] = useState<((deletePayments: boolean) => void) | null>(null);
@@ -93,6 +92,12 @@ export default function SupplierEntryClient() {
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
 
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
+
+  const nextSupplierSrNo = useMemo(() => {
+    if (safeSuppliers.length === 0) return formatSrNo(1, 'S');
+    const lastNum = Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0));
+    return formatSrNo(lastNum + 1, 'S');
+  }, [safeSuppliers]);
   
   const filteredSuppliers = useMemo(() => {
     if (!debouncedSearchTerm) {
@@ -172,19 +177,15 @@ export default function SupplierEntryClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
-    let nextSrNum = 1;
-    if (safeSuppliers.length > 0) {
-      nextSrNum = Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
-    }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum, 'S');
+    newState.srNo = nextSupplierSrNo;
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
+  }, [lastVariety, lastPaymentType, resetFormToState, form, nextSupplierSrNo]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -195,20 +196,9 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (suppliers !== undefined) {
         setIsLoading(false);
-        if (isInitialLoad.current && suppliers.length > 0) {
-            const nextSrNum = Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'S');
-            form.setValue('srNo', initialSrNo);
-            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-            isInitialLoad.current = false;
-        } else if (isInitialLoad.current && suppliers.length === 0) {
-            const initialSrNo = formatSrNo(1, 'S');
-            form.setValue('srNo', initialSrNo);
-            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-            isInitialLoad.current = false;
-        }
+        handleNew(); 
     }
-  }, [suppliers, form]);
+  }, [suppliers, handleNew]);
 
 
   useEffect(() => {
@@ -293,8 +283,7 @@ export default function SupplierEntryClient() {
         if (isEditing) {
             setIsEditing(false);
             const currentId = currentSupplier.srNo;
-            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
+            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || nextSupplierSrNo, id: currentId };
             resetFormToState(newState);
         }
     }
