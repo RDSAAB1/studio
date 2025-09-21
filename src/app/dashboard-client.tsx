@@ -32,7 +32,7 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading, onCl
     </Card>
 );
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const COLORS = ['#22c55e', '#ef4444', '#f97316', '#eab308', '#3b82f6'];
 
 export default function DashboardClient() {
     const router = useRouter();
