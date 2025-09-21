@@ -44,10 +44,14 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         if (!user && isAppPage) {
             router.replace('/login');
         } else if (user) {
-            if (isSetupComplete === false && pathname !== '/settings') {
-                 router.replace('/settings');
-            } else if (isSetupComplete === true && (pathname === '/login' || pathname === '/')) {
-                router.replace('/dashboard-overview');
+             if (isSetupComplete === false) {
+                if (pathname !== '/settings') {
+                    router.replace('/settings');
+                }
+            } else if (isSetupComplete === true) {
+                if (pathname === '/login' || pathname === '/') {
+                    router.replace('/dashboard-overview');
+                }
             }
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
@@ -62,8 +66,20 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         );
     }
     
+    // If not authenticated and on a public page, children (which are null for this layout) can be returned,
+    // and the public layout will handle rendering. If on an app page, the redirect above will have fired.
     if (!user) {
         return null;
+    }
+
+    // If authenticated but setup is not complete and not on the settings page, we're in a loading/redirect state.
+    if (isSetupComplete === false && pathname !== '/settings') {
+         return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-4 text-muted-foreground">Redirecting to settings...</span>
+            </div>
+        );
     }
 
     return (
