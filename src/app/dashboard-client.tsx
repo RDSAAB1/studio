@@ -175,6 +175,18 @@ export default function DashboardClient() {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
     }
 
+    const customTooltip = ({ active, payload }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="p-2 border rounded-lg bg-background/80 backdrop-blur-sm shadow-md">
+                    <p className="label">{`${payload[0].name} : ${formatCurrency(payload[0].value)}`}</p>
+                </div>
+            );
+        }
+        return null;
+    };
+
+
     return (
         <div className="space-y-6">
              <Card>
@@ -226,18 +238,21 @@ export default function DashboardClient() {
                 <CardContent className="h-96">
                    <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)' }}/>
+                            <Tooltip content={customTooltip} />
 
                             {/* Level 1: Innermost - Income vs Expense */}
                             <Pie
                                 data={level1Data}
                                 dataKey="value"
+                                nameKey="name"
                                 cx="50%"
                                 cy="50%"
                                 outerRadius={60}
                                 onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
+                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
+                                labelLine={false}
                             >
                                 {level1Data.map((entry, index) => (
                                     <Cell key={`cell-0-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -248,15 +263,16 @@ export default function DashboardClient() {
                             {level1 && <Pie
                                 data={level2Data}
                                 dataKey="value"
+                                nameKey="name"
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={70}
                                 outerRadius={90}
                                 onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
-                                labelLine={false}
-                                label={({ name, percent }) => percent > 0.05 ? name : ''}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
+                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
+                                labelLine={false}
                             >
                                 {level2Data.map((entry, index) => (
                                     <Cell key={`cell-1-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -267,15 +283,16 @@ export default function DashboardClient() {
                             {level2 && <Pie
                                 data={level3Data}
                                 dataKey="value"
+                                nameKey="name"
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={100}
                                 outerRadius={120}
                                 onClick={(data) => setLevel3(data.name)}
-                                labelLine={false}
-                                label={({ name, percent }) => percent > 0.05 ? name : ''}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
+                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
+                                labelLine={false}
                             >
                                 {level3Data.map((entry, index) => (
                                     <Cell key={`cell-2-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -286,14 +303,15 @@ export default function DashboardClient() {
                             {level3 && <Pie
                                 data={level4Data}
                                 dataKey="value"
+                                nameKey="name"
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={130}
                                 outerRadius={150}
-                                labelLine={false}
-                                label={({ name, percent }) => percent > 0.05 ? name : ''}
                                 stroke="hsl(var(--card))"
                                 strokeWidth={4}
+                                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}
+                                labelLine={false}
                             >
                                 {level4Data.map((entry, index) => (
                                     <Cell key={`cell-3-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -306,5 +324,3 @@ export default function DashboardClient() {
         </div>
     );
 }
-
-    
