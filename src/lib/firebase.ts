@@ -16,13 +16,12 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "API_KEY",
-  authDomain: "AUTH_DOMAIN",
-  databaseURL: "DATABASE_URL",
-  projectId: "PROJECT_ID",
-  storageBucket: "STORAGE_BUCKET",
-  messagingSenderId: "MESSAGING_SENDER_ID",
-  appId: "APP_ID",
+  apiKey: "YOUR_API_KEY",
+  authDomain: "bizsuite-dataflow.firebaseapp.com",
+  projectId: "bizsuite-dataflow",
+  storageBucket: "bizsuite-dataflow.appspot.com",
+  messagingSenderId: "1083654429292",
+  appId: "1:1083654429292:web:735c2b52865c1f394a5e0f"
 };
 
 // Initialize Firebase
