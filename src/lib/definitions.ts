@@ -210,6 +210,7 @@ export type CustomerSummary = {
     contact: string;
     so?: string;
     address?: string;
+    companyName?: string;
     acNo?: string;
     ifscCode?: string;
     bank?: string;
@@ -241,6 +242,8 @@ export type CustomerSummary = {
     allTransactions: Customer[];
     allPayments: (SupplierPayment | CustomerPayment)[];
     transactionsByVariety: { [key: string]: number };
+    totalBrokerage?: number;
+    totalCd?: number;
 }
 
 export type OptionItem = {
@@ -454,5 +457,3 @@ export type Holiday = {
     
 
     
-
-

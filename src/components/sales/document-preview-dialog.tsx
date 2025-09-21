@@ -127,6 +127,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
         let expenseId = customer.advanceExpenseId;
         const newAdvanceAmount = invoiceDetails.advanceFreight;
+        const finalCustomerData: Partial<Customer> = { ...customer, ...editableInvoiceDetails };
 
         // Handle expense creation/update/deletion
         if (newAdvanceAmount > 0) {
@@ -166,11 +167,10 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         
         const calculated = calculateCustomerEntry(formValuesForCalc, []);
         
-        const finalDataToSave: Partial<Customer> = { 
-            ...customer,
-            ...editableInvoiceDetails,
+        const dataToSave: Partial<Customer> = { 
+            ...finalCustomerData,
             ...calculated,
-            advanceExpenseId: expenseId, // This will be undefined if deleted
+            advanceExpenseId: expenseId,
             advancePaymentMethod: invoiceDetails.advancePaymentMethod,
             nineRNo: invoiceDetails.nineRNo,
             gatePassNo: invoiceDetails.gatePassNo,
@@ -180,16 +180,16 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
          };
 
         if(isSameAsBilling) {
-            finalDataToSave.shippingName = finalDataToSave.name;
-            finalDataToSave.shippingCompanyName = finalDataToSave.companyName;
-            finalDataToSave.shippingAddress = finalDataToSave.address;
-            finalDataToSave.shippingContact = finalDataToSave.contact;
-            finalDataToSave.shippingGstin = finalDataToSave.gstin;
-            finalDataToSave.shippingStateName = finalDataToSave.stateName;
-            finalDataToSave.shippingStateCode = finalDataToSave.stateCode;
+            dataToSave.shippingName = dataToSave.name;
+            dataToSave.shippingCompanyName = dataToSave.companyName;
+            dataToSave.shippingAddress = dataToSave.address;
+            dataToSave.shippingContact = dataToSave.contact;
+            dataToSave.shippingGstin = dataToSave.gstin;
+            dataToSave.shippingStateName = dataToSave.stateName;
+            dataToSave.shippingStateCode = dataToSave.stateCode;
         }
         
-        await updateCustomer(customer.id, finalDataToSave);
+        await updateCustomer(customer.id, dataToSave);
         
 
         // ----- PRINTING LOGIC -----
@@ -243,17 +243,11 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
     const renderDocument = () => {
         if (!customer || !receiptSettings) return null;
         
+        const calculatedCustomerData = calculateCustomerEntry({ ...customer, ...editableInvoiceDetails, advanceFreight: invoiceDetails.advanceFreight }, []);
         const finalCustomerData: Customer = {
             ...customer,
             ...editableInvoiceDetails,
-            ...calculateCustomerEntry(
-                {
-                    ...customer,
-                    ...editableInvoiceDetails,
-                    advanceFreight: invoiceDetails.advanceFreight,
-                }, 
-                [] 
-            ),
+            ...calculatedCustomerData
         };
 
         if (isSameAsBilling) {

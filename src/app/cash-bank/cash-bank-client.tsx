@@ -87,7 +87,7 @@ export default function CashBankClient() {
         };
     }, []);
 
-    const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
+    const allTransactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
 
     const formSourcesAndDestinations = useMemo(() => {
         const accounts = bankAccounts.map(acc => ({
