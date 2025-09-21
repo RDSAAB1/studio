@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -7,8 +6,8 @@ import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, Fund
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome, updateSupplier } from "@/lib/firestore";
-import { collection, doc, getDocs, limit, query, runTransaction, where } from 'firebase/firestore';
 import { firestoreDB } from '@/lib/firebase';
+import { collection, doc, getDocs, limit, query, runTransaction, where, addDoc, deleteDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -70,7 +69,7 @@ export default function SupplierPaymentsClient() {
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
   const [isPayeeEditing, setIsPayeeEditing] = useState(false);
   
-  const [sixRNo, setSixRNo] = useState('');
+  const [nineRNo, setNineRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
@@ -302,35 +301,38 @@ export default function SupplierPaymentsClient() {
     today.setHours(0, 0, 0, 0);
     
     let baseAmountForCd = 0;
-    const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
 
     if (cdAt === 'partial_on_paid') {
         baseAmountForCd = paymentAmount;
-    } else if (cdAt === 'on_unpaid_amount') {
-        baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-    } else { // 'on_previously_paid' or 'on_full_amount'
-        const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-        const paymentsForSelectedEntries = (paymentHistory || []).filter(p => 
-            p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
-        );
+    } else {
+        const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
 
-        let eligiblePaidAmount = 0;
-        paymentsForSelectedEntries.forEach(p => {
-            if (!p.cdApplied) {
-                p.paidFor?.forEach(pf => {
-                    const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
-                    if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
-                        eligiblePaidAmount += pf.amount;
-                    }
-                });
+        if (cdAt === 'on_unpaid_amount') {
+            baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
+        } else { // 'on_previously_paid' or 'on_full_amount'
+            const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
+            const paymentsForSelectedEntries = (paymentHistory || []).filter(p => 
+                p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
+            );
+
+            let eligiblePaidAmount = 0;
+            paymentsForSelectedEntries.forEach(p => {
+                if (!p.cdApplied) {
+                    p.paidFor?.forEach(pf => {
+                        const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
+                        if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
+                            eligiblePaidAmount += pf.amount;
+                        }
+                    });
+                }
+            });
+            
+            if (cdAt === 'on_previously_paid') {
+                baseAmountForCd = eligiblePaidAmount;
+            } else if (cdAt === 'on_full_amount') {
+                const eligibleUnpaid = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
+                baseAmountForCd = eligibleUnpaid + eligiblePaidAmount;
             }
-        });
-        
-        if (cdAt === 'on_previously_paid') {
-            baseAmountForCd = eligiblePaidAmount;
-        } else if (cdAt === 'on_full_amount') {
-            const eligibleUnpaid = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-            baseAmountForCd = eligibleUnpaid + eligiblePaidAmount;
         }
     }
 
@@ -363,7 +365,7 @@ export default function SupplierPaymentsClient() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
-    setSixRNo('');
+    setNineRNo('');
     setParchiNo('');
     setRtgsQuantity(0);
     setRtgsRate(0);
@@ -544,7 +546,7 @@ const processPayment = async () => {
                 cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
                 receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                 paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
-                sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+                nineRNo: nineRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
                 parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
                 supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
                 supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
@@ -595,7 +597,7 @@ const processPayment = async () => {
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
         setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
-        setSixRNo(paymentToEdit.sixRNo || '');
+        setNineRNo(paymentToEdit.nineRNo || '');
         setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || '');
         setRtgsQuantity(paymentToEdit.quantity || 0);
@@ -863,8 +865,8 @@ const processPayment = async () => {
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
-                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
-                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} nineRNo={nineRNo}
+                        setNineRNo={setNineRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
@@ -954,10 +956,3 @@ const processPayment = async () => {
   );
 }
 
-    
-
-    
-
-    
-
-    

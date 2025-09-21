@@ -8,13 +8,10 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
-
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -83,8 +80,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo')) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -144,10 +141,19 @@ export default function CustomerEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (customers !== undefined) {
+    if (customers.length > 0) {
         setIsLoading(false);
-        if (isInitialLoad.current && customers) {
+        if (isInitialLoad.current) {
             const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'C');
+            form.setValue('srNo', initialSrNo);
+            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+            isInitialLoad.current = false;
+        }
+    } else if (customers) { // suppliers is defined but empty
+        setIsLoading(false);
+        if (isInitialLoad.current) {
+            const nextSrNum = 1;
             const initialSrNo = formatSrNo(nextSrNum, 'C');
             form.setValue('srNo', initialSrNo);
             setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
@@ -170,6 +176,9 @@ export default function CustomerEntryClient() {
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+    const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+    const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, console.error);
+
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -188,6 +197,8 @@ export default function CustomerEntryClient() {
     return () => {
       unsubVarieties();
       unsubPaymentTypes();
+      unsubCustomers();
+      unsubPayments();
     };
   }, [isClient, form, toast]);
   
@@ -338,12 +349,15 @@ export default function CustomerEntryClient() {
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
+    const localDate = new Date(formValues.date.getTime() - formValues.date.getTimezoneOffset() * 60000);
+    const dateString = localDate.toISOString().split('T')[0];
+
     const dataToSave: Omit<Customer, 'id'> = {
         ...currentCustomer,
         srNo: formValues.srNo,
-        date: formValues.date.toISOString().split('T')[0],
+        date: dateString,
         term: '0', 
-        dueDate: formValues.date.toISOString().split('T')[0],
+        dueDate: dateString,
         name: toTitleCase(formValues.name),
         companyName: toTitleCase(formValues.companyName || ''),
         address: toTitleCase(formValues.address),
@@ -688,3 +702,4 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+

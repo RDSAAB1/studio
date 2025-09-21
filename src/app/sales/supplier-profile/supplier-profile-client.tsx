@@ -1,14 +1,12 @@
-// src/app/sales/supplier-profile/supplier-profile-client.tsx
 
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
-import { db } from "@/lib/database";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -271,8 +269,8 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
 
 export default function SupplierProfileClient() {
-  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
@@ -286,6 +284,12 @@ export default function SupplierProfileClient() {
 
   useEffect(() => {
     setIsClient(true);
+    const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
+    const unsubPayments = getPaymentsRealtime(setPaymentHistory, console.error);
+    return () => {
+        unsubSuppliers();
+        unsubPayments();
+    };
   }, []);
 
   const filteredData = useMemo(() => {
@@ -522,3 +526,4 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
+

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getRtgsSettings, updateRtgsSettings } from '@/lib/firestore';
+import { getRtgsSettings, updateRtgsSettings, getPaymentsRealtime } from '@/lib/firestore';
 import { ConsolidatedRtgsPrintFormat } from '@/components/sales/consolidated-rtgs-print';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BankMailFormatDialog } from '@/components/sales/rtgs-report/bank-mail-format-dialog';
@@ -22,8 +22,6 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
 
 
 interface RtgsReportRow {
@@ -48,7 +46,7 @@ interface RtgsReportRow {
 }
 
 export default function RtgsReportClient() {
-    const payments = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const { toast } = useToast();
@@ -75,6 +73,9 @@ export default function RtgsReportClient() {
             }
         };
         fetchSettings();
+        
+        const unsubscribe = getPaymentsRealtime(setPayments, console.error);
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -481,3 +482,4 @@ export default function RtgsReportClient() {
         </div>
     );
 }
+

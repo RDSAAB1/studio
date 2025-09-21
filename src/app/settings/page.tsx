@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, addBank, addBankBranch, getHolidays, addHoliday, deleteHoliday } from '@/lib/firestore';
+import { getRtgsSettings, updateRtgsSettings, getCompanySettings, saveCompanySettings, deleteCompanySettings, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, addBankAccount, updateBankAccount, deleteBankAccount, getFormatSettings, saveFormatSettings, addBank, addBankBranch, getHolidays, addHoliday, deleteHoliday, getBankAccountsRealtime, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
 import type { RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, BankAccount, FormatSettings, Bank, BankBranch, Holiday } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
@@ -15,8 +15,6 @@ import { onAuthStateChanged, signOut, signInWithRedirect } from 'firebase/auth';
 import { toTitleCase, cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { statesAndCodes, findStateByName, findStateByCode } from "@/lib/data";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/lib/database";
 import { bankNames } from '@/lib/data';
 
 
@@ -146,9 +144,9 @@ export default function SettingsPage() {
     const [varietyOptions, setVarietyOptions] = useState<OptionItem[]>([]);
     const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-    const bankAccounts = useLiveQuery<BankAccount[]>(() => db.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
-    const banks = useLiveQuery<Bank[]>(() => db.mainDataStore?.where('collection').equals('banks').toArray()) || [];
-    const bankBranches = useLiveQuery<BankBranch[]>(() => db.mainDataStore?.where('collection').equals('bankBranches').toArray()) || [];
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [banks, setBanks] = useState<Bank[]>([]);
+    const [bankBranches, setBankBranches] = useState<BankBranch[]>([]);
     
     const [isBankAccountDialogOpen, setIsBankAccountDialogOpen] = useState(false);
     const [currentBankAccount, setCurrentBankAccount] = useState<Partial<BankAccount>>({});
@@ -228,10 +226,11 @@ export default function SettingsPage() {
                 const fetchedHolidays = await getHolidays();
                 setHolidays(fetchedHolidays);
 
-                const varieties = await db.mainDataStore?.where('collection').equals('varieties').toArray();
-                setVarietyOptions(varieties || []);
-                const paymentTypes = await db.mainDataStore?.where('collection').equals('paymentTypes').toArray();
-                setPaymentTypeOptions(paymentTypes || []);
+                const unsubVariety = getOptionsRealtime('varieties', setVarietyOptions, console.error);
+                const unsubPayment = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, console.error);
+                const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+                const unsubBanks = getBanksRealtime(setBanks, console.error);
+                const unsubBranches = getBankBranchesRealtime(setBankBranches, console.error);
                 
                 navigator.serviceWorker.ready.then(async (registration) => {
                     if ('periodicSync' in registration) {
@@ -244,6 +243,14 @@ export default function SettingsPage() {
                 });
 
                 setLoading(false);
+
+                return () => {
+                    unsubVariety();
+                    unsubPayment();
+                    unsubAccounts();
+                    unsubBanks();
+                    unsubBranches();
+                }
             } else {
                 setUser(null);
                 setLoading(false);
@@ -857,7 +864,4 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    
-
 

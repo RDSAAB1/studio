@@ -7,8 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/lib/database";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,7 +25,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; 
 
@@ -127,12 +125,12 @@ export default function IncomeExpenseClient() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const income = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').toArray()) || [];
-  const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').toArray()) || [];
-  const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray()) || [];
-  const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').toArray()) || [];
-  const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
-  const projects = useLiveQuery(() => db.mainDataStore.where('collection').equals('projects').toArray()) || [];
+  const [income, setIncome] = useState<Income[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<string | null>(null);
@@ -145,6 +143,19 @@ export default function IncomeExpenseClient() {
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+
+    useEffect(() => {
+        const unsubIncome = getIncomeRealtime(setIncome, console.error);
+        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
+        const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
+        const unsubLoans = getLoansRealtime(setLoans, console.error);
+        const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+        const unsubProjects = getProjectsRealtime(setProjects, console.error);
+
+        return () => {
+            unsubIncome(); unsubExpenses(); unsubFunds(); unsubLoans(); unsubAccounts(); unsubProjects();
+        }
+    }, []);
 
   useEffect(() => {
     if(income !== undefined && expenses !== undefined) {
@@ -647,7 +658,7 @@ export default function IncomeExpenseClient() {
                             {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                           </Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" />} />
+                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" /> } />
                            </InputWithIcon>
                           {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                       </div>

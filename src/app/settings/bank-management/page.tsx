@@ -2,12 +2,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { addBank, addBankBranch, deleteBankBranch, updateBankBranch } from '@/lib/firestore';
+import { addBank, addBankBranch, deleteBankBranch, updateBankBranch, getBanksRealtime, getBankBranchesRealtime } from '@/lib/firestore';
 import { Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -24,8 +22,8 @@ import { toTitleCase } from '@/lib/utils';
 
 export default function BankManagementPage() {
     const { toast } = useToast();
-    const banks = useLiveQuery(() => db.mainDataStore.where('collection').equals('banks').toArray()) || [];
-    const branches = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankBranches').toArray()) || [];
+    const [banks, setBanks] = useState<Bank[]>([]);
+    const [branches, setBranches] = useState<BankBranch[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
@@ -36,6 +34,16 @@ export default function BankManagementPage() {
     
     const [filterBank, setFilterBank] = useState<string | null>('all');
     const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        const unsubBanks = getBanksRealtime(setBanks, console.error);
+        const unsubBranches = getBankBranchesRealtime(setBranches, console.error);
+
+        return () => {
+            unsubBanks();
+            unsubBranches();
+        }
+    }, []);
 
     useEffect(() => {
         if(banks !== undefined && branches !== undefined) {
