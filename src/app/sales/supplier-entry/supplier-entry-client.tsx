@@ -117,6 +117,24 @@ export default function SupplierEntryClient() {
     shouldFocusError: false,
   });
 
+  const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
+      setCurrentSupplier(prev => ({...prev, ...calculatedState}));
+      if (showWarning && warning) {
+        let title = 'Date Warning';
+        let description = warning;
+        if (warning.includes('holiday')) {
+            title = 'Holiday on Due Date';
+            description = `Try Term: ${suggestedTerm} days`;
+        } else if (warning.includes('limit')) {
+            title = 'Daily Limit Reached';
+            description = `Try Term: ${suggestedTerm} days`;
+        }
+        
+        toast({ title, description, variant: 'destructive', duration: 7000 });
+      }
+  }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
+
   const resetFormToState = useCallback((customerState: Customer) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -238,24 +256,6 @@ export default function SupplierEntryClient() {
         localStorage.setItem('lastSelectedPaymentType', paymentType);
     }
   }
-
-  const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
-      setCurrentSupplier(prev => ({...prev, ...calculatedState}));
-      if (showWarning && warning) {
-        let title = 'Date Warning';
-        let description = warning;
-        if (warning.includes('holiday')) {
-            title = 'Holiday on Due Date';
-            description = `Try Term: ${suggestedTerm} days`;
-        } else if (warning.includes('limit')) {
-            title = 'Daily Limit Reached';
-            description = `Try Term: ${suggestedTerm} days`;
-        }
-        
-        toast({ title, description, variant: 'destructive', duration: 7000 });
-      }
-  }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
