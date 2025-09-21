@@ -34,7 +34,7 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading, onCl
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onBreadcrumbClick }: any) => {
+const NestedPieChart = ({ data, onLevel1Click, onLevel2Click, onLevel3Click, breadcrumbs, onBreadcrumbClick }: any) => {
     return (
         <div className="w-full h-[450px] relative">
              <div className="absolute top-0 left-2 text-sm text-muted-foreground">
@@ -51,59 +51,41 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                 <PieChart>
                     <Tooltip formatter={(value) => formatCurrency(value as number)} />
                     
-                    {/* Level 1: Permanent vs Seasonal */}
                     <Pie
-                        data={data.level1}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius="100%"
-                        innerRadius="80%"
-                        onClick={(e) => onNatureClick(e.name)}
-                        className="cursor-pointer"
+                        data={data.level1} dataKey="value" nameKey="name"
+                        cx="50%" cy="50%" outerRadius="100%" innerRadius="80%"
+                        onClick={(e) => onLevel1Click(e.name)} className="cursor-pointer"
                     >
-                        {data.level1.map((entry: any, index: number) => (
-                            <Cell key={`cell-l1-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
+                        {data.level1.map((entry: any, index: number) => <Cell key={`cell-l1-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Pie>
 
-                    {/* Level 2: Categories */}
                     {data.level2.length > 0 && (
                         <Pie
-                            data={data.level2}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius="75%"
-                            innerRadius="55%"
-                            onClick={(e) => onCategoryClick(e.name)}
-                            className="cursor-pointer"
+                            data={data.level2} dataKey="value" nameKey="name"
+                            cx="50%" cy="50%" outerRadius="75%" innerRadius="55%"
+                            onClick={(e) => onLevel2Click(e.name)} className="cursor-pointer"
                         >
-                            {data.level2.map((entry: any, index: number) => (
-                                <Cell key={`cell-l2-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
+                           {data.level2.map((entry: any, index: number) => <Cell key={`cell-l2-${index}`} fill={COLORS[index % COLORS.length]} />)}
                         </Pie>
                     )}
 
-                    {/* Level 3: Sub-Categories */}
                      {data.level3.length > 0 && (
                         <Pie
-                            data={data.level3}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius="50%"
-                            innerRadius="0%"
+                            data={data.level3} dataKey="value" nameKey="name"
+                            cx="50%" cy="50%" outerRadius="50%" innerRadius="30%"
+                            onClick={(e) => onLevel3Click(e.name)} className="cursor-pointer"
+                        >
+                            {data.level3.map((entry: any, index: number) => <Cell key={`cell-l3-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                        </Pie>
+                    )}
+                     {data.level4.length > 0 && (
+                        <Pie
+                            data={data.level4} dataKey="value" nameKey="name"
+                            cx="50%" cy="50%" outerRadius="25%" innerRadius="0%"
                             labelLine={false}
                             label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
-                            className="cursor-pointer"
                         >
-                            {data.level3.map((entry: any, index: number) => (
-                                <Cell key={`cell-l3-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
+                           {data.level4.map((entry: any, index: number) => <Cell key={`cell-l4-${index}`} fill={COLORS[index % COLORS.length]} />)}
                         </Pie>
                     )}
                 </PieChart>
@@ -126,6 +108,7 @@ export default function DashboardClient() {
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const [selectedView, setSelectedView] = useState<'Overview' | 'Income' | 'Expense'>('Overview');
     const [selectedNature, setSelectedNature] = useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -189,101 +172,125 @@ export default function DashboardClient() {
     }, [fundTransactions, allTransactions, bankAccounts, loans]);
 
     const nestedPieData = useMemo(() => {
-        const expenseData = {
-            name: 'Expenses',
-            children: [
-                { name: 'Permanent', children: [] as any[] },
-                { name: 'Seasonal', children: [] as any[] },
-            ],
-        };
+        const totalIncome = incomes.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
 
-        const categoryMap = new Map<string, any>();
-        expenseCategories.forEach(cat => {
-            categoryMap.set(cat.name, {
-                name: cat.name,
-                nature: cat.nature,
-                children: (cat.subCategories || []).map(sub => ({ name: sub, value: 0 })),
+        let level1: any[] = [];
+        let level2: any[] = [];
+        let level3: any[] = [];
+        let level4: any[] = [];
+
+        if (selectedView === 'Overview') {
+            level1 = [
+                { name: 'Income', value: totalIncome },
+                { name: 'Expense', value: totalExpense },
+            ].filter(d => d.value > 0);
+        } else if (selectedView === 'Income') {
+             // For income, we just have one level of categories for now.
+            const incomeByCategory = incomes.reduce((acc, item) => {
+                const category = item.category || 'Uncategorized';
+                acc[category] = (acc[category] || 0) + item.amount;
+                return acc;
+            }, {} as { [key: string]: number });
+
+            level1 = Object.entries(incomeByCategory).map(([name, value]) => ({ name, value }));
+
+        } else if (selectedView === 'Expense') {
+            const expenseData = {
+                name: 'Expenses',
+                children: [
+                    { name: 'Permanent', children: [] as any[] },
+                    { name: 'Seasonal', children: [] as any[] },
+                ],
+            };
+
+            const categoryMap = new Map<string, any>();
+            expenseCategories.forEach(cat => {
+                categoryMap.set(cat.name, { name: cat.name, nature: cat.nature, children: (cat.subCategories || []).map(sub => ({ name: sub, value: 0 })) });
             });
-        });
 
-        expenses.forEach(exp => {
-            const catInfo = expenseCategories.find(c => c.name === exp.category);
-            if (catInfo) {
+            expenses.forEach(exp => {
                 const categoryNode = categoryMap.get(exp.category);
                 if (categoryNode) {
                     const subCategoryNode = categoryNode.children.find((sub: any) => sub.name === exp.subCategory);
-                    if (subCategoryNode) {
-                        subCategoryNode.value += exp.amount;
-                    }
+                    if (subCategoryNode) subCategoryNode.value += exp.amount;
+                }
+            });
+
+            categoryMap.forEach(catNode => {
+                expenseData.children.find(n => n.name === catNode.nature)?.children.push(catNode);
+            });
+            
+            level1 = expenseData.children.map(nature => ({
+                name: nature.name,
+                value: nature.children.reduce((sum, cat) => sum + cat.children.reduce((s: any, sub: any) => s + sub.value, 0), 0),
+            })).filter(d => d.value > 0);
+
+            if (selectedNature) {
+                const natureNode = expenseData.children.find(n => n.name === selectedNature);
+                if (natureNode) {
+                    level2 = natureNode.children.map(cat => ({
+                        name: cat.name,
+                        value: cat.children.reduce((s: any, sub: any) => s + sub.value, 0),
+                    })).filter(d => d.value > 0);
                 }
             }
-        });
-        
-        categoryMap.forEach(catNode => {
-            const natureNode = expenseData.children.find(n => n.name === catNode.nature);
-            if (natureNode) {
-                natureNode.children.push(catNode);
-            }
-        });
-        
-        const level1 = expenseData.children.map(nature => ({
-            name: nature.name,
-            value: nature.children.reduce((sum, cat) => sum + cat.children.reduce((s, sub: any) => s + sub.value, 0), 0),
-        }));
-
-        let level2: any[] = [];
-        if (selectedNature) {
-            const natureNode = expenseData.children.find(n => n.name === selectedNature);
-            if (natureNode) {
-                level2 = natureNode.children.map(cat => ({
-                    name: cat.name,
-                    value: cat.children.reduce((s, sub: any) => s + sub.value, 0),
-                }));
+            
+            if (selectedNature && selectedCategory) {
+                const natureNode = expenseData.children.find(n => n.name === selectedNature);
+                const categoryNode = natureNode?.children.find((c: any) => c.name === selectedCategory);
+                if (categoryNode) {
+                    level3 = categoryNode.children.filter((sub: any) => sub.value > 0);
+                }
             }
         }
         
-        let level3: any[] = [];
-        if (selectedNature && selectedCategory) {
-            const natureNode = expenseData.children.find(n => n.name === selectedNature);
-            const categoryNode = natureNode?.children.find((c: any) => c.name === selectedCategory);
-            if(categoryNode) {
-                level3 = categoryNode.children.filter((sub: any) => sub.value > 0);
-            }
-        }
-        
-        return { level1, level2, level3 };
+        return { level1, level2, level3, level4 };
+    }, [incomes, expenses, expenseCategories, selectedView, selectedNature, selectedCategory]);
 
-    }, [expenses, expenseCategories, selectedNature, selectedCategory]);
-    
     const breadcrumbs = useMemo(() => {
-        const crumbs = [{ name: 'Expenses', level: 0 }];
-        if (selectedNature) {
-            crumbs.push({ name: selectedNature, level: 1 });
+        const crumbs: { name: string; level: number }[] = [{ name: 'Overview', level: 0 }];
+        if (selectedView === 'Income' || selectedView === 'Expense') {
+            crumbs.push({ name: selectedView, level: 1 });
         }
-        if (selectedNature && selectedCategory) {
-            crumbs.push({ name: selectedCategory, level: 2 });
+        if (selectedView === 'Expense' && selectedNature) {
+            crumbs.push({ name: selectedNature, level: 2 });
+        }
+        if (selectedView === 'Expense' && selectedNature && selectedCategory) {
+            crumbs.push({ name: selectedCategory, level: 3 });
         }
         return crumbs;
-    }, [selectedNature, selectedCategory]);
+    }, [selectedView, selectedNature, selectedCategory]);
 
-    const handleNatureClick = (nature: string) => {
-        setSelectedNature(prev => prev === nature ? null : nature);
-        setSelectedCategory(null);
-    };
-
-    const handleCategoryClick = (category: string) => {
-        setSelectedCategory(prev => prev === category ? null : category);
+    const handleLevel1Click = (name: string) => {
+        if (selectedView === 'Overview') {
+            if (name === 'Income' || name === 'Expense') {
+                setSelectedView(name);
+            }
+        } else if (selectedView === 'Expense') {
+            setSelectedNature(prev => prev === name ? null : name);
+            setSelectedCategory(null);
+        }
     };
     
+    const handleLevel2Click = (name: string) => {
+        if (selectedView === 'Expense' && selectedNature) {
+            setSelectedCategory(prev => prev === name ? null : name);
+        }
+    };
+
     const handleBreadcrumbClick = (level: number) => {
         if (level === 0) {
+            setSelectedView('Overview');
             setSelectedNature(null);
             setSelectedCategory(null);
         } else if (level === 1) {
+            setSelectedNature(null);
+            setSelectedCategory(null);
+        } else if (level === 2) {
             setSelectedCategory(null);
         }
     };
-
 
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -317,14 +324,15 @@ export default function DashboardClient() {
 
              <Card>
                 <CardHeader>
-                    <CardTitle>Expense Breakdown</CardTitle>
+                    <CardTitle>Data Breakdown</CardTitle>
                     <CardDescription>Click on a section to drill down into categories and sub-categories.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <NestedPieChart 
                         data={nestedPieData}
-                        onNatureClick={handleNatureClick}
-                        onCategoryClick={handleCategoryClick}
+                        onLevel1Click={handleLevel1Click}
+                        onLevel2Click={handleLevel2Click}
+                        onLevel3Click={() => {}} // Placeholder for future deeper drilldown
                         breadcrumbs={breadcrumbs}
                         onBreadcrumbClick={handleBreadcrumbClick}
                     />
@@ -333,3 +341,6 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+
+    
