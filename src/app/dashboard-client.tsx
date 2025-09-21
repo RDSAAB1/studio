@@ -38,63 +38,52 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { 
 export default function DashboardClient() {
     const router = useRouter();
     const [isClient, setIsClient] = useState(false);
-    
-    const [suppliers, setSuppliers] = useState<Customer[] | undefined>(undefined);
-    const [customers, setCustomers] = useState<Customer[] | undefined>(undefined);
-    const [incomes, setIncomes] = useState<Income[] | undefined>(undefined);
-    const [expenses, setExpenses] = useState<Expense[] | undefined>(undefined);
-    const [loans, setLoans] = useState<Loan[] | undefined>(undefined);
-    const [fundTransactions, setFundTransactions] = useState<FundTransaction[] | undefined>(undefined);
+    const [suppliers, setSuppliers] = useState<Customer[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [incomes, setIncomes] = useState<Income[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [loans, setLoans] = useState<Loan[]>([]);
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Initial data fetch for primary dashboard stats
     useEffect(() => {
         setIsClient(true);
+        const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
+        const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
         const unsubIncomes = getIncomeRealtime((data) => {
             setIncomes(data);
-            if (expenses !== undefined) setIsLoading(false);
+            if(expenses) setIsLoading(false);
         }, console.error);
         const unsubExpenses = getExpensesRealtime((data) => {
             setExpenses(data);
-            if (incomes !== undefined) setIsLoading(false);
+            if(incomes) setIsLoading(false);
         }, console.error);
+        const unsubLoans = getLoansRealtime(setLoans, console.error);
+        const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
 
         return () => {
+            unsubSuppliers();
+            unsubCustomers();
             unsubIncomes();
             unsubExpenses();
+            unsubLoans();
+            unsubFundTransactions();
         };
     }, []);
-
-    // Fetch secondary data after initial load
-    useEffect(() => {
-        if (!isLoading) {
-            const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
-            const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
-            const unsubLoans = getLoansRealtime(setLoans, console.error);
-            const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
-
-            return () => {
-                unsubSuppliers();
-                unsubCustomers();
-                unsubLoans();
-                unsubFundTransactions();
-            };
-        }
-    }, [isLoading]);
 
     const transactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
 
     const summaryStats = useMemo(() => {
-        const totalIncome = (incomes || []).reduce((sum, t) => sum + t.amount, 0);
-        const totalExpense = (expenses || []).reduce((sum, t) => sum + t.amount, 0);
+        const totalIncome = incomes.reduce((sum, t) => sum + t.amount, 0);
+        const totalExpense = expenses.reduce((sum, t) => sum + t.amount, 0);
         const netProfit = totalIncome - totalExpense;
 
-        const totalPayable = (suppliers || []).reduce((sum, s) => sum + Number(s.netAmount), 0);
-        const totalReceivable = (customers || []).reduce((sum, c) => sum + Number(c.netAmount), 0);
+        const totalPayable = suppliers.reduce((sum, s) => sum + Number(s.netAmount), 0);
+        const totalReceivable = customers.reduce((sum, c) => sum + Number(c.netAmount), 0);
         
-        const totalLiabilities = (loans || []).reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
+        const totalLiabilities = loans.reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
         
-        const capitalInflow = (fundTransactions || []).filter(t => t.type === 'CapitalInflow').reduce((sum, t) => sum + t.amount, 0);
+        const capitalInflow = fundTransactions.filter(t => t.type === 'CapitalInflow').reduce((sum, t) => sum + t.amount, 0);
 
         return {
             totalIncome,
@@ -114,7 +103,7 @@ export default function DashboardClient() {
             const date = format(subDays(today, i), 'MMM dd');
             data[date] = { date, income: 0, expense: 0 };
         }
-        (transactions || []).forEach(t => {
+        transactions.forEach(t => {
             const date = format(new Date(t.date), 'MMM dd');
             if (data[date]) {
                 if (t.transactionType === 'Income') data[date].income += t.amount;
@@ -125,7 +114,7 @@ export default function DashboardClient() {
     }, [transactions]);
 
     const recentTransactions = useMemo(() => {
-        return (transactions || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
+        return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
     }, [transactions]);
 
     return (
@@ -133,7 +122,7 @@ export default function DashboardClient() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard 
                     title="Total Income" 
-                    value={formatCurrency(summaryStats?.totalIncome ?? 0)} 
+                    value={formatCurrency(summaryStats.totalIncome)} 
                     description="Last 30 days"
                     icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} 
                     colorClass="text-green-500"
@@ -141,7 +130,7 @@ export default function DashboardClient() {
                 />
                 <StatCard 
                     title="Total Expense" 
-                    value={formatCurrency(summaryStats?.totalExpense ?? 0)} 
+                    value={formatCurrency(summaryStats.totalExpense)} 
                     description="Last 30 days"
                     icon={<TrendingDown className="h-4 w-4 text-muted-foreground" />} 
                     colorClass="text-red-500"
@@ -149,18 +138,18 @@ export default function DashboardClient() {
                 />
                  <StatCard 
                     title="Net Profit" 
-                    value={formatCurrency(summaryStats?.netProfit ?? 0)} 
+                    value={formatCurrency(summaryStats.netProfit)} 
                     description="Total Income - Total Expense"
                     icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} 
-                    colorClass={summaryStats && summaryStats.netProfit >= 0 ? "text-green-500" : "text-red-500"}
+                    colorClass={summaryStats.netProfit >= 0 ? "text-green-500" : "text-red-500"}
                     isLoading={isLoading}
                 />
                 <StatCard 
                     title="Capital Inflow" 
-                    value={formatCurrency(summaryStats?.capitalInflow ?? 0)} 
+                    value={formatCurrency(summaryStats.capitalInflow)} 
                     description="Owner & Loan Capital"
                     icon={<PiggyBank className="h-4 w-4 text-muted-foreground" />} 
-                    isLoading={isLoading || fundTransactions === undefined}
+                    isLoading={isLoading}
                 />
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
@@ -191,15 +180,9 @@ export default function DashboardClient() {
                  <Card>
                     <CardHeader><CardTitle>Financial Position</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        {suppliers === undefined || customers === undefined || loans === undefined ? (
-                             <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between"><span>Total Payable (Suppliers)</span><span className="font-bold">{formatCurrency(summaryStats?.totalPayable ?? 0)}</span></div>
-                                <div className="flex items-center justify-between"><span>Total Receivable (Customers)</span><span className="font-bold">{formatCurrency(summaryStats?.totalReceivable ?? 0)}</span></div>
-                                <div className="flex items-center justify-between"><span>Total Liabilities (Loans)</span><span className="font-bold">{formatCurrency(summaryStats?.totalLiabilities ?? 0)}</span></div>
-                            </>
-                        )}
+                        <div className="flex items-center justify-between"><span>Total Payable (Suppliers)</span><span className="font-bold">{formatCurrency(summaryStats.totalPayable)}</span></div>
+                        <div className="flex items-center justify-between"><span>Total Receivable (Customers)</span><span className="font-bold">{formatCurrency(summaryStats.totalReceivable)}</span></div>
+                        <div className="flex items-center justify-between"><span>Total Liabilities (Loans)</span><span className="font-bold">{formatCurrency(summaryStats.totalLiabilities)}</span></div>
                     </CardContent>
                  </Card>
                  <Card className="lg:col-span-2">
