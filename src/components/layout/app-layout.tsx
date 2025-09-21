@@ -88,18 +88,9 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
               <Header toggleSidebar={toggleSidebar} />
             </div>
             <div className="flex-grow relative overflow-y-auto">
-              {openTabs.map(tab => {
-                const isTabActive = tab.id === pageId;
-                return (
-                  <div key={tab.id} className={cn("absolute inset-0", isTabActive ? "z-10" : "z-0 invisible")}>
-                    {isTabActive && (
-                      <main className="p-4 sm:p-6">
-                        {children}
-                      </main>
-                    )}
-                  </div>
-                );
-              })}
+              <main className="p-4 sm:p-6">
+                {children}
+              </main>
             </div>
           </div>
         </CustomSidebar>
