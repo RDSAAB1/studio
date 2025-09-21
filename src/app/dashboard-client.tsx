@@ -5,11 +5,11 @@ import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Project, Transaction } from '@/lib/definitions';
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime } from "@/lib/firestore";
 import { formatCurrency, toTitleCase } from '@/lib/utils';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { title: string, value: string, description?: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean }) => (
@@ -31,29 +31,17 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { 
     </Card>
 );
 
-const ChartCard = ({ title, children }: { title: string, children: React.ReactNode }) => (
+
+const ChartCard = ({ title, description, children }: { title: string, description?: string, children: React.ReactNode }) => (
     <Card>
-        <CardHeader className="p-4 pb-0">
-            <CardTitle className="text-sm font-semibold text-center">{title}</CardTitle>
+        <CardHeader>
+            <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
-        <CardContent className="h-48 p-2">
+        <CardContent className="pl-0">
             {children}
         </CardContent>
     </Card>
-);
-
-const PIE_CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#a4de6c', '#d0ed57', '#ffc658', '#ff7300'];
-
-const CustomPieChart = ({ data }: { data: { name: string, value: number }[] }) => (
-    <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-            <Pie data={data} cx="50%" cy="50%" outerRadius={60} dataKey="value" nameKey="name" labelLine={false} label={({ percent }) => (percent > 0.05) ? `${(percent * 100).toFixed(0)}%` : ''}>
-                {data.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-            <Legend wrapperStyle={{ fontSize: '10px', lineHeight: '12px' }} iconSize={8} />
-        </PieChart>
-    </ResponsiveContainer>
 );
 
 export default function DashboardClient() {
@@ -79,13 +67,10 @@ export default function DashboardClient() {
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
         
-        const unsubIncomes = getIncomeRealtime((data) => {
-            setIncomes(data);
-            if (expenses.length > 0) setIsLoading(false);
-        }, console.error);
-        const unsubExpenses = getExpensesRealtime((data) => {
+        const unsubIncomes = getIncomeRealtime((data) => { setIncomes(data); }, console.error);
+        const unsubExpenses = getExpensesRealtime((data) => { 
             setExpenses(data);
-            if (incomes.length > 0) setIsLoading(false);
+            setIsLoading(false); // Consider loading finished when expenses are loaded
         }, console.error);
 
         return () => {
@@ -93,11 +78,11 @@ export default function DashboardClient() {
             unsubAccounts(); unsubIncomes(); unsubExpenses();
             unsubLoans(); unsubProjects();
         };
-    }, [incomes.length, expenses.length]);
+    }, []);
 
     const allTransactions: Transaction[] = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
-    const financialState = useMemo(() => {
+     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
         bankAccounts.forEach(acc => balances.set(acc.id, 0));
         balances.set('CashInHand', 0);
@@ -124,67 +109,44 @@ export default function DashboardClient() {
         });
         
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
+        const totalLiabilities = loans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
+
         
-        return { balances, totalAssets };
-    }, [fundTransactions, allTransactions, bankAccounts]);
+        return { balances, totalAssets, totalLiabilities };
+    }, [fundTransactions, allTransactions, bankAccounts, loans]);
 
-    const pieChartData = useMemo(() => {
-        const expenseByCategory = expenses.reduce((acc, e) => {
-            acc[e.category] = (acc[e.category] || 0) + e.amount;
+    const weeklyChartData = useMemo(() => {
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+            const d = subDays(new Date(), i);
+            return format(d, 'MMM d');
+        }).reverse();
+
+        return last7Days.map(day => {
+            const dayIncomes = incomes
+                .filter(t => format(new Date(t.date), 'MMM d') === day)
+                .reduce((sum, t) => sum + t.amount, 0);
+            const dayExpenses = expenses
+                .filter(t => format(new Date(t.date), 'MMM d') === day)
+                .reduce((sum, t) => sum + t.amount, 0);
+            return {
+                date: day,
+                Income: dayIncomes,
+                Expense: dayExpenses,
+            };
+        });
+    }, [incomes, expenses]);
+
+    const topCategoriesData = useMemo(() => {
+        const categoryTotals = expenses.reduce((acc, expense) => {
+            acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
             return acc;
         }, {} as Record<string, number>);
 
-        const incomeByCategory = incomes.reduce((acc, i) => {
-            acc[i.category] = (acc[i.category] || 0) + i.amount;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const paymentMethods = allTransactions.reduce((acc, t) => {
-            const method = t.bankAccountId ? 'Bank' : t.paymentMethod;
-            acc[method] = (acc[method] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const suppliersByVariety = suppliers.reduce((acc, s) => {
-            const variety = toTitleCase(s.variety);
-            acc[variety] = (acc[variety] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-        
-        const customersByVariety = customers.reduce((acc, c) => {
-            const variety = toTitleCase(c.variety);
-            acc[variety] = (acc[variety] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const transactionStatus = allTransactions.reduce((acc, t) => {
-            acc[t.status] = (acc[t.status] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const loansByType = loans.reduce((acc, l) => {
-            acc[l.loanType] = (acc[l.loanType] || 0) + l.remainingAmount;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const projectsByStatus = projects.reduce((acc, p) => {
-            acc[p.status] = (acc[p.status] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const toChartData = (data: Record<string, number>) => Object.entries(data).map(([name, value]) => ({ name, value }));
-
-        return {
-            expenseByCategory: toChartData(expenseByCategory),
-            incomeByCategory: toChartData(incomeByCategory),
-            paymentMethods: toChartData(paymentMethods),
-            suppliersByVariety: toChartData(suppliersByVariety),
-            customersByVariety: toChartData(customersByVariety),
-            transactionStatus: toChartData(transactionStatus),
-            loansByType: toChartData(loansByType),
-            projectsByStatus: toChartData(projectsByStatus)
-        };
-    }, [expenses, incomes, allTransactions, suppliers, customers, loans, projects]);
+        return Object.entries(categoryTotals)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([name, amount]) => ({ name, amount }));
+    }, [expenses]);
 
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -197,7 +159,7 @@ export default function DashboardClient() {
                     <CardTitle className="flex items-center gap-2">Financial Overview</CardTitle>
                     <CardDescription>Your current financial standing across all accounts.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {Array.from(financialState.balances.entries()).map(([key, balance]) => {
                         const account = bankAccounts.find(acc => acc.id === key);
                         if (account) {
@@ -212,18 +174,36 @@ export default function DashboardClient() {
                         return null;
                     })}
                      <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
+                    <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Based on loans" />
                 </CardContent>
             </Card>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <ChartCard title="Expense by Category"><CustomPieChart data={pieChartData.expenseByCategory} /></ChartCard>
-                <ChartCard title="Income by Category"><CustomPieChart data={pieChartData.incomeByCategory} /></ChartCard>
-                <ChartCard title="Payment Methods"><CustomPieChart data={pieChartData.paymentMethods} /></ChartCard>
-                <ChartCard title="Suppliers by Variety"><CustomPieChart data={pieChartData.suppliersByVariety} /></ChartCard>
-                <ChartCard title="Customers by Variety"><CustomPieChart data={pieChartData.customersByVariety} /></ChartCard>
-                <ChartCard title="Transaction Status"><CustomPieChart data={pieChartData.transactionStatus} /></ChartCard>
-                <ChartCard title="Loans by Type"><CustomPieChart data={pieChartData.loansByType} /></ChartCard>
-                <ChartCard title="Projects by Status"><CustomPieChart data={pieChartData.projectsByStatus} /></ChartCard>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <ChartCard title="Income vs. Expense (Last 7 Days)" description="A look at your recent cash flow.">
+                    <ResponsiveContainer width="100%" height={300}>
+                        <AreaChart data={weeklyChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value as number)}/>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend />
+                            <Area type="monotone" dataKey="Income" stroke="#16a34a" fill="#16a34a" fillOpacity={0.4} />
+                            <Area type="monotone" dataKey="Expense" stroke="#dc2626" fill="#dc2626" fillOpacity={0.4} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </ChartCard>
+
+                 <ChartCard title="Top 5 Expense Categories" description="Where your money is going.">
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={topCategoriesData} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" hide />
+                            <YAxis dataKey="name" type="category" fontSize={12} tickLine={false} axisLine={false} width={120} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </ChartCard>
             </div>
         </div>
     );
