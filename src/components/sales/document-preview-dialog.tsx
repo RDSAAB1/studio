@@ -18,7 +18,7 @@ import { BillOfSupply } from "@/components/print-formats/bill-of-supply";
 import { Challan } from "@/components/print-formats/challan";
 import { cn, calculateCustomerEntry } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getBankAccountsRealtime, addExpense, updateCustomer } from "@/lib/firestore";
+import { getBankAccountsRealtime, addExpense, updateCustomer, updateExpense, deleteExpense } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
 import { formatCurrency } from "@/lib/utils";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
@@ -123,59 +123,78 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
 
      const handleActualPrint = async (id: string) => {
-        if (customer) {
-            const formValuesForCalc: Partial<Customer> = {
-                ...customer,
-                ...editableInvoiceDetails,
-                advanceFreight: invoiceDetails.advanceFreight,
-                brokerageRate: customer.brokerageRate, 
-                cdRate: customer.cdRate,
+        if (!customer) return;
+
+        let expenseId = customer.advanceExpenseId;
+        const newAdvanceAmount = invoiceDetails.advanceFreight;
+        const oldAdvanceAmount = customer.advanceFreight || 0;
+
+        // Handle expense creation/update/deletion
+        if (newAdvanceAmount > 0) {
+            const expenseData: Omit<Expense, 'id'> = {
+                transactionType: 'Expense',
+                date: new Date().toISOString(),
+                category: 'Logistics',
+                subCategory: 'Advance Freight',
+                amount: newAdvanceAmount,
+                payee: `Driver - ${customer.vehicleNo || 'N/A'}`,
+                description: `Advance for SR #${customer.srNo}`,
+                paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
+                bankAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
+                status: 'Paid',
+                isRecurring: false,
             };
 
-            const calculated = calculateCustomerEntry(formValuesForCalc, []);
-            
-            const finalDataToSave: Partial<Customer> = { 
-                ...customer,
-                ...editableInvoiceDetails,
-                ...calculated,
-                advancePaymentMethod: invoiceDetails.advancePaymentMethod,
-                advancePaymentAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
-                nineRNo: invoiceDetails.nineRNo,
-                gatePassNo: invoiceDetails.gatePassNo,
-                grNo: invoiceDetails.grNo,
-                grDate: invoiceDetails.grDate,
-                transport: invoiceDetails.transport,
-             };
-
-            if(isSameAsBilling) {
-                finalDataToSave.shippingName = finalDataToSave.name;
-                finalDataToSave.shippingCompanyName = finalDataToSave.companyName;
-                finalDataToSave.shippingAddress = finalDataToSave.address;
-                finalDataToSave.shippingContact = finalDataToSave.contact;
-                finalDataToSave.shippingGstin = finalDataToSave.gstin;
-                finalDataToSave.shippingStateName = finalDataToSave.stateName;
-                finalDataToSave.shippingStateCode = finalDataToSave.stateCode;
+            if (expenseId) {
+                // Update existing expense
+                await updateExpense(expenseId, expenseData);
+            } else {
+                // Create new expense and get its ID
+                const newExpense = await addExpense(expenseData);
+                expenseId = newExpense.id;
             }
-
-            if (invoiceDetails.advanceFreight > 0) {
-                 await addExpense({
-                    transactionType: 'Expense',
-                    date: new Date().toISOString(),
-                    category: 'Logistics',
-                    subCategory: 'Advance Freight',
-                    amount: invoiceDetails.advanceFreight,
-                    payee: `Driver - ${finalDataToSave.vehicleNo}`,
-                    description: `Advance for SR #${finalDataToSave.srNo}`,
-                    paymentMethod: invoiceDetails.advancePaymentMethod === 'CashInHand' ? 'Cash' : 'Online',
-                    bankAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
-                    status: 'Paid',
-                    isRecurring: false,
-                 });
-            }
-            
-            await updateCustomer(customer.id, finalDataToSave);
+        } else if (newAdvanceAmount === 0 && expenseId) {
+            // Delete existing expense if advance is removed
+            await deleteExpense(expenseId);
+            expenseId = undefined;
         }
 
+        // Prepare customer data with all calculations
+        const formValuesForCalc: Partial<Customer> = {
+            ...customer,
+            ...editableInvoiceDetails,
+            advanceFreight: newAdvanceAmount,
+        };
+        const calculated = calculateCustomerEntry(formValuesForCalc, []);
+        
+        const finalDataToSave: Partial<Customer> = { 
+            ...customer,
+            ...editableInvoiceDetails,
+            ...calculated,
+            advanceExpenseId: expenseId,
+            advancePaymentMethod: invoiceDetails.advancePaymentMethod,
+            advancePaymentAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
+            nineRNo: invoiceDetails.nineRNo,
+            gatePassNo: invoiceDetails.gatePassNo,
+            grNo: invoiceDetails.grNo,
+            grDate: invoiceDetails.grDate,
+            transport: invoiceDetails.transport,
+         };
+
+        if(isSameAsBilling) {
+            finalDataToSave.shippingName = finalDataToSave.name;
+            finalDataToSave.shippingCompanyName = finalDataToSave.companyName;
+            finalDataToSave.shippingAddress = finalDataToSave.address;
+            finalDataToSave.shippingContact = finalDataToSave.contact;
+            finalDataToSave.shippingGstin = finalDataToSave.gstin;
+            finalDataToSave.shippingStateName = finalDataToSave.stateName;
+            finalDataToSave.shippingStateCode = finalDataToSave.stateCode;
+        }
+        
+        await updateCustomer(customer.id, finalDataToSave);
+        
+
+        // ----- PRINTING LOGIC -----
         const receiptNode = document.getElementById(id);
         if (!receiptNode) return;
 
@@ -196,7 +215,6 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         iframeDoc.open();
         iframeDoc.write('<html><head><title>Print Document</title>');
 
-        // Copy all stylesheets from the main document to the iframe
         Array.from(document.styleSheets).forEach(styleSheet => {
             try {
                 const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
@@ -217,7 +235,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             document.body.removeChild(iframe);
-        }, 500); // A short delay to ensure content is fully rendered
+        }, 500);
     };
     
     const stateNameOptions = statesAndCodes.map(s => ({ value: s.name, label: s.name }));
@@ -236,7 +254,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     ...editableInvoiceDetails,
                     advanceFreight: invoiceDetails.advanceFreight,
                 }, 
-                [] // We don't need payment history for this calculation
+                [] 
             ),
         };
 
@@ -405,5 +423,3 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
         </Dialog>
     );
 };
-
-    

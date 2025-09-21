@@ -77,6 +77,7 @@ export type Customer = {
   advanceFreight?: number;
   advancePaymentMethod?: string;
   advancePaymentAccountId?: string;
+  advanceExpenseId?: string;
   gatePassNo?: string;
   grNo?: string;
   grDate?: string;
