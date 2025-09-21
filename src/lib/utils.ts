@@ -50,6 +50,11 @@ export function formatSrNo(num: number | string, prefix: 'S' | 'C' | 'R' = 'S') 
   return prefix + String(num).padStart(5, '0');
 }
 
+export function formatTransactionId(num: number | string, prefix: 'IN' | 'EX' = 'IN') {
+  return prefix + String(num).padStart(5, '0');
+}
+
+
 export function formatPaymentId(num: number | string) {
   return 'P' + String(num).padStart(5, '0');
 }

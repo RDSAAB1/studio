@@ -87,7 +87,7 @@ export type Customer = {
 
 export type Transaction = {
   id: string; // Firestore unique ID
-  transactionId?: string; // Human-readable ID (e.g., IM00001, ES00001)
+  transactionId: string; // Human-readable ID (e.g., IN00001, EX00001)
   date: string;
   transactionType: 'Income' | 'Expense';
   category: string;

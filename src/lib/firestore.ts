@@ -538,13 +538,17 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
 
 // --- Income and Expense specific functions ---
 export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
-    const docRef = await addDoc(incomesCollection, incomeData);
-    return { id: docRef.id, ...incomeData };
+    const docRef = doc(incomesCollection, incomeData.transactionId);
+    const newIncome = { ...incomeData, id: docRef.id };
+    await setDoc(docRef, newIncome);
+    return newIncome;
 }
 
 export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
-    const docRef = await addDoc(expensesCollection, expenseData);
-    return { id: docRef.id, ...expenseData };
+    const docRef = doc(expensesCollection, expenseData.transactionId);
+    const newExpense = { ...expenseData, id: docRef.id };
+    await setDoc(docRef, newExpense);
+    return newExpense;
 }
 
 export async function updateIncome(id: string, incomeData: Partial<Omit<Income, 'id'>>): Promise<void> {
