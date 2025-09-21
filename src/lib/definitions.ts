@@ -97,7 +97,6 @@ export type Transaction = {
   description?: string;
   paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS' | 'Other';
   status: 'Paid' | 'Pending' | 'Cancelled';
-  invoiceNumber?: string;
   taxAmount?: number;
   expenseType?: 'Personal' | 'Business';
   isRecurring: boolean;

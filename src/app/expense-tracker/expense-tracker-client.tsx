@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -6,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense } from "@/lib/definitions";
-import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency, formatTransactionId } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -37,6 +38,7 @@ import { format, addMonths } from "date-fns"
 // Zod Schema for form validation
 const transactionFormSchema = z.object({
   id: z.string().optional(),
+  transactionId: z.string().optional(),
   date: z.date(),
   transactionType: z.enum(["Income", "Expense"]),
   category: z.string().min(1, "Category is required."),
@@ -47,7 +49,6 @@ const transactionFormSchema = z.object({
   bankAccountId: z.string().optional(),
   status: z.string().min(1, "Status is required."),
   description: z.string().optional(),
-  invoiceNumber: z.string().optional(),
   taxAmount: z.coerce.number().optional(),
   expenseType: z.enum(["Personal", "Business"]).optional(),
   isRecurring: z.boolean(),
@@ -81,7 +82,7 @@ const getInitialFormState = (): TransactionFormValues => {
     description: '',
     paymentMethod: 'Cash',
     status: 'Paid',
-    invoiceNumber: '',
+    transactionId: '',
     taxAmount: 0,
     expenseType: 'Business',
     isRecurring: false,
@@ -189,15 +190,50 @@ export default function IncomeExpenseClient() {
   const quantity = watch('quantity');
   const rate = watch('rate');
 
+  const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
+      const prefix = type === 'Income' ? 'IN' : 'EX';
+      const relevantTransactions = allTransactions.filter(t => t.transactionType === type);
+      if (!relevantTransactions || relevantTransactions.length === 0) {
+          return formatTransactionId(1, prefix);
+      }
+      const lastNum = relevantTransactions.reduce((max, t) => {
+          const numMatch = t.transactionId?.match(/^(?:IN|EX)(\d+)$/);
+          const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+          return num > max ? num : max;
+      }, 0);
+      return formatTransactionId(lastNum + 1, prefix);
+  }, [allTransactions]);
+
+  useEffect(() => {
+      if (!isEditing) {
+          setValue('transactionId', getNextTransactionId(selectedTransactionType));
+      }
+  }, [selectedTransactionType, isEditing, setValue, getNextTransactionId]);
+
+  const handleTransactionIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      let value = e.target.value.trim();
+      const prefix = selectedTransactionType === 'Income' ? 'IN' : 'EX';
+      if (value && !isNaN(parseInt(value)) && isFinite(Number(value))) {
+          value = formatTransactionId(parseInt(value), prefix);
+          setValue('transactionId', value);
+      }
+      const foundTransaction = allTransactions.find(t => t.transactionId === value);
+      if (foundTransaction) {
+          handleEdit(foundTransaction);
+      }
+  };
+
+
   const handleNew = useCallback(() => {
     setIsEditing(null); 
     reset(getInitialFormState());
+    setValue('transactionId', getNextTransactionId('Expense'));
     setIsAdvanced(false);
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
     setTimeout(() => setFocus('transactionType'), 50);
-  }, [reset, setFocus]);
+  }, [reset, setFocus, getNextTransactionId, setValue]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -694,16 +730,10 @@ export default function IncomeExpenseClient() {
                         </div>
 
                         <div className="space-y-1">
-                            <Label htmlFor="invoiceNumber" className="text-xs">Invoice Number</Label>
-                            <Controller
-                                name="invoiceNumber"
-                                control={control}
-                                render={({ field }) => (
-                                    <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input id="invoiceNumber" {...field} className="h-8 text-sm pl-10" />
-                                    </InputWithIcon>
-                                )}
-                            />
+                            <Label htmlFor="transactionId" className="text-xs">Transaction ID</Label>
+                            <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                                <Input id="transactionId" {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-8 text-sm pl-10" />
+                            </InputWithIcon>
                         </div>
                     </div>
 
@@ -907,3 +937,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
