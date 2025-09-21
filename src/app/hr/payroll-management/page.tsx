@@ -3,9 +3,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useLiveQuery } from 'dexie-react-hooks';
 import type { Employee, PayrollEntry, AttendanceEntry } from "@/lib/definitions"; 
-import { getAttendanceForPeriod, addPayrollEntry, updatePayrollEntry, deletePayrollEntry } from "@/lib/firestore";
+import { getAttendanceForPeriod, addPayrollEntry, updatePayrollEntry, deletePayrollEntry, getPayrollRealtime, getEmployeesRealtime } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +15,6 @@ import { format, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
 import { Loader2, Pencil, Trash2, PlusCircle, Banknote, Calculator, TrendingUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/database";
 
 type AttendanceSummary = {
     present: number;
@@ -28,8 +26,8 @@ type AttendanceSummary = {
 };
 
 export default function PayrollManagementPage() {
-  const payrollEntries = useLiveQuery(() => db.mainDataStore.where('collection').equals('payroll').sortBy('payPeriod')) || [];
-  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId')) || [];
+  const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -40,6 +38,12 @@ export default function PayrollManagementPage() {
   
   useEffect(() => {
     setIsClient(true);
+    const unsubPayroll = getPayrollRealtime(setPayrollEntries, console.error);
+    const unsubEmployees = getEmployeesRealtime(setEmployees, console.error);
+    return () => {
+        unsubPayroll();
+        unsubEmployees();
+    };
   }, []);
 
   const calculateSalary = async () => {
@@ -274,3 +278,5 @@ export default function PayrollManagementPage() {
     </div>
   );
 }
+
+    

@@ -6,9 +6,9 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { addBank, addBankBranch, getReceiptSettings, addExpense, addIncome, updateSupplier, deletePayment as deletePaymentFromDB, } from "@/lib/firestore";
-import { addPayment, db as dexieDB } from '@/lib/database';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome, updateSupplier } from "@/lib/firestore";
+import { collection, doc, getDocs, limit, query, runTransaction, where } from 'firebase/firestore';
+import { firestoreDB } from '@/lib/firebase';
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,8 +26,6 @@ import { PaymentDetailsDialog } from '@/components/sales/supplier-payments/payme
 import { OutstandingEntriesDialog } from '@/components/sales/supplier-payments/outstanding-entries-dialog';
 import { BankSettingsDialog } from '@/components/sales/supplier-payments/bank-settings-dialog';
 import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-receipt-dialog';
-import { collection, doc, getDocs, limit, query, runTransaction, where } from 'firebase/firestore';
-import { firestoreDB } from '@/lib/firebase';
 
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
@@ -48,14 +46,14 @@ type SortConfig = {
 
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('suppliers').sortBy('srNo')) || [];
-  const paymentHistory = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('payments').sortBy('date')) || [];
-  const incomes = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('incomes').toArray()) || [];
-  const expenses = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('expenses').toArray()) || [];
-  const fundTransactions = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('fund_transactions').toArray()) || [];
-  const bankAccounts = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('bankAccounts').toArray()) || [];
-  const banks = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('banks').toArray()) || [];
-  const bankBranches = useLiveQuery(() => dexieDB.mainDataStore?.where('collection').equals('bankBranches').toArray()) || [];
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [banks, setBanks] = useState<any[]>([]);
+  const [bankBranches, setBankBranches] = useState<any[]>([]);
 
   
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
@@ -240,7 +238,7 @@ export default function SupplierPaymentsClient() {
   }, []);
 
   useEffect(() => {
-    if (suppliers !== undefined) {
+    if (suppliers.length > 0) {
       setLoading(false);
     }
   }, [suppliers]);
@@ -268,11 +266,27 @@ export default function SupplierPaymentsClient() {
     };
     fetchSettings();
 
+    const unsubSuppliers = getSuppliersRealtime(setSuppliers, (error) => console.error("Error fetching suppliers:", error));
+    const unsubPayments = getPaymentsRealtime(setPaymentHistory, (error) => console.error("Error fetching payments:", error));
+    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
+    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
+    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+    const unsubscribeBanks = getBanksRealtime(setBanks, (error) => console.error("Error fetching banks:", error));
+    const unsubscribeBankBranches = getBankBranchesRealtime(setBankBranches, (error) => console.error("Error fetching bank branches:", error));
 
     return () => {
       isSubscribed = false;
+      unsubSuppliers();
+      unsubPayments();
+      unsubIncomes();
+      unsubExpenses();
+      unsubFunds();
+      unsubBankAccounts();
+      unsubscribeBanks();
+      unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, paymentHistory, getNextPaymentId, getNextRtgsSrNo]);
+  }, [isClient, editingPayment, getNextPaymentId, getNextRtgsSrNo]);
   
   useEffect(() => {
     autoSetCDToggle();
@@ -576,9 +590,8 @@ const processPayment = async () => {
         setPaymentType(paymentToEdit.type);
         setPaymentMethod(paymentToEdit.receiptType);
         setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
-        setCdEnabled(paymentToEdit.cdApplied || false);
-        setCalculatedCdAmount(paymentToEdit.cdAmount || 0);
-
+        setCdEnabled(paymentToEdit.cdApplied);
+        setCalculatedCdAmount(paymentToEdit.cdAmount);
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
         setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
@@ -588,7 +601,6 @@ const processPayment = async () => {
         setRtgsQuantity(paymentToEdit.quantity || 0);
         setRtgsRate(paymentToEdit.rate || 0);
         setRtgsAmount(paymentToEdit.rtgsAmount || 0);
-
         setSupplierDetails({
             name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '',
             address: paymentToEdit.supplierAddress || '', contact: ''
@@ -851,9 +863,8 @@ const processPayment = async () => {
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
-                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} 
-                        sixRNo={sixRNo} setSixRNo={setSixRNo}
-                        sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
@@ -949,6 +960,4 @@ const processPayment = async () => {
 
     
 
-
-
-
+    

@@ -3,9 +3,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { db } from "@/lib/database";
 import type { Employee, AttendanceEntry } from "@/lib/definitions";
-import { setAttendance } from "@/lib/firestore";
+import { setAttendance, getEmployeesRealtime } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,7 +14,6 @@ import { format } from "date-fns";
 import { Calendar as CalendarIcon, UserCheck, UserX, FileText, Users, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { useLiveQuery } from "dexie-react-hooks";
 
 const StatCard = ({ title, value, icon }: { title: string; value: number | string; icon: React.ReactNode }) => (
     <Card className="flex-1">
@@ -31,15 +29,17 @@ const StatCard = ({ title, value, icon }: { title: string; value: number | strin
 
 export default function AttendanceTrackingPage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-    const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId')) || [];
-    const dateStr = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
-    const attendanceRecordsToday = useLiveQuery(() => db.mainDataStore.where('collection').equals('attendance').and(record => record.date === dateStr).toArray(), [dateStr]) || [];
-
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    // This part will need to be refactored to fetch attendance records for the selected date
+    const [attendanceRecordsToday, setAttendanceRecordsToday] = useState<AttendanceEntry[]>([]);
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
+        const unsubscribe = getEmployeesRealtime(setEmployees, console.error);
+        // TODO: Add a realtime listener for attendance records for the selectedDate
+        return () => unsubscribe();
     }, []);
     
     const attendanceMap = useMemo(() => {
@@ -48,6 +48,7 @@ export default function AttendanceTrackingPage() {
     
     const handleStatusChange = async (employeeId: string, status: 'Present' | 'Absent' | 'Leave' | 'Half-day') => {
         try {
+            const dateStr = format(selectedDate, "yyyy-MM-dd");
             const entry: AttendanceEntry = {
                 id: `${dateStr}-${employeeId}`,
                 date: dateStr,
@@ -145,3 +146,5 @@ export default function AttendanceTrackingPage() {
         </div>
     );
 }
+
+    

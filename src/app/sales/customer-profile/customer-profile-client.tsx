@@ -1,14 +1,13 @@
-// src/app/sales/customer-profile/customer-profile-client.tsx
+
 
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
-import { db } from "@/lib/database";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { getCustomersRealtime, getCustomerPaymentsRealtime } from '@/lib/firestore';
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -188,8 +187,8 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 
 
 export default function CustomerProfileClient() {
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').toArray()) || [];
-  const customerPayments = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').toArray()) || [];
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
@@ -202,6 +201,12 @@ export default function CustomerProfileClient() {
 
   useEffect(() => {
     setIsClient(true);
+    const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+    const unsubPayments = getCustomerPaymentsRealtime(setCustomerPayments, console.error);
+    return () => {
+        unsubCustomers();
+        unsubPayments();
+    };
   }, []);
 
   const filteredData = useMemo(() => {
@@ -402,3 +407,6 @@ export default function CustomerProfileClient() {
     </div>
   );
 }
+
+
+    

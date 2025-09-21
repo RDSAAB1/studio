@@ -1,8 +1,8 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { db } from '@/lib/firebase';
 import { getBanksRealtime, getBankBranchesRealtime, addBank, addBankBranch, deleteBankBranch, updateBankBranch } from '@/lib/firestore';
 import { Bank, BankBranch } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
@@ -45,3 +45,5 @@ export const BankSettingsDialog = ({ isOpen, onOpenChange, banks, onAddBank, onA
        </Dialog>
     );
 }
+
+    

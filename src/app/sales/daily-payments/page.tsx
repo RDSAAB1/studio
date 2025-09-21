@@ -1,9 +1,9 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
+import { getSuppliersRealtime } from '@/lib/firestore';
 import { Customer } from '@/lib/definitions';
 import { format, isSameDay } from 'date-fns';
 import { formatCurrency, toTitleCase } from '@/lib/utils';
@@ -27,11 +27,13 @@ const StatCard = ({ title, value, icon, colorClass }: { title: string, value: st
 
 export default function DailyPaymentsPage() {
     const router = useRouter();
-    const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray(), []) || [];
+    const [suppliers, setSuppliers] = useState<Customer[]>([]);
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
+        const unsubscribe = getSuppliersRealtime(setSuppliers, console.error);
+        return () => unsubscribe();
     }, []);
 
     const dueTodaySuppliers = useMemo(() => {
@@ -130,3 +132,5 @@ export default function DailyPaymentsPage() {
         </div>
     );
 }
+
+    

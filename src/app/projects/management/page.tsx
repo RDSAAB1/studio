@@ -18,12 +18,10 @@ import { format } from "date-fns";
 import { getProjectsRealtime, addProject, updateProject, deleteProject } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
 
 
 export default function ProjectManagementPage() {
-    const projects = useLiveQuery(() => db.mainDataStore.where('collection').equals('projects').toArray());
+    const [projects, setProjects] = useState<Project[]>([]);
     const [isClient, setIsClient] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProject, setCurrentProject] = useState<Partial<Project>>({});
@@ -31,6 +29,8 @@ export default function ProjectManagementPage() {
 
     useEffect(() => {
         setIsClient(true);
+        const unsubscribe = getProjectsRealtime(setProjects, console.error);
+        return () => unsubscribe();
     }, []);
 
     const handleNewProject = () => {
@@ -209,3 +209,5 @@ export default function ProjectManagementPage() {
         </div>
     );
 }
+
+    

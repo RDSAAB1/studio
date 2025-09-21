@@ -3,15 +3,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import {
-  getInventoryItems,
+  getInventoryItemsRealtime,
   addInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
 } from '@/lib/firestore';
 import { InventoryItem } from '@/lib/definitions';
-import { db } from '@/lib/database';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toTitleCase } from '@/lib/utils';
 
 export default function InventoryManagementPage() {
-  const inventoryItems = useLiveQuery(() => db.mainDataStore.where('collection').equals('inventoryItems').toArray());
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentInventoryItem, setCurrentInventoryItem] = useState<Partial<InventoryItem>>({});
@@ -41,6 +39,8 @@ export default function InventoryManagementPage() {
 
   useEffect(() => {
     setIsClient(true);
+    const unsubscribe = getInventoryItemsRealtime(setInventoryItems, console.error);
+    return () => unsubscribe();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,3 +223,5 @@ export default function InventoryManagementPage() {
     </div>
   );
 }
+
+    

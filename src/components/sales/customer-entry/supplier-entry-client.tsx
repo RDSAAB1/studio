@@ -9,13 +9,10 @@ import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
-
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { format } from "date-fns";
 import { Hourglass } from "lucide-react";
 
@@ -65,8 +62,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo')) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -122,9 +119,9 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (suppliers !== undefined) {
+    if (suppliers.length > 0) {
         setIsLoading(false);
-        if (isInitialLoad.current && suppliers) {
+        if (isInitialLoad.current) {
             const nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
             const initialSrNo = formatSrNo(nextSrNum, 'S');
             form.setValue('srNo', initialSrNo);
@@ -147,6 +144,8 @@ export default function SupplierEntryClient() {
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+    const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
+    const unsubPayments = getPaymentsRealtime(setPaymentHistory, console.error);
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -165,6 +164,8 @@ export default function SupplierEntryClient() {
     return () => {
       unsubVarieties();
       unsubPaymentTypes();
+      unsubSuppliers();
+      unsubPayments();
     };
   }, [isClient, form, toast]);
   
@@ -674,3 +675,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    

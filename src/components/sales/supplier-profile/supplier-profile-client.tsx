@@ -5,10 +5,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer as Supplier, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
-import { db } from "@/lib/database";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { useLiveQuery } from 'dexie-react-hooks';
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +21,7 @@ import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { DetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { SupplierProfileView } from "@/app/sales/supplier-profile/supplier-profile-view";
+import { getSuppliersRealtime, getPaymentsRealtime } from '@/lib/firestore';
 
 
 // Icons
@@ -270,9 +269,9 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 };
 
 
-export function SupplierProfileClient() {
-  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
+export default function SupplierProfileClient() {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   
   const [selectedSupplierKey, setSelectedSupplierKey] = useState<string | null>(MILL_OVERVIEW_KEY);
   
@@ -286,6 +285,12 @@ export function SupplierProfileClient() {
 
   useEffect(() => {
     setIsClient(true);
+    const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
+    const unsubPayments = getPaymentsRealtime(setPaymentHistory, console.error);
+    return () => {
+        unsubSuppliers();
+        unsubPayments();
+    };
   }, []);
 
   const filteredData = useMemo(() => {
@@ -522,3 +527,6 @@ export function SupplierProfileClient() {
     </div>
   );
 }
+
+
+    

@@ -15,9 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogClose } from "../ui/dialog";
 import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter } from "next/navigation";
-import { db, syncData } from "@/lib/database";
-import { getDailyPaymentLimit, getHolidays } from '@/lib/firestore';
-import { useLiveQuery } from "dexie-react-hooks";
+import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
 
 const DynamicIslandToaster = dynamic(
@@ -29,39 +27,6 @@ const DynamicIslandToaster = dynamic(
 interface HeaderProps {
   toggleSidebar: () => void;
 }
-
-const SyncButton = () => {
-    const { toast } = useToast();
-    const [isSyncing, setIsSyncing] = useState(false);
-    const pendingSyncs = useLiveQuery(() => db.syncQueueStore.count(), []);
-
-    const handleSync = async () => {
-        setIsSyncing(true);
-        const result = await syncData();
-        if (result.success) {
-            if (result.syncedCount > 0) {
-                toast({ title: "Sync Complete", description: `${result.syncedCount} item(s) synced with the server.`, variant: 'success' });
-            } else {
-                toast({ title: "Already Up-to-Date", description: "Your data is already synced with the server." });
-            }
-        } else {
-            toast({ title: "Sync Failed", description: result.error || "Could not sync with the server.", variant: "destructive" });
-        }
-        setIsSyncing(false);
-    };
-
-    return (
-        <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="relative">
-            <RefreshCw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
-            {pendingSyncs !== undefined && pendingSyncs > 0 && !isSyncing && (
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px]">
-                    {pendingSyncs}
-                </span>
-            )}
-            <span className="sr-only">Sync Data</span>
-        </Button>
-    );
-};
 
 const NetworkStatusIndicator = () => {
     const [isOnline, setIsOnline] = useState(true);
@@ -99,96 +64,16 @@ const NetworkStatusIndicator = () => {
     );
 };
 
-const CashAlert = () => {
-    const [cashAlerts, setCashAlerts] = useState<string[]>([]);
-    const [isOpen, setIsOpen] = useState(false);
-    const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray());
-    const cashInHand = useLiveQuery(() => {
-        // This is a simplified query. A real implementation might need to calculate this.
-        // For now, let's assume there's a way to get this value.
-        // This part needs a proper financial state calculation.
-        return 500000; // Placeholder
-    }, []);
-    const [holidays, setHolidays] = useState<Holiday[]>([]);
-
-    useEffect(() => {
-        getHolidays().then(setHolidays);
-    }, []);
-
-    useEffect(() => {
-        if (!suppliers || !cashInHand || holidays.length === 0) return;
-
-        const alerts: string[] = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        // Check for the next 4 days
-        for (let i = 1; i <= 4; i++) {
-            const checkDate = addDays(today, i);
-            let isHolidayOrSunday = isSunday(checkDate) || holidays.some(h => new Date(h.date).getTime() === checkDate.getTime());
-            
-            // If today is a working day before a series of holidays
-            if (i === 1 && isHolidayOrSunday) {
-                let consecutiveHolidays = 0;
-                let nextDay = new Date(checkDate);
-                while (isSunday(nextDay) || holidays.some(h => new Date(h.date).getTime() === nextDay.getTime())) {
-                    consecutiveHolidays++;
-                    nextDay = addDays(nextDay, 1);
-                }
-
-                if (consecutiveHolidays > 0) {
-                    let requiredCash = 0;
-                    for (let j = 0; j <= consecutiveHolidays; j++) {
-                        const paymentDate = addDays(today, j);
-                        const paymentsForDay = suppliers.filter(s => new Date(s.dueDate).getTime() === paymentDate.getTime())
-                                                        .reduce((sum, s) => sum + (s.netAmount || 0), 0);
-                        requiredCash += paymentsForDay;
-                    }
-                    
-                    // User's logic: 8 lakh buffer + 6 lakh extra
-                    const recommendedCash = requiredCash + 800000 + 600000;
-
-                    if (cashInHand < recommendedCash) {
-                        alerts.push(`Upcoming holidays! You might need around ${formatCurrency(recommendedCash)}. Current cash in hand is low.`);
-                    }
-                }
-            }
-        }
-        setCashAlerts(alerts);
-    }, [suppliers, cashInHand, holidays]);
-
-    if (cashAlerts.length === 0) return null;
-
-    return (
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-            <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-yellow-500">
-                    <AlertTriangle className="h-5 w-5" />
-                    <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-yellow-400" />
-                    <span className="sr-only">Cash Alerts</span>
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80" align="end">
-                 <div className="p-2">
-                    <h4 className="font-medium text-sm">Cash Flow Alerts</h4>
-                </div>
-                <div className="mt-2 space-y-2 max-h-72 overflow-y-auto">
-                    {cashAlerts.map((alert, index) => (
-                         <div key={index} className="p-2 rounded-md bg-yellow-100 dark:bg-yellow-900/50">
-                            <p className="text-sm text-yellow-800 dark:text-yellow-300">{alert}</p>
-                         </div>
-                    ))}
-                </div>
-            </PopoverContent>
-        </Popover>
-    );
-}
-
 const NotificationBell = () => {
-    const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').toArray());
+    const [loans, setLoans] = useState<Loan[]>([]);
     const [pendingNotifications, setPendingNotifications] = useState<Loan[]>([]);
     const [open, setOpen] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        const unsub = getLoansRealtime(setLoans, console.error);
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         if (Array.isArray(loans)) {
@@ -357,8 +242,6 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
-          <SyncButton />
-          <CashAlert />
           <NotificationBell />
           <DraggableCalculator />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>

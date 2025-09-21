@@ -3,7 +3,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,11 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { Employee } from '@/lib/definitions';
 import { toTitleCase } from '@/lib/utils';
-import { addEmployee, updateEmployee, deleteEmployee } from '@/lib/firestore';
-import { db } from '@/lib/database';
+import { getEmployeesRealtime, addEmployee, updateEmployee, deleteEmployee } from '@/lib/firestore';
 
 export default function EmployeeDatabasePage() {
-  const employees = useLiveQuery(() => db.mainDataStore.where('collection').equals('employees').sortBy('employeeId')) || [];
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<Employee>>({});
@@ -34,6 +32,8 @@ export default function EmployeeDatabasePage() {
 
   useEffect(() => {
     setIsClient(true);
+    const unsubscribe = getEmployeesRealtime(setEmployees, console.error);
+    return () => unsubscribe();
   }, []);
 
   const nextEmployeeId = useMemo(() => {
@@ -233,3 +233,5 @@ export default function EmployeeDatabasePage() {
     </div>
   );
 }
+
+    

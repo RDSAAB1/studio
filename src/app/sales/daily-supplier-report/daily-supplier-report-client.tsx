@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Customer, RtgsSettings } from '@/lib/definitions';
-import { getRtgsSettings } from '@/lib/firestore';
+import { getRtgsSettings, getSuppliersRealtime } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
@@ -15,9 +16,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
-
 
 const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { label: string; value: string; isHighlighted?: boolean }[]; icon: React.ReactNode }) => (
     <Card className="flex-1 bg-card/60 border-primary/30 shadow-md print:border print:shadow-none">
@@ -40,7 +38,7 @@ const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { lab
 
 
 export default function DailySupplierReportClient() {
-    const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
+    const [suppliers, setSuppliers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -49,17 +47,25 @@ export default function DailySupplierReportClient() {
     const printRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if(suppliers !== undefined){
-            setLoading(false);
-        }
-        
         const fetchSettings = async () => {
             const fetchedSettings = await getRtgsSettings();
             setSettings(fetchedSettings);
         }
         fetchSettings();
+        
+        const unsubscribe = getSuppliersRealtime(setSuppliers, (error) => {
+            console.error(error);
+            setLoading(false);
+        });
+        
+        return () => unsubscribe();
+    }, []);
 
-    }, [suppliers]);
+    useEffect(() => {
+        if(suppliers.length > 0 || !loading) {
+            setLoading(false);
+        }
+    }, [suppliers, loading]);
 
     const filteredSuppliers = useMemo(() => {
         if (!suppliers) return [];
@@ -288,3 +294,5 @@ export default function DailySupplierReportClient() {
         </div>
     );
 }
+
+    
