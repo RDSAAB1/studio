@@ -80,7 +80,7 @@ export default function SupplierPaymentsClient() {
 
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
-  const [cdAt, setCdAt] = useState('unpaid_amount');
+  const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_previously_paid' | 'on_unpaid_amount' | 'on_full_amount'>('on_unpaid_amount');
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [isClient, setIsClient] = useState(false);
@@ -280,39 +280,42 @@ export default function SupplierPaymentsClient() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    let baseAmountForCd = 0;
     
-    if (cdAt === 'paid_amount') {
+    let baseAmountForCd = 0;
+    const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+
+    if (cdAt === 'partial_on_paid') {
         baseAmountForCd = paymentAmount;
-    } else if (cdAt === 'unpaid_amount') {
-        const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+    } else if (cdAt === 'on_unpaid_amount') {
         baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-    } else if (cdAt === 'full_amount') {
-        const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-        const eligibleOutstanding = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-        let eligiblePaid = 0;
+    } else { // 'on_previously_paid' or 'on_full_amount'
         const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
         const paymentsForSelectedEntries = (paymentHistory || []).filter(p => 
             p.paidFor?.some(pf => selectedSrNos.has(pf.srNo))
         );
 
+        let eligiblePaidAmount = 0;
         paymentsForSelectedEntries.forEach(p => {
             if (!p.cdApplied) {
                 p.paidFor?.forEach(pf => {
                     const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
                     if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
-                        eligiblePaid += pf.amount;
+                        eligiblePaidAmount += pf.amount;
                     }
                 });
             }
         });
         
-        baseAmountForCd = eligibleOutstanding + eligiblePaid;
+        if (cdAt === 'on_previously_paid') {
+            baseAmountForCd = eligiblePaidAmount;
+        } else if (cdAt === 'on_full_amount') {
+            const eligibleUnpaid = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
+            baseAmountForCd = eligibleUnpaid + eligiblePaidAmount;
+        }
     }
 
     setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-  }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentType]);
+  }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory]);
   
   useEffect(() => {
     const finalAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
@@ -589,7 +592,7 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setCdAt('full_amount');
+        setCdAt('on_full_amount');
         setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
@@ -712,7 +715,7 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} nineRNo={nineRNo}
-                        setNineRNo={setNineRNo} sixRDate={sixRDate} setSetSixRDate={setSixRDate} utrNo={utrNo}
+                        setNineRNo={setNineRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
@@ -807,3 +810,5 @@ const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean
     
 
     
+
+

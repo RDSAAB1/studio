@@ -21,9 +21,10 @@ import { Separator } from '@/components/ui/separator';
 
 
 const cdOptions = [
-    { value: 'paid_amount', label: 'CD on Paid Amount' },
-    { value: 'unpaid_amount', label: 'CD on Unpaid Amount (Selected)' },
-    { value: 'full_amount', label: 'CD on Full Amount (Selected)' },
+    { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
+    { value: 'on_previously_paid', label: 'CD on Previously Paid Amount' },
+    { value: 'on_unpaid_amount', label: 'CD on Unpaid Amount' },
+    { value: 'on_full_amount', label: 'Full CD (Paid + Unpaid)' },
 ];
 
 const SectionTitle = ({ title, onEdit, isEditing }: { title: string, onEdit?: () => void, isEditing?: boolean }) => (
