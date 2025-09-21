@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import type { Customer, Transaction, Loan, FundTransaction } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getIncomeAndExpensesRealtime, getLoansRealtime, getFundTransactionsRealtime } from "@/lib/firestore";
+import { useState, useEffect, useMemo } from 'react';
+import type { Customer, Transaction, Loan, FundTransaction, Income, Expense } from '@/lib/definitions';
+import { getSuppliersRealtime, getCustomersRealtime, getIncomeAndExpensesRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime } from "@/lib/firestore";
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
 
@@ -40,7 +40,8 @@ export default function DashboardClient() {
     
     const [suppliers, setSuppliers] = useState<Customer[] | undefined>(undefined);
     const [customers, setCustomers] = useState<Customer[] | undefined>(undefined);
-    const [transactions, setTransactions] = useState<Transaction[] | undefined>(undefined);
+    const [incomes, setIncomes] = useState<Income[] | undefined>(undefined);
+    const [expenses, setExpenses] = useState<Expense[] | undefined>(undefined);
     const [loans, setLoans] = useState<Loan[] | undefined>(undefined);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[] | undefined>(undefined);
 
@@ -48,28 +49,32 @@ export default function DashboardClient() {
         setIsClient(true);
         const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
         const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
-        const unsubTransactions = getIncomeAndExpensesRealtime(setTransactions, console.error);
+        const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
 
         return () => {
             unsubSuppliers();
             unsubCustomers();
-            unsubTransactions();
+            unsubIncomes();
+            unsubExpenses();
             unsubLoans();
             unsubFundTransactions();
         };
     }, []);
 
-    const summaryStats = isClient ? (() => {
-        const totalIncome = (transactions as Transaction[] || []).filter(t => t.transactionType === 'Income').reduce((sum, t) => sum + t.amount, 0);
-        const totalExpense = (transactions as Transaction[] || []).filter(t => t.transactionType === 'Expense').reduce((sum, t) => sum + t.amount, 0);
+    const transactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
+
+    const summaryStats = useMemo(() => {
+        const totalIncome = (incomes || []).reduce((sum, t) => sum + t.amount, 0);
+        const totalExpense = (expenses || []).reduce((sum, t) => sum + t.amount, 0);
         const netProfit = totalIncome - totalExpense;
 
-        const totalPayable = (suppliers as Customer[] || []).reduce((sum, s) => sum + Number(s.netAmount), 0);
-        const totalReceivable = (customers as Customer[] || []).reduce((sum, c) => sum + Number(c.netAmount), 0);
+        const totalPayable = (suppliers || []).reduce((sum, s) => sum + Number(s.netAmount), 0);
+        const totalReceivable = (customers || []).reduce((sum, c) => sum + Number(c.netAmount), 0);
         
-        const totalLiabilities = (loans as Loan[] || []).reduce((sum, l) => sum + l.remainingAmount, 0);
+        const totalLiabilities = (loans || []).reduce((sum, l) => sum + l.remainingAmount, 0);
         
         const capitalInflow = (fundTransactions || []).filter(t => t.type === 'CapitalInflow').reduce((sum, t) => sum + t.amount, 0);
 
@@ -82,16 +87,16 @@ export default function DashboardClient() {
             totalLiabilities,
             capitalInflow,
         };
-    })() : null;
+    }, [incomes, expenses, suppliers, customers, loans, fundTransactions]);
 
-    const chartData = isClient ? (() => {
+    const chartData = useMemo(() => {
         const data: { [key: string]: { date: string, income: number, expense: number } } = {};
         const today = new Date();
         for (let i = 6; i >= 0; i--) {
             const date = format(subDays(today, i), 'MMM dd');
             data[date] = { date, income: 0, expense: 0 };
         }
-        (transactions as Transaction[] || []).forEach(t => {
+        (transactions || []).forEach(t => {
             const date = format(new Date(t.date), 'MMM dd');
             if (data[date]) {
                 if (t.transactionType === 'Income') data[date].income += t.amount;
@@ -99,11 +104,13 @@ export default function DashboardClient() {
             }
         });
         return Object.values(data);
-    })() : [];
+    }, [transactions]);
 
-    const recentTransactions = isClient ? (transactions as Transaction[] || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5) : [];
+    const recentTransactions = useMemo(() => {
+        return (transactions || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
+    }, [transactions]);
 
-    const isLoading = !isClient || !suppliers || !customers || !transactions || !loans || !fundTransactions;
+    const isLoading = !isClient || !suppliers || !customers || !incomes || !expenses || !loans || !fundTransactions;
 
     return (
         <div className="space-y-6">

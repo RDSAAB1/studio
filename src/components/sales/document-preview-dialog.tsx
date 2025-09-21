@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -126,7 +127,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
         let expenseId = customer.advanceExpenseId;
         const newAdvanceAmount = invoiceDetails.advanceFreight;
-        
+
         // Handle expense creation/update/deletion
         if (newAdvanceAmount > 0) {
             const expenseData: Partial<Expense> = {
@@ -144,25 +145,19 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
             if (invoiceDetails.advancePaymentMethod !== 'CashInHand') {
                 expenseData.bankAccountId = invoiceDetails.advancePaymentMethod;
-            } else {
-                delete expenseData.bankAccountId;
             }
 
             if (expenseId) {
-                // Update existing expense
                 await updateExpense(expenseId, expenseData);
             } else {
-                // Create new expense and get its ID
                 const newExpense = await addExpense(expenseData as Omit<Expense, 'id'>);
                 expenseId = newExpense.id;
             }
         } else if (newAdvanceAmount === 0 && expenseId) {
-            // Delete existing expense if advance is removed
             await deleteExpense(expenseId);
-            expenseId = undefined;
+            expenseId = undefined; // Clear the ID after deletion
         }
 
-        // Prepare customer data with all calculations
         const formValuesForCalc: Partial<Customer> = {
             ...customer,
             ...editableInvoiceDetails,
@@ -175,7 +170,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             ...customer,
             ...editableInvoiceDetails,
             ...calculated,
-            advanceExpenseId: expenseId,
+            advanceExpenseId: expenseId, // This will be undefined if deleted
             advancePaymentMethod: invoiceDetails.advancePaymentMethod,
             nineRNo: invoiceDetails.nineRNo,
             gatePassNo: invoiceDetails.gatePassNo,
@@ -419,7 +414,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                     </ScrollArea>
                     <DialogFooter className="pt-4 flex-row justify-end gap-2 flex-shrink-0">
                         <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                        <Button onClick={() => handleActualPrint('document-content')}><Printer className="mr-2 h-4 w-4" /> Print</Button>
+                        <Button onClick={() => handleActualPrint('document-content')}><Printer className="mr-2 h-4 w-4" /> Save & Print</Button>
                     </DialogFooter>
                 </div>
             </DialogContent>

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -160,7 +161,7 @@ export default function CashBankClient() {
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts]);
+    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts, incomes, expenses]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)

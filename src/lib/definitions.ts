@@ -87,7 +87,7 @@ export type Customer = {
 
 export type Transaction = {
   id: string; // Firestore unique ID
-  transactionId: string; // Human-readable ID (e.g., IM00001, ES00001)
+  transactionId?: string; // Human-readable ID (e.g., IM00001, ES00001)
   date: string;
   transactionType: 'Income' | 'Expense';
   category: string;
@@ -95,7 +95,7 @@ export type Transaction = {
   amount: number;
   payee: string;
   description?: string;
-  paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS';
+  paymentMethod: 'Cash' | 'Online' | 'Cheque' | 'RTGS' | 'Other';
   status: 'Paid' | 'Pending' | 'Cancelled';
   invoiceNumber?: string;
   taxAmount?: number;
@@ -132,7 +132,7 @@ export type ExpenseCategory = {
 
 export type FundTransaction = {
     id: string; // Firestore unique ID
-    transactionId: string; // Human-readable ID (e.g., AT0001)
+    transactionId?: string; // Human-readable ID (e.g., AT0001)
     date: string;
     type: 'CapitalInflow' | 'BankWithdrawal' | 'BankDeposit' | 'CashTransfer';
     source: 'OwnerCapital' | 'BankLoan' | 'ExternalLoan' | 'BankAccount' | 'CashInHand' | 'CashAtHome' | string;
@@ -446,7 +446,13 @@ export type FormatSettings = {
 };
 
 
+export type Holiday = {
+    id: string;
+    date: string;
+    name: string;
+}
     
 
     
+
 
