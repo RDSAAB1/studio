@@ -186,6 +186,20 @@ export default function DashboardClient() {
         return null;
     };
     
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }: any) => {
+        if (percent < 0.02) return null;
+        const RADIAN = Math.PI / 180;
+        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+        return (
+            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-bold">
+                {`${(percent * 100).toFixed(0)}%`}
+            </text>
+        );
+    };
+
     const DetailTree = () => {
         const totalL1 = level1Data.reduce((sum, i) => sum + i.value, 0);
         const totalL2 = level2Data.reduce((sum, i) => sum + i.value, 0);
@@ -307,7 +321,9 @@ export default function DashboardClient() {
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    outerRadius={60}
+                                    outerRadius={50}
+                                    labelLine={false}
+                                    label={renderCustomizedLabel}
                                     onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}
                                     stroke="hsl(var(--card))"
                                     strokeWidth={4}
@@ -323,8 +339,10 @@ export default function DashboardClient() {
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={70}
+                                    innerRadius={60}
                                     outerRadius={90}
+                                    labelLine={false}
+                                    label={renderCustomizedLabel}
                                     onClick={(data) => { setLevel2(data.name); setLevel3(null); }}
                                     stroke="hsl(var(--card))"
                                     strokeWidth={4}
@@ -341,7 +359,9 @@ export default function DashboardClient() {
                                     cx="50%"
                                     cy="50%"
                                     innerRadius={100}
-                                    outerRadius={120}
+                                    outerRadius={130}
+                                    labelLine={false}
+                                    label={renderCustomizedLabel}
                                     onClick={(data) => setLevel3(data.name)}
                                     stroke="hsl(var(--card))"
                                     strokeWidth={4}
@@ -357,8 +377,10 @@ export default function DashboardClient() {
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={130}
-                                    outerRadius={150}
+                                    innerRadius={140}
+                                    outerRadius={170}
+                                    labelLine={false}
+                                    label={renderCustomizedLabel}
                                     stroke="hsl(var(--card))"
                                     strokeWidth={4}
                                 >
@@ -377,5 +399,3 @@ export default function DashboardClient() {
         </div>
     );
 }
-
-    
