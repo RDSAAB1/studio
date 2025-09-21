@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getBankAccountsRealtime, addExpense, updateCustomer } from "@/lib/firestore";
 import { CustomDropdown } from "../ui/custom-dropdown";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import { statesAndCodes, findStateByCode, findStateByName } from "@/lib/data";
 
 
@@ -116,26 +116,35 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
 
      const handleActualPrint = async (id: string) => {
         if (customer) {
-            const finalDataToSave: Partial<Customer> = { 
+             const formValuesForCalc = {
+                ...customer,
                 ...editableInvoiceDetails,
+                advanceFreight: invoiceDetails.totalAdvance,
+             };
+            
+            if(isSameAsBilling) {
+                formValuesForCalc.shippingName = formValuesForCalc.name;
+                formValuesForCalc.shippingCompanyName = formValuesForCalc.companyName;
+                formValuesForCalc.shippingAddress = formValuesForCalc.address;
+                formValuesForCalc.shippingContact = formValuesForCalc.contact;
+                formValuesForCalc.shippingGstin = formValuesForCalc.gstin;
+                formValuesForCalc.shippingStateName = formValuesForCalc.stateName;
+                formValuesForCalc.shippingStateCode = formValuesForCalc.stateCode;
+            }
+
+            // Recalculate financial fields before saving
+            const calculatedData = calculateCustomerEntry(formValuesForCalc, []); // Passing empty payments as we only want to recalc totals, not affect payments.
+            
+            const finalDataToSave: Partial<Customer> = { 
+                ...formValuesForCalc,
+                ...calculatedData, // Apply all recalculated values
                 nineRNo: invoiceDetails.nineRNo,
                 gatePassNo: invoiceDetails.gatePassNo,
                 grNo: invoiceDetails.grNo,
                 grDate: invoiceDetails.grDate,
                 transport: invoiceDetails.transport,
-                advanceFreight: invoiceDetails.totalAdvance,
              };
             
-            if(isSameAsBilling) {
-                finalDataToSave.shippingName = editableInvoiceDetails.name;
-                finalDataToSave.shippingCompanyName = editableInvoiceDetails.companyName;
-                finalDataToSave.shippingAddress = editableInvoiceDetails.address;
-                finalDataToSave.shippingContact = editableInvoiceDetails.contact;
-                finalDataToSave.shippingGstin = editableInvoiceDetails.gstin;
-                finalDataToSave.shippingStateName = editableInvoiceDetails.stateName || '';
-                finalDataToSave.shippingStateCode = editableInvoiceDetails.stateCode || '';
-            }
-
             await updateCustomer(customer.id, finalDataToSave);
         }
 
