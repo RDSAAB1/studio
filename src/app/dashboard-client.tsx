@@ -2,14 +2,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Project, Transaction } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime } from "@/lib/firestore";
-import { formatCurrency, toTitleCase } from '@/lib/utils';
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Project, Transaction, ExpenseCategory } from '@/lib/definitions';
+import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories } from "@/lib/firestore";
+import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2 } from 'lucide-react';
+import { AreaChart, Area, BarChart, Bar, Treemap, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { title: string, value: string, description?: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean }) => (
@@ -31,8 +31,7 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { 
     </Card>
 );
 
-
-const ChartCard = ({ title, description, children }: { title: string, description?: string, children: React.ReactNode }) => (
+const ChartCard = ({ title, description, children, footer }: { title: string, description?: string, children: React.ReactNode, footer?: React.ReactNode }) => (
     <Card>
         <CardHeader>
             <CardTitle className="text-lg font-semibold">{title}</CardTitle>
@@ -41,8 +40,57 @@ const ChartCard = ({ title, description, children }: { title: string, descriptio
         <CardContent className="pl-0">
             {children}
         </CardContent>
+        {footer && <CardContent className="pt-4">{footer}</CardContent>}
     </Card>
 );
+
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', '#FFBB28'];
+
+const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="bg-background/80 backdrop-blur-sm border border-border p-2 rounded-lg shadow-lg">
+                <p className="text-sm font-bold">{data.name}</p>
+                <p className="text-xs text-primary">{`${formatCurrency(data.value)}`}</p>
+            </div>
+        );
+    }
+    return null;
+};
+
+// Custom component for rendering the treemap content with depth-based coloring
+const CustomizedContent = (props: any) => {
+  const { root, depth, x, y, width, height, index, colors, name } = props;
+  
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        style={{
+          fill: depth < 2 ? colors[index % colors.length] : 'none',
+          stroke: '#fff',
+          strokeWidth: 2 / (depth + 1e-10),
+          strokeOpacity: 1 / (depth + 1e-10),
+        }}
+      />
+      {depth === 1 ? (
+        <text x={x + width / 2} y={y + height / 2 + 7} textAnchor="middle" fill="#fff" fontSize={14}>
+          {name}
+        </text>
+      ) : null}
+       {depth > 1 && width > 80 && height > 20 ? (
+        <text x={x + 4} y={y + 18} fillOpacity={0.7} fontSize={12} fill="#fff">
+            {name}
+        </text>
+       ) : null}
+    </g>
+  );
+};
+
 
 export default function DashboardClient() {
     const router = useRouter();
@@ -51,11 +99,15 @@ export default function DashboardClient() {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const [sunburstHistory, setSunburstHistory] = useState<string[]>([]);
+    const currentSunburstLevelName = sunburstHistory[sunburstHistory.length - 1] || 'Expenses';
 
     useEffect(() => {
         setIsClient(true);
@@ -66,17 +118,18 @@ export default function DashboardClient() {
         const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
+        const unsubExpCats = getExpenseCategories(setExpenseCategories, console.error);
         
         const unsubIncomes = getIncomeRealtime((data) => { setIncomes(data); }, console.error);
         const unsubExpenses = getExpensesRealtime((data) => { 
             setExpenses(data);
-            setIsLoading(false); // Consider loading finished when expenses are loaded
+            setIsLoading(false);
         }, console.error);
 
         return () => {
             unsubSuppliers(); unsubCustomers(); unsubFunds();
             unsubAccounts(); unsubIncomes(); unsubExpenses();
-            unsubLoans(); unsubProjects();
+            unsubLoans(); unsubProjects(); unsubExpCats();
         };
     }, []);
 
@@ -114,39 +167,64 @@ export default function DashboardClient() {
         
         return { balances, totalAssets, totalLiabilities };
     }, [fundTransactions, allTransactions, bankAccounts, loans]);
+    
+     const expenseTreemapData = useMemo(() => {
+        const permanentExpenses = { name: 'Permanent', children: [] as any[] };
+        const seasonalExpenses = { name: 'Seasonal', children: [] as any[] };
 
-    const weeklyChartData = useMemo(() => {
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
-            const d = subDays(new Date(), i);
-            return format(d, 'MMM d');
-        }).reverse();
-
-        return last7Days.map(day => {
-            const dayIncomes = incomes
-                .filter(t => format(new Date(t.date), 'MMM d') === day)
-                .reduce((sum, t) => sum + t.amount, 0);
-            const dayExpenses = expenses
-                .filter(t => format(new Date(t.date), 'MMM d') === day)
-                .reduce((sum, t) => sum + t.amount, 0);
-            return {
-                date: day,
-                Income: dayIncomes,
-                Expense: dayExpenses,
-            };
+        expenseCategories.forEach(cat => {
+            const categoryNode = { name: cat.name, children: [] as any[] };
+            
+            const expensesInCategory = expenses.filter(exp => exp.category === cat.name);
+            
+            if (cat.subCategories && cat.subCategories.length > 0) {
+                 cat.subCategories.forEach(subCat => {
+                    const expensesInSubCat = expensesInCategory.filter(exp => exp.subCategory === subCat);
+                    const total = expensesInSubCat.reduce((sum, exp) => sum + exp.amount, 0);
+                    if (total > 0) {
+                        categoryNode.children.push({ name: subCat, value: total });
+                    }
+                });
+            } else {
+                 const total = expensesInCategory.reduce((sum, exp) => sum + exp.amount, 0);
+                 if (total > 0) {
+                     // If no sub-categories, use the category itself as a leaf node
+                     categoryNode.children.push({ name: cat.name, value: total });
+                 }
+            }
+            
+            if (categoryNode.children.length > 0) {
+                if (cat.nature === 'Permanent') {
+                    permanentExpenses.children.push(categoryNode);
+                } else if (cat.nature === 'Seasonal') {
+                    seasonalExpenses.children.push(categoryNode);
+                }
+            }
         });
-    }, [incomes, expenses]);
+        
+        return [permanentExpenses, seasonalExpenses].filter(nature => nature.children.length > 0);
+    }, [expenses, expenseCategories]);
+    
+    const currentSunburstData = useMemo(() => {
+        if (sunburstHistory.length === 0) return expenseTreemapData;
+        let data: any[] | undefined = expenseTreemapData;
+        for (const level of sunburstHistory) {
+            const found = data?.find(item => item.name === level);
+            data = found?.children;
+        }
+        return data;
+    }, [sunburstHistory, expenseTreemapData]);
+    
+    const handleSunburstClick = (data: any) => {
+        if (data && data.children) {
+            setSunburstHistory(prev => [...prev, data.name]);
+        }
+    };
 
-    const topCategoriesData = useMemo(() => {
-        const categoryTotals = expenses.reduce((acc, expense) => {
-            acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-            return acc;
-        }, {} as Record<string, number>);
+    const handleBreadcrumbClick = (index: number) => {
+        setSunburstHistory(prev => prev.slice(0, index));
+    }
 
-        return Object.entries(categoryTotals)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 5)
-            .map(([name, amount]) => ({ name, amount }));
-    }, [expenses]);
 
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -178,33 +256,37 @@ export default function DashboardClient() {
                 </CardContent>
             </Card>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <ChartCard title="Income vs. Expense (Last 7 Days)" description="A look at your recent cash flow.">
-                    <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={weeklyChartData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
-                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value as number)}/>
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Legend />
-                            <Area type="monotone" dataKey="Income" stroke="#16a34a" fill="#16a34a" fillOpacity={0.4} />
-                            <Area type="monotone" dataKey="Expense" stroke="#dc2626" fill="#dc2626" fillOpacity={0.4} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </ChartCard>
+            <ChartCard 
+                title="Expense Breakdown" 
+                description={`Showing: ${currentSunburstLevelName}. Click on a section to drill down.`}
+                footer={
+                     <div className="flex items-center text-sm text-muted-foreground p-2">
+                        <button onClick={() => handleBreadcrumbClick(0)} className="hover:text-primary">Expenses</button>
+                        {sunburstHistory.map((level, index) => (
+                            <React.Fragment key={level}>
+                                <ChevronsRight className="h-4 w-4 mx-1" />
+                                <button onClick={() => handleBreadcrumbClick(index + 1)} className="hover:text-primary">{level}</button>
+                            </React.Fragment>
+                        ))}
+                    </div>
+                }
+            >
+                <ResponsiveContainer width="100%" height={400}>
+                    <Treemap
+                        data={currentSunburstData}
+                        dataKey="value"
+                        ratio={4 / 3}
+                        stroke="#fff"
+                        fill="#8884d8"
+                        content={<CustomizedContent colors={COLORS} />}
+                        onClick={handleSunburstClick}
+                        aspectRatio={1}
+                    >
+                         <Tooltip content={<CustomTooltip />} />
+                    </Treemap>
+                </ResponsiveContainer>
+            </ChartCard>
 
-                 <ChartCard title="Top 5 Expense Categories" description="Where your money is going.">
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={topCategoriesData} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" fontSize={12} tickLine={false} axisLine={false} width={120} />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </ChartCard>
-            </div>
         </div>
     );
 }
