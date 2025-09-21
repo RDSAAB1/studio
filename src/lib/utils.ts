@@ -157,7 +157,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     };
 };
 
-export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paymentHistory: any[]) => {
+export const calculateCustomerEntry = (values: Partial<Customer>, paymentHistory: any[]) => {
     const grossWeight = values.grossWeight || 0;
     const teirWeight = values.teirWeight || 0;
     const weight = grossWeight - teirWeight;
@@ -171,10 +171,10 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const rate = values.rate || 0;
     const amount = Math.round(netWeight * rate);
     
-    const brokerageRate = Number(values.brokerage) || 0;
+    const brokerageRate = Number(values.brokerageRate) || 0;
     const brokerageAmount = Math.round(netWeight * brokerageRate);
 
-    const cdPercentage = Number(values.cd) || 0;
+    const cdPercentage = Number(values.cdRate) || 0;
     const cdAmount = Math.round((netWeight * rate * cdPercentage) / 100);
     
     const kanta = Number(values.kanta) || 0;
@@ -218,5 +218,3 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
         netAmount: netAmount,
     }
 }
-
-    
