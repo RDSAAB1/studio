@@ -66,9 +66,9 @@ export const SupplierProfileView = ({
         if (!selectedSupplierData) return [];
         return [
           { name: 'Total Paid', value: selectedSupplierData.totalPaid + (selectedSupplierData.totalCdAmount || 0) },
-          { name: 'Total Receivable', value: selectedSupplierData.totalOutstanding },
+          { name: isCustomerView ? 'Total Receivable' : 'Total Outstanding', value: selectedSupplierData.totalOutstanding },
         ];
-      }, [selectedSupplierData]);
+      }, [selectedSupplierData, isCustomerView]);
     
       const varietyPieChartData = useMemo(() => {
         if (!selectedSupplierData?.transactionsByVariety) return [];
@@ -136,7 +136,7 @@ export const SupplierProfileView = ({
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Amount <span className="text-xs">{`(@${formatCurrency(selectedSupplierData.averageRate || 0)}/Qtl)`}</span></span><span className="font-semibold">{`${formatCurrency(selectedSupplierData.totalAmount || 0)}`}</span></div>
-                            <Separator className="my-2"/>
+                             <Separator className="my-2"/>
                             {isCustomerView ? (
                                 <>
                                     <div className="flex justify-between"><span className="text-muted-foreground">Brokerage</span><span className="font-semibold">{`- ${formatCurrency(selectedSupplierData.totalBrokerage || 0)}`}</span></div>
