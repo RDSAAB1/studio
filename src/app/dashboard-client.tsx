@@ -1,9 +1,9 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
-import type { Customer, Transaction, Loan } from '@/lib/definitions';
+import type { Customer, Transaction, Loan, FundTransaction } from '@/lib/definitions';
+import { getSuppliersRealtime, getCustomersRealtime, getIncomeAndExpensesRealtime, getLoansRealtime, getFundTransactionsRealtime } from "@/lib/firestore";
 import { formatCurrency, toTitleCase } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
 
@@ -37,14 +37,28 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { 
 export default function DashboardClient() {
     const router = useRouter();
     const [isClient, setIsClient] = useState(false);
-    const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray());
-    const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').toArray());
-    const transactions = useLiveQuery(() => db.mainDataStore.where({ collection: 'incomes' }).or('collection').equals('expenses').toArray());
-    const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').toArray());
-    const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray());
+    
+    const [suppliers, setSuppliers] = useState<Customer[] | undefined>(undefined);
+    const [customers, setCustomers] = useState<Customer[] | undefined>(undefined);
+    const [transactions, setTransactions] = useState<Transaction[] | undefined>(undefined);
+    const [loans, setLoans] = useState<Loan[] | undefined>(undefined);
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[] | undefined>(undefined);
 
     useEffect(() => {
         setIsClient(true);
+        const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
+        const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+        const unsubTransactions = getIncomeAndExpensesRealtime(setTransactions, console.error);
+        const unsubLoans = getLoansRealtime(setLoans, console.error);
+        const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
+
+        return () => {
+            unsubSuppliers();
+            unsubCustomers();
+            unsubTransactions();
+            unsubLoans();
+            unsubFundTransactions();
+        };
     }, []);
 
     const summaryStats = isClient ? (() => {

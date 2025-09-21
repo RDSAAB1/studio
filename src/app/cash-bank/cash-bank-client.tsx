@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -7,8 +6,6 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { FundTransaction, Income, Expense, Loan, BankAccount } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -60,17 +57,34 @@ const initialLoanFormState: Partial<Loan> = {
 
 export default function CashBankClient() {
     
-    const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').sortBy('date')) || [];
-    const incomes = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').sortBy('date')) || [];
-    const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').sortBy('date')) || [];
-    const loans = useLiveQuery(() => db.mainDataStore.where('collection').equals('loans').sortBy('startDate')) || [];
-    const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
+    const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
+    const [incomes, setIncomes] = useState<Income[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [loans, setLoans] = useState<Loan[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     
     const [isClient, setIsClient] = useState(false);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
     const [currentLoan, setCurrentLoan] = useState<Partial<Loan>>(initialLoanFormState);
     const [isFundTransactionDialogOpen, setIsFundTransactionDialogOpen] = useState(false);
     const [currentFundTransaction, setCurrentFundTransaction] = useState<Partial<FundTransaction> | null>(null);
+
+    useEffect(() => {
+        setIsClient(true);
+        const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
+        const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+        const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
+        const unsubLoans = getLoansRealtime(setLoans, console.error);
+        const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+
+        return () => {
+            unsubFundTransactions();
+            unsubIncomes();
+            unsubExpenses();
+            unsubLoans();
+            unsubBankAccounts();
+        };
+    }, []);
 
     const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
@@ -86,10 +100,6 @@ export default function CashBankClient() {
         ];
     }, [bankAccounts]);
 
-
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
 
     const transferForm = useForm<TransferValues>({ 
         resolver: zodResolver(cashBankFormSchemas.transferSchema), 

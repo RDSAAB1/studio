@@ -11,8 +11,8 @@ import { Loader2 } from 'lucide-react';
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User } from '@/lib/firebase';
 import { usePathname, useRouter } from 'next/navigation';
-import { getRtgsSettings } from "@/lib/firestore";
-import { initialDataSync } from '@/lib/database';
+import { getRtgsSettings, initialDataSync } from "@/lib/firestore";
+
 
 const inter = Inter({
   subsets: ['latin'],
@@ -46,7 +46,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                await initialDataSync();
+                // No longer need to call initialDataSync here as data will be live.
                 const companySettings = await getRtgsSettings();
                 setIsSetupComplete(!!companySettings?.companyName);
             } else {
