@@ -58,18 +58,26 @@ export const PaymentForm = ({
 }: any) => {
 
     const availableBranches = React.useMemo(() => {
-        if (!bankDetails.bank) return [];
-        return bankBranches
+        if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
+        
+        const uniqueBranches = new Map<string, { value: string; label: string }>();
+        bankBranches
             .filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase())
-            .map((branch: any) => ({ value: branch.branchName, label: branch.branchName }));
+            .forEach((branch: any) => {
+                // Use IFSC as the unique value, as branch names can be duplicated.
+                if (!uniqueBranches.has(branch.ifscCode)) {
+                    uniqueBranches.set(branch.ifscCode, { value: branch.ifscCode, label: branch.branchName });
+                }
+            });
+        return Array.from(uniqueBranches.values());
     }, [bankDetails.bank, bankBranches]);
 
-    const handleBranchSelect = (branchValue: string | null) => {
-        const selectedBranch = bankBranches.find((b: any) => b.branchName === branchValue);
+    const handleBranchSelect = (ifscCode: string | null) => {
+        const selectedBranch = bankBranches.find((b: any) => b.ifscCode === ifscCode);
         if(selectedBranch) {
           setBankDetails((prev: any) => ({...prev, branch: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
         } else {
-            setBankDetails((prev: any) => ({...prev, branch: branchValue || ''}));
+            setBankDetails((prev: any) => ({...prev, branch: '', ifscCode: '' }));
         }
     };
     
@@ -129,7 +137,8 @@ export const PaymentForm = ({
                 </div>
                 
                 {rtgsFor === 'Supplier' && (
-                 <div className="flex items-center justify-between mt-4 mb-2">
+                <>
+                <div className="flex items-center justify-between mt-4 mb-2">
                     <h3 className="text-sm font-semibold flex items-center gap-2"><CircleDollarSign size={14}/>Cash Discount (CD)</h3>
                     <div className="flex items-center space-x-2">
                         <button type="button" onClick={() => setCdEnabled(!cdEnabled)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
@@ -143,18 +152,19 @@ export const PaymentForm = ({
                         </button>
                     </div>
                 </div>
-                )}
-                {cdEnabled && rtgsFor === 'Supplier' && (
+                {cdEnabled && (
                     <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-3 gap-2">
                         <div className="space-y-1"><Label htmlFor="cd-percent" className="text-xs">CD %</Label><Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>
                         <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
                         <div className="space-y-1"><Label className="text-xs">CD Amount</Label><Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" /></div>
                     </div>
                 )}
+                </>
+                )}
                 
                 {paymentMethod === 'RTGS' && (
                     <>
-                        <Separator className="my-3"/>
+                         <Separator className="my-3"/>
                         <Card>
                             <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
                                 <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
@@ -218,7 +228,7 @@ export const PaymentForm = ({
                                 placeholder="Select bank" 
                              />
                             </div>
-                            <div className="space-y-1"><Label className="text-xs">Branch</Label><CustomDropdown options={availableBranches} value={bankDetails.branch} onChange={handleBranchSelect} placeholder="Select branch" /></div>
+                            <div className="space-y-1"><Label className="text-xs">Branch</Label><CustomDropdown options={availableBranches} value={bankDetails.ifscCode} onChange={handleBranchSelect} placeholder="Select branch" /></div>
                             <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} className="h-8 text-xs uppercase"/></div>
                         </div>

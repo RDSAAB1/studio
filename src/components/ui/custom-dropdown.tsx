@@ -139,9 +139,9 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg">
                     <ul className="py-1 max-h-60 overflow-y-auto scrollbar-hide">
                         {filteredItems.length > 0 ? (
-                            filteredItems.map((item) => (
+                            filteredItems.map((item, index) => (
                                 <li
-                                    key={`${item.value}-${item.label}`}
+                                    key={`${item.value}-${index}`}
                                     onClick={() => handleSelect(item)}
                                     className={cn(
                                         "cursor-pointer px-4 py-2 text-sm hover:bg-accent",
