@@ -6,7 +6,7 @@ import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, Pro
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-
+import * as RechartsPrimitive from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft } from 'lucide-react';
@@ -65,7 +65,7 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                         className="cursor-pointer"
                          activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
                             <g>
-                                <path d={RechartsPrimitive.Sector({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
+                                <path d={(RechartsPrimitive.Sector as any)({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
                             </g>
                         )}
                     >
@@ -89,7 +89,7 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                             className="cursor-pointer"
                              activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
                                 <g>
-                                    <path d={RechartsPrimitive.Sector({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
+                                    <path d={(RechartsPrimitive.Sector as any)({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
                                 </g>
                             )}
                         >
@@ -115,7 +115,7 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                             className="cursor-pointer"
                              activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
                                 <g>
-                                    <path d={RechartsPrimitive.Sector({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
+                                    <path d={(RechartsPrimitive.Sector as any)({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
                                 </g>
                             )}
                         >
@@ -171,7 +171,7 @@ export default function DashboardClient() {
         };
     }, []);
 
-    const allTransactions: Transaction[] = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
+    const allTransactions: (Income | Expense)[] = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
      const financialState = useMemo(() => {
         const balances = new Map<string, number>();
