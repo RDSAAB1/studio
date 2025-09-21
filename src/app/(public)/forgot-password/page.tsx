@@ -13,6 +13,7 @@ import { Loader2, Mail, Sparkles } from 'lucide-react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useRouter } from 'next/navigation';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -23,6 +24,7 @@ type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export default function ForgotPasswordPage() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const router = useRouter();
 
     const { register, handleSubmit, formState: { errors } } = useForm<ForgotPasswordFormValues>({
         resolver: zodResolver(forgotPasswordSchema),
@@ -34,6 +36,7 @@ export default function ForgotPasswordPage() {
         try {
             await sendPasswordResetEmail(auth, data.email);
             toast({ title: "Password Reset Email Sent", description: "Please check your inbox to reset your password.", variant: "success" });
+            router.push('/login');
         } catch (error: any) {
             console.error("Password reset error:", error);
             let errorMessage = "Failed to send reset email. Please try again.";
