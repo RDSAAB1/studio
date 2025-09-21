@@ -30,29 +30,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { collection, runTransaction, doc, getDocs, where, limit } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase";
 import { ReceiptPrintDialog } from "@/components/sales/print-dialogs";
-import { getReceiptSettings, addCustomerPayment, deleteCustomerPayment, updateCustomer, addIncome, deleteIncome } from "@/lib/firestore";
+import { getReceiptSettings, addCustomerPayment, deleteCustomerPayment, updateCustomer, addIncome, deleteIncome, getCustomersRealtime, getCustomerPaymentsRealtime, getBankAccountsRealtime, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime } from "@/lib/firestore";
 import { DetailsDialog as CustomerDetailsDialog } from "@/components/sales/details-dialog";
 import { PaymentDetailsDialog } from "@/components/sales/supplier-payments/payment-details-dialog";
 import { OutstandingEntriesDialog } from "@/components/sales/supplier-payments/outstanding-entries-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/database';
 
 
 const customersCollection = collection(firestoreDB, "customers");
 const incomesCollection = collection(firestoreDB, "incomes");
-const expensesCollection = collection(firestoreDB, "expenses");
 
 
 export default function CustomerPaymentsPage() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').toArray()) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').toArray()) || [];
-  const bankAccounts = useLiveQuery(() => db.mainDataStore.where('collection').equals('bankAccounts').toArray()) || [];
-  const incomes = useLiveQuery(() => db.mainDataStore.where('collection').equals('incomes').toArray()) || [];
-  const expenses = useLiveQuery(() => db.mainDataStore.where('collection').equals('expenses').toArray()) || [];
-  const fundTransactions = useLiveQuery(() => db.mainDataStore.where('collection').equals('fund_transactions').toArray()) || [];
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -118,11 +115,33 @@ export default function CustomerPaymentsPage() {
   }, []);
   
   useEffect(() => {
-      if(customers.length > 0) setLoading(false);
-  }, [customers]);
+    let isMounted = true;
+    setLoading(true);
+
+    const unsubCustomers = getCustomersRealtime(data => { if(isMounted) setCustomers(data) }, console.error);
+    const unsubPayments = getCustomerPaymentsRealtime(data => { if(isMounted) setPaymentHistory(data) }, console.error);
+    const unsubBankAccounts = getBankAccountsRealtime(data => { if(isMounted) setBankAccounts(data) }, console.error);
+    const unsubIncomes = getIncomeRealtime(data => { if(isMounted) setIncomes(data) }, console.error);
+    const unsubExpenses = getExpensesRealtime(data => { if(isMounted) setExpenses(data) }, console.error);
+    const unsubFunds = getFundTransactionsRealtime(data => { if(isMounted) setFundTransactions(data) }, console.error);
+
+    getReceiptSettings().then(settings => { if(isMounted) setReceiptSettings(settings) });
+    
+    setLoading(false);
+    
+    return () => {
+        isMounted = false;
+        unsubCustomers();
+        unsubPayments();
+        unsubBankAccounts();
+        unsubIncomes();
+        unsubExpenses();
+        unsubFunds();
+    };
+  }, []);
+
 
   useEffect(() => {
-    getReceiptSettings().then(setReceiptSettings);
     if (paymentHistory && !editingPayment) {
         setReceiptNo(getNextReceiptNo(paymentHistory));
     }
@@ -389,12 +408,3 @@ export default function CustomerPaymentsPage() {
     </div>
   );
 }
-
-    
-
-
-
-
-    
-
-    
