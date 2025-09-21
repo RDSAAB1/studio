@@ -60,14 +60,8 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                         cy="50%"
                         outerRadius="100%"
                         innerRadius="80%"
-                        fill="#8884d8"
                         onClick={(e) => onNatureClick(e.name)}
                         className="cursor-pointer"
-                         activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
-                            <g>
-                                <path d={(RechartsPrimitive.Sector as any)({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
-                            </g>
-                        )}
                     >
                         {data.level1.map((entry: any, index: number) => (
                             <Cell key={`cell-l1-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -84,14 +78,8 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                             cy="50%"
                             outerRadius="75%"
                             innerRadius="55%"
-                            fill="#82ca9d"
                             onClick={(e) => onCategoryClick(e.name)}
                             className="cursor-pointer"
-                             activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
-                                <g>
-                                    <path d={(RechartsPrimitive.Sector as any)({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
-                                </g>
-                            )}
                         >
                             {data.level2.map((entry: any, index: number) => (
                                 <Cell key={`cell-l2-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -109,15 +97,9 @@ const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onB
                             cy="50%"
                             outerRadius="50%"
                             innerRadius="0%"
-                            fill="#ffc658"
                             labelLine={false}
                             label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
                             className="cursor-pointer"
-                             activeShape={({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill }) => (
-                                <g>
-                                    <path d={(RechartsPrimitive.Sector as any)({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }).props.d} fill={fill} />
-                                </g>
-                            )}
                         >
                             {data.level3.map((entry: any, index: number) => (
                                 <Cell key={`cell-l3-${index}`} fill={COLORS[index % COLORS.length]} />
