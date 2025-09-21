@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -44,8 +43,9 @@ export const PaymentForm = ({
     isPayeeEditing, setIsPayeeEditing,
     bankDetails, setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
     rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
-    cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, nineRNo, setNineRNo, sixRDate,
-    setSixRDate, parchiNo, setParchiNo, checkNo, setCheckNo,
+    cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
+    setSixRDate, utrNo, setUtrNo, 
+    parchiNo, setParchiNo, checkNo, setCheckNo,
     rtgsQuantity, setRtgsQuantity,
     rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, resetPaymentForm,
     editingPayment, setIsBankSettingsOpen,
@@ -128,7 +128,7 @@ export const PaymentForm = ({
                     )}
                 </div>
                 
-                {rtgsFor === 'Supplier' && paymentMethod !== 'RTGS' && (
+                {rtgsFor === 'Supplier' && (
                  <div className="flex items-center justify-between mt-4 mb-2">
                     <h3 className="text-sm font-semibold flex items-center gap-2"><CircleDollarSign size={14}/>Cash Discount (CD)</h3>
                     <div className="flex items-center space-x-2">
@@ -144,7 +144,7 @@ export const PaymentForm = ({
                     </div>
                 </div>
                 )}
-                {cdEnabled && paymentMethod !== 'RTGS' && (
+                {cdEnabled && rtgsFor === 'Supplier' && (
                     <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-3 gap-2">
                         <div className="space-y-1"><Label htmlFor="cd-percent" className="text-xs">CD %</Label><Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>
                         <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
@@ -154,6 +154,59 @@ export const PaymentForm = ({
                 
                 {paymentMethod === 'RTGS' && (
                     <>
+                        <Separator className="my-3"/>
+                        <Card>
+                            <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
+                                <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
+                                <div className="flex items-center gap-2">
+                                        <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
+                                        <Switch id="round-figure-toggle" checked={roundFigureToggle} onCheckedChange={setRoundFigureToggle} />
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-2 space-y-2">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Target Amount</Label>
+                                        <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Min Amount</Label>
+                                        <Input type="number" value={calcMinRate} onChange={(e) => setCalcMinRate(Number(e.target.value))} className="h-8 text-xs" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Max Amount</Label>
+                                        <Input type="number" value={calcMaxRate} onChange={(e) => setCalcMaxRate(Number(e.target.value))} className="h-8 text-xs" />
+                                    </div>
+                                </div>
+                                <Button onClick={handleGeneratePaymentOptions} size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4" />Generate Combinations</Button>
+                                <div className="p-2 border rounded-lg bg-background min-h-[100px] max-h-60 overflow-y-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('quantity')} className="text-xs p-1">Qty <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('rate')} className="text-xs p-1">Rate <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('calculatedAmount')} className="text-xs p-1">Amount <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('amountRemaining')} className="text-xs p-1">Remain <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
+                                                <TableHead className="h-8 p-1">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {sortedPaymentOptions.length > 0 ? sortedPaymentOptions.map((option: any, index: number) => (
+                                                <TableRow key={index}>
+                                                    <TableCell className="p-1 text-xs">{option.quantity.toFixed(2)}</TableCell>
+                                                    <TableCell className="p-1 text-xs">{option.rate}</TableCell>
+                                                    <TableCell className="p-1 text-xs">{formatCurrency(option.calculatedAmount)}</TableCell>
+                                                    <TableCell className="p-1 text-xs">{formatCurrency(option.amountRemaining)}</TableCell>
+                                                    <TableCell className="p-1 text-xs"><Button variant="outline" size="sm" className="h-6 p-1 text-xs" onClick={() => selectPaymentAmount(option)}>Select</Button></TableCell>
+                                                </TableRow>
+                                            )) : (
+                                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs h-24">Generated payment combinations will appear here.</TableCell></TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
                         <Separator className="my-3"/>
                         <SectionTitle title="Bank Details" onEdit={() => setIsBankSettingsOpen(true)} />
                         <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
@@ -178,7 +231,7 @@ export const PaymentForm = ({
                             <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
                             <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                            <div className="space-y-1"><Label className="text-xs">9R No.</Label><Input value={nineRNo} onChange={e => setNineRNo(e.target.value)} className="h-8 text-xs"/></div>
+                            <div className="space-y-1"><Label className="text-xs">9R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">6R Date</Label>
                                 <Popover>
                                     <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-8 text-xs">{sixRDate ? format(sixRDate, "PPP") : "Select date"}<CalendarIcon className="ml-auto h-4 w-4 opacity-50"/></Button></PopoverTrigger>
@@ -207,60 +260,6 @@ export const PaymentForm = ({
             </CardContent>
         </Card>
 
-        {paymentMethod === 'RTGS' && (
-                <Card>
-                    <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
-                        <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
-                        <div className="flex items-center gap-2">
-                                <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
-                                <Switch id="round-figure-toggle" checked={roundFigureToggle} onCheckedChange={setRoundFigureToggle} />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-2 space-y-2">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                            <div className="space-y-1">
-                                <Label className="text-xs">Target Amount</Label>
-                                <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs">Min Amount</Label>
-                                <Input type="number" value={calcMinRate} onChange={(e) => setCalcMinRate(Number(e.target.value))} className="h-8 text-xs" />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs">Max Amount</Label>
-                                <Input type="number" value={calcMaxRate} onChange={(e) => setCalcMaxRate(Number(e.target.value))} className="h-8 text-xs" />
-                            </div>
-                        </div>
-                        <Button onClick={handleGeneratePaymentOptions} size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4" />Generate Combinations</Button>
-                        <div className="p-2 border rounded-lg bg-background min-h-[100px] max-h-60 overflow-y-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('quantity')} className="text-xs p-1">Qty <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('rate')} className="text-xs p-1">Rate <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('calculatedAmount')} className="text-xs p-1">Amount <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                        <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('amountRemaining')} className="text-xs p-1">Remain <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                        <TableHead className="h-8 p-1">Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {sortedPaymentOptions.length > 0 ? sortedPaymentOptions.map((option: any, index: number) => (
-                                        <TableRow key={index}>
-                                            <TableCell className="p-1 text-xs">{option.quantity.toFixed(2)}</TableCell>
-                                            <TableCell className="p-1 text-xs">{option.rate}</TableCell>
-                                            <TableCell className="p-1 text-xs">{formatCurrency(option.calculatedAmount)}</TableCell>
-                                            <TableCell className="p-1 text-xs">{formatCurrency(option.amountRemaining)}</TableCell>
-                                            <TableCell className="p-1 text-xs"><Button variant="outline" size="sm" className="h-6 p-1 text-xs" onClick={() => selectPaymentAmount(option)}>Select</Button></TableCell>
-                                        </TableRow>
-                                    )) : (
-                                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs h-24">Generated payment combinations will appear here.</TableCell></TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 };

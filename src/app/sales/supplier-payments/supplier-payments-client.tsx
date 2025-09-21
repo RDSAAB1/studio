@@ -6,7 +6,7 @@ import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, Fund
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome, updateSupplier } from "@/lib/firestore";
-import { firestoreDB } from '@/lib/firebase';
+import { firestoreDB } from "@/lib/firebase";
 import { collection, doc, getDocs, limit, query, runTransaction, where, addDoc, deleteDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 
@@ -69,7 +69,7 @@ export default function SupplierPaymentsClient() {
   const [bankDetails, setBankDetails] = useState({ acNo: '', ifscCode: '', bank: '', branch: '' });
   const [isPayeeEditing, setIsPayeeEditing] = useState(false);
   
-  const [nineRNo, setNineRNo] = useState('');
+  const [sixRNo, setSixRNo] = useState('');
   const [sixRDate, setSixRDate] = useState<Date | undefined>(new Date());
   const [parchiNo, setParchiNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
@@ -365,7 +365,7 @@ export default function SupplierPaymentsClient() {
     setEditingPayment(null);
     setUtrNo('');
     setCheckNo('');
-    setNineRNo('');
+    setSixRNo('');
     setParchiNo('');
     setRtgsQuantity(0);
     setRtgsRate(0);
@@ -546,7 +546,7 @@ const processPayment = async () => {
                 cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
                 receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                 paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
-                nineRNo: nineRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+                sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
                 parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
                 supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
                 supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
@@ -597,7 +597,7 @@ const processPayment = async () => {
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
         setUtrNo(paymentToEdit.utrNo || '');
         setCheckNo(paymentToEdit.checkNo || '');
-        setNineRNo(paymentToEdit.nineRNo || '');
+        setSixRNo(paymentToEdit.sixRNo || '');
         setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || '');
         setRtgsQuantity(paymentToEdit.quantity || 0);
@@ -865,8 +865,8 @@ const processPayment = async () => {
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
-                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} nineRNo={nineRNo}
-                        setNineRNo={setNineRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
+                        cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
+                        setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
