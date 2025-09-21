@@ -128,7 +128,7 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
             const formValuesForCalc: Partial<Customer> = {
                 ...customer,
                 ...editableInvoiceDetails,
-                // These are just for calculation, not part of the final saved object directly
+                advanceFreight: invoiceDetails.advanceFreight,
                 brokerageRate: customer.brokerageRate, 
                 cdRate: customer.cdRate,
             };
@@ -139,7 +139,6 @@ export const DocumentPreviewDialog = ({ isOpen, setIsOpen, customer, documentTyp
                 ...customer,
                 ...editableInvoiceDetails,
                 ...calculated,
-                advanceFreight: invoiceDetails.advanceFreight,
                 advancePaymentMethod: invoiceDetails.advancePaymentMethod,
                 advancePaymentAccountId: invoiceDetails.advancePaymentMethod !== 'CashInHand' ? invoiceDetails.advancePaymentMethod : undefined,
                 nineRNo: invoiceDetails.nineRNo,

@@ -331,14 +331,11 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    const localDate = new Date(values.date.getTime() - values.date.getTimezoneOffset() * 60000);
-    const dateString = localDate.toISOString().split('T')[0];
-
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
-        date: dateString,
+        date: values.date.toISOString().split("T")[0],
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
@@ -450,7 +447,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, holidays, dailyPaymentLimit, suppliers);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -706,5 +703,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -9,8 +8,6 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
 
 
 import { useToast } from "@/hooks/use-toast";
@@ -84,8 +81,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
+  const [customers, setCustomers] = useState<Customer[] | undefined>(undefined);
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -114,6 +111,12 @@ export default function CustomerEntryClient() {
 
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
   
+  const nextCustomerSrNo = useMemo(() => {
+    if (safeCustomers.length === 0) return formatSrNo(1, 'C');
+    const lastNum = Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0));
+    return formatSrNo(lastNum + 1, 'C');
+  }, [safeCustomers]);
+
   const filteredCustomers = useMemo(() => {
     if (!debouncedSearchTerm) {
       return safeCustomers;
@@ -148,14 +151,12 @@ export default function CustomerEntryClient() {
     if (customers !== undefined) {
         setIsLoading(false);
         if (isInitialLoad.current && customers) {
-            const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'C');
-            form.setValue('srNo', initialSrNo);
-            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+            form.setValue('srNo', nextCustomerSrNo);
+            setCurrentCustomer(prev => ({ ...prev, srNo: nextCustomerSrNo }));
             isInitialLoad.current = false;
         }
     }
-  }, [customers, form]);
+  }, [customers, form, nextCustomerSrNo]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -171,6 +172,9 @@ export default function CustomerEntryClient() {
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
+    const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+    const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, console.error);
+
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -189,6 +193,8 @@ export default function CustomerEntryClient() {
     return () => {
       unsubVarieties();
       unsubPaymentTypes();
+      unsubCustomers();
+      unsubPayments();
     };
   }, [isClient, form, toast]);
   
@@ -259,16 +265,15 @@ export default function CustomerEntryClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
-    const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum, 'C');
+    newState.srNo = nextCustomerSrNo;
     const today = new Date();
     today.setHours(0,0,0,0);
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
+  }, [nextCustomerSrNo, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);

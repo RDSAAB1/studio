@@ -176,14 +176,16 @@ export const calculateCustomerEntry = (values: Partial<Customer>, paymentHistory
     const brokerageAmount = Math.round(netWeight * brokerageRate);
 
     const cdPercentage = Number(values.cdRate) || 0;
-    const cdAmount = Math.round((netWeight * rate * cdPercentage) / 100);
+    const cdAmount = Math.round((amount * cdPercentage) / 100);
     
     const kanta = Number(values.kanta) || 0;
     
     const bagRate = Number(values.bagRate) || 0;
     const bagAmount = Math.round(bags * bagRate);
 
-    let originalNetAmount = Math.round(amount + kanta + bagAmount - cdAmount);
+    const advanceFreight = Number(values.advanceFreight) || 0;
+
+    let originalNetAmount = Math.round(amount + kanta + bagAmount - cdAmount + advanceFreight);
     if (!values.isBrokerageIncluded) {
         originalNetAmount -= brokerageAmount;
     }
