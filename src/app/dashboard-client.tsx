@@ -7,9 +7,11 @@ import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTr
 import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 
 const StatCard = ({ title, value, description, icon, colorClass, isLoading, onClick }: { title: string, value: string, description?: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean, onClick?: () => void }) => (
     <Card className={cn("shadow-sm hover:shadow-md transition-shadow", onClick && "cursor-pointer")} onClick={onClick}>
@@ -103,6 +105,17 @@ export default function DashboardClient() {
         return { balances, totalAssets, totalLiabilities };
     }, [fundTransactions, allTransactions, bankAccounts, loans]);
 
+    const incomeExpenseData = useMemo(() => {
+        const totalIncome = incomes.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
+        return [
+            { name: 'Income', value: totalIncome },
+            { name: 'Expenses', value: totalExpense },
+        ];
+    }, [incomes, expenses]);
+    
+    const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))'];
+
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
     }
@@ -130,6 +143,60 @@ export default function DashboardClient() {
                     })}
                      <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Based on loans" />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <PieChartIcon className="h-5 w-5 text-primary"/>
+                        Income vs. Expenses
+                    </CardTitle>
+                    <CardDescription>
+                        A visual breakdown of your total income compared to your total expenses.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={incomeExpenseData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
+                                    const RADIAN = Math.PI / 180;
+                                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                    return (
+                                        <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                                            {formatCurrency(value)}
+                                        </text>
+                                    );
+                                }}
+                                outerRadius={120}
+                                innerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                                stroke="hsl(var(--background))"
+                                strokeWidth={4}
+                            >
+                                {incomeExpenseData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                    backgroundColor: 'hsl(var(--background))',
+                                    borderColor: 'hsl(var(--border))',
+                                    borderRadius: 'var(--radius)',
+                                }}
+                            />
+                            <Legend />
+                        </PieChart>
+                    </ResponsiveContainer>
                 </CardContent>
             </Card>
         </div>
