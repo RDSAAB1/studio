@@ -8,13 +8,13 @@ import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AreaChart, Area, BarChart, Bar, Treemap, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
 
-const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { title: string, value: string, description?: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean }) => (
-    <Card className="shadow-sm hover:shadow-md transition-shadow">
+const StatCard = ({ title, value, description, icon, colorClass, isLoading, onClick }: { title: string, value: string, description?: string, icon: React.ReactNode, colorClass?: string, isLoading?: boolean, onClick?: () => void }) => (
+    <Card className={cn("shadow-sm hover:shadow-md transition-shadow", onClick && "cursor-pointer")} onClick={onClick}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             {icon}
@@ -32,6 +32,89 @@ const StatCard = ({ title, value, description, icon, colorClass, isLoading }: { 
     </Card>
 );
 
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', '#FFBB28'];
+
+const NestedPieChart = ({ data, onNatureClick, onCategoryClick, breadcrumbs, onBreadcrumbClick }: any) => {
+    return (
+        <div className="w-full h-[450px] relative">
+             <div className="absolute top-0 left-2 text-sm text-muted-foreground">
+                {breadcrumbs.map((crumb: any, index: number) => (
+                    <span key={index}>
+                        <button onClick={() => onBreadcrumbClick(index)} className="hover:underline disabled:no-underline disabled:cursor-default" disabled={index === breadcrumbs.length -1}>
+                            {crumb.name}
+                        </button>
+                        {index < breadcrumbs.length - 1 && <ChevronsRight className="inline h-4 w-4 mx-1" />}
+                    </span>
+                ))}
+            </div>
+            <ResponsiveContainer>
+                <PieChart>
+                    <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                    
+                    {/* Level 1: Permanent vs Seasonal */}
+                    <Pie
+                        data={data.level1}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius="100%"
+                        innerRadius="80%"
+                        fill="#8884d8"
+                        onClick={(e) => onNatureClick(e.name)}
+                        className="cursor-pointer"
+                    >
+                        {data.level1.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                    </Pie>
+
+                    {/* Level 2: Categories */}
+                    {data.level2.length > 0 && (
+                        <Pie
+                            data={data.level2}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius="75%"
+                            innerRadius="55%"
+                            fill="#82ca9d"
+                            onClick={(e) => onCategoryClick(e.name)}
+                            className="cursor-pointer"
+                        >
+                            {data.level2.map((entry: any, index: number) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                    )}
+
+                    {/* Level 3: Sub-Categories */}
+                     {data.level3.length > 0 && (
+                        <Pie
+                            data={data.level3}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius="50%"
+                            innerRadius="0%"
+                            fill="#ffc658"
+                            labelLine={false}
+                            label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                             className="cursor-pointer"
+                        >
+                            {data.level3.map((entry: any, index: number) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                    )}
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
 export default function DashboardClient() {
     const router = useRouter();
     const [isClient, setIsClient] = useState(false);
@@ -45,6 +128,9 @@ export default function DashboardClient() {
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const [selectedNature, setSelectedNature] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     useEffect(() => {
         setIsClient(true);
@@ -105,6 +191,103 @@ export default function DashboardClient() {
         return { balances, totalAssets, totalLiabilities };
     }, [fundTransactions, allTransactions, bankAccounts, loans]);
 
+    const nestedPieData = useMemo(() => {
+        const expenseData = {
+            name: 'Expenses',
+            children: [
+                { name: 'Permanent', children: [] as any[] },
+                { name: 'Seasonal', children: [] as any[] },
+            ],
+        };
+
+        const categoryMap = new Map<string, any>();
+        expenseCategories.forEach(cat => {
+            categoryMap.set(cat.name, {
+                name: cat.name,
+                nature: cat.nature,
+                children: (cat.subCategories || []).map(sub => ({ name: sub, value: 0 })),
+            });
+        });
+
+        expenses.forEach(exp => {
+            const catInfo = expenseCategories.find(c => c.name === exp.category);
+            if (catInfo) {
+                const categoryNode = categoryMap.get(exp.category);
+                if (categoryNode) {
+                    const subCategoryNode = categoryNode.children.find((sub: any) => sub.name === exp.subCategory);
+                    if (subCategoryNode) {
+                        subCategoryNode.value += exp.amount;
+                    }
+                }
+            }
+        });
+        
+        categoryMap.forEach(catNode => {
+            const natureNode = expenseData.children.find(n => n.name === catNode.nature);
+            if (natureNode) {
+                natureNode.children.push(catNode);
+            }
+        });
+        
+        const level1 = expenseData.children.map(nature => ({
+            name: nature.name,
+            value: nature.children.reduce((sum, cat) => sum + cat.children.reduce((s, sub: any) => s + sub.value, 0), 0),
+        }));
+
+        let level2: any[] = [];
+        if (selectedNature) {
+            const natureNode = expenseData.children.find(n => n.name === selectedNature);
+            if (natureNode) {
+                level2 = natureNode.children.map(cat => ({
+                    name: cat.name,
+                    value: cat.children.reduce((s, sub: any) => s + sub.value, 0),
+                }));
+            }
+        }
+        
+        let level3: any[] = [];
+        if (selectedNature && selectedCategory) {
+            const natureNode = expenseData.children.find(n => n.name === selectedNature);
+            const categoryNode = natureNode?.children.find((c: any) => c.name === selectedCategory);
+            if(categoryNode) {
+                level3 = categoryNode.children.filter((sub: any) => sub.value > 0);
+            }
+        }
+        
+        return { level1, level2, level3 };
+
+    }, [expenses, expenseCategories, selectedNature, selectedCategory]);
+    
+    const breadcrumbs = useMemo(() => {
+        const crumbs = [{ name: 'Expenses', level: 0 }];
+        if (selectedNature) {
+            crumbs.push({ name: selectedNature, level: 1 });
+        }
+        if (selectedNature && selectedCategory) {
+            crumbs.push({ name: selectedCategory, level: 2 });
+        }
+        return crumbs;
+    }, [selectedNature, selectedCategory]);
+
+    const handleNatureClick = (nature: string) => {
+        setSelectedNature(prev => prev === nature ? null : nature);
+        setSelectedCategory(null);
+    };
+
+    const handleCategoryClick = (category: string) => {
+        setSelectedCategory(prev => prev === category ? null : category);
+    };
+    
+    const handleBreadcrumbClick = (level: number) => {
+        if (level === 0) {
+            setSelectedNature(null);
+            setSelectedCategory(null);
+        } else if (level === 1) {
+            setSelectedCategory(null);
+        }
+    };
+
+
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
     }
@@ -132,6 +315,22 @@ export default function DashboardClient() {
                     })}
                      <StatCard title="Total Assets" value={formatCurrency(financialState.totalAssets)} icon={<PiggyBank />} colorClass="text-green-500" />
                     <StatCard title="Total Liabilities" value={formatCurrency(financialState.totalLiabilities)} icon={<DollarSign />} colorClass="text-red-500" description="Based on loans" />
+                </CardContent>
+            </Card>
+
+             <Card>
+                <CardHeader>
+                    <CardTitle>Expense Breakdown</CardTitle>
+                    <CardDescription>Click on a section to drill down into categories and sub-categories.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <NestedPieChart 
+                        data={nestedPieData}
+                        onNatureClick={handleNatureClick}
+                        onCategoryClick={handleCategoryClick}
+                        breadcrumbs={breadcrumbs}
+                        onBreadcrumbClick={handleBreadcrumbClick}
+                    />
                 </CardContent>
             </Card>
         </div>
