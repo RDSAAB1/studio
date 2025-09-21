@@ -113,8 +113,17 @@ export default function DashboardClient() {
             { name: 'Expenses', value: totalExpense },
         ];
     }, [incomes, expenses]);
+
+    const expenseBreakdownData = useMemo(() => {
+        const permanent = expenses.filter(e => e.expenseNature === 'Permanent').reduce((sum, item) => sum + item.amount, 0);
+        const seasonal = expenses.filter(e => e.expenseNature === 'Seasonal').reduce((sum, item) => sum + item.amount, 0);
+        return [
+            { name: 'Permanent', value: permanent },
+            { name: 'Seasonal', value: seasonal },
+        ];
+    }, [expenses]);
     
-    const COLORS = ['#22c55e', '#ef4444'];
+    const COLORS = ['#22c55e', '#f97316', '#f59e0b']; // Green for Income, Orange for Permanent, Yellow for Seasonal
 
     if (isLoading && isClient) {
         return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -153,7 +162,7 @@ export default function DashboardClient() {
                         Income vs. Expenses
                     </CardTitle>
                     <CardDescription>
-                        A visual breakdown of your total income compared to your total expenses.
+                        A visual breakdown of your total income compared to your total expenses, with a further breakdown of expense types.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="h-80">
@@ -161,28 +170,27 @@ export default function DashboardClient() {
                         <PieChart>
                             <Pie
                                 data={incomeExpenseData}
+                                dataKey="value"
                                 cx="50%"
                                 cy="50%"
-                                labelLine={false}
-                                label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
-                                    const RADIAN = Math.PI / 180;
-                                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                                    return (
-                                        <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
-                                            {formatCurrency(value)}
-                                        </text>
-                                    );
-                                }}
-                                outerRadius={120}
-                                innerRadius={80}
-                                dataKey="value"
-                                stroke="hsl(var(--card))"
-                                strokeWidth={4}
+                                outerRadius={80}
+                                label={({ name, value }) => `${name}: ${formatCurrency(value)}`}
                             >
-                                {incomeExpenseData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                <Cell key="cell-income" fill={COLORS[0]} />
+                                <Cell key="cell-expense" fill={'transparent'} /> 
+                            </Pie>
+                             <Pie
+                                data={expenseBreakdownData}
+                                dataKey="value"
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={90}
+                                outerRadius={120}
+                                labelLine={false}
+                                label={({ name, value }) => value > 0 ? `${name}: ${formatCurrency(value)}` : ''}
+                            >
+                                {expenseBreakdownData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index + 1]} />
                                 ))}
                             </Pie>
                             <Tooltip
