@@ -61,7 +61,8 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (!authChecked) return;
 
-        const isPublicPage = ['/login', '/forgot-password', '/'].includes(pathname);
+        const isPublicPage = ['/login', '/forgot-password'].includes(pathname);
+        const isRootPage = pathname === '/';
 
         if (user) {
             // User is logged in
@@ -71,20 +72,21 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                     router.replace('/settings');
                 }
             } else if (isSetupComplete === true) {
-                // Setup is complete, redirect from public pages to dashboard
+                // Setup is complete, redirect from public pages to dashboard (root)
                 if (isPublicPage) {
-                   router.replace('/dashboard-overview');
+                   router.replace('/');
                 }
             }
         } else {
             // User is not logged in, redirect to login if not on a public page
-            if (!isPublicPage) {
+            if (!isPublicPage && !isRootPage) {
                 router.replace('/login');
             }
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
 
-    if (!authChecked || (user && isSetupComplete === null && pathname !== '/login' && pathname !== '/forgot-password' && pathname !== '/')) {
+    // Initial loading state
+    if (!authChecked || (user && isSetupComplete === null && !['/login', '/forgot-password', '/'].includes(pathname))) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -94,7 +96,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     }
     
     // Determine if we should show the full app layout
-    const showAppLayout = user && !['/login', '/forgot-password', '/'].includes(pathname);
+    const showAppLayout = user && !['/login', '/forgot-password'].includes(pathname);
 
     if (showAppLayout) {
         return <AppLayoutWrapper>{children}</AppLayoutWrapper>;
