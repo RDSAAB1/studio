@@ -197,19 +197,25 @@ export default function CustomerPaymentsPage() {
             remainingPayment -= paymentForThisEntry;
         }
         
-        const incomeTransaction: Omit<Income, 'id'> = {
+        const incomeData: Partial<Omit<Income, 'id'>> = {
             date: new Date().toISOString().split('T')[0],
             transactionType: 'Income', category: 'Sales', subCategory: 'Customer Payment',
             amount: paymentAmount, payee: customerSummary.get(selectedCustomerKey!)?.name || 'Customer',
             description: `Payment ${paymentData.paymentId} from ${customerSummary.get(selectedCustomerKey!)?.name || 'customer'}.`,
             paymentMethod: selectedAccountId === 'CashInHand' ? 'Cash' : 'Online',
-            bankAccountId: selectedAccountId === 'CashInHand' ? undefined : selectedAccountId,
             status: 'Paid', isRecurring: false
         };
 
-        const newIncome = await addIncome(incomeTransaction);
+        if (selectedAccountId !== 'CashInHand') {
+            incomeData.bankAccountId = selectedAccountId;
+        }
+
+        const newIncome = await addIncome(incomeData as Omit<Income, 'id'>);
         paymentData.incomeTransactionId = newIncome.id;
-        paymentData.bankAccountId = selectedAccountId === 'CashInHand' ? undefined : selectedAccountId;
+        
+        if (selectedAccountId !== 'CashInHand') {
+            paymentData.bankAccountId = selectedAccountId;
+        }
         
         if (editingPayment && editingPayment.id) {
             // Update logic if needed, for now we add new payment
