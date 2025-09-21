@@ -320,11 +320,15 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    // Timezone correction for date
+    const localDate = new Date(values.date.getTime() - values.date.getTimezoneOffset() * 60000);
+    const dateString = localDate.toISOString().split('T')[0];
+
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
-        date: values.date.toISOString().split("T")[0],
+        date: dateString,
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
@@ -692,3 +696,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    
