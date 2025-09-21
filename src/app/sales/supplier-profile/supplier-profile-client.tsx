@@ -181,11 +181,11 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
                  <Card className="bg-white border-gray-200">
                     <CardHeader className="p-2 pb-1"><h3 className="font-semibold text-black text-base border-b border-gray-300 pb-1">Operational</h3></CardHeader>
                     <CardContent className="p-2 pt-1 text-xs space-y-0.5">
-                        <div className="flex justify-between"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} Qtl`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} Qtl`}</span></div>
-                        <div className="flex justify-between font-bold border-t border-gray-200 pt-1"><span className="text-black">Final Wt</span><span className="font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} Qtl`}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Karta Wt</span><span className="font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} Qtl`}</span></div>
-                        <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1"><span>Net Wt</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} Qtl`}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Gross Wt</span><span className="font-semibold text-black">{`${(data.totalGrossWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Teir Wt</span><span className="font-semibold text-black">{`${(data.totalTeirWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold border-t border-gray-200 pt-1"><span className="text-black">Final Wt</span><span className="font-semibold text-black">{`${(data.totalFinalWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Karta Wt</span><span className="font-semibold text-black">{`${(data.totalKartaWeight || 0).toFixed(2)} kg`}</span></div>
+                        <div className="flex justify-between font-bold text-primary border-t border-gray-200 pt-1"><span>Net Wt</span><span>{`${(data.totalNetWeight || 0).toFixed(2)} kg`}</span></div>
                     </CardContent>
                 </Card>
                  <Card className="bg-white border-gray-200">
@@ -270,7 +270,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
 };
 
 
-export function SupplierProfileClient() {
+export default function SupplierProfileClient() {
   const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').toArray()) || [];
   const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').toArray()) || [];
   
@@ -338,14 +338,14 @@ export function SupplierProfileClient() {
         const data = summary.get(s.customerId)!;
         data.totalAmount += s.amount || 0;
         data.totalOriginalAmount += s.originalNetAmount || 0;
-        data.totalGrossWeight! += parseFloat(String(s.grossWeight)) || 0;
-        data.totalTeirWeight! += parseFloat(String(s.teirWeight)) || 0;
-        data.totalFinalWeight! += s.weight || 0;
-        data.totalKartaWeight! += s.kartaWeight || 0;
-        data.totalNetWeight! += s.netWeight || 0;
-        data.totalKartaAmount! += s.kartaAmount || 0;
-        data.totalLabouryAmount! += s.labouryAmount || 0;
-        data.totalKanta! += s.kanta || 0;
+        data.totalGrossWeight! += s.grossWeight;
+        data.totalTeirWeight! += s.teirWeight;
+        data.totalFinalWeight! += s.weight;
+        data.totalKartaWeight! += s.kartaWeight;
+        data.totalNetWeight! += s.netWeight;
+        data.totalKartaAmount! += s.kartaAmount;
+        data.totalLabouryAmount! += s.labouryAmount;
+        data.totalKanta! += s.kanta;
         data.totalOtherCharges! += s.otherCharges || 0;
         data.totalTransactions! += 1;
         if (!supplierRateSum[s.customerId]) {
@@ -405,8 +405,7 @@ export function SupplierProfileClient() {
          paymentHistory: [], outstandingEntryIds: [], totalGrossWeight: 0, totalTeirWeight: 0, totalFinalWeight: 0, totalKartaWeight: 0, totalNetWeight: 0,
          totalKartaAmount: 0, totalLabouryAmount: 0, totalKanta: 0, totalOtherCharges: 0, totalCdAmount: 0, totalDeductions: 0,
          averageRate: 0, averageOriginalPrice: 0, totalTransactions: 0, totalOutstandingTransactions: 0, allTransactions: filteredSuppliers, 
-         allPayments: filteredPayments.filter(p => p.customerId !== 'OUTSIDER'), // Correctly filter for supplier payments
-         transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
+         allPayments: filteredPayments, transactionsByVariety: {}, averageKartaPercentage: 0, averageLabouryRate: 0
      });
      
     millSummary.totalDeductions = millSummary.totalKartaAmount! + millSummary.totalLabouryAmount! + millSummary.totalKanta! + millSummary.totalOtherCharges!;
