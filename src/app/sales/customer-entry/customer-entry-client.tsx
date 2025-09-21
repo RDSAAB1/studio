@@ -22,7 +22,7 @@ import { CustomerDetailsDialog } from "@/components/sales/customer-details-dialo
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
-import { Hourglass } from "lucide-react";
+import { Hourglass, Loader2 } from "lucide-react";
 
 
 export const formSchema = z.object({
@@ -86,6 +86,7 @@ export default function CustomerEntryClient() {
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
@@ -141,16 +142,14 @@ export default function CustomerEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (customers.length > 0) {
+    if (customers.length > 0 && isInitialLoad.current) {
+        const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+        const initialSrNo = formatSrNo(nextSrNum, 'C');
+        form.setValue('srNo', initialSrNo);
+        setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+        isInitialLoad.current = false;
         setIsLoading(false);
-        if (isInitialLoad.current) {
-            const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'C');
-            form.setValue('srNo', initialSrNo);
-            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
-            isInitialLoad.current = false;
-        }
-    } else if (customers) { // suppliers is defined but empty
+    } else if (customers) {
         setIsLoading(false);
         if (isInitialLoad.current) {
             const nextSrNum = 1;
@@ -173,12 +172,10 @@ export default function CustomerEntryClient() {
     };
     fetchSettings();
 
-
-    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
-    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
     const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
     const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, console.error);
-
+    const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
+    const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -195,10 +192,10 @@ export default function CustomerEntryClient() {
     form.setValue('date', new Date());
 
     return () => {
-      unsubVarieties();
-      unsubPaymentTypes();
       unsubCustomers();
       unsubPayments();
+      unsubVarieties();
+      unsubPaymentTypes();
     };
   }, [isClient, form, toast]);
   
@@ -333,6 +330,7 @@ export default function CustomerEntryClient() {
       toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
       return;
     }
+    setIsSaving(true);
     try {
       await deleteCustomer(id);
       await deleteCustomerPaymentsForSrNo(currentCustomer.srNo);
@@ -343,10 +341,13 @@ export default function CustomerEntryClient() {
     } catch (error) {
       console.error("Error deleting customer and payments: ", error);
       toast({ title: "Failed to delete entry.", variant: "destructive" });
+    } finally {
+        setIsSaving(false);
     }
   };
 
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    setIsSaving(true);
     const formValues = form.getValues();
     
     const localDate = new Date(formValues.date.getTime() - formValues.date.getTimezoneOffset() * 60000);
@@ -415,6 +416,8 @@ export default function CustomerEntryClient() {
     } catch (error) {
         console.error("Error saving customer:", error);
         toast({ title: "Failed to save entry.", variant: "destructive" });
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -644,6 +647,7 @@ export default function CustomerEntryClient() {
                 onBrokerageToggle={(checked: boolean) => form.setValue('isBrokerageIncluded', checked)}
                 onImport={handleImport}
                 onExport={handleExport}
+                isDeleting={isSaving}
             />
         </form>
       </FormProvider>      
@@ -702,4 +706,3 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
-

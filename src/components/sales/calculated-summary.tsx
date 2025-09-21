@@ -73,7 +73,7 @@ export const CalculatedSummary = ({
     isDeleting = false
 }: CalculatedSummaryProps) => {
 
-    const isLoading = !customer || !customer.srNo;
+    const isLoading = !customer || !customer.srNo || isDeleting;
     const isPrintActionForSelected = selectedIdsCount > 0;
     
     const averageBagWeight = useMemo(() => {
@@ -149,8 +149,9 @@ export const CalculatedSummary = ({
                          {onDeleteAll && (
                              <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="destructive" className="h-8" type="button">
-                                        <Trash2 className="mr-2 h-4 w-4"/> Delete All
+                                    <Button size="sm" variant="destructive" className="h-8" type="button" disabled={isDeleting}>
+                                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4"/>}
+                                        Delete All
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
@@ -194,7 +195,8 @@ export const CalculatedSummary = ({
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
-                                    <Save className="mr-2 h-4 w-4" /> Save & Print <ChevronsUpDown className="ml-2 h-4 w-4"/>
+                                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
+                                    Save & Print <ChevronsUpDown className="ml-2 h-4 w-4"/>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -207,12 +209,13 @@ export const CalculatedSummary = ({
 
                         {onSaveAndPrint && !isCustomerForm && (
                             <Button onClick={() => onSaveAndPrint('receipt')} size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
-                                <Save className="mr-2 h-4 w-4" /> Save & Print
+                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} 
+                                Save & Print
                             </Button>
                         )}
 
                         <Button onClick={onSave} size="sm" className="h-8 rounded-md" disabled={isLoading} type="button">
-                            {isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>}
+                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (isEditing ? <><Pen className="mr-2 h-4 w-4" /> Update</> : <><Save className="mr-2 h-4 w-4" /> Save</>)}
                         </Button>
                         <Button onClick={onNew} size="sm" variant="outline" className="h-8 rounded-md" disabled={isLoading} type="button">
                             <PlusCircle className="mr-2 h-4 w-4" /> New
