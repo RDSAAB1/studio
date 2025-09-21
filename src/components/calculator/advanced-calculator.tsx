@@ -316,6 +316,7 @@ const UnitConverter = () => {
                 const tempConf = unitConfig.Temperature;
                 const from = tempConf[fromUnit as keyof typeof tempConf];
                 const to = tempConf[toUnit as keyof typeof tempConf];
+                if (!from || !to) return; // Guard against undefined units on category change
                 const baseValue = from.toBase(val); // Convert to Celsius (our base)
                 const result = to.fromBase(baseValue);
                 setToValue(result.toFixed(4));
@@ -323,6 +324,7 @@ const UnitConverter = () => {
                 const catConf = unitConfig[category as 'Weight' | 'Length' | 'Area' | 'Volume'];
                 const fromFactor = catConf[fromUnit as keyof typeof catConf];
                 const toFactor = catConf[toUnit as keyof typeof catConf];
+                if (fromFactor === undefined || toFactor === undefined) return; // Guard
                 const result = (val * fromFactor) / toFactor;
                 setToValue(result.toString());
             }
@@ -333,7 +335,7 @@ const UnitConverter = () => {
     useEffect(() => {
         const units = Object.keys(unitConfig[category]);
         setFromUnit(units[0]);
-        setToUnit(units[1]);
+        setToUnit(units.length > 1 ? units[1] : units[0]); // Handle categories with one unit
         setFromValue('1');
     }, [category]);
     
