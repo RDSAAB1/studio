@@ -204,7 +204,7 @@ export default function DashboardClient() {
             const account = bankAccounts.find(acc => acc.id === key);
             let name = toTitleCase(key.replace(/([A-Z])/g, ' $1').trim());
             if (account) {
-                name = `${account.accountHolderName}`;
+                name = `${account.accountHolderName} (...${account.accountNumber.slice(-4)})`;
             }
             return { name, value };
         }).filter(item => item.value > 0);
@@ -214,13 +214,13 @@ export default function DashboardClient() {
     const paymentMethodData = useMemo(() => {
         const groupedBySource = allTransactions.reduce((acc, item) => {
             let key = 'Other';
-            if (item.paymentMethod === 'RTGS') {
-                key = 'RTGS';
-            } else if (item.bankAccountId) {
-                const bank = bankAccounts.find(b => b.id === item.bankAccountId);
-                key = bank ? bank.accountHolderName : 'Other Bank';
+            if(item.bankAccountId) {
+                 const bank = bankAccounts.find(b => b.id === item.bankAccountId);
+                 key = bank ? bank.accountHolderName : 'Other Bank';
             } else if (item.paymentMethod === 'Cash') {
                 key = 'Cash in Hand';
+            } else if (item.paymentMethod === 'RTGS') {
+                key = 'RTGS';
             }
             acc[key] = (acc[key] || 0) + item.amount;
             return acc;
@@ -370,9 +370,8 @@ export default function DashboardClient() {
                 <StatCard title="Customer Receivables" value={formatCurrency(totalCustomerReceivables)} icon={<Users />} colorClass="text-blue-500" isLoading={isLoading}/>
             </div>
 
-            <div className="grid gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <Card className="h-64">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="h-64">
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
                     </CardHeader>
@@ -428,22 +427,22 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card className="h-64 md:col-span-2">
+                <Card className="h-auto md:col-span-2">
                     <CardHeader>
                         <CardTitle>Fund Sources</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-48 grid grid-cols-2 items-center gap-4">
-                         <ResponsiveContainer width="100%" height="100%">
+                    <CardContent className="h-auto grid grid-cols-2 items-center gap-4">
+                         <ResponsiveContainer width="100%" height={200}>
                             <PieChart>
                                 <Tooltip content={customTooltip}/>
-                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
+                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5}>
                                      {fundSourcesData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="space-y-2 overflow-y-auto max-h-full">
+                        <div className="space-y-2">
                              {fundSourcesData.map((entry, index) => (
                                 <div key={index} className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
@@ -456,26 +455,25 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                </div>
-                <Card className="col-span-1 lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Income vs. Expense</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-80">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={incomeExpenseChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <Tooltip content={customTooltip} />
-                                <Legend />
-                                <Area type="monotone" dataKey="income" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.4} />
-                                <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.4} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
             </div>
+            <Card className="col-span-1 lg:col-span-2">
+                <CardHeader>
+                    <CardTitle>Income vs. Expense</CardTitle>
+                </CardHeader>
+                <CardContent className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={incomeExpenseChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip content={customTooltip} />
+                            <Legend />
+                            <Area type="monotone" dataKey="income" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.4} />
+                            <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.4} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
             
              <Card>
                 <CardHeader>
