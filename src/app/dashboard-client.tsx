@@ -211,7 +211,15 @@ export default function DashboardClient() {
     }, [financialState.balances, bankAccounts]);
 
 
-    const paymentMethodData = useMemo(() => groupDataByField(allTransactions, 'paymentMethod'), [allTransactions]);
+    const paymentMethodData = useMemo(() => {
+        const grouped = allTransactions.reduce((acc, item) => {
+            const key = item.bankAccountId ? bankAccounts.find(b => b.id === item.bankAccountId)?.accountHolderName || item.bankAccountId : (item.paymentMethod === 'Cash' ? 'Cash in Hand' : 'Other');
+            acc[key] = (acc[key] || 0) + item.amount;
+            return acc;
+        }, {} as { [key: string]: number });
+        
+        return Object.entries(grouped).map(([name, value]) => ({ name: toTitleCase(name), value }));
+    }, [allTransactions, bankAccounts]);
 
     function groupDataByField(data: (Income | Expense)[], field: keyof (Income|Expense)) {
         const grouped = data.reduce((acc, item) => {
@@ -510,3 +518,5 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+    
