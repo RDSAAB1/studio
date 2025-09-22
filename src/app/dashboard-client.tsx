@@ -213,7 +213,7 @@ export default function DashboardClient() {
 
     const paymentMethodData = useMemo(() => {
         const groupedBySource = allTransactions.reduce((acc, item) => {
-            let key = 'Other'; // Default key
+            let key = 'Other';
             if (item.paymentMethod === 'Cash') {
                 key = 'Cash in Hand';
             } else if (item.paymentMethod === 'RTGS') {
@@ -228,6 +228,7 @@ export default function DashboardClient() {
     
         return Object.entries(groupedBySource).map(([name, value]) => ({ name: toTitleCase(name), value }));
     }, [allTransactions, bankAccounts]);
+    
 
     function groupDataByField(data: (Income | Expense)[], field: keyof (Income|Expense)) {
         const grouped = data.reduce((acc, item) => {
@@ -436,8 +437,8 @@ export default function DashboardClient() {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-                <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <Card>
+                <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <Card className="h-80">
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
                     </CardHeader>
@@ -465,7 +466,7 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="h-80">
                     <CardHeader>
                         <CardTitle>Payment Methods</CardTitle>
                     </CardHeader>
@@ -493,7 +494,7 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card>
+                 <Card className="h-80">
                     <CardHeader>
                         <CardTitle>Fund Sources</CardTitle>
                     </CardHeader>
