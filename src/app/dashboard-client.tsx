@@ -233,7 +233,7 @@ export default function DashboardClient() {
     };
     
      const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
-        if (percent < 0.05) return null;
+        if (percent < 0.02) return null; // Hide label for very small slices
         const RADIAN = Math.PI / 180;
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -359,16 +359,16 @@ export default function DashboardClient() {
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip} />
-                                <Pie data={level1Data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}>
+                                <Pie data={level1Data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}>
                                     {level1Data.map((entry, index) => ( <Cell key={`cell-0-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                                 </Pie>
-                                {level1 && <Pie data={level2Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={70} outerRadius={100} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel2(data.name); setLevel3(null); }}>
+                                {level1 && <Pie data={level2Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={90} outerRadius={120} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel2(data.name); setLevel3(null); }}>
                                     {level2Data.map((entry, index) => ( <Cell key={`cell-1-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                                 </Pie>}
-                                {level2 && <Pie data={level3Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={110} outerRadius={140} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => setLevel3(data.name)}>
+                                {level2 && <Pie data={level3Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={130} outerRadius={160} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => setLevel3(data.name)}>
                                     {level3Data.map((entry, index) => ( <Cell key={`cell-2-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                                 </Pie>}
-                                {level3 && <Pie data={level4Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={150} outerRadius={180} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4}>
+                                {level3 && <Pie data={level4Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={170} outerRadius={200} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4}>
                                     {level4Data.map((entry, index) => ( <Cell key={`cell-3-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
                                 </Pie>}
                             </PieChart>
@@ -391,7 +391,7 @@ export default function DashboardClient() {
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" />
                                 <YAxis />
-                                <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={customTooltip} />
                                 <Legend />
                                 <Area type="monotone" dataKey="income" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.4} />
                                 <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.4} />
@@ -409,7 +409,7 @@ export default function DashboardClient() {
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="name" />
                                 <YAxis />
-                                <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={customTooltip} />
                                 <Legend />
                                 <Bar dataKey="assets" fill="#22c55e" />
                                 <Bar dataKey="liabilities" fill="#ef4444" />
@@ -429,7 +429,7 @@ export default function DashboardClient() {
                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip content={<CustomTooltip />}/>
+                                <Tooltip content={customTooltip}/>
                                 <Legend />
                             </PieChart>
                         </ResponsiveContainer>
@@ -439,5 +439,3 @@ export default function DashboardClient() {
         </div>
     );
 }
-
-    
