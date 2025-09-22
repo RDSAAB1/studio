@@ -401,8 +401,8 @@ export default function DashboardClient() {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <Card>
+            <div className="grid gap-6">
+                <Card className="col-span-1 lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Income vs. Expense</CardTitle>
                     </CardHeader>
@@ -420,6 +420,7 @@ export default function DashboardClient() {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
+                <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
                  <Card>
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
@@ -474,10 +475,13 @@ export default function DashboardClient() {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
+                </div>
             </div>
         </div>
     );
 }
+
+    
 
     
 
