@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
-import { AreaChart, Area, Bar, BarChart as RechartsBarChart, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, Bar, BarChart as RechartsBarChart, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -439,3 +439,5 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+    
