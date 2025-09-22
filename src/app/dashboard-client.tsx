@@ -211,7 +211,7 @@ export default function DashboardClient() {
     }, [financialState.balances, bankAccounts]);
 
 
-    const paymentMethodData = useMemo(() => groupDataByField(filteredData.filteredExpenses, 'paymentMethod'), [filteredData]);
+    const paymentMethodData = useMemo(() => groupDataByField(allTransactions, 'paymentMethod'), [allTransactions]);
 
     function groupDataByField(data: (Income | Expense)[], field: keyof (Income|Expense)) {
         const grouped = data.reduce((acc, item) => {
@@ -481,4 +481,5 @@ export default function DashboardClient() {
     );
 }
 
+    
     
