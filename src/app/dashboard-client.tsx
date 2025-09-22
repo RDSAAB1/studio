@@ -213,14 +213,14 @@ export default function DashboardClient() {
 
     const paymentMethodData = useMemo(() => {
         const groupedBySource = allTransactions.reduce((acc, item) => {
-            let key = 'Other'; 
-            if (item.bankAccountId) {
+            let key = 'Other';
+            if (item.paymentMethod === 'RTGS') {
+                key = 'RTGS';
+            } else if (item.bankAccountId) {
                 const bank = bankAccounts.find(b => b.id === item.bankAccountId);
                 key = bank ? bank.accountHolderName : 'Other Bank';
             } else if (item.paymentMethod === 'Cash') {
                 key = 'Cash in Hand';
-            } else if (item.paymentMethod === 'RTGS') {
-                key = 'RTGS';
             }
             acc[key] = (acc[key] || 0) + item.amount;
             return acc;
@@ -371,12 +371,12 @@ export default function DashboardClient() {
             </div>
 
             <div className="grid gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 <Card className="h-80">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <Card className="h-64">
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-64 grid grid-cols-2 items-center">
+                    <CardContent className="h-48 grid grid-cols-2 items-center">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip} />
@@ -400,11 +400,11 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="h-80">
+                <Card className="h-64">
                     <CardHeader>
                         <CardTitle>Payment Methods</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-64 grid grid-cols-2 items-center gap-4">
+                    <CardContent className="h-48 grid grid-cols-2 items-center gap-4">
                          <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip}/>
@@ -428,11 +428,11 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card className="h-80">
+                 <Card className="h-64 md:col-span-2">
                     <CardHeader>
                         <CardTitle>Fund Sources</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-64 grid grid-cols-2 items-center gap-4">
+                    <CardContent className="h-48 grid grid-cols-2 items-center gap-4">
                          <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip}/>
