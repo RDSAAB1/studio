@@ -213,14 +213,14 @@ export default function DashboardClient() {
 
     const paymentMethodData = useMemo(() => {
         const groupedBySource = allTransactions.reduce((acc, item) => {
-            let key = 'Other'; // Default key
-            if (item.paymentMethod === 'RTGS') {
-                key = 'RTGS';
-            } else if (item.paymentMethod === 'Cash') {
-                key = 'Cash in Hand';
-            } else if (item.bankAccountId) {
+            let key = 'Other'; 
+            if (item.bankAccountId) {
                 const bank = bankAccounts.find(b => b.id === item.bankAccountId);
                 key = bank ? bank.accountHolderName : 'Other Bank';
+            } else if (item.paymentMethod === 'Cash') {
+                key = 'Cash in Hand';
+            } else if (item.paymentMethod === 'RTGS') {
+                key = 'RTGS';
             }
             acc[key] = (acc[key] || 0) + item.amount;
             return acc;
@@ -437,7 +437,7 @@ export default function DashboardClient() {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-                <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <Card className="h-80">
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
@@ -481,10 +481,10 @@ export default function DashboardClient() {
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="space-y-2">
+                        <div className="space-y-2 overflow-y-auto max-h-full">
                              {paymentMethodData.map((entry, index) => (
                                 <div key={index} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
                                     <div className="text-sm">
                                         <p className="text-muted-foreground truncate">{entry.name}</p>
                                         <p className="font-semibold">{formatCurrency(entry.value)}</p>
@@ -509,12 +509,12 @@ export default function DashboardClient() {
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="space-y-2">
+                        <div className="space-y-2 overflow-y-auto max-h-full">
                              {fundSourcesData.map((entry, index) => (
                                 <div key={index} className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
                                     <div className="text-sm overflow-hidden">
-                                        <p className="text-muted-foreground truncate">{entry.name}</p>
+                                        <p className="text-muted-foreground truncate" title={entry.name}>{entry.name}</p>
                                         <p className="font-semibold">{formatCurrency(entry.value)}</p>
                                     </div>
                                 </div>
