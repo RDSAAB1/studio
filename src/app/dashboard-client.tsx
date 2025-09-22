@@ -4,13 +4,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project } from '@/lib/definitions';
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
-import { formatCurrency, toTitleCase, cn } from '@/lib/utils';
+import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
-import { AreaChart, Area, Bar, BarChart as RechartsBarChart, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { AreaChart, Area, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis, BarChart as RechartsBarChart, Bar } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -190,6 +190,14 @@ export default function DashboardClient() {
         }, {} as Record<string, { date: string, income: number, expense: number }>);
         return Object.values(grouped).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [filteredData]);
+    
+    const assetsLiabilitiesData = useMemo(() => {
+        return [
+            { name: 'Total Assets', value: financialState.totalAssets },
+            { name: 'Total Liabilities', value: financialState.totalLiabilities }
+        ];
+    }, [financialState]);
+
 
     const paymentMethodData = useMemo(() => groupDataByField(filteredData.filteredExpenses, 'paymentMethod'), [filteredData]);
 
@@ -405,15 +413,15 @@ export default function DashboardClient() {
                     </CardHeader>
                     <CardContent className="h-80">
                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsBarChart data={[{ name: 'Financials', assets: financialState.totalAssets, liabilities: financialState.totalLiabilities }]}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
+                             <PieChart>
                                 <Tooltip content={customTooltip} />
+                                <Pie data={assetsLiabilitiesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80}>
+                                    {assetsLiabilitiesData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Pie>
                                 <Legend />
-                                <Bar dataKey="assets" fill="#22c55e" />
-                                <Bar dataKey="liabilities" fill="#ef4444" />
-                            </RechartsBarChart>
+                            </PieChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
@@ -423,15 +431,18 @@ export default function DashboardClient() {
                     </CardHeader>
                     <CardContent className="h-80">
                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={paymentMethodData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                                    {paymentMethodData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                    ))}
-                                </Pie>
+                            <RechartsBarChart data={paymentMethodData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis />
                                 <Tooltip content={customTooltip}/>
                                 <Legend />
-                            </PieChart>
+                                <Bar dataKey="value">
+                                     {paymentMethodData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </RechartsBarChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
@@ -439,3 +450,4 @@ export default function DashboardClient() {
         </div>
     );
 }
+
