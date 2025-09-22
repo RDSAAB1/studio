@@ -177,6 +177,7 @@ export default function SupplierEntryClient() {
     newState.date = today.toISOString().split('T')[0];
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
+    form.setValue('date', new Date()); // Set today's date
     setTimeout(() => form.setFocus('srNo'), 50);
   }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
