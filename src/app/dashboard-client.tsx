@@ -212,13 +212,21 @@ export default function DashboardClient() {
 
 
     const paymentMethodData = useMemo(() => {
-        const grouped = allTransactions.reduce((acc, item) => {
-            const key = item.bankAccountId ? bankAccounts.find(b => b.id === item.bankAccountId)?.accountHolderName || item.bankAccountId : (item.paymentMethod === 'Cash' ? 'Cash in Hand' : 'Other');
+        const groupedBySource = allTransactions.reduce((acc, item) => {
+            let key = 'Other'; // Default key
+            if (item.paymentMethod === 'Cash') {
+                key = 'Cash in Hand';
+            } else if (item.paymentMethod === 'RTGS') {
+                key = 'RTGS';
+            } else if (item.bankAccountId) {
+                const bank = bankAccounts.find(b => b.id === item.bankAccountId);
+                key = bank ? bank.accountHolderName : 'Other Bank';
+            }
             acc[key] = (acc[key] || 0) + item.amount;
             return acc;
         }, {} as { [key: string]: number });
-        
-        return Object.entries(grouped).map(([name, value]) => ({ name: toTitleCase(name), value }));
+    
+        return Object.entries(groupedBySource).map(([name, value]) => ({ name: toTitleCase(name), value }));
     }, [allTransactions, bankAccounts]);
 
     function groupDataByField(data: (Income | Expense)[], field: keyof (Income|Expense)) {
@@ -518,5 +526,7 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+    
 
     
