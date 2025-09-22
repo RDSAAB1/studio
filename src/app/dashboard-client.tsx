@@ -204,7 +204,7 @@ export default function DashboardClient() {
             const account = bankAccounts.find(acc => acc.id === key);
             let name = toTitleCase(key.replace(/([A-Z])/g, ' $1').trim());
             if (account) {
-                name = `${account.accountHolderName} (...${account.accountNumber.slice(-4)})`;
+                name = `${account.accountHolderName}`;
             }
             return { name, value };
         }).filter(item => item.value > 0);
@@ -369,75 +369,9 @@ export default function DashboardClient() {
                 <StatCard title="Supplier Dues" value={formatCurrency(totalSupplierDues)} icon={<Users />} colorClass="text-amber-500" isLoading={isLoading}/>
                 <StatCard title="Customer Receivables" value={formatCurrency(totalCustomerReceivables)} icon={<Users />} colorClass="text-blue-500" isLoading={isLoading}/>
             </div>
-            
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <PieChartIcon className="h-5 w-5 text-primary"/>
-                        Financial Breakdown
-                    </CardTitle>
-                     <div className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                        {breadcrumbs.map((crumb, index) => (
-                            <React.Fragment key={crumb}>
-                                <Button
-                                    variant="link"
-                                    onClick={() => handleBreadcrumbClick(index)}
-                                    className="p-0 h-auto text-sm text-muted-foreground hover:text-primary disabled:text-foreground disabled:no-underline"
-                                    disabled={index === breadcrumbs.length - 1}
-                                >
-                                    {toTitleCase(crumb)}
-                                </Button>
-                                {index < breadcrumbs.length - 1 && <ChevronsRight size={14} />}
-                            </React.Fragment>
-                        ))}
-                    </div>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Tooltip content={customTooltip} />
-                                <Pie data={level1Data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}>
-                                    {level1Data.map((entry, index) => ( <Cell key={`cell-0-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>
-                                {level1 && <Pie data={level2Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={90} outerRadius={120} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel2(data.name); setLevel3(null); }}>
-                                    {level2Data.map((entry, index) => ( <Cell key={`cell-1-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>}
-                                {level2 && <Pie data={level3Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={130} outerRadius={160} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => setLevel3(data.name)}>
-                                    {level3Data.map((entry, index) => ( <Cell key={`cell-2-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>}
-                                {level3 && <Pie data={level4Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={170} outerRadius={200} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4}>
-                                    {level4Data.map((entry, index) => ( <Cell key={`cell-3-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
-                                </Pie>}
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <div>
-                        <DetailTree />
-                    </div>
-                </CardContent>
-            </Card>
 
             <div className="grid gap-6">
-                <Card className="col-span-1 lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Income vs. Expense</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-80">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={incomeExpenseChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <Tooltip content={customTooltip} />
-                                <Legend />
-                                <Area type="monotone" dataKey="income" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.4} />
-                                <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.4} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  <Card className="h-80">
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
@@ -494,7 +428,7 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card className="h-80 md:col-span-2">
+                 <Card className="h-80">
                     <CardHeader>
                         <CardTitle>Fund Sources</CardTitle>
                     </CardHeader>
@@ -523,7 +457,75 @@ export default function DashboardClient() {
                     </CardContent>
                 </Card>
                 </div>
+                <Card className="col-span-1 lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Income vs. Expense</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-80">
+                         <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={incomeExpenseChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <Tooltip content={customTooltip} />
+                                <Legend />
+                                <Area type="monotone" dataKey="income" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.4} />
+                                <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.4} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
             </div>
+            
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <PieChartIcon className="h-5 w-5 text-primary"/>
+                        Financial Breakdown
+                    </CardTitle>
+                     <div className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                        {breadcrumbs.map((crumb, index) => (
+                            <React.Fragment key={crumb}>
+                                <Button
+                                    variant="link"
+                                    onClick={() => handleBreadcrumbClick(index)}
+                                    className="p-0 h-auto text-sm text-muted-foreground hover:text-primary disabled:text-foreground disabled:no-underline"
+                                    disabled={index === breadcrumbs.length - 1}
+                                >
+                                    {toTitleCase(crumb)}
+                                </Button>
+                                {index < breadcrumbs.length - 1 && <ChevronsRight size={14} />}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Tooltip content={customTooltip} />
+                                <Pie data={level1Data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel1(data.name); setLevel2(null); setLevel3(null); }}>
+                                    {level1Data.map((entry, index) => ( <Cell key={`cell-0-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
+                                </Pie>
+                                {level1 && <Pie data={level2Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={90} outerRadius={120} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => { setLevel2(data.name); setLevel3(null); }}>
+                                    {level2Data.map((entry, index) => ( <Cell key={`cell-1-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
+                                </Pie>}
+                                {level2 && <Pie data={level3Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={130} outerRadius={160} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4} onClick={(data) => setLevel3(data.name)}>
+                                    {level3Data.map((entry, index) => ( <Cell key={`cell-2-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
+                                </Pie>}
+                                {level3 && <Pie data={level4Data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={170} outerRadius={200} label={renderCustomizedLabel} labelLine={false} stroke="hsl(var(--card))" strokeWidth={4}>
+                                    {level4Data.map((entry, index) => ( <Cell key={`cell-3-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} /> ))}
+                                </Pie>}
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div>
+                        <DetailTree />
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
+
+    
