@@ -213,14 +213,14 @@ export default function DashboardClient() {
 
     const paymentMethodData = useMemo(() => {
         const groupedBySource = allTransactions.reduce((acc, item) => {
-            let key = 'Other';
-            if (item.paymentMethod === 'Cash') {
-                key = 'Cash in Hand';
-            } else if (item.paymentMethod === 'RTGS') {
+            let key = 'Other'; // Default key
+            if (item.paymentMethod === 'RTGS') {
                 key = 'RTGS';
             } else if (item.bankAccountId) {
                 const bank = bankAccounts.find(b => b.id === item.bankAccountId);
                 key = bank ? bank.accountHolderName : 'Other Bank';
+            } else if (item.paymentMethod === 'Cash') {
+                key = 'Cash in Hand';
             }
             acc[key] = (acc[key] || 0) + item.amount;
             return acc;
@@ -437,16 +437,16 @@ export default function DashboardClient() {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-                <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 <Card className="h-80">
+                <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <Card className="h-64">
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-64 grid grid-cols-2 items-center">
+                    <CardContent className="h-48 grid grid-cols-2 items-center">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip} />
-                                <Pie data={assetsLiabilitiesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
+                                <Pie data={assetsLiabilitiesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={5}>
                                     {assetsLiabilitiesData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.name === 'Total Assets' ? '#22c55e' : '#ef4444'} />
                                     ))}
@@ -466,15 +466,15 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="h-80">
+                <Card className="h-64">
                     <CardHeader>
                         <CardTitle>Payment Methods</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-64 grid grid-cols-2 items-center gap-4">
+                    <CardContent className="h-48 grid grid-cols-2 items-center gap-4">
                          <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip}/>
-                                <Pie data={paymentMethodData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
+                                <Pie data={paymentMethodData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={5}>
                                      {paymentMethodData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
@@ -494,15 +494,15 @@ export default function DashboardClient() {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card className="h-80">
+                 <Card className="h-64 col-span-1 md:col-span-2">
                     <CardHeader>
                         <CardTitle>Fund Sources</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-64 grid grid-cols-2 items-center gap-4">
+                    <CardContent className="h-48 grid grid-cols-2 items-center gap-4">
                          <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip}/>
-                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
+                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={5}>
                                      {fundSourcesData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
@@ -531,3 +531,4 @@ export default function DashboardClient() {
     
 
     
+
