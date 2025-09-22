@@ -425,54 +425,84 @@ export default function DashboardClient() {
                     <CardHeader>
                         <CardTitle>Assets vs. Liabilities</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-80">
-                         <ResponsiveContainer width="100%" height="100%">
+                    <CardContent className="h-64 grid grid-cols-2 items-center">
+                        <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip} />
-                                <Legend />
-                                <Pie data={assetsLiabilitiesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
+                                <Pie data={assetsLiabilitiesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
                                     {assetsLiabilitiesData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.name === 'Total Assets' ? '#22c55e' : '#ef4444'} />
                                     ))}
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
+                        <div className="space-y-2">
+                             {assetsLiabilitiesData.map((entry, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: entry.name === 'Total Assets' ? '#22c55e' : '#ef4444'}}></div>
+                                    <div className="text-sm">
+                                        <p className="text-muted-foreground">{entry.name}</p>
+                                        <p className="font-semibold">{formatCurrency(entry.value)}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>Payment Methods</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-80">
+                    <CardContent className="h-64 grid grid-cols-2 items-center gap-4">
                          <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip}/>
-                                <Legend />
-                                <Pie data={paymentMethodData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
+                                <Pie data={paymentMethodData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
                                      {paymentMethodData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
+                        <div className="space-y-2">
+                             {paymentMethodData.map((entry, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
+                                    <div className="text-sm">
+                                        <p className="text-muted-foreground">{entry.name}</p>
+                                        <p className="font-semibold">{formatCurrency(entry.value)}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader>
                         <CardTitle>Fund Sources</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-80">
+                    <CardContent className="h-64 grid grid-cols-2 items-center gap-4">
                          <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Tooltip content={customTooltip}/>
-                                <Legend />
-                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
+                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5}>
                                      {fundSourcesData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
+                        <div className="space-y-2">
+                             {fundSourcesData.map((entry, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: PIE_COLORS[index % PIE_COLORS.length]}}></div>
+                                    <div className="text-sm">
+                                        <p className="text-muted-foreground truncate">{entry.name}</p>
+                                        <p className="font-semibold">{formatCurrency(entry.value)}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </CardContent>
                 </Card>
                 </div>
