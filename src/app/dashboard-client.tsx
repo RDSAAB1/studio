@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
-import { AreaChart, Area, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Bar, BarChart as RechartsBarChart } from 'recharts';
+import { AreaChart, Area, PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -32,7 +32,7 @@ const StatCard = ({ title, value, icon, colorClass, isLoading }: { title: string
     </Card>
 );
 
-const PIE_COLORS = ['#22c55e', '#ef4444', '#f97316', '#eab308', '#3b82f6'];
+const PIE_COLORS = ['#22c55e', '#ef4444', '#f97316', '#eab308', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 export default function DashboardClient() {
     const router = useRouter();
@@ -195,10 +195,20 @@ export default function DashboardClient() {
     const assetsLiabilitiesData = useMemo(() => {
         return [
             { name: 'Total Assets', value: financialState.totalAssets },
-            { name: 'Total Liabilities', value: financialState.totalLiabilities },
-            { name: 'Working Capital', value: financialState.workingCapital }
+            { name: 'Total Liabilities', value: financialState.totalLiabilities }
         ];
     }, [financialState]);
+    
+    const fundSourcesData = useMemo(() => {
+         return Array.from(financialState.balances.entries()).map(([key, value]) => {
+            const account = bankAccounts.find(acc => acc.id === key);
+            let name = toTitleCase(key.replace(/([A-Z])/g, ' $1').trim());
+            if (account) {
+                name = `${account.accountHolderName} (...${account.accountNumber.slice(-4)})`;
+            }
+            return { name, value };
+        }).filter(item => item.value > 0);
+    }, [financialState.balances, bankAccounts]);
 
 
     const paymentMethodData = useMemo(() => groupDataByField(filteredData.filteredExpenses, 'paymentMethod'), [filteredData]);
@@ -210,7 +220,7 @@ export default function DashboardClient() {
             return acc;
         }, {} as { [key: string]: number });
 
-        return Object.entries(grouped).map(([name, value]) => ({ name, value }));
+        return Object.entries(grouped).map(([name, value]) => ({ name: toTitleCase(name), value }));
     }
 
     const breadcrumbs = ['Overview'];
@@ -223,11 +233,7 @@ export default function DashboardClient() {
         if (index < 2) setLevel2(null);
         if (index < 1) setLevel1(null);
     };
-
-    if (isLoading && isClient) {
-        return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-    }
-
+    
     const customTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
@@ -315,6 +321,11 @@ export default function DashboardClient() {
             </ScrollArea>
         )
     }
+    
+    if (isLoading && isClient) {
+        return <div className="flex h-64 w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    }
+
 
     return (
         <div className="space-y-6">
@@ -390,7 +401,7 @@ export default function DashboardClient() {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader>
                         <CardTitle>Income vs. Expense</CardTitle>
@@ -415,18 +426,15 @@ export default function DashboardClient() {
                     </CardHeader>
                     <CardContent className="h-80">
                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsBarChart data={assetsLiabilitiesData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
+                            <PieChart>
                                 <Tooltip content={customTooltip} />
                                 <Legend />
-                                <Bar dataKey="value">
+                                <Pie data={assetsLiabilitiesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
                                     {assetsLiabilitiesData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.name === 'Total Assets' ? '#22c55e' : entry.name === 'Total Liabilities' ? '#ef4444' : '#3b82f6'} />
+                                        <Cell key={`cell-${index}`} fill={entry.name === 'Total Assets' ? '#22c55e' : '#ef4444'} />
                                     ))}
-                                </Bar>
-                            </RechartsBarChart>
+                                </Pie>
+                            </PieChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
@@ -448,9 +456,29 @@ export default function DashboardClient() {
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Fund Sources</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-80">
+                         <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Tooltip content={customTooltip}/>
+                                <Legend />
+                                <Pie data={fundSourcesData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
+                                     {fundSourcesData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
 }
+
+    
 
     
