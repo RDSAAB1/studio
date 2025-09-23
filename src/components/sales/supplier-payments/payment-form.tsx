@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins, User, Building, Home, Landmark, Hash, Wallet, CircleDollarSign, Weight } from "lucide-react";
+import { Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins, User, Building, Home, Landmark, Hash, Wallet, CircleDollarSign, Weight, Loader2 } from "lucide-react";
 import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from '@/components/ui/switch';
@@ -47,7 +47,7 @@ export const PaymentForm = ({
     setSixRDate, utrNo, setUtrNo, 
     parchiNo, setParchiNo, checkNo, setCheckNo,
     rtgsQuantity, setRtgsQuantity,
-    rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, resetPaymentForm,
+    rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, isProcessing, resetPaymentForm,
     editingPayment, setIsBankSettingsOpen,
     // Combination Generator Props
     calcTargetAmount, setCalcTargetAmount, calcMinRate, setCalcMinRate, calcMaxRate, setCalcMaxRate,
@@ -261,7 +261,8 @@ export const PaymentForm = ({
                             <div className="flex items-center gap-2 border-l pl-2 ml-2"><span className="text-sm font-medium text-muted-foreground">Total Reduction:</span><span className="text-base font-bold text-primary">{formatCurrency((rtgsAmount || paymentAmount) + calculatedCdAmount)}</span></div>
                             <div className="flex-grow"></div>
                             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
-                            <Button onClick={processPayment} size="sm" className="h-8 text-xs">
+                            <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
+                                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                                 Finalize Payment
                             </Button>
                         </CardContent>

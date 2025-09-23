@@ -89,6 +89,7 @@ export default function SupplierPaymentsClient() {
 
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<Customer | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<Payment | null>(null);
@@ -106,7 +107,7 @@ export default function SupplierPaymentsClient() {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [roundFigureToggle, setRoundFigureToggle] = useState(false);
 
-  const allTransactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
+  const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
 
 
   const stableToast = useCallback(toast, []);
@@ -456,6 +457,7 @@ const processPayment = async () => {
         return;
     }
 
+    setIsProcessing(true);
     try {
         let finalPaymentData: Payment | null = null;
         
@@ -577,6 +579,8 @@ const processPayment = async () => {
     } catch (error) {
         console.error("Error processing payment:", error);
         toast({ title: "Transaction Failed", description: (error as Error).message, variant: "destructive" });
+    } finally {
+        setIsProcessing(false);
     }
 };
 
@@ -785,7 +789,7 @@ const processPayment = async () => {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (!isClient || loading) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -879,11 +883,11 @@ const processPayment = async () => {
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        checkNo={checkNo} setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                        setCheckNo={setCheckNo}
+                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} 
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -965,3 +969,9 @@ const processPayment = async () => {
     </div>
   );
 }
+
+    
+
+    
+
+    
