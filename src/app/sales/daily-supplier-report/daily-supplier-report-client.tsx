@@ -106,79 +106,104 @@ export default function DailySupplierReportClient() {
 
     const handlePrint = () => {
         const node = printRef.current;
-        if (!node) return;
-
-        const newWindow = window.open('', '_blank', 'height=800,width=1200');
-        if (newWindow) {
-            newWindow.document.write('<html><head><title>Daily Supplier Report</title>');
-            // Copy styles
-            Array.from(document.styleSheets).forEach(styleSheet => {
-                try {
-                    const css = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                    const styleElement = newWindow.document.createElement('style');
-                    styleElement.appendChild(newWindow.document.createTextNode(css));
-                    newWindow.document.head.appendChild(styleElement);
-                } catch (e) {
-                    console.warn("Could not copy stylesheet:", e);
-                }
-            });
-            
-             const printStyles = newWindow.document.createElement('style');
-             printStyles.textContent = `
-                @media print {
-                    @page { size: landscape; margin: 0mm; }
-                    body { 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important; 
-                        padding: 0 !important; 
-                        margin: 0 !important; 
-                        background-color: #fff !important; 
-                    }
-                    .printable-area { 
-                        background-color: #fff !important; 
-                        color: #000 !important; 
-                    }
-                    .printable-area * { 
-                        color: #000 !important; 
-                        border-color: #ccc !important;
-                        background-color: transparent !important;
-                    }
-                    .printable-area .card { 
-                        border: 1px solid #000 !important; 
-                    }
-                    .print-summary-container { 
-                        display: flex !important; 
-                        flex-direction: row !important; 
-                        gap: 0.5rem !important; 
-                    }
-                    .print-header { 
-                        margin-bottom: 0.5rem; 
-                        text-align: center; 
-                        background-color: #f2f2f2 !important;
-                    }
-                    thead tr {
-                        background-color: #e5e7eb !important;
-                    }
-                    .no-print { 
-                        display: none !important; 
-                    }
-                    .print-no-border { 
-                        border: none !important; 
-                    }
-                }
-            `;
-            newWindow.document.head.appendChild(printStyles);
-
-            newWindow.document.write('</head><body></body></html>');
-            newWindow.document.body.innerHTML = `<div class="printable-area p-4">${node.innerHTML}</div>`;
-            newWindow.document.close();
-            
-            setTimeout(() => {
-                newWindow.focus();
-                newWindow.print();
-                newWindow.close();
-            }, 500);
+        if (!node || !settings) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not find the content to print.' });
+            return;
         }
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (!iframeDoc) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not create print window.' });
+            document.body.removeChild(iframe);
+            return;
+        }
+
+        iframeDoc.open();
+        iframeDoc.write('<html><head><title>Daily Supplier Report</title>');
+
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            try {
+                const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
+                const style = iframeDoc.createElement('style');
+                style.appendChild(iframeDoc.createTextNode(cssText));
+                iframeDoc.head.appendChild(style);
+            } catch (e) {
+                console.warn("Could not copy stylesheet:", e);
+            }
+        });
+        
+         const printStyles = iframeDoc.createElement('style');
+         printStyles.textContent = `
+            @media print {
+                @page { size: landscape; margin: 10mm; }
+                body { 
+                    -webkit-print-color-adjust: exact !important; 
+                    print-color-adjust: exact !important;
+                    background-color: #fff !important;
+                }
+                .printable-area, .printable-area * {
+                    background-color: #fff !important;
+                    color: #000 !important;
+                    border-color: #ccc !important;
+                }
+                .print-header { 
+                    margin-bottom: 0.5rem; 
+                    text-align: center;
+                    display: block !important;
+                }
+                thead {
+                    display: table-header-group !important; /* Ensure header repeats on each page */
+                    background-color: #e5e7eb !important;
+                }
+                tbody {
+                    display: table-row-group !important;
+                }
+                tr {
+                    page-break-inside: avoid !important;
+                }
+                .no-print { 
+                    display: none !important; 
+                }
+                .print-summary-container {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    gap: 0.5rem !important;
+                }
+                .h-\\[60vh\\] {
+                    height: auto !important;
+                    overflow: visible !important;
+                }
+            }
+        `;
+        iframeDoc.head.appendChild(printStyles);
+
+        iframeDoc.write('</head><body>');
+        
+        const printContent = `
+            <div class="printable-area p-4">
+                <div class="hidden print:block print-header">
+                    <h2>${toTitleCase(settings.companyName)} - Daily Supplier Report</h2>
+                    <p>Date: ${format(selectedDate, "dd-MMM-yyyy")}</p>
+                </div>
+                ${node.innerHTML}
+            </div>
+        `;
+        
+        iframeDoc.body.innerHTML = printContent;
+        iframeDoc.close();
+        
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+        }, 500);
     };
 
 
@@ -189,10 +214,6 @@ export default function DailySupplierReportClient() {
     return (
         <div className="space-y-4">
              <div ref={printRef}>
-                 <div className="hidden print:block print-header">
-                    {settings && <h2>{toTitleCase(settings.companyName)} - Daily Supplier Report</h2>}
-                    <p>Date: {format(selectedDate, "dd-MMM-yyyy")}</p>
-                </div>
                 <Card className="print-no-border">
                     <CardContent className="p-4 space-y-4">
                          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center no-print">
@@ -288,11 +309,9 @@ export default function DailySupplierReportClient() {
                     </CardContent>
                 </Card>
              </div>
-             <div className="flex justify-end mt-4">
+             <div className="flex justify-end mt-4 no-print">
                  <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print Report</Button>
              </div>
         </div>
     );
 }
-
-    
