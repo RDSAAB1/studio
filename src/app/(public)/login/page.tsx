@@ -36,6 +36,7 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signInWithRedirect(auth, provider);
+            // After redirect, the logic in AuthWrapper will handle the user state.
         } catch (error) {
            console.error("Sign-in with redirect failed", error);
            setLoading(false);
@@ -54,6 +55,7 @@ export default function LoginPage() {
                 await createUserWithEmailAndPassword(auth, data.email, data.password);
                 toast({ title: "Signup Successful", description: "You are now logged in.", variant: "success" });
             }
+            // On success, the onAuthStateChanged listener in AuthWrapper will handle redirection.
         } catch (error: any) {
             console.error(`${isLogin ? 'Login' : 'Signup'} error:`, error);
             const errorCode = error.code || '';

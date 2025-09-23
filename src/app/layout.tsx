@@ -9,9 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { StateProvider } from '@/lib/state-store.tsx';
 import { Loader2 } from 'lucide-react';
 import AppLayoutWrapper from '@/components/layout/app-layout';
-import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User, getAdditionalUserInfo } from '@/lib/firebase';
+import { getFirebaseAuth, onAuthStateChanged, type User } from '@/lib/firebase';
 import { usePathname, useRouter } from 'next/navigation';
-import { getRtgsSettings, initialDataSync } from "@/lib/firestore";
+import { getRtgsSettings } from "@/lib/firestore";
 
 
 const inter = Inter({
@@ -35,20 +35,21 @@ const sourceCodePro = Source_Code_Pro({
 const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
-    const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
+    const [isSetupComplete, setIsSetupComplete] = useState<boolean | undefined>(undefined);
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
+                // If user is logged in, check if their setup is complete.
                 const companySettings = await getRtgsSettings();
                 setIsSetupComplete(!!companySettings?.companyName);
             } else {
-                setIsSetupComplete(null);
+                // If no user, setup is not relevant.
+                setIsSetupComplete(undefined);
             }
             setAuthChecked(true);
         });
@@ -57,32 +58,42 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     }, []);
 
     useEffect(() => {
-        if (!authChecked) return;
+        if (!authChecked) {
+            // Don't do anything until initial auth check is complete.
+            return;
+        }
 
-        const isPublicPage = ['/login', '/forgot-password'].includes(pathname);
-        const isRootPage = pathname === '/';
+        const isPublicPage = ['/login', '/forgot-password', '/'].includes(pathname);
         const isSettingsPage = pathname === '/settings';
 
         if (user) {
-            // User is logged in
+            // User is logged in.
+            if (isSetupComplete === undefined) {
+                // Still waiting for setup status, show loading.
+                return;
+            }
+
             if (isSetupComplete === false && !isSettingsPage) {
-                // If setup is not complete, force redirect to settings
+                // Setup is incomplete, force redirect to settings page.
                 router.replace('/settings');
-            } else if (isSetupComplete === true) {
-                // Setup is complete, redirect from public pages to dashboard
-                if (isPublicPage || isRootPage) {
-                   router.replace('/');
-                }
+            } else if (isSetupComplete === true && (isPublicPage || (pathname !== '/' && isSettingsPage && isSetupComplete))) {
+                 // Setup is complete, if user is on a public page or settings, redirect to dashboard.
+                 // The check for pathname !== '/' is to prevent a redirect loop on the dashboard.
+                 if (isPublicPage) {
+                    router.replace('/');
+                 }
             }
         } else {
-            // User is not logged in, redirect to login if not on a public page
-            if (!isPublicPage && !isRootPage) {
+            // User is not logged in.
+            if (!isPublicPage) {
+                // Redirect to login if not on a public page.
                 router.replace('/login');
             }
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
 
-    if (!authChecked || (user && isSetupComplete === null && !['/login', '/forgot-password', '/'].includes(pathname))) {
+    // Show a global loader while checking auth state or setup status.
+    if (!authChecked || (user && isSetupComplete === undefined)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -91,12 +102,14 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         );
     }
     
-    const showAppLayout = user && !['/login', '/forgot-password'].includes(pathname);
+    // Determine whether to show the main app layout or the public page layout
+    const showAppLayout = user && isSetupComplete;
 
     if (showAppLayout) {
         return <AppLayoutWrapper>{children}</AppLayoutWrapper>;
     }
     
+    // For logged-out users or users in the setup process, show children without the main layout.
     return <>{children}</>;
 };
 
