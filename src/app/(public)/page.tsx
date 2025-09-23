@@ -1,21 +1,11 @@
 
 "use client";
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+
+// This page is now handled by the main layout, which includes an auth check.
+// If the user is logged in, they will be directed to the dashboard.
+// If not, they will be redirected to the login page.
+// No specific logic is needed here anymore.
 
 export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // The logic in the PublicLayout will handle redirection if the user is already logged in.
-    // If not, we send them to the login page.
-    router.replace('/login');
-  }, [router]);
-
-  return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
+  return null;
 }

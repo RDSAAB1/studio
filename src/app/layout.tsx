@@ -58,7 +58,8 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (!authChecked) return;
 
-        const isPublicPage = ['/login', '/signup', '/forgot-password', '/'].includes(pathname);
+        const isPublicPage = ['/login', '/signup', '/forgot-password'].includes(pathname);
+        const isRootPage = pathname === '/';
         const isSettingsPage = pathname === '/settings';
 
         if (user) { // User is logged in
@@ -70,12 +71,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             if (!isSetupComplete && !isSettingsPage) {
                 // Setup is incomplete, force redirect to settings page
                 router.replace('/settings');
-            } else if (isSetupComplete && isPublicPage) {
-                // Setup is complete, but user is on a public page, redirect to dashboard.
-                router.replace('/');
+            } else if (isSetupComplete && pathname === '/login') {
+                 // If setup is complete and user is on login page, redirect to dashboard.
+                 router.replace('/');
             }
         } else { // User is not logged in
-            if (!isPublicPage) { 
+             if (!isPublicPage && pathname !== '/') { 
                 router.replace('/login');
             }
         }
