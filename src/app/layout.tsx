@@ -75,7 +75,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 router.replace('/');
             }
         } else { // User is not logged in
-            if (!isPublicPage && pathname !== '/signup') { // Allow access to signup page
+            if (!isPublicPage) { 
                 router.replace('/login');
             }
         }
