@@ -61,28 +61,28 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         const isPublicPage = ['/login', '/signup', '/forgot-password'].includes(pathname);
         const isRootPage = pathname === '/';
         const isSettingsPage = pathname === '/settings';
-
+        
         if (user) { // User is logged in
             if (isSetupComplete === undefined) {
-                // Still waiting for setup status, show loading (covered by the global loader)
-                return;
+                return; // Still loading setup status, show loader
             }
 
             if (!isSetupComplete && !isSettingsPage) {
-                // Setup is incomplete, force redirect to settings page
+                // If setup is incomplete, force redirect to settings page
                 router.replace('/settings');
-            } else if (isSetupComplete && pathname === '/login') {
-                 // If setup is complete and user is on login page, redirect to dashboard.
-                 router.replace('/');
+            } else if (isSetupComplete && (isPublicPage || isRootPage)) {
+                 // If setup is complete and user is on a public page, redirect to dashboard.
+                 // Note: We check for isRootPage as well to ensure they land on the dashboard
+                 // if they try to access '/' before the logic decides what to show.
+                 if(pathname !== '/') router.replace('/');
             }
         } else { // User is not logged in
-             if (!isPublicPage && pathname !== '/') { 
+             if (!isPublicPage) {
                 router.replace('/login');
             }
         }
     }, [user, authChecked, isSetupComplete, pathname, router]);
 
-    // Show a global loader while checking auth state or setup status.
     if (!authChecked || (user && isSetupComplete === undefined)) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -92,14 +92,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         );
     }
     
-    // Determine whether to show the main app layout or the public page layout
     const showAppLayout = user && isSetupComplete;
 
     if (showAppLayout) {
         return <AppLayoutWrapper>{children}</AppLayoutWrapper>;
     }
     
-    // For logged-out users or users in the setup process, show children without the main layout.
     return <>{children}</>;
 };
 
