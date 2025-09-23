@@ -74,6 +74,10 @@ export default function DailySupplierReportClient() {
             const supplierDate = format(new Date(s.date), 'yyyy-MM-dd');
             const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
             return supplierDate === dateStr && nameMatch;
+        }).sort((a, b) => {
+            const srNoA = parseInt(a.srNo.substring(1), 10);
+            const srNoB = parseInt(b.srNo.substring(1), 10);
+            return srNoA - srNoB;
         });
     }, [suppliers, selectedDate, searchTerm]);
 
@@ -146,10 +150,11 @@ export default function DailySupplierReportClient() {
                 body { 
                     -webkit-print-color-adjust: exact !important; 
                     print-color-adjust: exact !important;
+                }
+                .printable-area {
                     background-color: #fff !important;
                 }
-                .printable-area, .printable-area * {
-                    background-color: #fff !important;
+                .printable-area *, .printable-area *::before, .printable-area *::after {
                     color: #000 !important;
                     border-color: #ccc !important;
                 }
@@ -160,7 +165,9 @@ export default function DailySupplierReportClient() {
                 }
                 thead {
                     display: table-header-group !important; /* Ensure header repeats on each page */
-                    background-color: #e5e7eb !important;
+                }
+                .print-header-bg {
+                     background-color: #e5e7eb !important;
                 }
                 tbody {
                     display: table-row-group !important;
@@ -261,7 +268,7 @@ export default function DailySupplierReportClient() {
                         <div className="h-[60vh] overflow-auto scrollbar-hide">
                             <table className="w-full text-xs border-collapse border border-gray-300">
                                 <thead className="bg-muted font-semibold text-[10px] uppercase whitespace-nowrap sticky top-0 z-10">
-                                    <tr className="text-primary">
+                                    <tr className="text-primary print-header-bg">
                                         <th className="border border-gray-300 p-1 text-left">SR</th>
                                         <th className="border border-gray-300 p-1 text-left">Date</th>
                                         <th className="border border-gray-300 p-1 text-left">Term</th>
