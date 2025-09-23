@@ -44,11 +44,9 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                // If user is logged in, check if their setup is complete.
                 const companySettings = await getRtgsSettings();
                 setIsSetupComplete(!!companySettings?.companyName);
             } else {
-                // If no user, setup is not relevant.
                 setIsSetupComplete(undefined);
             }
             setAuthChecked(true);
@@ -58,35 +56,26 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
     }, []);
 
     useEffect(() => {
-        if (!authChecked) {
-            // Don't do anything until initial auth check is complete.
-            return;
-        }
+        if (!authChecked) return;
 
-        const isPublicPage = ['/login', '/forgot-password', '/'].includes(pathname);
+        const isPublicPage = ['/login', '/signup', '/forgot-password', '/'].includes(pathname);
         const isSettingsPage = pathname === '/settings';
 
-        if (user) {
-            // User is logged in.
+        if (user) { // User is logged in
             if (isSetupComplete === undefined) {
-                // Still waiting for setup status, show loading.
+                // Still waiting for setup status, show loading (covered by the global loader)
                 return;
             }
 
-            if (isSetupComplete === false && !isSettingsPage) {
-                // Setup is incomplete, force redirect to settings page.
+            if (!isSetupComplete && !isSettingsPage) {
+                // Setup is incomplete, force redirect to settings page
                 router.replace('/settings');
-            } else if (isSetupComplete === true && (isPublicPage || (pathname !== '/' && isSettingsPage && isSetupComplete))) {
-                 // Setup is complete, if user is on a public page or settings, redirect to dashboard.
-                 // The check for pathname !== '/' is to prevent a redirect loop on the dashboard.
-                 if (isPublicPage) {
-                    router.replace('/');
-                 }
+            } else if (isSetupComplete && isPublicPage) {
+                // Setup is complete, but user is on a public page, redirect to dashboard.
+                router.replace('/');
             }
-        } else {
-            // User is not logged in.
-            if (!isPublicPage) {
-                // Redirect to login if not on a public page.
+        } else { // User is not logged in
+            if (!isPublicPage && pathname !== '/signup') { // Allow access to signup page
                 router.replace('/login');
             }
         }
