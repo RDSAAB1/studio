@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { StateProvider } from '@/lib/state-store.tsx';
 import { Loader2 } from 'lucide-react';
 import AppLayoutWrapper from '@/components/layout/app-layout';
-import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User } from '@/lib/firebase';
+import { getFirebaseAuth, onAuthStateChanged, getRedirectResult, type User, getAdditionalUserInfo } from '@/lib/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { getRtgsSettings, initialDataSync } from "@/lib/firestore";
 
@@ -34,6 +34,7 @@ const sourceCodePro = Source_Code_Pro({
 
 const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [isNewUser, setIsNewUser] = useState(false);
     const [authChecked, setAuthChecked] = useState(false);
     const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
     const router = useRouter();
@@ -41,12 +42,19 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-        getRedirectResult(auth).catch(console.error);
+        
+        getRedirectResult(auth)
+            .then((result) => {
+                if(result) {
+                    const isNew = getAdditionalUserInfo(result)?.isNewUser;
+                    setIsNewUser(!!isNew);
+                }
+            })
+            .catch(console.error);
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                // No longer need to call initialDataSync here as data will be live.
                 const companySettings = await getRtgsSettings();
                 setIsSetupComplete(!!companySettings?.companyName);
             } else {
@@ -66,14 +74,14 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
         if (user) {
             // User is logged in
-            if (isSetupComplete === false) {
-                // Setup is not complete, must redirect to settings
+            if (isNewUser || isSetupComplete === false) {
+                // If it's a new user OR setup is not complete, redirect to settings
                 if (pathname !== '/settings') {
                     router.replace('/settings');
                 }
             } else if (isSetupComplete === true) {
-                // Setup is complete, redirect from public pages to dashboard (root)
-                if (isPublicPage) {
+                // Setup is complete, redirect from public pages to dashboard
+                if (isPublicPage || isRootPage) {
                    router.replace('/');
                 }
             }
@@ -83,9 +91,8 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 router.replace('/login');
             }
         }
-    }, [user, authChecked, isSetupComplete, pathname, router]);
+    }, [user, authChecked, isSetupComplete, isNewUser, pathname, router]);
 
-    // Initial loading state
     if (!authChecked || (user && isSetupComplete === null && !['/login', '/forgot-password', '/'].includes(pathname))) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
@@ -95,14 +102,12 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
         );
     }
     
-    // Determine if we should show the full app layout
     const showAppLayout = user && !['/login', '/forgot-password'].includes(pathname);
 
     if (showAppLayout) {
         return <AppLayoutWrapper>{children}</AppLayoutWrapper>;
     }
     
-    // For public pages or during initial load for public routes
     return <>{children}</>;
 };
 

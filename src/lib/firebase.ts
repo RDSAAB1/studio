@@ -12,6 +12,7 @@ import {
     createUserWithEmailAndPassword,
     sendPasswordResetEmail,
     signInWithRedirect,
+    getAdditionalUserInfo,
     type Auth 
 } from 'firebase/auth';
 
@@ -87,5 +88,6 @@ export {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     sendPasswordResetEmail,
-    signInWithRedirect
+    signInWithRedirect,
+    getAdditionalUserInfo
 };

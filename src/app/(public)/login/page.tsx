@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getFirebaseAuth, getGoogleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithRedirect } from '@/lib/firebase';
+import { getFirebaseAuth, getGoogleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithRedirect, getRedirectResult, getAdditionalUserInfo } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ export default function LoginPage() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const [isLogin, setIsLogin] = useState(true);
+    const [isNewUser, setIsNewUser] = useState(false);
 
     const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -35,7 +36,13 @@ export default function LoginPage() {
         const provider = getGoogleProvider();
         setLoading(true);
         try {
-          await signInWithRedirect(auth, provider);
+            const result = await getRedirectResult(auth);
+            if (result) {
+                const isNew = getAdditionalUserInfo(result)?.isNewUser;
+                setIsNewUser(!!isNew);
+            } else {
+                 await signInWithRedirect(auth, provider);
+            }
         } catch (error) {
            console.error("Sign-in with redirect failed", error);
            setLoading(false);
@@ -107,7 +114,7 @@ export default function LoginPage() {
                             <div className="text-right">
                                  <Button type="button" variant="link" size="sm" className="h-auto p-0" asChild>
                                     <Link href="/forgot-password">Forgot Password?</Link>
-                                </Button>
+                                 </Button>
                             </div>
                         )}
                     </CardContent>
