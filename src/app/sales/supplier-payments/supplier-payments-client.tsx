@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome, updateSupplier } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome, updateSupplier, deleteIncome } from "@/lib/firestore";
 import { firestoreDB } from "@/lib/firebase";
 import { collection, doc, getDocs, limit, query, runTransaction, where, addDoc, deleteDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -29,6 +29,7 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const expensesCollection = collection(firestoreDB, "expenses");
+const incomesCollection = collection(firestoreDB, "incomes");
 
 
 type PaymentOption = {
@@ -518,8 +519,6 @@ const processPayment = async () => {
             };
             if (paymentMethod !== 'Cash') {
                 expenseData.bankAccountId = selectedAccountId;
-            } else {
-                delete expenseData.bankAccountId;
             }
             transaction.set(expenseTransactionRef, expenseData);
 
@@ -670,6 +669,15 @@ const processPayment = async () => {
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
+                }
+                 // Delete the associated income transaction for CD, if it exists
+                if (paymentToDelete.cdApplied && paymentToDelete.cdAmount && paymentToDelete.cdAmount > 0) {
+                    const incomeQuery = query(incomesCollection, where("description", "==", `CD received on payment ${paymentToDelete.paymentId}`), limit(1));
+                    const incomeSnapshot = await getDocs(incomeQuery);
+                    if (!incomeSnapshot.empty) {
+                        const incomeDocRef = incomeSnapshot.docs[0].ref;
+                        transaction.delete(incomeDocRef);
+                    }
                 }
                 
                 // Delete the payment itself

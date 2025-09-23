@@ -183,13 +183,13 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTe
                     <Card className="h-full">
                          <CardContent className="p-3 space-y-2 flex flex-col justify-between h-full">
                             <div className="space-y-1">
-                                <Label className="text-xs">Payment Type</Label>
+                                <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <Controller name="paymentType" control={form.control} render={({ field }) => (
                                     <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} onAdd={(newVal) => handleAddOption('paymentTypes', {name: newVal})} placeholder="Select type..." />
                                 )} />
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-xs">Variety</Label>
+                                <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <Controller name="variety" control={form.control} render={({ field }) => (
                                     <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: v.name}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', {name: newVal})} placeholder="Select variety..." />
                                 )} />
@@ -252,5 +252,3 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTe
         </>
     );
 };
-
-    

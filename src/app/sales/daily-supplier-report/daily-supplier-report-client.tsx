@@ -75,11 +75,11 @@ export default function DailySupplierReportClient() {
             const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
             return supplierDate === dateStr && nameMatch;
         });
-        // Sort by srNo in ascending order
+        // Sort by srNo in descending order
         return filtered.sort((a, b) => {
             const numA = parseInt(a.srNo.substring(1), 10);
             const numB = parseInt(b.srNo.substring(1), 10);
-            return numA - numB;
+            return numB - numA;
         });
     }, [suppliers, selectedDate, searchTerm]);
 
@@ -185,6 +185,13 @@ export default function DailySupplierReportClient() {
                 .h-\\[60vh\\] {
                     height: auto !important;
                     overflow: visible !important;
+                }
+                 .scrollbar-hide {
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                }
+                .scrollbar-hide::-webkit-scrollbar {
+                    display: none;
                 }
             }
         `;
