@@ -34,7 +34,6 @@ const sourceCodePro = Source_Code_Pro({
 
 const AuthWrapper = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [isNewUser, setIsNewUser] = useState(false);
     const [authChecked, setAuthChecked] = useState(false);
     const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
     const router = useRouter();
@@ -42,15 +41,6 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const auth = getFirebaseAuth();
-        
-        getRedirectResult(auth)
-            .then((result) => {
-                if(result) {
-                    const isNew = getAdditionalUserInfo(result)?.isNewUser;
-                    setIsNewUser(!!isNew);
-                }
-            })
-            .catch(console.error);
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
@@ -71,14 +61,13 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
 
         const isPublicPage = ['/login', '/forgot-password'].includes(pathname);
         const isRootPage = pathname === '/';
+        const isSettingsPage = pathname === '/settings';
 
         if (user) {
             // User is logged in
-            if (isNewUser || isSetupComplete === false) {
-                // If it's a new user OR setup is not complete, redirect to settings
-                if (pathname !== '/settings') {
-                    router.replace('/settings');
-                }
+            if (isSetupComplete === false && !isSettingsPage) {
+                // If setup is not complete, force redirect to settings
+                router.replace('/settings');
             } else if (isSetupComplete === true) {
                 // Setup is complete, redirect from public pages to dashboard
                 if (isPublicPage || isRootPage) {
@@ -91,7 +80,7 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 router.replace('/login');
             }
         }
-    }, [user, authChecked, isSetupComplete, isNewUser, pathname, router]);
+    }, [user, authChecked, isSetupComplete, pathname, router]);
 
     if (!authChecked || (user && isSetupComplete === null && !['/login', '/forgot-password', '/'].includes(pathname))) {
         return (
