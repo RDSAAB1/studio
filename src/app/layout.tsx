@@ -72,8 +72,6 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
                 router.replace('/settings');
             } else if (isSetupComplete && (isPublicPage || isRootPage)) {
                  // If setup is complete and user is on a public page, redirect to dashboard.
-                 // Note: We check for isRootPage as well to ensure they land on the dashboard
-                 // if they try to access '/' before the logic decides what to show.
                  if(pathname !== '/') router.replace('/');
             }
         } else { // User is not logged in
