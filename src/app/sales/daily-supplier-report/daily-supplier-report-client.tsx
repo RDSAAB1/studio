@@ -70,7 +70,7 @@ export default function DailySupplierReportClient() {
     const filteredSuppliers = useMemo(() => {
         if (!suppliers) return [];
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        return suppliers.filter(s => {
+        const filtered = suppliers.filter(s => {
             const supplierDate = format(new Date(s.date), 'yyyy-MM-dd');
             const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
             return supplierDate === dateStr && nameMatch;
@@ -78,6 +78,12 @@ export default function DailySupplierReportClient() {
             const srNoA = parseInt(a.srNo.substring(1), 10);
             const srNoB = parseInt(b.srNo.substring(1), 10);
             return srNoA - srNoB;
+        });
+        // Sort by srNo in ascending order
+        return filtered.sort((a, b) => {
+            const numA = parseInt(a.srNo.substring(1), 10);
+            const numB = parseInt(b.srNo.substring(1), 10);
+            return numA - numB;
         });
     }, [suppliers, selectedDate, searchTerm]);
 
