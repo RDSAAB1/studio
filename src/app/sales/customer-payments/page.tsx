@@ -146,13 +146,21 @@ export default function CustomerPaymentsPage() {
         setReceiptNo(getNextReceiptNo(paymentHistory));
     }
   }, [paymentHistory, getNextReceiptNo, editingPayment]);
+
+  const resetPaymentForm = useCallback(() => {
+      setSelectedEntryIds(new Set());
+      setPaymentAmount(0);
+      setPaymentType('Full');
+      setEditingPayment(null);
+      if (paymentHistory) {
+          setReceiptNo(getNextReceiptNo(paymentHistory));
+      }
+  }, [paymentHistory, getNextReceiptNo]);
+
   
   const handleCustomerSelect = (key: string | null) => {
     setSelectedCustomerKey(key);
-    setSelectedEntryIds(new Set());
-    setPaymentAmount(0);
-    setPaymentType('Full');
-    setEditingPayment(null);
+    resetPaymentForm();
     if(key) {
         setIsOutstandingModalOpen(true);
     }
@@ -225,8 +233,7 @@ export default function CustomerPaymentsPage() {
         }
 
         toast({ title: "Success", description: "Payment recorded successfully." });
-        setSelectedEntryIds(new Set()); setPaymentAmount(0); setPaymentType('Full'); setEditingPayment(null);
-        setReceiptNo(getNextReceiptNo(paymentHistory));
+        resetPaymentForm();
     } catch(error) {
         console.error("Error processing payment:", error);
         toast({ variant: 'destructive', title: "Error", description: "Failed to process payment." });
@@ -293,9 +300,7 @@ export default function CustomerPaymentsPage() {
 
             toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success' });
             if (editingPayment?.id === paymentIdToDelete) {
-              setSelectedEntryIds(new Set());
-              setPaymentAmount(0);
-              setEditingPayment(null);
+              resetPaymentForm();
             }
         } catch (error) {
             console.error("Error deleting payment:", error);
