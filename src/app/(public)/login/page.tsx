@@ -91,85 +91,78 @@ export default function AuthPage() {
     };
 
     return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-            <div className="w-full max-w-md space-y-8">
+        <div className="flex min-h-screen w-full items-center justify-center p-4 auth-container">
+            <div className="w-full max-w-md space-y-6">
                 <div className="text-center">
-                    <div className="flex items-center justify-center gap-3 mb-2">
+                    <div className="flex items-center justify-center gap-3 mb-4">
                         <Sparkles className="h-8 w-8 text-primary" />
-                        <h1 className="text-3xl font-bold">BizSuite DataFlow</h1>
+                        <h1 className="text-3xl font-bold text-foreground">BizSuite DataFlow</h1>
                     </div>
-                     <p className="text-muted-foreground">Welcome! Please log in or sign up to continue.</p>
                 </div>
 
-               <Tabs defaultValue="login" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="login">Login</TabsTrigger>
-                        <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="login">
-                        <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6 pt-4">
+                <div className="bg-card/60 backdrop-blur-lg border border-border/20 rounded-2xl p-6 shadow-2xl">
+                    <Tabs defaultValue="login" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 bg-muted/50">
+                            <TabsTrigger value="login">Login</TabsTrigger>
+                            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="login">
+                            <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6 pt-6">
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="login-email">Email</Label>
+                                        <Input id="login-email" placeholder="m@example.com" {...loginForm.register("email")} className="bg-background/70"/>
+                                        {loginForm.formState.errors.email && <p className="text-xs text-destructive">{loginForm.formState.errors.email.message}</p>}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="login-password">Password</Label>
+                                            <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                                                <Link href="/forgot-password">Forgot Password?</Link>
+                                            </Button>
+                                        </div>
+                                        <Input id="login-password" type="password" {...loginForm.register("password")} className="bg-background/70"/>
+                                        {loginForm.formState.errors.password && <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-4">
+                                    <Button type="submit" className="w-full" disabled={loading}>
+                                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+                                        Login
+                                    </Button>
+                                    <Button variant="outline" onClick={handleGoogleSignIn} className="w-full bg-background/50" disabled={loading}>
+                                        <LogIn className="mr-2 h-4 w-4" /> Login with Google
+                                    </Button>
+                                </div>
+                            </form>
+                        </TabsContent>
+                        <TabsContent value="signup">
+                            <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-6 pt-6">
                             <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <Label htmlFor="login-email">Email</Label>
-                                    <Input id="login-email" placeholder="m@example.com" {...loginForm.register("email")} />
-                                    {loginForm.formState.errors.email && <p className="text-xs text-destructive">{loginForm.formState.errors.email.message}</p>}
-                                </div>
-                                <div className="space-y-1">
-                                     <div className="flex items-center justify-between">
-                                        <Label htmlFor="login-password">Password</Label>
-                                        <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
-                                            <Link href="/forgot-password">Forgot Password?</Link>
-                                        </Button>
-                                     </div>
-                                    <Input id="login-password" type="password" {...loginForm.register("password")} />
-                                    {loginForm.formState.errors.password && <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>}
-                                </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="signup-email">Email</Label>
+                                        <Input id="signup-email" placeholder="m@example.com" {...signupForm.register("email")} className="bg-background/70"/>
+                                        {signupForm.formState.errors.email && <p className="text-xs text-destructive">{signupForm.formState.errors.email.message}</p>}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="signup-password">Password</Label>
+                                        <Input id="signup-password" type="password" {...signupForm.register("password")} className="bg-background/70"/>
+                                        {signupForm.formState.errors.password && <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>}
+                                    </div>
                             </div>
                             <div className="flex flex-col gap-4">
-                                <Button type="submit" className="w-full" disabled={loading}>
-                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-                                    Login
-                                </Button>
-                                <div className="relative w-full">
-                                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
-                                </div>
-                                <Button variant="outline" onClick={handleGoogleSignIn} className="w-full" disabled={loading}>
-                                    <LogIn className="mr-2 h-4 w-4" /> Login with Google
-                                </Button>
+                                    <Button type="submit" className="w-full" disabled={loading}>
+                                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                                        Sign Up
+                                    </Button>
+                                    <Button variant="outline" onClick={handleGoogleSignIn} className="w-full bg-background/50" disabled={loading}>
+                                        <LogIn className="mr-2 h-4 w-4" /> Sign Up with Google
+                                    </Button>
                             </div>
-                        </form>
-                    </TabsContent>
-                    <TabsContent value="signup">
-                         <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-6 pt-4">
-                           <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <Label htmlFor="signup-email">Email</Label>
-                                    <Input id="signup-email" placeholder="m@example.com" {...signupForm.register("email")} />
-                                    {signupForm.formState.errors.email && <p className="text-xs text-destructive">{signupForm.formState.errors.email.message}</p>}
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="signup-password">Password</Label>
-                                    <Input id="signup-password" type="password" {...signupForm.register("password")} />
-                                    {signupForm.formState.errors.password && <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>}
-                                </div>
-                           </div>
-                           <div className="flex flex-col gap-4">
-                                <Button type="submit" className="w-full" disabled={loading}>
-                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-                                    Sign Up
-                                </Button>
-                                 <div className="relative w-full">
-                                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
-                                </div>
-                                <Button variant="outline" onClick={handleGoogleSignIn} className="w-full" disabled={loading}>
-                                    <LogIn className="mr-2 h-4 w-4" /> Sign Up with Google
-                                </Button>
-                           </div>
-                        </form>
-                    </TabsContent>
-                </Tabs>
+                            </form>
+                        </TabsContent>
+                    </Tabs>
+                </div>
             </div>
         </div>
     );

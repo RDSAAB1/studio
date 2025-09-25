@@ -44,6 +44,13 @@ body {
   }
 }
 
+.auth-container {
+    background:
+        radial-gradient(ellipse 50% 80% at 20% 40%, hsl(var(--primary) / 0.15), transparent),
+        radial-gradient(ellipse 50% 80% at 80% 50%, hsl(var(--secondary) / 0.15), transparent);
+}
+
+
 .wrapper{
     position: relative;
     display: flex;
