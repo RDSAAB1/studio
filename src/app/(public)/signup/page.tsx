@@ -102,10 +102,10 @@ export default function SignupPage() {
                         </div>
                         <Button variant="outline" onClick={handleGoogleSignIn} className="w-full" disabled={loading}>
                             <LogIn className="mr-2 h-4 w-4" />
-                            Sign up with Google
+                            Login with Google
                         </Button>
                          <Button type="button" variant="link" size="sm" asChild>
-                           <Link href="/login">Already have an account? Sign In</Link>
+                           <Link href="/login">Already have an account? Login</Link>
                          </Button>
                     </CardFooter>
                 </form>

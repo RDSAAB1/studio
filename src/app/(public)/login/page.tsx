@@ -36,9 +36,9 @@ export default function LoginPage() {
         try {
             await signInWithRedirect(auth, provider);
         } catch (error) {
-           console.error("Sign-in with redirect failed", error);
+           console.error("Login with redirect failed", error);
            setLoading(false);
-           toast({ title: "Sign-in Failed", description: "Could not start the sign-in process.", variant: "destructive" });
+           toast({ title: "Login Failed", description: "Could not start the login process.", variant: "destructive" });
         }
     };
     
@@ -69,9 +69,9 @@ export default function LoginPage() {
                          <Sparkles className="h-8 w-8 text-primary" />
                          <h1 className="text-3xl font-bold">BizSuite DataFlow</h1>
                     </div>
-                    <CardTitle>Sign In</CardTitle>
+                    <CardTitle>Login</CardTitle>
                     <CardDescription>
-                         Sign in to access your business dashboard.
+                         Login to access your business dashboard.
                     </CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit(onSubmit)}>
@@ -95,7 +95,7 @@ export default function LoginPage() {
                     <CardFooter className="flex flex-col gap-4">
                         <Button type="submit" className="w-full" disabled={loading}>
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-                            Sign In
+                            Login
                         </Button>
                          <div className="relative w-full">
                             <div className="absolute inset-0 flex items-center">
@@ -107,7 +107,7 @@ export default function LoginPage() {
                         </div>
                         <Button variant="outline" onClick={handleGoogleSignIn} className="w-full" disabled={loading}>
                             <LogIn className="mr-2 h-4 w-4" />
-                            Sign in with Google
+                            Login with Google
                         </Button>
                          <Button type="button" variant="link" size="sm" asChild>
                             <Link href="/signup">Don't have an account? Sign Up</Link>
