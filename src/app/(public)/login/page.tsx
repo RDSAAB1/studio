@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getFirebaseAuth, getGoogleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithRedirect } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -92,26 +93,23 @@ export default function AuthPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-background md:bg-muted/40 md:p-4">
-            <Card className="w-full max-w-md border-0 md:border md:shadow-lg">
-                 <CardHeader className="text-center">
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                         <Sparkles className="h-8 w-8 text-primary" />
-                         <h1 className="text-3xl font-bold">BizSuite DataFlow</h1>
-                    </div>
-                </CardHeader>
-                <Tabs defaultValue="login" className="w-full">
+        <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2 xl:min-h-screen">
+          <div className="flex items-center justify-center py-12">
+            <div className="mx-auto grid w-[350px] gap-6">
+              <div className="grid gap-2 text-center">
+                 <div className="flex items-center justify-center gap-3 mb-2">
+                     <Sparkles className="h-8 w-8 text-primary" />
+                     <h1 className="text-3xl font-bold">BizSuite DataFlow</h1>
+                </div>
+              </div>
+               <Tabs defaultValue="login" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="login">Login</TabsTrigger>
                         <TabsTrigger value="signup">Sign Up</TabsTrigger>
                     </TabsList>
                     <TabsContent value="login">
-                        <CardHeader className="text-center pt-4">
-                            <CardTitle>Login</CardTitle>
-                            <CardDescription>Access your business dashboard.</CardDescription>
-                        </CardHeader>
                         <form onSubmit={loginForm.handleSubmit(onLoginSubmit)}>
-                            <CardContent className="space-y-4">
+                            <CardContent className="space-y-4 pt-6">
                                 <div className="space-y-1">
                                     <Label htmlFor="login-email">Email</Label>
                                     <Input id="login-email" placeholder="m@example.com" {...loginForm.register("email")} />
@@ -144,12 +142,8 @@ export default function AuthPage() {
                         </form>
                     </TabsContent>
                     <TabsContent value="signup">
-                         <CardHeader className="text-center pt-4">
-                            <CardTitle>Create an Account</CardTitle>
-                            <CardDescription>Get started by creating a new account.</CardDescription>
-                        </CardHeader>
                          <form onSubmit={signupForm.handleSubmit(onSignupSubmit)}>
-                            <CardContent className="space-y-4">
+                            <CardContent className="space-y-4 pt-6">
                                 <div className="space-y-1">
                                     <Label htmlFor="signup-email">Email</Label>
                                     <Input id="signup-email" placeholder="m@example.com" {...signupForm.register("email")} />
@@ -177,7 +171,18 @@ export default function AuthPage() {
                         </form>
                     </TabsContent>
                 </Tabs>
-            </Card>
+            </div>
+          </div>
+          <div className="hidden bg-muted lg:block">
+            <Image
+              src="https://picsum.photos/seed/1/1920/1080"
+              alt="Image"
+              width="1920"
+              height="1080"
+              data-ai-hint="office productivity"
+              className="h-full w-full object-cover dark:brightness-[0.4]"
+            />
+          </div>
         </div>
     );
 }
