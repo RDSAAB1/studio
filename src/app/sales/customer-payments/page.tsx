@@ -198,6 +198,11 @@ export default function CustomerPaymentsPage() {
         let remainingPayment = paymentAmount;
         for (const entry of selectedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {
             if (remainingPayment <= 0) break;
+            
+            if (!entry.id) {
+                throw new Error(`Cannot process payment: Entry with SR# ${entry.srNo} is missing a valid ID.`);
+            }
+
             const receivable = parseFloat(String(entry.netAmount)) || 0;
             const paymentForThisEntry = Math.min(receivable, remainingPayment);
             await updateCustomer(entry.id, { netAmount: receivable - paymentForThisEntry });
@@ -226,7 +231,6 @@ export default function CustomerPaymentsPage() {
         }
         
         if (editingPayment && editingPayment.id) {
-            // Update logic if needed, for now we add new payment
             await addCustomerPayment(paymentData);
         } else {
             await addCustomerPayment(paymentData);
@@ -236,7 +240,7 @@ export default function CustomerPaymentsPage() {
         resetPaymentForm();
     } catch(error) {
         console.error("Error processing payment:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Failed to process payment." });
+        toast({ variant: 'destructive', title: "Error", description: (error as Error).message || "Failed to process payment." });
     }
   };
   
@@ -284,7 +288,7 @@ export default function CustomerPaymentsPage() {
             if (paymentToDelete.paidFor) {
                 for (const detail of paymentToDelete.paidFor) {
                     const customerToUpdate = customers.find(c => c.srNo === detail.srNo);
-                    if (customerToUpdate) {
+                    if (customerToUpdate && customerToUpdate.id) {
                         const amountToRestore = detail.amount;
                         const newNetAmount = (customerToUpdate.netAmount as number) + amountToRestore;
                         await updateCustomer(customerToUpdate.id, { netAmount: Math.round(newNetAmount) });
