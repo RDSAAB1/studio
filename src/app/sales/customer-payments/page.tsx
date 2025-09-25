@@ -60,6 +60,7 @@ export default function CustomerPaymentsPage() {
   const [receiptNo, setReceiptNo] = useState('');
   
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [editingPayment, setEditingPayment] = useState<CustomerPayment | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
@@ -182,6 +183,8 @@ export default function CustomerPaymentsPage() {
       toast({ variant: 'destructive', title: "Invalid Payment", description: "Partial payment cannot exceed total receivable." });
       return;
     }
+    
+    setIsProcessing(true);
 
     try {
         const paymentData: Omit<CustomerPayment, 'id'> = {
@@ -241,6 +244,8 @@ export default function CustomerPaymentsPage() {
     } catch(error) {
         console.error("Error processing payment:", error);
         toast({ variant: 'destructive', title: "Error", description: (error as Error).message || "Failed to process payment." });
+    } finally {
+        setIsProcessing(false);
     }
   };
   
@@ -370,7 +375,10 @@ export default function CustomerPaymentsPage() {
                                     onChange={(v) => v && setSelectedAccountId(v)} 
                                 />
                           </div>
-                          <Button onClick={processPayment} disabled={selectedEntryIds.size === 0} className="h-9 w-full">Receive Payment</Button>
+                          <Button onClick={processPayment} disabled={selectedEntryIds.size === 0 || isProcessing} className="h-9 w-full">
+                              {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Receive Payment
+                          </Button>
                       </div>
                   </CardContent>
               </Card>
