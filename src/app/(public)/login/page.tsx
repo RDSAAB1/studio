@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { getFirebaseAuth, getGoogleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithRedirect } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -92,22 +91,24 @@ export default function AuthPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-            <Card className="w-full max-w-md">
-                 <CardHeader className="text-center">
+        <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
+            <div className="w-full max-w-md space-y-8">
+                <div className="text-center">
                     <div className="flex items-center justify-center gap-3 mb-2">
-                         <Sparkles className="h-8 w-8 text-primary" />
-                         <h1 className="text-3xl font-bold">BizSuite DataFlow</h1>
+                        <Sparkles className="h-8 w-8 text-primary" />
+                        <h1 className="text-3xl font-bold">BizSuite DataFlow</h1>
                     </div>
-                </CardHeader>
+                     <p className="text-muted-foreground">Welcome! Please log in or sign up to continue.</p>
+                </div>
+
                <Tabs defaultValue="login" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="login">Login</TabsTrigger>
                         <TabsTrigger value="signup">Sign Up</TabsTrigger>
                     </TabsList>
                     <TabsContent value="login">
-                        <form onSubmit={loginForm.handleSubmit(onLoginSubmit)}>
-                            <CardContent className="space-y-4 pt-6">
+                        <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6 pt-4">
+                            <div className="space-y-4">
                                 <div className="space-y-1">
                                     <Label htmlFor="login-email">Email</Label>
                                     <Input id="login-email" placeholder="m@example.com" {...loginForm.register("email")} />
@@ -123,25 +124,25 @@ export default function AuthPage() {
                                     <Input id="login-password" type="password" {...loginForm.register("password")} />
                                     {loginForm.formState.errors.password && <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>}
                                 </div>
-                            </CardContent>
-                            <CardFooter className="flex flex-col gap-4">
+                            </div>
+                            <div className="flex flex-col gap-4">
                                 <Button type="submit" className="w-full" disabled={loading}>
                                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
                                     Login
                                 </Button>
                                 <div className="relative w-full">
                                     <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or</span></div>
+                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
                                 </div>
                                 <Button variant="outline" onClick={handleGoogleSignIn} className="w-full" disabled={loading}>
                                     <LogIn className="mr-2 h-4 w-4" /> Login with Google
                                 </Button>
-                            </CardFooter>
+                            </div>
                         </form>
                     </TabsContent>
                     <TabsContent value="signup">
-                         <form onSubmit={signupForm.handleSubmit(onSignupSubmit)}>
-                            <CardContent className="space-y-4 pt-6">
+                         <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-6 pt-4">
+                           <div className="space-y-4">
                                 <div className="space-y-1">
                                     <Label htmlFor="signup-email">Email</Label>
                                     <Input id="signup-email" placeholder="m@example.com" {...signupForm.register("email")} />
@@ -152,26 +153,24 @@ export default function AuthPage() {
                                     <Input id="signup-password" type="password" {...signupForm.register("password")} />
                                     {signupForm.formState.errors.password && <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>}
                                 </div>
-                            </CardContent>
-                            <CardFooter className="flex flex-col gap-4">
+                           </div>
+                           <div className="flex flex-col gap-4">
                                 <Button type="submit" className="w-full" disabled={loading}>
                                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
                                     Sign Up
                                 </Button>
                                  <div className="relative w-full">
                                     <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or</span></div>
+                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
                                 </div>
                                 <Button variant="outline" onClick={handleGoogleSignIn} className="w-full" disabled={loading}>
                                     <LogIn className="mr-2 h-4 w-4" /> Sign Up with Google
                                 </Button>
-                            </CardFooter>
+                           </div>
                         </form>
                     </TabsContent>
                 </Tabs>
-            </Card>
+            </div>
         </div>
     );
 }
-
-    
