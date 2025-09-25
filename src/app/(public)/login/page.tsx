@@ -92,8 +92,8 @@ export default function AuthPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-            <Card className="w-full max-w-md">
+        <div className="flex min-h-screen items-center justify-center bg-background md:bg-muted/40 md:p-4">
+            <Card className="w-full max-w-md border-0 md:border md:shadow-lg">
                  <CardHeader className="text-center">
                     <div className="flex items-center justify-center gap-3 mb-2">
                          <Sparkles className="h-8 w-8 text-primary" />
