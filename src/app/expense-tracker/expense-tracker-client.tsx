@@ -232,8 +232,7 @@ export default function IncomeExpenseClient() {
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-    setTimeout(() => setFocus('transactionType'), 50);
-  }, [reset, setFocus, getNextTransactionId, setValue]);
+  }, [reset, getNextTransactionId, setValue]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -552,11 +551,11 @@ export default function IncomeExpenseClient() {
             if (latestTransaction.transactionType === 'Expense') {
                 setValue('expenseNature', latestTransaction.expenseNature);
             }
-            setValue('category', latestTransaction.category);
-            
-            // This needs a slight delay for sub-categories to populate
             setTimeout(() => {
-                setValue('subCategory', latestTransaction.subCategory);
+                setValue('category', latestTransaction.category);
+                setTimeout(() => {
+                    setValue('subCategory', latestTransaction.subCategory);
+                }, 50);
             }, 50);
             toast({ title: 'Auto-filled!', description: `Details for ${payeeName} loaded.` });
         }
