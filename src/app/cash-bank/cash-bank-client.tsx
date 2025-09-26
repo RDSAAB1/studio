@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { FundTransaction, Income, Expense, Loan, BankAccount } from "@/lib/definitions";
+import type { FundTransaction, Income, Expense, Loan, BankAccount, Customer } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-fns";
 
-import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
+import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction, getSuppliersRealtime } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -63,6 +62,7 @@ export default function CashBankClient() {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [suppliers, setSuppliers] = useState<Customer[]>([]);
     
     const [isClient, setIsClient] = useState(false);
     const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
@@ -77,6 +77,7 @@ export default function CashBankClient() {
         const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+        const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
 
         return () => {
             unsubFundTransactions();
@@ -84,6 +85,7 @@ export default function CashBankClient() {
             unsubExpenses();
             unsubLoans();
             unsubBankAccounts();
+            unsubSuppliers();
         };
     }, []);
 
@@ -158,11 +160,13 @@ export default function CashBankClient() {
             }
         });
         
-        const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + Math.max(0, loan.remainingAmount), 0);
+        const totalLoanLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + Math.max(0, loan.remainingAmount), 0);
+        const totalSupplierDues = suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0);
+        const totalLiabilities = totalLoanLiabilities + totalSupplierDues;
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts]);
+    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts, suppliers]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)

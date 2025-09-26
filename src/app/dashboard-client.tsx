@@ -137,11 +137,12 @@ export default function DashboardClient() {
         });
         
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
-        const totalLiabilities = loans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
+        const totalLoanLiabilities = loans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
+        const totalLiabilities = totalLoanLiabilities + totalSupplierDues;
         const workingCapital = totalAssets - totalLiabilities;
         
         return { balances, totalAssets, totalLiabilities, workingCapital };
-    }, [fundTransactions, incomes, expenses, bankAccounts, loans]);
+    }, [fundTransactions, incomes, expenses, bankAccounts, loans, totalSupplierDues]);
 
     // --- Chart Data Calculation ---
     const level1Data = useMemo(() => {
