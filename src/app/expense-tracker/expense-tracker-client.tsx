@@ -698,8 +698,15 @@ export default function IncomeExpenseClient() {
                             </Popover>
                           </div>
                       )} />
-
+                      
                       <div className="space-y-1">
+                          <Label htmlFor="transactionId" className="text-xs">Transaction ID</Label>
+                          <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
+                              <Input id="transactionId" {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-8 text-sm pl-10" />
+                          </InputWithIcon>
+                      </div>
+
+                       <div className="space-y-1">
                           <Label htmlFor="amount" className="text-xs">Amount</Label>
                           <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
                               <Controller name="amount" control={control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
@@ -764,12 +771,6 @@ export default function IncomeExpenseClient() {
                             />
                         </div>
 
-                        <div className="space-y-1">
-                            <Label htmlFor="transactionId" className="text-xs">Transaction ID</Label>
-                            <InputWithIcon icon={<FileText className="h-4 w-4 text-muted-foreground" />}>
-                                <Input id="transactionId" {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-8 text-sm pl-10" />
-                            </InputWithIcon>
-                        </div>
                     </div>
 
                     {isAdvanced && (
@@ -975,5 +976,7 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
 
     
