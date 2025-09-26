@@ -180,8 +180,8 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
     const brokerageRate = Number(values.brokerageRate) || 0;
     const brokerageAmount = Math.round(netWeight * brokerageRate);
 
-    const cdPercentage = Number(values.cdRate) || 0;
-    const cdAmount = Math.round((amount * cdPercentage) / 100);
+    const cdRate = Number(values.cdRate) || 0;
+    const cdAmount = Math.round((amount * cdRate) / 100);
     
     const kanta = Number(values.kanta) || 0;
     
