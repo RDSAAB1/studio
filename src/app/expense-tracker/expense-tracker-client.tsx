@@ -68,7 +68,7 @@ type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 // This combines both income and expense for the list display
 type DisplayTransaction = (Income | Expense) & { id: string };
 
-const getInitialFormState = (): TransactionFormValues => {
+const getInitialFormState = (nextTxId: string): TransactionFormValues => {
   const staticDate = new Date();
   staticDate.setHours(0, 0, 0, 0);
 
@@ -82,7 +82,7 @@ const getInitialFormState = (): TransactionFormValues => {
     description: '',
     paymentMethod: 'Cash',
     status: 'Paid',
-    transactionId: '',
+    transactionId: nextTxId,
     taxAmount: 0,
     expenseType: 'Business',
     isRecurring: false,
@@ -164,12 +164,31 @@ export default function IncomeExpenseClient() {
     }
   }, [income, expenses])
 
+  const allTransactions: DisplayTransaction[] = useMemo(() => [...(income || []), ...(expenses || [])], [income, expenses]);
+
+  const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
+      const prefix = type === 'Income' ? 'IN' : 'EX';
+      const relevantTransactions = allTransactions.filter(t => t.transactionType === type && t.transactionId);
+      if (!relevantTransactions || relevantTransactions.length === 0) {
+          return formatTransactionId(1, prefix);
+      }
+      
+      const lastNum = relevantTransactions.reduce((max, t) => {
+          const numMatch = t.transactionId?.match(/^(?:IN|EX)(\d+)$/);
+          if (numMatch && numMatch[1]) {
+            const num = parseInt(numMatch[1], 10);
+            return num > max ? num : max;
+          }
+          return max;
+      }, 0);
+
+      return formatTransactionId(lastNum + 1, prefix);
+  }, [allTransactions]);
+
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
-    defaultValues: getInitialFormState(),
+    defaultValues: getInitialFormState(getNextTransactionId('Expense')),
   });
-
-  const allTransactions: DisplayTransaction[] = useMemo(() => [...(income || []), ...(expenses || [])], [income, expenses]);
 
   const {
     watch,
@@ -190,19 +209,6 @@ export default function IncomeExpenseClient() {
   const quantity = watch('quantity');
   const rate = watch('rate');
 
-  const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
-      const prefix = type === 'Income' ? 'IN' : 'EX';
-      const relevantTransactions = allTransactions.filter(t => t.transactionType === type);
-      if (!relevantTransactions || relevantTransactions.length === 0) {
-          return formatTransactionId(1, prefix);
-      }
-      const lastNum = relevantTransactions.reduce((max, t) => {
-          const numMatch = t.transactionId?.match(/^(?:IN|EX)(\d+)$/);
-          const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-          return num > max ? num : max;
-      }, 0);
-      return formatTransactionId(lastNum + 1, prefix);
-  }, [allTransactions]);
 
   useEffect(() => {
       if (!isEditing) {
@@ -226,13 +232,13 @@ export default function IncomeExpenseClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(null); 
-    reset(getInitialFormState());
-    setValue('transactionId', getNextTransactionId('Expense'));
+    const nextId = getNextTransactionId('Expense');
+    reset(getInitialFormState(nextId));
     setIsAdvanced(false);
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-  }, [reset, getNextTransactionId, setValue]);
+  }, [reset, getNextTransactionId]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -550,13 +556,13 @@ export default function IncomeExpenseClient() {
         if (latestTransaction) {
             if (latestTransaction.transactionType === 'Expense') {
                 setValue('expenseNature', latestTransaction.expenseNature);
-            }
-            setTimeout(() => {
-                setValue('category', latestTransaction.category);
-                setTimeout(() => {
-                    setValue('subCategory', latestTransaction.subCategory);
+                 setTimeout(() => {
+                    setValue('category', latestTransaction.category);
+                    setTimeout(() => {
+                        setValue('subCategory', latestTransaction.subCategory);
+                    }, 50);
                 }, 50);
-            }, 50);
+            }
             toast({ title: 'Auto-filled!', description: `Details for ${payeeName} loaded.` });
         }
     };
