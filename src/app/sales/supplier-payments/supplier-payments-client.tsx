@@ -567,7 +567,7 @@ const processPayment = async () => {
                 delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
             }
 
-            const newPaymentRef = doc(collection(db, "payments"));
+            const newPaymentRef = doc(collection(firestoreDB, "payments"));
             transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
             finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
         });
@@ -652,8 +652,8 @@ const processPayment = async () => {
         }
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const paymentRef = doc(db, "payments", paymentIdToDelete);
+            await runTransaction(firestoreDB, async (transaction) => {
+                const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
                 
                 // Revert supplier netAmount
                 if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
@@ -749,7 +749,7 @@ const processPayment = async () => {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setCdAt('full_amount');
+        setCdAt('on_full_amount');
         setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
@@ -968,4 +968,5 @@ const processPayment = async () => {
     
 
     
+
 
