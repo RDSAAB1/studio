@@ -165,7 +165,10 @@ export default function IncomeExpenseClient() {
     }
   }, [income, expenses])
 
-  const allTransactions: DisplayTransaction[] = useMemo(() => [...(income || []), ...(expenses || [])], [income, expenses]);
+  const allTransactions: DisplayTransaction[] = useMemo(() => {
+      const combined = [...(income || []), ...(expenses || [])];
+      return combined.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [income, expenses]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
       const prefix = type === 'Income' ? 'IN' : 'EX';
@@ -554,7 +557,7 @@ export default function IncomeExpenseClient() {
             .filter(t => toTitleCase(t.payee) === payeeName)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
         
-        if (latestTransaction && latestTransaction.transactionType === 'Expense') {
+        if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
             setValue('expenseNature', latestTransaction.expenseNature);
             setTimeout(() => {
                 setValue('category', latestTransaction.category);
@@ -574,6 +577,11 @@ export default function IncomeExpenseClient() {
         requestAnimationFrame(() => {
             e.target.setSelectionRange(selectionStart, selectionEnd);
         });
+    };
+    
+    const getDisplayId = (transaction: DisplayTransaction): string => {
+        const paymentIdMatch = transaction.description?.match(/(?:Payment|CD received on payment)\s([SPC]{1,2}\d+)/);
+        return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
     };
 
   if(isPageLoading) {
@@ -627,7 +635,7 @@ export default function IncomeExpenseClient() {
                     {sortedTransactions.map((transaction) => (
                       <TableRow key={transaction.id}>
                         <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
-                        <TableCell className="font-mono text-xs">{transaction.transactionId}</TableCell>
+                        <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
                         <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
                         <TableCell>{transaction.category}</TableCell>
                         <TableCell>{transaction.subCategory}</TableCell>
