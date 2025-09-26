@@ -42,7 +42,7 @@ export const PaymentForm = ({
     paymentMethod, rtgsFor, supplierDetails, setSupplierDetails,
     isPayeeEditing, setIsPayeeEditing,
     bankDetails, setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
-    rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
+    rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentDate, setPaymentDate, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
     cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
     setSixRDate, utrNo, setUtrNo, 
     parchiNo, setParchiNo, checkNo, setCheckNo,
@@ -112,7 +112,20 @@ export const PaymentForm = ({
                 
                 <Separator/>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-2 items-end">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-2 items-end">
+                    <div className="space-y-1">
+                        <Label className="text-xs">Payment Date</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-8 text-xs", !paymentDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-3 w-3" />
+                                    {paymentDate ? format(paymentDate, "dd-MMM-yy") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={paymentDate} onSelect={setPaymentDate} initialFocus /></PopoverContent>
+                        </Popover>
+                    </div>
+
                     {rtgsFor === 'Supplier' && (
                     <>
                         <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs font-mono" /></div>

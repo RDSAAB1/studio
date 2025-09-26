@@ -61,6 +61,7 @@ export default function SupplierPaymentsClient() {
   
   const [paymentId, setPaymentId] = useState('');
   const [rtgsSrNo, setRtgsSrNo] = useState('');
+  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('Full');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -508,7 +509,7 @@ const processPayment = async () => {
             const expenseTransactionRef = doc(collection(firestoreDB, 'expenses'));
             const expenseData: Partial<Expense> = {
                 id: expenseTransactionRef.id,
-                date: new Date().toISOString().split('T')[0],
+                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0],
                 transactionType: 'Expense',
                 category: 'Supplier Payments',
                 subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
@@ -545,7 +546,7 @@ const processPayment = async () => {
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: paymentId,
                 customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
-                date: new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
+                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
                 cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
                 receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
                 paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
@@ -566,7 +567,7 @@ const processPayment = async () => {
                 delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
             }
 
-            const newPaymentRef = doc(collection(firestoreDB, "payments"));
+            const newPaymentRef = doc(collection(db, "payments"));
             transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
             finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
         });
@@ -651,8 +652,8 @@ const processPayment = async () => {
         }
 
         try {
-            await runTransaction(firestoreDB, async (transaction) => {
-                const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
+            await runTransaction(db, async (transaction) => {
+                const paymentRef = doc(db, "payments", paymentIdToDelete);
                 
                 // Revert supplier netAmount
                 if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
@@ -673,15 +674,6 @@ const processPayment = async () => {
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
-                }
-                 // Delete the associated income transaction for CD, if it exists
-                if (paymentToDelete.cdApplied && paymentToDelete.cdAmount && paymentToDelete.cdAmount > 0) {
-                    const incomeQuery = query(incomesCollection, where("description", "==", `CD received on payment ${paymentToDelete.paymentId}`), limit(1));
-                    const incomeSnapshot = await getDocs(incomeQuery);
-                    if (!incomeSnapshot.empty) {
-                        const incomeDocRef = incomeSnapshot.docs[0].ref;
-                        transaction.delete(incomeDocRef);
-                    }
                 }
                 
                 // Delete the payment itself
@@ -757,7 +749,7 @@ const processPayment = async () => {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setCdAt('on_full_amount');
+        setCdAt('full_amount');
         setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
@@ -877,6 +869,7 @@ const processPayment = async () => {
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
                         handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
@@ -975,3 +968,4 @@ const processPayment = async () => {
     
 
     
+
