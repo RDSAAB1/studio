@@ -178,20 +178,7 @@ export default function DailySupplierReportClient() {
                 const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 const style = iframeDoc.createElement('style');
                 style.appendChild(iframeDoc.createTextNode(cssText));
-                style.appendChild(iframeDoc.createTextNode(`
-                    @page { size: landscape; margin: 10mm; }
-                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .print-header { margin-bottom: 0.5rem; text-align: center; display: block !important; }
-                    thead { display: table-header-group !important; /* Ensure header repeats on each page */ background-color: #e5e7eb !important; }
-                    tbody { display: table-row-group !important; }
-                    tr { page-break-inside: avoid !important; }
-                    .no-print { display: none !important; }
-                    .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
-                    .h-\\[60vh\\] { height: auto !important; overflow: visible !important; }
-                     .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
-                    .scrollbar-hide::-webkit-scrollbar { display: none; }
-                `));
-                iframeDoc.head.appendChild(printStyles);
+                iframeDoc.head.appendChild(style);
             } catch (e) {
                 console.warn("Could not copy stylesheet:", e);
             }
@@ -210,7 +197,7 @@ export default function DailySupplierReportClient() {
                 .no-print { display: none !important; }
                 .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
                 .h-\\[60vh\\] { height: auto !important; overflow: visible !important; }
-                 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+                .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
                 .scrollbar-hide::-webkit-scrollbar { display: none; }
             }
         `;
@@ -374,3 +361,6 @@ export default function DailySupplierReportClient() {
         </div>
     );
 }
+
+
+    
