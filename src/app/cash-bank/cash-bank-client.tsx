@@ -21,7 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
-import { format, addMonths, differenceInMonths, parseISO } from "date-fns";
+import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-fns";
 
 import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
@@ -118,8 +118,9 @@ export default function CashBankClient() {
             const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
             
             let accumulatedInterest = 0;
-            if (loan.loanType === 'Outsider' && loan.interestRate > 0) {
-                const monthsPassed = differenceInMonths(new Date(), parseISO(loan.startDate));
+            const startDate = parseISO(loan.startDate);
+            if (loan.loanType === 'Outsider' && loan.interestRate > 0 && isValid(startDate)) {
+                const monthsPassed = differenceInMonths(new Date(), startDate);
                 if (monthsPassed > 0) {
                     accumulatedInterest = (loan.totalAmount * (loan.interestRate / 100) * monthsPassed) / 12;
                 }
@@ -157,11 +158,11 @@ export default function CashBankClient() {
             }
         });
         
-        const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + (loan.remainingAmount > 0 ? loan.remainingAmount : 0), 0);
+        const totalLiabilities = loansWithCalculatedRemaining.reduce((sum, loan) => sum + Math.max(0, loan.remainingAmount), 0);
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts, incomes, expenses]);
+    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
@@ -176,6 +177,11 @@ export default function CashBankClient() {
     };
 
     const onTransferSubmit = (values: TransferValues) => {
+        if (!values.source || !values.destination) {
+            toast({ title: "Source and destination are required", variant: "destructive" });
+            return;
+        }
+
         if (values.source === values.destination) {
             toast({ title: "Source and destination cannot be the same", variant: "destructive" });
             return;
