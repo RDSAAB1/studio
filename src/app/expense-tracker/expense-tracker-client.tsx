@@ -464,7 +464,6 @@ export default function IncomeExpenseClient() {
       }
       
       handleNew();
-      setActiveTab("history");
     } catch (error) {
         console.error("Error saving transaction: ", error);
         toast({ title: "Failed to save transaction.", variant: "destructive" });
@@ -540,6 +539,35 @@ export default function IncomeExpenseClient() {
       totalTransactions: allTransactions.length,
     };
   }, [income, expenses, allTransactions]);
+  
+    const handlePayeeBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        const payeeName = toTitleCase(e.target.value.trim());
+        if (!payeeName) return;
+
+        const latestTransaction = allTransactions
+            .filter(t => toTitleCase(t.payee) === payeeName)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+        if (latestTransaction) {
+            setValue('category', latestTransaction.category);
+            setValue('expenseNature', latestTransaction.expenseNature);
+            // This needs a slight delay for sub-categories to populate
+            setTimeout(() => {
+                setValue('subCategory', latestTransaction.subCategory);
+            }, 50);
+            toast({ title: 'Auto-filled!', description: `Details for ${payeeName} loaded.` });
+        }
+    };
+
+    const handlePayeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { value, selectionStart, selectionEnd } = e.target;
+        const capitalizedValue = toTitleCase(value);
+        setValue('payee', capitalizedValue);
+        // This is a trick to maintain cursor position after programmatic change
+        requestAnimationFrame(() => {
+            e.target.setSelectionRange(selectionStart, selectionEnd);
+        });
+    };
 
   if(loading) {
     return <div>Loading...</div>
@@ -702,7 +730,7 @@ export default function IncomeExpenseClient() {
                             {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                           </Label>
                            <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} className="h-8 text-sm pl-10" /> } />
+                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} onChange={handlePayeeChange} onBlur={handlePayeeBlur} className="h-8 text-sm pl-10" /> } />
                            </InputWithIcon>
                           {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                       </div>
