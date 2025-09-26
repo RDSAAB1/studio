@@ -547,10 +547,13 @@ export default function IncomeExpenseClient() {
         const latestTransaction = allTransactions
             .filter(t => toTitleCase(t.payee) === payeeName)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-
+        
         if (latestTransaction) {
+            if (latestTransaction.transactionType === 'Expense') {
+                setValue('expenseNature', latestTransaction.expenseNature);
+            }
             setValue('category', latestTransaction.category);
-            setValue('expenseNature', latestTransaction.expenseNature);
+            
             // This needs a slight delay for sub-categories to populate
             setTimeout(() => {
                 setValue('subCategory', latestTransaction.subCategory);
