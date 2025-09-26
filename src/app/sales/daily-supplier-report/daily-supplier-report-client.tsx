@@ -8,7 +8,7 @@ import { getRtgsSettings, getSuppliersRealtime } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
-import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins, Scale, Percent, Wheat } from 'lucide-react';
+import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins, Scale, Percent, Wheat, Sigma } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -96,7 +96,7 @@ export default function DailySupplierReportClient() {
     }, [suppliers, selectedDate, searchTerm, selectedVariety]);
 
     const summary = useMemo(() => {
-        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, rate: 0, kartaPercentage: 0 };
+        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, rate: 0, kartaPercentage: 0, totalEntries: 0 };
         const newSummary = filteredSuppliers.reduce((acc, s) => {
             acc.gross += s.grossWeight;
             acc.tier += s.teirWeight;
@@ -111,6 +111,8 @@ export default function DailySupplierReportClient() {
             acc.kartaPercentage += s.kartaPercentage;
             return acc;
         }, initialSummary);
+
+        newSummary.totalEntries = filteredSuppliers.length;
 
         if (newSummary.total > 0) {
             newSummary.rate = newSummary.amount / newSummary.total;
@@ -175,7 +177,20 @@ export default function DailySupplierReportClient() {
                 const cssText = Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
                 const style = iframeDoc.createElement('style');
                 style.appendChild(iframeDoc.createTextNode(cssText));
-                iframeDoc.head.appendChild(style);
+                style.appendChild(iframeDoc.createTextNode(`
+                    @page { size: landscape; margin: 10mm; }
+                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .print-header { margin-bottom: 0.5rem; text-align: center; display: block !important; }
+                    thead { display: table-header-group !important; /* Ensure header repeats on each page */ background-color: #e5e7eb !important; }
+                    tbody { display: table-row-group !important; }
+                    tr { page-break-inside: avoid !important; }
+                    .no-print { display: none !important; }
+                    .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
+                    .h-\\[60vh\\] { height: auto !important; overflow: visible !important; }
+                     .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+                    .scrollbar-hide::-webkit-scrollbar { display: none; }
+                `));
+                iframeDoc.head.appendChild(printStyles);
             } catch (e) {
                 console.warn("Could not copy stylesheet:", e);
             }
@@ -185,50 +200,17 @@ export default function DailySupplierReportClient() {
          printStyles.textContent = `
             @media print {
                 @page { size: landscape; margin: 10mm; }
-                body { 
-                    -webkit-print-color-adjust: exact !important; 
-                    print-color-adjust: exact !important;
-                    background-color: #fff !important;
-                }
-                .printable-area, .printable-area * {
-                    background-color: #fff !important;
-                    color: #000 !important;
-                    border-color: #ccc !important;
-                }
-                .print-header { 
-                    margin-bottom: 0.5rem; 
-                    text-align: center;
-                    display: block !important;
-                }
-                thead {
-                    display: table-header-group !important; /* Ensure header repeats on each page */
-                    background-color: #e5e7eb !important;
-                }
-                tbody {
-                    display: table-row-group !important;
-                }
-                tr {
-                    page-break-inside: avoid !important;
-                }
-                .no-print { 
-                    display: none !important; 
-                }
-                .print-summary-container {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    gap: 0.5rem !important;
-                }
-                .h-\\[60vh\\] {
-                    height: auto !important;
-                    overflow: visible !important;
-                }
-                 .scrollbar-hide {
-                    scrollbar-width: none;
-                    -ms-overflow-style: none;
-                }
-                .scrollbar-hide::-webkit-scrollbar {
-                    display: none;
-                }
+                body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background-color: #fff !important; }
+                .printable-area, .printable-area * { background-color: #fff !important; color: #000 !important; border-color: #ccc !important; }
+                .print-header { margin-bottom: 0.5rem; text-align: center; display: block !important; }
+                thead { display: table-header-group !important; background-color: #e5e7eb !important; }
+                tbody { display: table-row-group !important; }
+                tr { page-break-inside: avoid !important; }
+                .no-print { display: none !important; }
+                .print-summary-container { display: flex !important; flex-direction: row !important; gap: 0.5rem !important; }
+                .h-\\[60vh\\] { height: auto !important; overflow: visible !important; }
+                 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+                .scrollbar-hide::-webkit-scrollbar { display: none; }
             }
         `;
         iframeDoc.head.appendChild(printStyles);
@@ -279,7 +261,10 @@ export default function DailySupplierReportClient() {
                              <CustomDropdown options={varietyOptions} value={selectedVariety} onChange={setSelectedVariety} placeholder="Filter by variety..." />
                         </div>
                         
-                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 print:flex print-summary-container">
+                         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-2 print:flex print-summary-container">
+                           <CategorySummaryCard title="Total Entries" icon={<Sigma size={16}/>} data={[
+                                { label: 'Parchi', value: `${summary.totalEntries}` },
+                           ]}/>
                            <CategorySummaryCard title="Gross & Tier" icon={<Weight size={16}/>} data={[
                                 { label: 'Gross', value: `${summary.gross.toFixed(2)}` },
                                 { label: 'Tier', value: `${summary.tier.toFixed(2)}` },
