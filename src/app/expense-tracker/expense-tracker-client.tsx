@@ -31,7 +31,7 @@ import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc,
 import { firestoreDB } from "@/lib/firebase"; 
 
 
-import { Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins } from "lucide-react";
+import { Loader2, Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format, addMonths } from "date-fns"
 
@@ -133,7 +133,8 @@ export default function IncomeExpenseClient() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  const [loading, setLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("form");
   const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
@@ -160,7 +161,7 @@ export default function IncomeExpenseClient() {
 
   useEffect(() => {
     if(income !== undefined && expenses !== undefined) {
-      setLoading(false);
+      setIsPageLoading(false);
     }
   }, [income, expenses])
 
@@ -424,7 +425,7 @@ export default function IncomeExpenseClient() {
         }
     }
   
-    setLoading(true);
+    setIsSubmitting(true);
     try {
       const transactionData: Partial<TransactionFormValues> = {
         ...values,
@@ -473,7 +474,7 @@ export default function IncomeExpenseClient() {
         console.error("Error saving transaction: ", error);
         toast({ title: "Failed to save transaction.", variant: "destructive" });
     } finally {
-        setLoading(false);
+        setIsSubmitting(false);
     }
   };
 
@@ -553,16 +554,14 @@ export default function IncomeExpenseClient() {
             .filter(t => toTitleCase(t.payee) === payeeName)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
         
-        if (latestTransaction) {
-            if (latestTransaction.transactionType === 'Expense') {
-                setValue('expenseNature', latestTransaction.expenseNature);
-                 setTimeout(() => {
-                    setValue('category', latestTransaction.category);
-                    setTimeout(() => {
-                        setValue('subCategory', latestTransaction.subCategory);
-                    }, 50);
+        if (latestTransaction && latestTransaction.transactionType === 'Expense') {
+            setValue('expenseNature', latestTransaction.expenseNature);
+            setTimeout(() => {
+                setValue('category', latestTransaction.category);
+                setTimeout(() => {
+                    setValue('subCategory', latestTransaction.subCategory);
                 }, 50);
-            }
+            }, 50);
             toast({ title: 'Auto-filled!', description: `Details for ${payeeName} loaded.` });
         }
     };
@@ -577,7 +576,7 @@ export default function IncomeExpenseClient() {
         });
     };
 
-  if(loading) {
+  if(isPageLoading) {
     return <div>Loading...</div>
   }
 
@@ -707,6 +706,16 @@ export default function IncomeExpenseClient() {
                           </InputWithIcon>
                           {errors.amount && <p className="text-xs text-destructive mt-1">{errors.amount.message}</p>}
                       </div>
+
+                       <div className="space-y-1">
+                          <Label htmlFor="payee" className="text-xs">
+                            {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
+                          </Label>
+                           <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} onChange={handlePayeeChange} onBlur={handlePayeeBlur} className="h-8 text-sm pl-10" /> } />
+                           </InputWithIcon>
+                          {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
+                      </div>
                        
                         {selectedTransactionType === 'Expense' && (
                             <Controller name="expenseNature" control={control} render={({ field }) => (
@@ -732,16 +741,6 @@ export default function IncomeExpenseClient() {
                             {errors.subCategory && <p className="text-xs text-destructive mt-1">{errors.subCategory.message}</p>}
                           </div>
                         )} />
-
-                      <div className="space-y-1">
-                          <Label htmlFor="payee" className="text-xs">
-                            {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
-                          </Label>
-                           <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} onChange={handlePayeeChange} onBlur={handlePayeeBlur} className="h-8 text-sm pl-10" /> } />
-                           </InputWithIcon>
-                          {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
-                      </div>
                       
                         <div className="space-y-1">
                             <Label htmlFor="paymentMethod" className="text-xs">Payment Method</Label>
@@ -951,7 +950,10 @@ export default function IncomeExpenseClient() {
                       </div>
                       <div className="flex space-x-2">
                         <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
-                        <Button type="submit" disabled={loading}><Save className="mr-2 h-4 w-4" />{isEditing ? 'Update' : 'Save'}</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            {isEditing ? 'Update' : 'Save'}
+                        </Button>
                       </div>
                     </div>
                  </form>
@@ -973,8 +975,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
-
-    
-    
 
     
