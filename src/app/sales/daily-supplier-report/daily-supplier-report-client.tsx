@@ -96,7 +96,7 @@ export default function DailySupplierReportClient() {
     }, [suppliers, selectedDate, searchTerm, selectedVariety]);
 
     const summary = useMemo(() => {
-        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, rate: 0, kartaPercentage: 0, totalEntries: 0 };
+        const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, originalNetAmount: 0, rate: 0, kartaPercentage: 0, totalEntries: 0 };
         const newSummary = filteredSuppliers.reduce((acc, s) => {
             acc.gross += s.grossWeight;
             acc.tier += s.teirWeight;
@@ -107,6 +107,7 @@ export default function DailySupplierReportClient() {
             acc.kartaAmount += s.kartaAmount;
             acc.kanta += s.kanta;
             acc.amount += s.amount;
+            acc.originalNetAmount += s.originalNetAmount;
             acc.netAmount += Number(s.netAmount);
             acc.kartaPercentage += s.kartaPercentage;
             return acc;
@@ -287,7 +288,8 @@ export default function DailySupplierReportClient() {
                                 { label: 'Kanta Amt', value: formatCurrency(summary.kanta) },
                            ]}/>
                            <CategorySummaryCard title="Financial Summary" icon={<CircleDollarSign size={16}/>} data={[
-                                { label: 'Total Amt', value: formatCurrency(summary.amount) },
+                                { label: 'Total Original', value: formatCurrency(summary.originalNetAmount) },
+                                { label: 'Total Paid', value: formatCurrency(summary.originalNetAmount - summary.netAmount) },
                                 { label: 'Net Payable', value: formatCurrency(summary.netAmount), isHighlighted: true },
                            ]}/>
                         </div>
