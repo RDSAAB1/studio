@@ -124,7 +124,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
     const rate = values.rate || 0;
     
     const kartaWeight = Math.round(weight * kartaPercentage) / 100;
-    const kartaAmount = Math.ceil(weight * kartaPercentage);
+    const kartaAmount = Math.round(kartaWeight * rate);
     
     const netWeight = weight - kartaWeight;
     
