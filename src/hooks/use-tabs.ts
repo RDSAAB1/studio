@@ -84,9 +84,13 @@ export const allMenuItems: MenuItem[] = [
     icon: Landmark,
   },
   { 
-    id: "expense-tracker", 
+    id: "income-expense", 
     name: "Income & Expense", 
     icon: Scale, 
+    subMenus: [
+      { id: "expense-tracker", name: "I/E Tracker", icon: Calculator },
+      { id: "expense-tracker/payee-profile", name: "Payee Profile", icon: UserCircle },
+    ],
   },
   {
     id: "reports",

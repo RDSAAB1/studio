@@ -32,8 +32,10 @@ interface CustomSidebarProps {
 
 const SidebarMenuItem = ({ item, activePath, onTabSelect, isMobile, isSidebarActive, toggleSidebar }: { item: MenuItemType, activePath: string, onTabSelect: (menuItem: MenuItemType) => void, isMobile: boolean, isSidebarActive: boolean, toggleSidebar: () => void }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const isSubMenuActive = item.subMenus?.some(sub => `/${sub.id}` === activePath) ?? false;
-    const isActive = `/${item.id}` === activePath || (item.id === "dashboard-overview" && activePath === "/");
+    
+    // Check if the item itself is active or if any of its sub-items are active
+    const isSubMenuActive = item.subMenus?.some(sub => sub.id === activePath.substring(1)) ?? false;
+    const isActive = item.id === (activePath === '/' ? 'dashboard-overview' : activePath.substring(1));
 
 
     const handleLinkClick = (menuItem: MenuItemType) => {
