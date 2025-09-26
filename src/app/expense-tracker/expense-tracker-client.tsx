@@ -613,6 +613,7 @@ export default function IncomeExpenseClient() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
+                      <TableHead>ID</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                       <TableHead>Sub-Category</TableHead>
@@ -626,6 +627,7 @@ export default function IncomeExpenseClient() {
                     {sortedTransactions.map((transaction) => (
                       <TableRow key={transaction.id}>
                         <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
+                        <TableCell className="font-mono text-xs">{transaction.transactionId}</TableCell>
                         <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
                         <TableCell>{transaction.category}</TableCell>
                         <TableCell>{transaction.subCategory}</TableCell>
