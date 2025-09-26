@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project } from '@/lib/definitions';
 import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, DollarSign, Users, PiggyBank, HandCoins, Landmark, Home, Activity, Loader2, Calendar, BarChart2, ChevronsRight, ChevronsLeft, PieChart as PieChartIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -86,7 +86,11 @@ export default function DashboardClient() {
         if (!date || !date.from) {
             return { filteredIncomes: incomes, filteredExpenses: expenses, filteredSuppliers: suppliers, filteredCustomers: customers };
         }
-        const interval = { start: date.from, end: date.to || date.from };
+        
+        const interval = { 
+            start: startOfDay(date.from), 
+            end: endOfDay(date.to || date.from) 
+        };
         const filterFn = (item: { date: string }) => isWithinInterval(new Date(item.date), interval);
 
         return {
@@ -526,5 +530,7 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+    
 
     
