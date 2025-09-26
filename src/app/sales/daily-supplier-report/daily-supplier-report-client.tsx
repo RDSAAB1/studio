@@ -8,7 +8,7 @@ import { getRtgsSettings, getSuppliersRealtime } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { toTitleCase, formatCurrency } from '@/lib/utils';
-import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins, Scale, Percent } from 'lucide-react';
+import { Loader2, Search, Printer, Calendar as CalendarIcon, Weight, CircleDollarSign, TrendingUp, HandCoins, Scale, Percent, Wheat } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { CustomDropdown } from '@/components/ui/custom-dropdown';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const CategorySummaryCard = ({ title, data, icon }: { title: string; data: { label: string; value: string; isHighlighted?: boolean }[]; icon: React.ReactNode }) => (
     <Card className="flex-1 bg-card/60 border-primary/30 shadow-md print:border print:shadow-none">
@@ -43,6 +45,7 @@ export default function DailySupplierReportClient() {
     const [settings, setSettings] = useState<RtgsSettings | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedVariety, setSelectedVariety] = useState<string | null>('all');
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +69,14 @@ export default function DailySupplierReportClient() {
             setLoading(false);
         }
     }, [suppliers, loading]);
+    
+    const varietyOptions = useMemo(() => {
+        if (!suppliers) return [{ value: 'all', label: 'All Varieties' }];
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const varieties = new Set(suppliers.filter(s => format(new Date(s.date), 'yyyy-MM-dd') === dateStr).map(s => toTitleCase(s.variety)));
+        const sortedVarieties = Array.from(varieties).sort();
+        return [{ value: 'all', label: 'All Varieties' }, ...sortedVarieties.map(v => ({ value: v, label: v }))];
+    }, [suppliers, selectedDate]);
 
     const filteredSuppliers = useMemo(() => {
         if (!suppliers) return [];
@@ -73,7 +84,8 @@ export default function DailySupplierReportClient() {
         const filtered = suppliers.filter(s => {
             const supplierDate = format(new Date(s.date), 'yyyy-MM-dd');
             const nameMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
-            return supplierDate === dateStr && nameMatch;
+            const varietyMatch = !selectedVariety || selectedVariety === 'all' || s.variety.toLowerCase() === selectedVariety.toLowerCase();
+            return supplierDate === dateStr && nameMatch && varietyMatch;
         });
         // Sort by srNo in descending order
         return filtered.sort((a, b) => {
@@ -81,7 +93,7 @@ export default function DailySupplierReportClient() {
             const numB = parseInt(b.srNo.substring(1), 10);
             return numB - numA;
         });
-    }, [suppliers, selectedDate, searchTerm]);
+    }, [suppliers, selectedDate, searchTerm, selectedVariety]);
 
     const summary = useMemo(() => {
         const initialSummary = { gross: 0, tier: 0, total: 0, karta: 0, net: 0, labour: 0, kartaAmount: 0, kanta: 0, amount: 0, netAmount: 0, rate: 0, kartaPercentage: 0 };
@@ -108,6 +120,30 @@ export default function DailySupplierReportClient() {
         }
 
         return newSummary;
+    }, [filteredSuppliers]);
+    
+    const varietySummary = useMemo(() => {
+        const summaryByVariety: { [key: string]: { netWeight: number; netAmount: number; rate: number; count: number } } = {};
+        
+        filteredSuppliers.forEach(s => {
+            const varietyKey = toTitleCase(s.variety);
+            if (!summaryByVariety[varietyKey]) {
+                summaryByVariety[varietyKey] = { netWeight: 0, netAmount: 0, rate: 0, count: 0 };
+            }
+            summaryByVariety[varietyKey].netWeight += s.netWeight;
+            summaryByVariety[varietyKey].netAmount += Number(s.netAmount);
+            summaryByVariety[varietyKey].count += 1;
+        });
+
+        Object.keys(summaryByVariety).forEach(key => {
+            const varietyData = summaryByVariety[key];
+            if (varietyData.netWeight > 0) {
+                 const totalAmountForVariety = filteredSuppliers.filter(s=> toTitleCase(s.variety) === key).reduce((sum, s) => sum + s.amount, 0);
+                 varietyData.rate = totalAmountForVariety / (filteredSuppliers.filter(s=> toTitleCase(s.variety) === key).reduce((sum, s) => sum + s.weight, 0));
+            }
+        });
+
+        return Object.entries(summaryByVariety).map(([variety, data]) => ({ variety, ...data }));
     }, [filteredSuppliers]);
 
     const handlePrint = () => {
@@ -240,8 +276,9 @@ export default function DailySupplierReportClient() {
                                 <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
                             </Popover>
                              <Input placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
+                             <CustomDropdown options={varietyOptions} value={selectedVariety} onChange={setSelectedVariety} placeholder="Filter by variety..." />
                         </div>
-
+                        
                          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 print:flex print-summary-container">
                            <CategorySummaryCard title="Gross & Tier" icon={<Weight size={16}/>} data={[
                                 { label: 'Gross', value: `${summary.gross.toFixed(2)}` },
@@ -270,50 +307,72 @@ export default function DailySupplierReportClient() {
                            ]}/>
                         </div>
                         
+                        {varietySummary.length > 1 && (
+                            <>
+                                <Separator />
+                                <h3 className="text-sm font-semibold no-print">Variety-wise Summary</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 no-print">
+                                    {varietySummary.map(({ variety, netWeight, netAmount, rate, count }) => (
+                                        <Card key={variety}>
+                                            <CardHeader className="p-2 pb-1">
+                                                <CardTitle className="text-sm flex items-center gap-2"><Wheat size={14}/>{variety}</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="p-2 pt-0 text-xs space-y-1">
+                                                <div className="flex justify-between"><span className="text-muted-foreground">Entries</span><span>{count}</span></div>
+                                                <div className="flex justify-between"><span className="text-muted-foreground">Net Wt.</span><span>{netWeight.toFixed(2)} Qtl</span></div>
+                                                <div className="flex justify-between"><span className="text-muted-foreground">Net Amt.</span><span>{formatCurrency(netAmount)}</span></div>
+                                                <div className="flex justify-between font-semibold"><span className="text-muted-foreground">Avg. Rate</span><span>{formatCurrency(rate || 0)}</span></div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                        
 
-                        <div className="h-[60vh] overflow-auto scrollbar-hide">
-                            <table className="w-full text-xs border-collapse border border-gray-300">
+                        <div className="h-[60vh] overflow-auto scrollbar-hide border rounded-lg">
+                            <table className="w-full text-xs border-collapse">
                                 <thead className="bg-muted font-semibold text-[10px] uppercase whitespace-nowrap sticky top-0 z-10">
                                     <tr className="text-primary">
-                                        <th className="border border-gray-300 p-1 text-left">SR</th>
-                                        <th className="border border-gray-300 p-1 text-left">Date</th>
-                                        <th className="border border-gray-300 p-1 text-left">Term</th>
-                                        <th className="border border-gray-300 p-1 text-left">Name</th>
-                                        <th className="border border-gray-300 p-1 text-left">S/O</th>
-                                        <th className="border border-gray-300 p-1 text-left">Vehicle</th>
-                                        <th className="border border-gray-300 p-1 text-right">Gross</th>
-                                        <th className="border border-gray-300 p-1 text-right">Teir</th>
-                                        <th className="border border-gray-300 p-1 text-right">Final</th>
-                                        <th className="border border-gray-300 p-1 text-right">Karta</th>
-                                        <th className="border border-gray-300 p-1 text-right">Net</th>
-                                        <th className="border border-gray-300 p-1 text-right">Rate</th>
-                                        <th className="border border-gray-300 p-1 text-right">Amount</th>
-                                        <th className="border border-gray-300 p-1 text-right">Karta Amt</th>
-                                        <th className="border border-gray-300 p-1 text-right">Laboury</th>
-                                        <th className="border border-gray-300 p-1 text-right">Kanta</th>
-                                        <th className="border border-gray-300 p-1 text-right">Net Payable</th>
+                                        <th className="border-b border-r p-1 text-left">SR</th>
+                                        <th className="border-b border-r p-1 text-left">Date</th>
+                                        <th className="border-b border-r p-1 text-left">Term</th>
+                                        <th className="border-b border-r p-1 text-left">Name</th>
+                                        <th className="border-b border-r p-1 text-left">S/O</th>
+                                        <th className="border-b border-r p-1 text-left">Vehicle</th>
+                                        <th className="border-b border-r p-1 text-right">Gross</th>
+                                        <th className="border-b border-r p-1 text-right">Teir</th>
+                                        <th className="border-b border-r p-1 text-right">Final</th>
+                                        <th className="border-b border-r p-1 text-right">Karta</th>
+                                        <th className="border-b border-r p-1 text-right">Net</th>
+                                        <th className="border-b border-r p-1 text-right">Rate</th>
+                                        <th className="border-b border-r p-1 text-right">Amount</th>
+                                        <th className="border-b border-r p-1 text-right">Karta Amt</th>
+                                        <th className="border-b border-r p-1 text-right">Laboury</th>
+                                        <th className="border-b border-r p-1 text-right">Kanta</th>
+                                        <th className="border-b p-1 text-right">Net Payable</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredSuppliers.map((s) => (
-                                        <tr key={s.id} className="hover:bg-muted/50 whitespace-nowrap h-[29px]">
-                                            <td className="border border-gray-300 p-1 font-bold">{s.srNo}</td>
-                                            <td className="border border-gray-300 p-1">{format(new Date(s.date), "dd-MMM")}</td>
-                                            <td className="border border-gray-300 p-1 text-center">{s.term}</td>
-                                            <td className="border border-gray-300 p-1">{toTitleCase(s.name)}</td>
-                                            <td className="border border-gray-300 p-1">{toTitleCase(s.so)}</td>
-                                            <td className="border border-gray-300 p-1">{s.vehicleNo.toUpperCase()}</td>
-                                            <td className="border border-gray-300 p-1 text-right">{s.grossWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-300 p-1 text-right">{s.teirWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-300 p-1 text-right font-semibold">{s.weight.toFixed(2)}</td>
-                                            <td className="border border-gray-300 p-1 text-right">{s.kartaWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-300 p-1 text-right font-bold text-blue-600">{s.netWeight.toFixed(2)}</td>
-                                            <td className="border border-gray-300 p-1 text-right">{formatCurrency(s.rate)}</td>
-                                            <td className="border border-gray-300 p-1 text-right">{formatCurrency(s.amount)}</td>
-                                            <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.kartaAmount)}</td>
-                                            <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.labouryAmount)}</td>
-                                            <td className="border border-gray-300 p-1 text-right text-red-600">{formatCurrency(s.kanta)}</td>
-                                            <td className="border border-gray-300 p-1 text-right font-bold text-sm">{formatCurrency(Number(s.netAmount))}</td>
+                                        <tr key={s.id} className="hover:bg-muted/50 whitespace-nowrap h-[29px] border-b">
+                                            <td className="border-r p-1 font-bold">{s.srNo}</td>
+                                            <td className="border-r p-1">{format(new Date(s.date), "dd-MMM")}</td>
+                                            <td className="border-r p-1 text-center">{s.term}</td>
+                                            <td className="border-r p-1">{toTitleCase(s.name)}</td>
+                                            <td className="border-r p-1">{toTitleCase(s.so)}</td>
+                                            <td className="border-r p-1">{s.vehicleNo.toUpperCase()}</td>
+                                            <td className="border-r p-1 text-right">{s.grossWeight.toFixed(2)}</td>
+                                            <td className="border-r p-1 text-right">{s.teirWeight.toFixed(2)}</td>
+                                            <td className="border-r p-1 text-right font-semibold">{s.weight.toFixed(2)}</td>
+                                            <td className="border-r p-1 text-right">{s.kartaWeight.toFixed(2)}</td>
+                                            <td className="border-r p-1 text-right font-bold text-blue-600">{s.netWeight.toFixed(2)}</td>
+                                            <td className="border-r p-1 text-right">{formatCurrency(s.rate)}</td>
+                                            <td className="border-r p-1 text-right">{formatCurrency(s.amount)}</td>
+                                            <td className="border-r p-1 text-right text-red-600">{formatCurrency(s.kartaAmount)}</td>
+                                            <td className="border-r p-1 text-right text-red-600">{formatCurrency(s.labouryAmount)}</td>
+                                            <td className="border-r p-1 text-right text-red-600">{formatCurrency(s.kanta)}</td>
+                                            <td className="p-1 text-right font-bold text-sm">{formatCurrency(Number(s.netAmount))}</td>
                                         </tr>
                                     ))}
                                 </tbody>
