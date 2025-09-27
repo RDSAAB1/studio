@@ -38,8 +38,9 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
     useEffect(() => {
-        setSearchTerm(selectedItem?.label || '');
-    }, [selectedItem]);
+        // When the `value` prop changes from outside, update the searchTerm to reflect the new selection's label.
+        setSearchTerm(selectedItem?.label || (value || ''));
+    }, [value, selectedItem]);
     
     const filteredItems = useMemo(() => {
         if (!searchTerm || searchTerm === selectedItem?.label) {
@@ -54,6 +55,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
+                 // If there's a selected item, revert input text to its label. Otherwise, clear it.
                 setSearchTerm(selectedItem?.label || '');
             }
         };
@@ -80,9 +82,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
-        if (value && newSearchTerm !== selectedItem?.label) {
-            onChange(null);
-        }
+        // We call onChange with the raw input value so the parent form state is updated in real-time
+        onChange(newSearchTerm);
         if(!isOpen) {
             setIsOpen(true);
         }
@@ -92,6 +93,24 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         if (!isOpen) {
            setIsOpen(true);
         }
+    };
+    
+    const handleInputBlur = () => {
+        // Delay closing to allow click on options
+        setTimeout(() => {
+            if (!dropdownRef.current?.contains(document.activeElement)) {
+                setIsOpen(false);
+                // On blur, if no item is selected, but there's a search term, treat it as a new entry.
+                // Otherwise, revert to the selected item's label or clear.
+                if (onAdd && searchTerm && !options.some(opt => opt.label.toLowerCase() === searchTerm.toLowerCase())) {
+                    onAdd(searchTerm);
+                } else if (selectedItem) {
+                    setSearchTerm(selectedItem.label);
+                } else {
+                    setSearchTerm('');
+                }
+            }
+        }, 150);
     };
 
     const handleAddNew = () => {
@@ -113,6 +132,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     onChange={handleInputChange}
                     onClick={handleInputClick}
                     onFocus={handleInputClick}
+                    onBlur={handleInputBlur}
                     className="w-full pl-8 pr-8 h-8 text-sm"
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
@@ -152,9 +172,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                                 </li>
                             ))
                         ) : (
-                            <li className="px-4 py-2 text-sm text-muted-foreground text-center">
-                                {noItemsPlaceholder}
-                            </li>
+                             !onAdd && <li className="px-4 py-2 text-sm text-muted-foreground text-center">{noItemsPlaceholder}</li>
                         )}
                          {onAdd && searchTerm && !filteredItems.some(item => item.label.toLowerCase() === searchTerm.toLowerCase()) && (
                             <li

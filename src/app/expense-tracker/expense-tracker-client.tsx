@@ -577,10 +577,13 @@ export default function IncomeExpenseClient() {
     }
   }, [allTransactions, setValue, toast]);
     
-    const getDisplayId = (transaction: DisplayTransaction): string => {
-        const paymentIdMatch = transaction.description?.match(/(?:Payment|CD received on payment)\s([SPC]{2}\d+)/);
-        return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
-    };
+  const getDisplayId = (transaction: DisplayTransaction): string => {
+      if (transaction.category === 'Supplier Payments') {
+          const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
+          return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
+      }
+      return transaction.transactionId || 'N/A';
+  };
 
   if(isPageLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin" /></div>
@@ -726,15 +729,15 @@ export default function IncomeExpenseClient() {
                             <Label htmlFor="payee" className="text-xs">
                                 {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                             </Label>
-                             <CustomDropdown
+                            <CustomDropdown
                                 options={uniquePayees.map(p => ({ value: p, label: p }))}
                                 value={watch('payee')}
                                 onChange={(value) => {
-                                    setValue('payee', value || '', { shouldValidate: true });
+                                    setValue('payee', toTitleCase(value || ''));
                                     if (value) handleAutoFill(value);
                                 }}
                                 onAdd={(newValue) => {
-                                  setValue('payee', newValue, { shouldValidate: true });
+                                  setValue('payee', toTitleCase(newValue));
                                 }}
                                 placeholder="Search or add payee..."
                             />
