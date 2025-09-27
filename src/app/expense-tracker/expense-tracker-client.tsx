@@ -260,10 +260,6 @@ export default function IncomeExpenseClient() {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
-    const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
-        ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
-        : transaction.subCategory;
-
     reset({
         ...transaction,
         date: new Date(transaction.date),
@@ -272,15 +268,28 @@ export default function IncomeExpenseClient() {
         rate: transaction.rate || 0,
         isCalculated: transaction.isCalculated || false,
         nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
-        subCategory: subCategoryToSet,
     });
+    
+    // Use a timeout to ensure the form state (especially dependent fields) is updated before setting category/sub-category
+    setTimeout(() => {
+        setValue('expenseNature', transaction.expenseNature);
+        setTimeout(() => {
+            setValue('category', transaction.category);
+            setTimeout(() => {
+                 const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
+                    ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
+                    : transaction.subCategory;
+                setValue('subCategory', subCategoryToSet);
+            }, 50);
+        }, 50);
+    }, 0);
     
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
     
     setActiveTab("form");
-}, [editingTransaction, reset, loans]);
+}, [editingTransaction, reset, setValue, loans]);
 
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
     setIsEditing(transaction.id);
@@ -780,7 +789,7 @@ export default function IncomeExpenseClient() {
                           <div className="space-y-1">
                             <Label className="text-xs">Category</Label>
                             <CustomDropdown 
-                                key={availableCategories.map(c => c.id).join('-')}
+                                key={`category-${availableCategories.map(c => c.id).join('-')}`}
                                 options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} 
                                 {...field} 
                                 placeholder="Select Category" 
@@ -793,7 +802,7 @@ export default function IncomeExpenseClient() {
                           <div className="space-y-1">
                             <Label className="text-xs">Sub-Category</Label>
                             <CustomDropdown 
-                                key={availableSubCategories.join('-')}
+                                key={`subcategory-${selectedCategory}-${availableSubCategories.join('-')}`}
                                 options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} 
                                 {...field} 
                                 placeholder="Select Sub-Category" 
