@@ -283,8 +283,6 @@ export default function SupplierEntryClient() {
     } else {
         if (isEditing) {
             setIsEditing(false);
-            // Don't clear the form, just set isEditing to false.
-            // The user wants to save the current data under a new srNo.
         }
     }
   }
@@ -327,7 +325,8 @@ export default function SupplierEntryClient() {
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
-        id: values.srNo, // Use srNo as ID
+        id: values.srNo,
+        srNo: values.srNo,
         date: correctedDate.toISOString().split("T")[0],
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
@@ -440,7 +439,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, holidays, dailyPaymentLimit, suppliers);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -696,4 +695,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-

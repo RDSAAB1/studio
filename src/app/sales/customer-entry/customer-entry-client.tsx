@@ -8,10 +8,13 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from '@/lib/database';
+
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -43,8 +46,8 @@ export const formSchema = z.object({
     grossWeight: z.coerce.number().min(0),
     teirWeight: z.coerce.number().min(0),
     rate: z.coerce.number().min(0),
-    cdRate: z.coerce.number().min(0),
-    brokerageRate: z.coerce.number().min(0),
+    cd: z.coerce.number().min(0),
+    brokerage: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
     isBrokerageIncluded: z.boolean(),
@@ -80,8 +83,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) as CustomerPayment[] | undefined || [];
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -167,8 +170,6 @@ export default function CustomerEntryClient() {
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
-    const unsubCustomers = getCustomersRealtime(setCustomers, (err) => console.error("Error fetching customers:", err));
-    const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, (err) => console.error("Error fetching customer payments:", err));
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -187,8 +188,6 @@ export default function CustomerEntryClient() {
     return () => {
       unsubVarieties();
       unsubPaymentTypes();
-      unsubCustomers();
-      unsubPayments();
     };
   }, [isClient, form, toast]);
   
@@ -234,8 +233,8 @@ export default function CustomerEntryClient() {
       contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
       grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
       rate: customerState.rate || 0, 
-      cdRate: customerState.cdRate || 0,
-      brokerageRate: customerState.brokerageRate || 0,
+      cd: customerState.cdRate || customerState.cd || 0,
+      brokerage: customerState.brokerageRate || customerState.brokerage || 0,
       kanta: customerState.kanta || 0,
       paymentType: customerState.paymentType || 'Full',
       isBrokerageIncluded: customerState.isBrokerageIncluded || false,
@@ -343,9 +342,10 @@ export default function CustomerEntryClient() {
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
-    const dataToSave: Partial<Customer> = {
+    const dataToSave: Customer = {
         ...currentCustomer,
         srNo: formValues.srNo,
+        id: formValues.srNo,
         date: formValues.date.toISOString().split('T')[0],
         term: '0', 
         dueDate: formValues.date.toISOString().split('T')[0],
@@ -384,39 +384,26 @@ export default function CustomerEntryClient() {
         labouryAmount: 0,
         barcode: '',
         receiptType: 'Cash',
-        cdRate: formValues.cdRate,
-        brokerageRate: formValues.brokerageRate,
-        advanceExpenseId: currentCustomer.advanceExpenseId,
-        advancePaymentMethod: currentCustomer.advancePaymentMethod,
-        advancePaymentAccountId: currentCustomer.advancePaymentAccountId
+        cd: formValues.cd || 0,
+        brokerage: formValues.brokerage || 0,
     };
-
-    if (dataToSave.advanceExpenseId === undefined) {
-        delete dataToSave.advanceExpenseId;
-    }
-    if (dataToSave.advancePaymentMethod === undefined) {
-        delete dataToSave.advancePaymentMethod;
-    }
-    if (dataToSave.advancePaymentAccountId === undefined) {
-        delete dataToSave.advancePaymentAccountId;
-    }
     
     try {
-        if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
+        if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.id) {
             await deleteCustomer(currentCustomer.id);
         }
         
         if (deletePayments) {
             await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
-            const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
-            await addCustomer(entryWithRestoredAmount as Customer);
+            const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount };
+            await addCustomer(entryWithRestoredAmount);
             toast({ title: "Entry updated, payments deleted.", variant: "success" });
-            if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
+            if (callback) callback(entryWithRestoredAmount); else handleNew();
         } else {
-            const entryToSave = { ...dataToSave, id: dataToSave.srNo };
-            await addCustomer(entryToSave as Customer);
+            const entryToSave = { ...dataToSave };
+            await addCustomer(entryToSave);
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-            if (callback) callback(entryToSave as Customer); else handleNew();
+            if (callback) callback(entryToSave); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
@@ -670,7 +657,7 @@ export default function CustomerEntryClient() {
         customer={detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
         onPrint={handleOpenPrintPreview}
-        paymentHistory={paymentHistory as CustomerPayment[]}
+        paymentHistory={paymentHistory}
       />
         
       <DocumentPreviewDialog
