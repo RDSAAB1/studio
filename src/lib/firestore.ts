@@ -553,9 +553,20 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
 
 export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
     const formatSettings = await getFormatSettings();
+    
+    // Use the provided transactionId if it exists, otherwise generate a new one.
     const newTransactionId = expenseData.transactionId || (await (async () => {
         const expensesSnapshot = await getDocs(query(expensesCollection, orderBy('transactionId', 'desc'), limit(1)));
-        const lastNum = expensesSnapshot.empty ? 0 : parseInt(expensesSnapshot.docs[0].data().transactionId.replace(formatSettings.expense?.prefix || 'EX', ''));
+        
+        let lastNum = 0;
+        if (!expensesSnapshot.empty) {
+            const lastId = expensesSnapshot.docs[0].data().transactionId;
+            const prefix = formatSettings.expense?.prefix || 'EX';
+            if (lastId && lastId.startsWith(prefix)) {
+                lastNum = parseInt(lastId.replace(prefix, ''), 10) || 0;
+            }
+        }
+        
         return generateReadableId(formatSettings.expense?.prefix || 'EX', lastNum, formatSettings.expense?.padding || 5);
     })());
     
