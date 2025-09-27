@@ -238,6 +238,10 @@ export default function IncomeExpenseClient() {
       const foundTransaction = allTransactions.find(t => t.transactionId === value);
       if (foundTransaction) {
           handleEdit(foundTransaction);
+      } else {
+          if (isEditing) {
+              setIsEditing(null);
+          }
       }
   };
 
@@ -623,7 +627,7 @@ export default function IncomeExpenseClient() {
         <TabsContent value="history" className="mt-4">
           <SectionCard>
             <CardContent className="p-0">
-                <ScrollArea className="h-96">
+                <ScrollArea className="h-[calc(100vh-350px)]">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -740,9 +744,9 @@ export default function IncomeExpenseClient() {
                                     options={uniquePayees.map(p => ({ value: p, label: p }))}
                                     value={field.value}
                                     onChange={(value) => {
-                                        const capitalizedValue = value ? toTitleCase(value) : null;
+                                        const capitalizedValue = value ? toTitleCase(value) : '';
                                         field.onChange(capitalizedValue);
-                                        if (capitalizedValue && uniquePayees.includes(capitalizedValue)) {
+                                        if (value && uniquePayees.includes(capitalizedValue)) {
                                             handleAutoFill(capitalizedValue);
                                         }
                                     }}

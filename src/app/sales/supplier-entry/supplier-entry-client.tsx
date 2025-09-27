@@ -283,10 +283,8 @@ export default function SupplierEntryClient() {
     } else {
         if (isEditing) {
             setIsEditing(false);
-            const currentId = currentSupplier.srNo;
-            const nextSrNum = safeSuppliers.length > 0 ? Math.max(0, ...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
-            resetFormToState(newState);
+            // Don't clear the form, just set isEditing to false.
+            // The user wants to save the current data under a new srNo.
         }
     }
   }
@@ -442,7 +440,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, holidays, dailyPaymentLimit, suppliers);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -698,3 +696,4 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+

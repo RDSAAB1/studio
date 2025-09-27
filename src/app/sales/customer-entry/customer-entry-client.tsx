@@ -289,6 +289,10 @@ export default function CustomerEntryClient() {
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
+    } else {
+        if (isEditing) {
+            setIsEditing(false);
+        }
     }
   }
 
