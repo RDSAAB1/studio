@@ -644,6 +644,18 @@ const processPayment = async () => {
         toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
     };
 
+    const handlePaymentIdBlur = () => {
+        let formattedId = paymentId.trim();
+        if (formattedId && !isNaN(parseInt(formattedId)) && isFinite(Number(formattedId))) {
+            formattedId = formatPaymentId(parseInt(formattedId));
+            setPaymentId(formattedId);
+        }
+        const foundPayment = paymentHistory.find(p => p.paymentId === formattedId);
+        if (foundPayment) {
+            handleEditPayment(foundPayment);
+        }
+    }
+
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
         const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
         if (!paymentToDelete || !paymentToDelete.id) {
@@ -868,7 +880,7 @@ const processPayment = async () => {
                         isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                        handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
@@ -968,5 +980,6 @@ const processPayment = async () => {
     
 
     
+
 
 
