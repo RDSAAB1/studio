@@ -137,7 +137,6 @@ export default function IncomeExpenseClient() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
-  const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("form");
   const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
   
@@ -240,7 +239,6 @@ export default function IncomeExpenseClient() {
 
 
   const handleNew = useCallback(() => {
-    setIsEditing(null); 
     setEditingTransaction(null);
     const nextId = getNextTransactionId('Expense');
     reset(getInitialFormState(nextId));
@@ -269,18 +267,57 @@ export default function IncomeExpenseClient() {
             nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
             subCategory: subCategoryToSet,
         });
+
+        // Use setTimeout to ensure the state updates from reset have propagated
+        // before trying to set category/sub-category values, which depend on expenseNature.
+        setTimeout(() => {
+            if (transaction.expenseNature) {
+                setValue('expenseNature', transaction.expenseNature);
+            }
+            if (transaction.category) {
+                setValue('category', transaction.category);
+            }
+            if (subCategoryToSet) {
+                 setValue('subCategory', subCategoryToSet);
+            }
+        }, 50);
         
         setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
         setIsCalculated(transaction.isCalculated || false);
         setIsRecurring(transaction.isRecurring || false);
         
         setActiveTab("form");
-    }, [editingTransaction, reset, loans]);
+    }, [editingTransaction, reset, loans, setValue]);
 
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
-    setIsEditing(transaction.id);
     setEditingTransaction(transaction);
   }, []);
+
+  const handleAutoFill = useCallback((payeeName: string) => {
+    if (editingTransaction) return;
+    
+    const trimmedPayeeName = toTitleCase(payeeName.trim());
+    if (!trimmedPayeeName) return;
+
+    const latestTransaction = allTransactions
+        .filter(t => toTitleCase(t.payee) === trimmedPayeeName)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    
+    if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
+        setTimeout(() => {
+            setValue('expenseNature', latestTransaction.expenseNature);
+            // We need another timeout to allow the category dropdown to re-render with new options
+            setTimeout(() => {
+                setValue('category', latestTransaction.category);
+                 // And another one for sub-category
+                setTimeout(() => {
+                     setValue('subCategory', latestTransaction.subCategory);
+                }, 50)
+            }, 50);
+        }, 0);
+        toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
+    }
+  }, [allTransactions, setValue, toast, editingTransaction]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -409,7 +446,7 @@ export default function IncomeExpenseClient() {
         await deleteExpense(transaction.id);
       }
       toast({ title: "Transaction deleted.", variant: "success" });
-      if (isEditing === transaction.id) handleNew();
+      if (editingTransaction?.id === transaction.id) handleNew();
     } catch (error) {
       console.error("Error deleting transaction: ", error);
       toast({ title: "Failed to delete transaction.", variant: "destructive" });
@@ -422,8 +459,8 @@ export default function IncomeExpenseClient() {
         const availableBalance = financialState.balances.get(balanceKey) || 0;
         
         let amountToCheck = values.amount;
-        if (isEditing) {
-            const originalTx = allTransactions.find(tx => tx.id === isEditing);
+        if (editingTransaction) {
+            const originalTx = allTransactions.find(tx => tx.id === editingTransaction.id);
             if (originalTx && (originalTx.bankAccountId || 'CashInHand') === (values.bankAccountId || 'CashInHand')) {
                  amountToCheck = values.amount - originalTx.amount;
             }
@@ -460,11 +497,11 @@ export default function IncomeExpenseClient() {
           delete transactionData.bankAccountId;
       }
 
-      if (isEditing) {
+      if (editingTransaction) {
         if (values.transactionType === 'Income') {
-            await updateIncome(isEditing, transactionData as Omit<Income, 'id'>);
+            await updateIncome(editingTransaction.id, transactionData as Omit<Income, 'id'>);
         } else {
-            await updateExpense(isEditing, transactionData as Omit<Expense, 'id'>);
+            await updateExpense(editingTransaction.id, transactionData as Omit<Expense, 'id'>);
         }
         toast({ title: "Transaction updated.", variant: "success" });
       } else {
@@ -504,8 +541,8 @@ export default function IncomeExpenseClient() {
                     handleNew();
                     break;
                 case 'd':
-                    if (isEditing) {
-                        const tx = allTransactions.find(t => t.id === isEditing);
+                    if (editingTransaction) {
+                        const tx = allTransactions.find(t => t.id === editingTransaction.id);
                         if (tx) handleDelete(tx);
                     }
                     break;
@@ -514,7 +551,7 @@ export default function IncomeExpenseClient() {
                     break;
             }
         }
-    }, [handleSubmit, onSubmit, handleNew, isEditing, allTransactions, handleDelete]);
+    }, [handleSubmit, onSubmit, handleNew, editingTransaction, allTransactions, handleDelete]);
 
     useEffect(() => {
         document.addEventListener('keydown', handleKeyDown);
@@ -560,28 +597,6 @@ export default function IncomeExpenseClient() {
       totalTransactions: allTransactions.length,
     };
   }, [income, expenses, allTransactions]);
-  
-  const handleAutoFill = useCallback((payeeName: string) => {
-    if (isEditing) return;
-    
-    const trimmedPayeeName = toTitleCase(payeeName.trim());
-    if (!trimmedPayeeName) return;
-
-    const latestTransaction = allTransactions
-        .filter(t => toTitleCase(t.payee) === trimmedPayeeName)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-    
-    if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
-        setValue('expenseNature', latestTransaction.expenseNature);
-        setTimeout(() => {
-            setValue('category', latestTransaction.category);
-            setTimeout(() => {
-                setValue('subCategory', latestTransaction.subCategory);
-            }, 50);
-        }, 50);
-        toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
-    }
-  }, [allTransactions, setValue, toast, isEditing]);
     
   const getDisplayId = (transaction: DisplayTransaction): string => {
     if (transaction.category === 'Supplier Payments') {
@@ -617,7 +632,7 @@ export default function IncomeExpenseClient() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
           <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{isEditing ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
+            <TabsTrigger value="form" className="flex-1 sm:flex-initial"><FilePlus className="mr-2 h-4 w-4"/>{editingTransaction ? 'Edit Transaction' : 'Add New Transaction'}</TabsTrigger>
             <TabsTrigger value="history" className="flex-1 sm:flex-initial"><List className="mr-2 h-4 w-4"/>Transaction History</TabsTrigger>
           </TabsList>
           <div className="w-full sm:w-auto flex items-center gap-2">
@@ -1003,7 +1018,7 @@ export default function IncomeExpenseClient() {
                         <Button type="button" variant="ghost" onClick={handleNew}><RefreshCw className="mr-2 h-4 w-4" />New</Button>
                         <Button type="submit" disabled={isSubmitting}>
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            {isEditing ? 'Update' : 'Save'}
+                            {editingTransaction ? 'Update' : 'Save'}
                         </Button>
                       </div>
                     </div>
@@ -1026,3 +1041,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
