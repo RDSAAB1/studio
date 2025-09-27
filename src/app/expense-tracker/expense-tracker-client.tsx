@@ -235,10 +235,6 @@ export default function IncomeExpenseClient() {
       const foundTransaction = allTransactions.find(t => t.transactionId === value);
       if (foundTransaction) {
           handleEdit(foundTransaction);
-      } else {
-        if (isEditing) {
-            handleNew();
-        }
       }
   };
 
@@ -254,31 +250,32 @@ export default function IncomeExpenseClient() {
     setActiveTab("form");
   }, [reset, getNextTransactionId]);
 
-useEffect(() => {
-    if (!editingTransaction) return;
+    useEffect(() => {
+        if (!editingTransaction) return;
 
-    const transaction = editingTransaction;
-    const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
-        ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
-        : transaction.subCategory;
+        const transaction = editingTransaction;
         
-    reset({
-        ...transaction,
-        date: new Date(transaction.date),
-        taxAmount: transaction.taxAmount || 0,
-        quantity: transaction.quantity || 0,
-        rate: transaction.rate || 0,
-        isCalculated: transaction.isCalculated || false,
-        nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
-        subCategory: subCategoryToSet,
-    });
-    
-    setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
-    setIsCalculated(transaction.isCalculated || false);
-    setIsRecurring(transaction.isRecurring || false);
-    
-    setActiveTab("form");
-}, [editingTransaction, reset, loans]);
+        const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
+            ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
+            : transaction.subCategory;
+            
+        reset({
+            ...transaction,
+            date: new Date(transaction.date),
+            taxAmount: transaction.taxAmount || 0,
+            quantity: transaction.quantity || 0,
+            rate: transaction.rate || 0,
+            isCalculated: transaction.isCalculated || false,
+            nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
+            subCategory: subCategoryToSet,
+        });
+        
+        setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
+        setIsCalculated(transaction.isCalculated || false);
+        setIsRecurring(transaction.isRecurring || false);
+        
+        setActiveTab("form");
+    }, [editingTransaction, reset, loans]);
 
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
     setIsEditing(transaction.id);
@@ -564,7 +561,7 @@ useEffect(() => {
     };
   }, [income, expenses, allTransactions]);
   
-const handleAutoFill = useCallback((payeeName: string) => {
+  const handleAutoFill = useCallback((payeeName: string) => {
     if (isEditing) return;
     
     const trimmedPayeeName = toTitleCase(payeeName.trim());
@@ -584,7 +581,7 @@ const handleAutoFill = useCallback((payeeName: string) => {
         }, 50);
         toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
     }
-}, [allTransactions, setValue, toast, isEditing]);
+  }, [allTransactions, setValue, toast, isEditing]);
     
   const getDisplayId = (transaction: DisplayTransaction): string => {
     if (transaction.category === 'Supplier Payments') {
@@ -749,7 +746,6 @@ const handleAutoFill = useCallback((payeeName: string) => {
                                     onChange={(value) => {
                                         const capitalizedValue = value ? toTitleCase(value) : '';
                                         field.onChange(capitalizedValue);
-                                        // Auto-fill only when an existing payee is selected from the list
                                         if (value && uniquePayees.includes(value)) {
                                             handleAutoFill(value);
                                         }
