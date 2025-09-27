@@ -579,6 +579,27 @@ export async function deleteExpense(id: string): Promise<void> {
     await deleteDoc(doc(expensesCollection, id));
 }
 
+export async function updateExpensePayee(oldPayee: string, newPayee: string): Promise<void> {
+    const q = query(expensesCollection, where('payee', '==', oldPayee));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(firestoreDB);
+    snapshot.forEach(doc => {
+        batch.update(doc.ref, { payee: toTitleCase(newPayee) });
+    });
+    await batch.commit();
+}
+
+export async function deleteExpensesForPayee(payee: string): Promise<void> {
+    const q = query(expensesCollection, where('payee', '==', payee));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(firestoreDB);
+    snapshot.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+}
+
+
 // --- Format Settings Functions ---
 export async function getFormatSettings(): Promise<FormatSettings> {
     const docRef = doc(settingsCollection, "formats");
