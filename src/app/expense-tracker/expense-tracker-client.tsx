@@ -234,8 +234,6 @@ export default function IncomeExpenseClient() {
           handleEdit(foundTransaction);
       } else {
         if (isEditing) {
-            // User loaded an entry but changed the ID to a new one.
-            // Keep the form data but mark as not editing.
             setIsEditing(null);
         }
       }
@@ -379,9 +377,9 @@ export default function IncomeExpenseClient() {
         if (loan) subCategoryToSet = loan.loanName;
     }
     
-    // Use reset to set all form values at once
     reset({
       ...transaction,
+      subCategory: subCategoryToSet,
       date: new Date(transaction.date), 
       taxAmount: transaction.taxAmount || 0,
       quantity: transaction.quantity || 0,
@@ -389,15 +387,12 @@ export default function IncomeExpenseClient() {
       isCalculated: transaction.isCalculated || false,
       nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
     });
-    
-    // Manually set subCategory after reset as it might depend on async data
-    setValue('subCategory', subCategoryToSet);
 
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
     setActiveTab("form");
-  }, [reset, loans, setValue]);
+  }, [reset, loans]);
 
 
   const handleDelete = async (transaction: DisplayTransaction) => {
