@@ -138,7 +138,7 @@ export default function IncomeExpenseClient() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
   const [activeTab, setActiveTab] = useState("form");
-  const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -179,22 +179,22 @@ export default function IncomeExpenseClient() {
   }, [allTransactions]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
-      const prefix = type === 'Income' ? 'IN' : 'EX';
-      const relevantTransactions = allTransactions.filter(t => t.transactionType === type && t.transactionId);
-      if (!relevantTransactions || relevantTransactions.length === 0) {
-          return formatTransactionId(1, prefix);
-      }
-      
-      const lastNum = relevantTransactions.reduce((max, t) => {
-          const numMatch = t.transactionId?.match(/^(?:IN|EX)(\d+)$/);
-          if (numMatch && numMatch[1]) {
-            const num = parseInt(numMatch[1], 10);
-            return num > max ? num : max;
-          }
-          return max;
-      }, 0);
+    const prefix = type === 'Income' ? 'IN' : 'EX';
+    const relevantTransactions = allTransactions.filter(t => t.transactionType === type && t.transactionId);
+    if (!relevantTransactions || relevantTransactions.length === 0) {
+        return formatTransactionId(1, prefix);
+    }
+    
+    const lastNum = relevantTransactions.reduce((max, t) => {
+        const numMatch = t.transactionId?.match(/^(?:IN|EX)(\d+)$/);
+        if (numMatch && numMatch[1]) {
+          const num = parseInt(numMatch[1], 10);
+          return num > max ? num : max;
+        }
+        return max;
+    }, 0);
 
-      return formatTransactionId(lastNum + 1, prefix);
+    return formatTransactionId(lastNum + 1, prefix);
   }, [allTransactions]);
 
   const form = useForm<TransactionFormValues>({
@@ -248,9 +248,9 @@ export default function IncomeExpenseClient() {
     setActiveTab("form");
   }, [reset, getNextTransactionId]);
 
-    const handleEdit = useCallback((transaction: DisplayTransaction) => {
-        setEditingTransaction(transaction);
-    }, []);
+  const handleEdit = useCallback((transaction: DisplayTransaction) => {
+      setEditingTransaction(transaction);
+  }, []);
 
   const handleAutoFill = useCallback((payeeName: string) => {
     const trimmedPayeeName = toTitleCase(payeeName.trim());
@@ -279,11 +279,6 @@ export default function IncomeExpenseClient() {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
-
-    const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
-        ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
-        : transaction.subCategory;
-
     reset({
         ...transaction,
         date: new Date(transaction.date),
@@ -293,19 +288,22 @@ export default function IncomeExpenseClient() {
         isCalculated: transaction.isCalculated || false,
         nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
     });
-
+    
     setTimeout(() => {
         if (transaction.expenseNature) {
             setValue('expenseNature', transaction.expenseNature);
         }
-        if (transaction.category) {
-            setValue('category', transaction.category);
-        }
         setTimeout(() => {
-            if (subCategoryToSet) {
-                 setValue('subCategory', subCategoryToSet);
-            }
-        }, 50); 
+            setValue('category', transaction.category);
+             setTimeout(() => {
+                const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
+                    ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
+                    : transaction.subCategory;
+                if (subCategoryToSet) {
+                    setValue('subCategory', subCategoryToSet);
+                }
+            }, 50);
+        }, 50);
     }, 0);
     
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
@@ -313,7 +311,7 @@ export default function IncomeExpenseClient() {
     setIsRecurring(transaction.isRecurring || false);
     
     setActiveTab("form");
-  }, [editingTransaction]);
+  }, [editingTransaction, loans, setValue, reset]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -785,7 +783,7 @@ export default function IncomeExpenseClient() {
                           <div className="space-y-1">
                             <Label className="text-xs">Category</Label>
                             <CustomDropdown 
-                                key={`category-${availableCategories.map(c => c.id).join('-')}`}
+                                key={`category-${selectedExpenseNature}`}
                                 options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} 
                                 {...field} 
                                 placeholder="Select Category" 
@@ -798,7 +796,7 @@ export default function IncomeExpenseClient() {
                           <div className="space-y-1">
                             <Label className="text-xs">Sub-Category</Label>
                             <CustomDropdown 
-                                key={`subcategory-${selectedCategory}-${availableSubCategories.join('-')}`}
+                                key={`subcategory-${selectedCategory}`}
                                 options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} 
                                 {...field} 
                                 placeholder="Select Sub-Category" 
@@ -1037,5 +1035,7 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
 
     
