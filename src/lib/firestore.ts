@@ -539,10 +539,11 @@ export async function deleteCustomerPayment(id: string): Promise<void> {
 // --- Income and Expense specific functions ---
 export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income> {
     const formatSettings = await getFormatSettings();
-    const incomesSnapshot = await getDocs(query(incomesCollection, orderBy('transactionId', 'desc'), limit(1)));
-    const lastNum = incomesSnapshot.empty ? 0 : parseInt(incomesSnapshot.docs[0].data().transactionId.replace(formatSettings.income?.prefix || 'IN', ''));
-    
-    const newTransactionId = generateReadableId(formatSettings.income?.prefix || 'IN', lastNum, formatSettings.income?.padding || 5);
+    const newTransactionId = incomeData.transactionId || (await (async () => {
+        const incomesSnapshot = await getDocs(query(incomesCollection, orderBy('transactionId', 'desc'), limit(1)));
+        const lastNum = incomesSnapshot.empty ? 0 : parseInt(incomesSnapshot.docs[0].data().transactionId.replace(formatSettings.income?.prefix || 'IN', ''));
+        return generateReadableId(formatSettings.income?.prefix || 'IN', lastNum, formatSettings.income?.padding || 5);
+    })());
 
     const docRef = doc(incomesCollection, newTransactionId);
     const newIncome = { ...incomeData, transactionId: newTransactionId, id: docRef.id };
@@ -552,10 +553,11 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
 
 export async function addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
     const formatSettings = await getFormatSettings();
-    const expensesSnapshot = await getDocs(query(expensesCollection, orderBy('transactionId', 'desc'), limit(1)));
-    const lastNum = expensesSnapshot.empty ? 0 : parseInt(expensesSnapshot.docs[0].data().transactionId.replace(formatSettings.expense?.prefix || 'EX', ''));
-
-    const newTransactionId = generateReadableId(formatSettings.expense?.prefix || 'EX', lastNum, formatSettings.expense?.padding || 5);
+    const newTransactionId = expenseData.transactionId || (await (async () => {
+        const expensesSnapshot = await getDocs(query(expensesCollection, orderBy('transactionId', 'desc'), limit(1)));
+        const lastNum = expensesSnapshot.empty ? 0 : parseInt(expensesSnapshot.docs[0].data().transactionId.replace(formatSettings.expense?.prefix || 'EX', ''));
+        return generateReadableId(formatSettings.expense?.prefix || 'EX', lastNum, formatSettings.expense?.padding || 5);
+    })());
     
     const docRef = doc(expensesCollection, newTransactionId);
     const newExpense = { ...expenseData, transactionId: newTransactionId, id: docRef.id };
