@@ -41,6 +41,7 @@ import {
   CircleDollarSign,
   PieChart,
   CalendarClock,
+  UserCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -108,7 +109,15 @@ export const allMenuItems: MenuItem[] = [
     icon: Users,
     subMenus: [
       { id: "hr/employee-database", name: "Employee Database", icon: Database },
-      { id: "hr/payroll-management", name: "Payroll Management", icon: Calculator },
+      { 
+        id: "hr/payroll", 
+        name: "Payroll", 
+        icon: Calculator,
+        subMenus: [
+            { id: "hr/payroll-management", name: "Salary Processing", icon: UserCheck, href: "/hr/payroll-management" },
+            { id: "hr/contract-payments", name: "Contractual Payments", icon: FileText, href: "/hr/contract-payments" },
+        ]
+      },
       { id: "hr/attendance-tracking", name: "Attendance Tracking", icon: CalendarCheck },
     ],
   },
