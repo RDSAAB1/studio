@@ -382,6 +382,7 @@ export default function IncomeExpenseClient() {
     
     reset({
       ...transaction,
+      transactionId: transaction.transactionId,
       date: new Date(transaction.date), 
       taxAmount: transaction.taxAmount || 0,
       quantity: transaction.quantity || 0,
@@ -1013,3 +1014,5 @@ export default function IncomeExpenseClient() {
 }
 
     
+
+      
