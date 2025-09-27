@@ -136,6 +136,7 @@ export default function IncomeExpenseClient() {
 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("form");
   const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
@@ -234,8 +235,8 @@ export default function IncomeExpenseClient() {
           handleEdit(foundTransaction);
       } else {
         if (isEditing) {
-            // Do not reset the form, just exit edit mode
             setIsEditing(null);
+            setEditingTransaction(null);
         }
       }
   };
@@ -243,6 +244,7 @@ export default function IncomeExpenseClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(null); 
+    setEditingTransaction(null);
     const nextId = getNextTransactionId('Expense');
     reset(getInitialFormState(nextId));
     setIsAdvanced(false);
@@ -250,6 +252,43 @@ export default function IncomeExpenseClient() {
     setIsRecurring(false);
     setActiveTab("form");
   }, [reset, getNextTransactionId, setValue]);
+
+  useEffect(() => {
+    if (!editingTransaction) return;
+
+    const transaction = editingTransaction;
+    reset({
+        ...transaction,
+        date: new Date(transaction.date),
+        taxAmount: transaction.taxAmount || 0,
+        quantity: transaction.quantity || 0,
+        rate: transaction.rate || 0,
+        isCalculated: transaction.isCalculated || false,
+        nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
+    });
+    setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
+    setIsCalculated(transaction.isCalculated || false);
+    setIsRecurring(transaction.isRecurring || false);
+
+    setTimeout(() => {
+        setValue('expenseNature', transaction.expenseNature);
+        setValue('category', transaction.category);
+
+        let subCategoryToSet = transaction.subCategory;
+        if (transaction.category === 'Interest & Loan Payments' && transaction.loanId) {
+            const loan = loans.find(l => l.id === transaction.loanId);
+            if (loan) subCategoryToSet = loan.loanName;
+        }
+        setValue('subCategory', subCategoryToSet);
+    }, 50);
+
+    setActiveTab("form");
+  }, [editingTransaction, reset, setValue, loans]);
+
+  const handleEdit = useCallback((transaction: DisplayTransaction) => {
+    setIsEditing(transaction.id);
+    setEditingTransaction(transaction);
+  }, []);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -368,35 +407,6 @@ export default function IncomeExpenseClient() {
   useEffect(() => {
     setValue('subCategory', '');
   }, [selectedCategory, setValue]);
-
-  const handleEdit = useCallback((transaction: DisplayTransaction) => {
-    setIsEditing(transaction.id);
-    let subCategoryToSet = transaction.subCategory;
-
-    if (transaction.category === 'Interest & Loan Payments' && transaction.loanId) {
-        const loan = loans.find(l => l.id === transaction.loanId);
-        if (loan) subCategoryToSet = loan.loanName;
-    }
-    
-    reset({
-      ...transaction,
-      date: new Date(transaction.date), 
-      taxAmount: transaction.taxAmount || 0,
-      quantity: transaction.quantity || 0,
-      rate: transaction.rate || 0,
-      isCalculated: transaction.isCalculated || false,
-      nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
-    });
-    
-    setValue('expenseNature', transaction.expenseNature);
-    setValue('category', transaction.category);
-    setValue('subCategory', subCategoryToSet);
-
-    setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
-    setIsCalculated(transaction.isCalculated || false);
-    setIsRecurring(transaction.isRecurring || false);
-    setActiveTab("form");
-  }, [reset, loans, setValue]);
 
 
   const handleDelete = async (transaction: DisplayTransaction) => {
@@ -1025,4 +1035,5 @@ export default function IncomeExpenseClient() {
 
 
     
+
 
