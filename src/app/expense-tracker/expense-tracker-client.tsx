@@ -222,12 +222,6 @@ export default function IncomeExpenseClient() {
   const rate = watch('rate');
 
 
-  useEffect(() => {
-      if (!isEditing) {
-          setValue('transactionId', getNextTransactionId(selectedTransactionType));
-      }
-  }, [selectedTransactionType, isEditing, setValue, getNextTransactionId]);
-
   const handleTransactionIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       let value = e.target.value.trim();
       const prefix = selectedTransactionType === 'Income' ? 'IN' : 'EX';
@@ -250,7 +244,6 @@ export default function IncomeExpenseClient() {
     setIsEditing(null); 
     const nextId = getNextTransactionId('Expense');
     reset(getInitialFormState(nextId));
-    setValue('transactionType', 'Expense');
     setIsAdvanced(false);
     setIsCalculated(false);
     setIsRecurring(false);
@@ -746,8 +739,11 @@ export default function IncomeExpenseClient() {
                                     onChange={(value) => {
                                         const capitalizedValue = value ? toTitleCase(value) : '';
                                         field.onChange(capitalizedValue);
-                                        if (value && uniquePayees.includes(capitalizedValue)) {
-                                            handleAutoFill(capitalizedValue);
+                                    }}
+                                    onBlur={() => {
+                                        const currentPayeeValue = form.getValues('payee');
+                                        if (currentPayeeValue && uniquePayees.includes(currentPayeeValue)) {
+                                            handleAutoFill(currentPayeeValue);
                                         }
                                     }}
                                     onAdd={(newValue) => {
