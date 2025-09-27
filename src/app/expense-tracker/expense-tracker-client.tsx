@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -173,9 +174,9 @@ export default function IncomeExpenseClient() {
   }, [income, expenses]);
 
   const uniquePayees = useMemo(() => {
-      const payees = new Set(allTransactions.map(t => toTitleCase(t.payee)));
+      const payees = new Set((expenses || []).map(t => toTitleCase(t.payee)));
       return Array.from(payees).sort();
-  }, [allTransactions]);
+  }, [expenses]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
       const prefix = type === 'Income' ? 'IN' : 'EX';
@@ -734,6 +735,14 @@ export default function IncomeExpenseClient() {
                       </div>
 
                        <div className="space-y-1">
+                          <Label htmlFor="amount" className="text-xs">Amount</Label>
+                          <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
+                              <Controller name="amount" control={control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
+                          </InputWithIcon>
+                          {errors.amount && <p className="text-xs text-destructive mt-1">{errors.amount.message}</p>}
+                      </div>
+
+                       <div className="space-y-1">
                             <Label htmlFor="payee" className="text-xs">
                                 {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                             </Label>
@@ -768,14 +777,6 @@ export default function IncomeExpenseClient() {
                             </Popover>
                            {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                        </div>
-
-                       <div className="space-y-1">
-                          <Label htmlFor="amount" className="text-xs">Amount</Label>
-                          <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
-                              <Controller name="amount" control={control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
-                          </InputWithIcon>
-                          {errors.amount && <p className="text-xs text-destructive mt-1">{errors.amount.message}</p>}
-                      </div>
                        
                         {selectedTransactionType === 'Expense' && (
                             <Controller name="expenseNature" control={control} render={({ field }) => (
@@ -1029,11 +1030,3 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
-
-    
-
-    
-
-
-    
-
