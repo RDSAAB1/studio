@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from './input';
@@ -53,18 +53,27 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleClickOutside = useCallback((event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
             setIsOpen(false);
+            // If there's a selected item, revert to its label
             if (selectedItem) {
                 setSearchTerm(selectedItem.label);
-            } else if (!onAdd && !options.some(opt => opt.label === searchTerm)) {
-                // If not allowing add and the text is not a valid option, clear it
-                 onChange(null);
-                 setSearchTerm('');
+                // Ensure form value is correct if user typed something else but didn't select
+                if (value !== selectedItem.value) {
+                    onChange(selectedItem.value);
+                }
+            } else if (value) {
+                // If there's a value (like a new entry) but no matching selectedItem, keep it
+                 const matchingOption = options.find(opt => opt.value === value || opt.label === value);
+                 if (matchingOption) {
+                    setSearchTerm(matchingOption.label);
+                 } else {
+                    setSearchTerm(value);
+                 }
             } else {
-                 // Keep the typed value if it's a new entry
-                 onChange(searchTerm);
+                // If no value and no selected item, clear the search
+                setSearchTerm('');
             }
         }
-    }, [selectedItem, onAdd, options, searchTerm, onChange]);
+    }, [selectedItem, value, options, onChange]);
 
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
@@ -91,7 +100,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
-        onChange(newSearchTerm); // Update form value as user types for new entries
+        // Only call onChange if we intend to allow new values to be set directly
+        // This is crucial for the "add new" functionality
+        if (onAdd || !options.some(opt => opt.label === newSearchTerm)) {
+             onChange(newSearchTerm);
+        }
         if (!isOpen) {
             setIsOpen(true);
         }
@@ -100,6 +113,10 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleInputClick = () => {
         if (!isOpen) {
            setIsOpen(true);
+           // When opening, if there is a selected value but the search term is empty, populate it.
+           if(!searchTerm && selectedItem) {
+                setSearchTerm(selectedItem.label);
+           }
         }
     };
 
