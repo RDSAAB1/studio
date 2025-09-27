@@ -38,8 +38,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
     useEffect(() => {
-        setSearchTerm(selectedItem?.label || '');
-    }, [selectedItem]);
+        setSearchTerm(selectedItem?.label || value || '');
+    }, [value, selectedItem]);
     
     const filteredItems = useMemo(() => {
         if (!searchTerm || (selectedItem && searchTerm === selectedItem.label)) {
@@ -50,18 +50,29 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         );
     }, [searchTerm, options, selectedItem]);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-                setSearchTerm(selectedItem?.label || '');
+    const handleClickOutside = useCallback((event: MouseEvent) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            setIsOpen(false);
+            if (selectedItem) {
+                setSearchTerm(selectedItem.label);
+            } else if (!onAdd && !options.some(opt => opt.label === searchTerm)) {
+                // If not allowing add and the text is not a valid option, clear it
+                 onChange(null);
+                 setSearchTerm('');
+            } else {
+                 // Keep the typed value if it's a new entry
+                 onChange(searchTerm);
             }
-        };
+        }
+    }, [selectedItem, onAdd, options, searchTerm, onChange]);
+
+    useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [selectedItem]);
+    }, [handleClickOutside]);
+
 
     const handleSelect = (item: CustomDropdownOption) => {
         onChange(item.value);
@@ -80,6 +91,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
+        onChange(newSearchTerm); // Update form value as user types for new entries
         if (!isOpen) {
             setIsOpen(true);
         }
@@ -89,20 +101,6 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         if (!isOpen) {
            setIsOpen(true);
         }
-    };
-    
-    const handleInputBlur = () => {
-        setTimeout(() => {
-            if (!dropdownRef.current?.contains(document.activeElement)) {
-                setIsOpen(false);
-                if (selectedItem) {
-                    setSearchTerm(selectedItem.label);
-                } else if (!onAdd) {
-                    setSearchTerm('');
-                    onChange(null);
-                }
-            }
-        }, 150);
     };
 
     const handleAddNew = () => {
@@ -130,7 +128,6 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     onChange={handleInputChange}
                     onClick={handleInputClick}
                     onFocus={handleInputClick}
-                    onBlur={handleInputBlur}
                     className="w-full pl-8 pr-8 h-8 text-sm"
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
