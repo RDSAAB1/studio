@@ -578,11 +578,15 @@ export default function IncomeExpenseClient() {
   }, [allTransactions, setValue, toast]);
     
   const getDisplayId = (transaction: DisplayTransaction): string => {
-      if (transaction.category === 'Supplier Payments') {
-          const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
-          return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
-      }
-      return transaction.transactionId || 'N/A';
+    if (transaction.category === 'Supplier Payments') {
+        const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
+        return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
+    }
+    if (transaction.category === 'Customer Payment') {
+        const paymentIdMatch = transaction.description?.match(/Payment (\S+)/);
+        return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
+    }
+    return transaction.transactionId || 'N/A';
   };
 
   if(isPageLoading) {
@@ -729,18 +733,22 @@ export default function IncomeExpenseClient() {
                             <Label htmlFor="payee" className="text-xs">
                                 {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                             </Label>
-                            <CustomDropdown
-                                options={uniquePayees.map(p => ({ value: p, label: p }))}
-                                value={watch('payee')}
-                                onChange={(value) => {
-                                    setValue('payee', toTitleCase(value || ''));
-                                    if (value) handleAutoFill(value);
-                                }}
-                                onAdd={(newValue) => {
-                                  setValue('payee', toTitleCase(newValue));
-                                }}
-                                placeholder="Search or add payee..."
-                            />
+                            <Controller name="payee" control={control} render={({ field }) => (
+                                <CustomDropdown
+                                    options={uniquePayees.map(p => ({ value: p, label: p }))}
+                                    value={field.value}
+                                    onChange={(value) => {
+                                        field.onChange(value);
+                                        if (value && uniquePayees.includes(toTitleCase(value))) {
+                                            handleAutoFill(value);
+                                        }
+                                    }}
+                                    onAdd={(newValue) => {
+                                        setValue('payee', toTitleCase(newValue));
+                                    }}
+                                    placeholder="Search or add payee..."
+                                />
+                            )} />
                            {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                        </div>
 
