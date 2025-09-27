@@ -34,6 +34,7 @@ import { firestoreDB } from "@/lib/firebase";
 import { Loader2, Pen, PlusCircle, Save, Trash, Calendar as CalendarIcon, Tag, User, Wallet, Info, FileText, ArrowUpDown, TrendingUp, Hash, Percent, RefreshCw, Briefcase, UserCircle, FilePlus, List, BarChart, CircleDollarSign, Landmark, Building2, SunMoon, Layers3, FolderTree, ArrowLeftRight, Settings, SlidersHorizontal, Calculator, HandCoins } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format, addMonths } from "date-fns"
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Zod Schema for form validation
 const transactionFormSchema = z.object({
@@ -169,7 +170,7 @@ export default function IncomeExpenseClient() {
 
   const allTransactions: DisplayTransaction[] = useMemo(() => {
       const combined = [...(income || []), ...(expenses || [])];
-      return combined.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return combined.sort((a, b) => (b.transactionId || '').localeCompare(a.transactionId || ''));
   }, [income, expenses]);
 
   const uniquePayees = useMemo(() => {
@@ -621,57 +622,57 @@ export default function IncomeExpenseClient() {
         <TabsContent value="history" className="mt-4">
           <SectionCard>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
-                      <TableHead>Sub-Category</TableHead>
-                      <TableHead>Payee/Payer</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                       <TableHead>Mill</TableHead>
-                      <TableHead className="text-center">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedTransactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
-                        <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
-                        <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
-                        <TableCell>{transaction.category}</TableCell>
-                        <TableCell>{transaction.subCategory}</TableCell>
-                        <TableCell>{transaction.payee}</TableCell>
-                        <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(transaction.amount)}</TableCell>
-                        <TableCell>{transaction.mill}</TableCell>
-                        <TableCell className="text-center">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
+                <ScrollArea className="h-96">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
+                        <TableHead>Sub-Category</TableHead>
+                        <TableHead>Payee/Payer</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                         <TableHead>Mill</TableHead>
+                        <TableHead className="text-center">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedTransactions.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
+                          <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
+                          <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
+                          <TableCell>{transaction.category}</TableCell>
+                          <TableCell>{transaction.subCategory}</TableCell>
+                          <TableCell>{transaction.payee}</TableCell>
+                          <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(transaction.amount)}</TableCell>
+                          <TableCell>{transaction.mill}</TableCell>
+                          <TableCell className="text-center">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete the transaction for "{toTitleCase(transaction.payee)}".
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(transaction)}>Continue</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
             </CardContent>
           </SectionCard>
         </TabsContent>
@@ -759,7 +760,7 @@ export default function IncomeExpenseClient() {
                             <Controller name="expenseNature" control={control} render={({ field }) => (
                               <div className="space-y-1">
                                 <Label className="text-xs">Expense Nature</Label>
-                                <CustomDropdown options={[{value: "Permanent", label: "Permanent"}, {value: "Seasonal", label: "Seasonal"}]} value={field.value} onChange={field.onChange} placeholder="Select Nature" />
+                                <CustomDropdown options={[{value: "Permanent", label: "Permanent"}, {value: "Seasonal", label: "Seasonal"}]} {...field} placeholder="Select Nature" />
                               </div>
                             )} />
                         )}
@@ -767,7 +768,7 @@ export default function IncomeExpenseClient() {
                         <Controller name="category" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Category</Label>
-                            <CustomDropdown options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} value={field.value} onChange={field.onChange} placeholder="Select Category" />
+                            <CustomDropdown options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} {...field} placeholder="Select Category" />
                             {errors.category && <p className="text-xs text-destructive mt-1">{errors.category.message}</p>}
                           </div>
                         )} />
@@ -775,7 +776,7 @@ export default function IncomeExpenseClient() {
                         <Controller name="subCategory" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Sub-Category</Label>
-                            <CustomDropdown options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} value={field.value} onChange={field.onChange} placeholder="Select Sub-Category" />
+                            <CustomDropdown options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} {...field} placeholder="Select Sub-Category" />
                             {errors.subCategory && <p className="text-xs text-destructive mt-1">{errors.subCategory.message}</p>}
                           </div>
                         )} />
@@ -1010,3 +1011,5 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
