@@ -260,12 +260,10 @@ export default function IncomeExpenseClient() {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
-    // Determine the correct subCategory value before resetting the form
     const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
         ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
         : transaction.subCategory;
 
-    // Reset the form with all values from the transaction
     reset({
         ...transaction,
         date: new Date(transaction.date),
@@ -277,12 +275,10 @@ export default function IncomeExpenseClient() {
         subCategory: subCategoryToSet,
     });
     
-    // Set UI state toggles
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
-
-    // Switch to the form tab
+    
     setActiveTab("form");
 }, [editingTransaction, reset, loans]);
 
@@ -1036,5 +1032,3 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
-
-    
