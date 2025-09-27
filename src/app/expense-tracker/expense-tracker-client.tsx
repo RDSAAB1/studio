@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -23,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { useForm, Controller } from "react-hook-form";
 import { Switch } from "@/components/ui/switch";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
@@ -145,6 +144,9 @@ export default function IncomeExpenseClient() {
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  
+  const [payeeSuggestions, setPayeeSuggestions] = useState<string[]>([]);
+  const [isPayeePopoverOpen, setIsPayeePopoverOpen] = useState(false);
 
     useEffect(() => {
         const unsubIncome = getIncomeRealtime(setIncome, console.error);
@@ -169,6 +171,11 @@ export default function IncomeExpenseClient() {
       const combined = [...(income || []), ...(expenses || [])];
       return combined.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [income, expenses]);
+
+  const uniquePayees = useMemo(() => {
+      const payees = new Set(allTransactions.map(t => toTitleCase(t.payee)));
+      return Array.from(payees).sort();
+  }, [allTransactions]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
       const prefix = type === 'Income' ? 'IN' : 'EX';
@@ -236,13 +243,14 @@ export default function IncomeExpenseClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(null); 
-    const nextId = getNextTransactionId(selectedTransactionType);
+    const nextId = getNextTransactionId('Expense');
     reset(getInitialFormState(nextId));
+    setValue('transactionType', 'Expense');
     setIsAdvanced(false);
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-  }, [reset, getNextTransactionId, selectedTransactionType]);
+  }, [reset, getNextTransactionId]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -549,12 +557,12 @@ export default function IncomeExpenseClient() {
     };
   }, [income, expenses, allTransactions]);
   
-    const handlePayeeBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-        const payeeName = toTitleCase(e.target.value.trim());
-        if (!payeeName) return;
+    const handlePayeeBlur = (payeeName: string) => {
+        const trimmedPayeeName = toTitleCase(payeeName.trim());
+        if (!trimmedPayeeName) return;
 
         const latestTransaction = allTransactions
-            .filter(t => toTitleCase(t.payee) === payeeName)
+            .filter(t => toTitleCase(t.payee) === trimmedPayeeName)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
         
         if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
@@ -565,22 +573,31 @@ export default function IncomeExpenseClient() {
                     setValue('subCategory', latestTransaction.subCategory);
                 }, 50);
             }, 50);
-            toast({ title: 'Auto-filled!', description: `Details for ${payeeName} loaded.` });
+            toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
+        }
+    };
+    
+    const handlePayeeNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = toTitleCase(e.target.value);
+        setValue('payee', value);
+        if (value.length > 0) {
+            const filtered = uniquePayees.filter(p => p.toLowerCase().includes(value.toLowerCase()));
+            setPayeeSuggestions(filtered);
+            setIsPayeePopoverOpen(true);
+        } else {
+            setPayeeSuggestions([]);
+            setIsPayeePopoverOpen(false);
         }
     };
 
-    const handlePayeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { value, selectionStart, selectionEnd } = e.target;
-        const capitalizedValue = toTitleCase(value);
-        setValue('payee', capitalizedValue);
-        // This is a trick to maintain cursor position after programmatic change
-        requestAnimationFrame(() => {
-            e.target.setSelectionRange(selectionStart, selectionEnd);
-        });
+    const handlePayeeSelect = (payee: string) => {
+        setValue('payee', payee);
+        setIsPayeePopoverOpen(false);
+        handlePayeeBlur(payee);
     };
     
     const getDisplayId = (transaction: DisplayTransaction): string => {
-        const paymentIdMatch = transaction.description?.match(/(?:Payment|CD received on payment)\s([SPC]{1,2}\d+)/);
+        const paymentIdMatch = transaction.description?.match(/(?:Payment|CD received on payment)\s([SPC]{2}\d+)/);
         return paymentIdMatch?.[1] || transaction.transactionId || 'N/A';
     };
 
@@ -625,8 +642,8 @@ export default function IncomeExpenseClient() {
                       <TableHead>Type</TableHead>
                       <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                       <TableHead>Sub-Category</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
                       <TableHead>Payee/Payer</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                        <TableHead>Mill</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
@@ -639,8 +656,8 @@ export default function IncomeExpenseClient() {
                         <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
                         <TableCell>{transaction.category}</TableCell>
                         <TableCell>{transaction.subCategory}</TableCell>
-                        <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(transaction.amount)}</TableCell>
                         <TableCell>{transaction.payee}</TableCell>
+                        <TableCell className={cn("text-right font-medium", transaction.transactionType === 'Income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(transaction.amount)}</TableCell>
                         <TableCell>{transaction.mill}</TableCell>
                         <TableCell className="text-center">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(transaction)}><Pen className="h-4 w-4" /></Button>
@@ -717,21 +734,47 @@ export default function IncomeExpenseClient() {
                       </div>
 
                        <div className="space-y-1">
+                            <Label htmlFor="payee" className="text-xs">
+                                {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
+                            </Label>
+                            <Popover open={isPayeePopoverOpen} onOpenChange={setIsPayeePopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
+                                        <Input 
+                                            id="payee"
+                                            value={watch('payee')} 
+                                            onChange={handlePayeeNameChange}
+                                            onBlur={() => setTimeout(() => setIsPayeePopoverOpen(false), 150)}
+                                            className={cn("h-8 text-sm pl-10", errors.payee && "border-destructive")} 
+                                            autoComplete="off"
+                                            onFocus={e => { if (e.target.value.length > 0 && payeeSuggestions.length > 0) { setIsPayeePopoverOpen(true); }}}
+                                        />
+                                    </InputWithIcon>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                                    <Command>
+                                        <CommandList>
+                                            <CommandEmpty>No suggestions found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {payeeSuggestions.map((payee) => (
+                                                    <CommandItem key={payee} onSelect={() => handlePayeeSelect(payee)}>
+                                                        {payee}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                           {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
+                       </div>
+
+                       <div className="space-y-1">
                           <Label htmlFor="amount" className="text-xs">Amount</Label>
                           <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
                               <Controller name="amount" control={control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
                           </InputWithIcon>
                           {errors.amount && <p className="text-xs text-destructive mt-1">{errors.amount.message}</p>}
-                      </div>
-
-                       <div className="space-y-1">
-                          <Label htmlFor="payee" className="text-xs">
-                            {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
-                          </Label>
-                           <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                               <Controller name="payee" control={control} render={({ field }) => <Input id="payee" {...field} onChange={handlePayeeChange} onBlur={handlePayeeBlur} className="h-8 text-sm pl-10" /> } />
-                           </InputWithIcon>
-                          {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                       </div>
                        
                         {selectedTransactionType === 'Expense' && (
@@ -993,3 +1036,4 @@ export default function IncomeExpenseClient() {
 
 
     
+
