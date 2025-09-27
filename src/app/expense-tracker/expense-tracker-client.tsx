@@ -237,9 +237,7 @@ export default function IncomeExpenseClient() {
           handleEdit(foundTransaction);
       } else {
         if (isEditing) {
-            // Keep the form data, just mark as not editing
             setIsEditing(null);
-            setEditingTransaction(null);
         }
       }
   };
@@ -270,7 +268,6 @@ export default function IncomeExpenseClient() {
         nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
     });
     
-    // Use a timeout to ensure the form state (especially dependent fields) is updated before setting category/sub-category
     setTimeout(() => {
         setValue('expenseNature', transaction.expenseNature);
         setTimeout(() => {
