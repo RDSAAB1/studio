@@ -253,6 +253,8 @@ export default function IncomeExpenseClient() {
   }, []);
 
   const handleAutoFill = useCallback((payeeName: string) => {
+    if (!uniquePayees.includes(payeeName)) return;
+
     const trimmedPayeeName = toTitleCase(payeeName.trim());
     if (!trimmedPayeeName) return;
 
@@ -267,12 +269,12 @@ export default function IncomeExpenseClient() {
                 setValue('category', latestTransaction.category);
                 setTimeout(() => {
                      setValue('subCategory', latestTransaction.subCategory);
-                }, 50)
+                }, 50);
             }, 50);
         }, 0);
         toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
     }
-  }, [allTransactions, setValue, toast]);
+  }, [allTransactions, setValue, toast, uniquePayees]);
 
 
   useEffect(() => {
