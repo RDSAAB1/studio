@@ -146,7 +146,6 @@ export default function IncomeExpenseClient() {
   const [isCalculated, setIsCalculated] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   
-  const [payeeSuggestions, setPayeeSuggestions] = useState<string[]>([]);
   const [isPayeePopoverOpen, setIsPayeePopoverOpen] = useState(false);
 
     useEffect(() => {
@@ -251,7 +250,7 @@ export default function IncomeExpenseClient() {
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-  }, [reset, getNextTransactionId]);
+  }, [reset, getNextTransactionId, setValue]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
@@ -558,44 +557,25 @@ export default function IncomeExpenseClient() {
     };
   }, [income, expenses, allTransactions]);
   
-    const handlePayeeBlur = (payeeName: string) => {
-        const trimmedPayeeName = toTitleCase(payeeName.trim());
-        if (!trimmedPayeeName) return;
+  const handleAutoFill = useCallback((payeeName: string) => {
+    const trimmedPayeeName = toTitleCase(payeeName.trim());
+    if (!trimmedPayeeName) return;
 
-        const latestTransaction = allTransactions
-            .filter(t => toTitleCase(t.payee) === trimmedPayeeName)
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-        
-        if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
-            setValue('expenseNature', latestTransaction.expenseNature);
-            setTimeout(() => {
-                setValue('category', latestTransaction.category);
-                setTimeout(() => {
-                    setValue('subCategory', latestTransaction.subCategory);
-                }, 50);
-            }, 50);
-            toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
-        }
-    };
+    const latestTransaction = allTransactions
+        .filter(t => toTitleCase(t.payee) === trimmedPayeeName)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     
-    const handlePayeeNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = toTitleCase(e.target.value);
-        setValue('payee', value);
-        if (value.length > 0) {
-            const filtered = uniquePayees.filter(p => p.toLowerCase().includes(value.toLowerCase()));
-            setPayeeSuggestions(filtered);
-            setIsPayeePopoverOpen(true);
-        } else {
-            setPayeeSuggestions([]);
-            setIsPayeePopoverOpen(false);
-        }
-    };
-
-    const handlePayeeSelect = (payee: string) => {
-        setValue('payee', payee, { shouldDirty: true });
-        setIsPayeePopoverOpen(false);
-        setTimeout(() => handlePayeeBlur(payee), 100);
-    };
+    if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
+        setValue('expenseNature', latestTransaction.expenseNature);
+        setTimeout(() => {
+            setValue('category', latestTransaction.category);
+            setTimeout(() => {
+                setValue('subCategory', latestTransaction.subCategory);
+            }, 50);
+        }, 50);
+        toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
+    }
+  }, [allTransactions, setValue, toast]);
     
     const getDisplayId = (transaction: DisplayTransaction): string => {
         const paymentIdMatch = transaction.description?.match(/(?:Payment|CD received on payment)\s([SPC]{2}\d+)/);
@@ -733,52 +713,34 @@ export default function IncomeExpenseClient() {
                               <Input id="transactionId" {...register("transactionId")} onBlur={handleTransactionIdBlur} className="h-8 text-sm pl-10" />
                           </InputWithIcon>
                       </div>
-
-                       <div className="space-y-1">
+                      
+                      <div className="space-y-1">
                           <Label htmlFor="amount" className="text-xs">Amount</Label>
                           <InputWithIcon icon={<Wallet className="h-4 w-4 text-muted-foreground" />}>
                               <Controller name="amount" control={control} render={({ field }) => <Input id="amount" type="number" {...field} className="h-9 text-sm pl-10" readOnly={isCalculated}/>} />
                           </InputWithIcon>
                           {errors.amount && <p className="text-xs text-destructive mt-1">{errors.amount.message}</p>}
                       </div>
-
+                      
                        <div className="space-y-1">
                             <Label htmlFor="payee" className="text-xs">
                                 {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                             </Label>
-                            <Popover open={isPayeePopoverOpen} onOpenChange={setIsPayeePopoverOpen}>
-                                <PopoverTrigger asChild>
-                                    <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                        <Input 
-                                            id="payee"
-                                            value={watch('payee')} 
-                                            onChange={handlePayeeNameChange}
-                                            onBlur={() => setTimeout(() => setIsPayeePopoverOpen(false), 150)}
-                                            className={cn("h-8 text-sm pl-10", errors.payee && "border-destructive")} 
-                                            autoComplete="off"
-                                            onFocus={e => { if (e.target.value.length > 0 && payeeSuggestions.length > 0) { setIsPayeePopoverOpen(true); }}}
-                                        />
-                                    </InputWithIcon>
-                                </PopoverTrigger>
-                                {isPayeePopoverOpen && (
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-                                    <Command>
-                                        <CommandList>
-                                            <CommandEmpty>No suggestions found.</CommandEmpty>
-                                            <CommandGroup>
-                                                {payeeSuggestions.map((payee) => (
-                                                    <CommandItem key={payee} value={payee} onSelect={() => handlePayeeSelect(payee)}>
-                                                        {payee}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                                )}
-                            </Popover>
+                             <CustomDropdown
+                                options={uniquePayees.map(p => ({ value: p, label: p }))}
+                                value={watch('payee')}
+                                onChange={(value) => {
+                                    setValue('payee', value || '', { shouldValidate: true });
+                                    if (value) handleAutoFill(value);
+                                }}
+                                onAdd={(newValue) => {
+                                  setValue('payee', newValue, { shouldValidate: true });
+                                }}
+                                placeholder="Search or add payee..."
+                            />
                            {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                        </div>
+
                        
                         {selectedTransactionType === 'Expense' && (
                             <Controller name="expenseNature" control={control} render={({ field }) => (
@@ -1032,4 +994,3 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
-
