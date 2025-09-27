@@ -38,12 +38,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
     useEffect(() => {
-        // When the `value` prop changes from outside, update the searchTerm to reflect the new selection's label.
-        setSearchTerm(selectedItem?.label || (value || ''));
-    }, [value, selectedItem]);
+        setSearchTerm(selectedItem?.label || '');
+    }, [selectedItem]);
     
     const filteredItems = useMemo(() => {
-        if (!searchTerm || searchTerm === selectedItem?.label) {
+        if (!searchTerm || (selectedItem && searchTerm === selectedItem.label)) {
             return options;
         }
         return options.filter(item =>
@@ -55,7 +54,6 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
-                 // If there's a selected item, revert input text to its label. Otherwise, clear it.
                 setSearchTerm(selectedItem?.label || '');
             }
         };
@@ -82,9 +80,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
-        // We call onChange with the raw input value so the parent form state is updated in real-time
-        onChange(newSearchTerm);
-        if(!isOpen) {
+        if (!isOpen) {
             setIsOpen(true);
         }
     };
@@ -96,29 +92,31 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     };
     
     const handleInputBlur = () => {
-        // Delay closing to allow click on options
         setTimeout(() => {
             if (!dropdownRef.current?.contains(document.activeElement)) {
                 setIsOpen(false);
-                // On blur, if no item is selected, but there's a search term, treat it as a new entry.
-                // Otherwise, revert to the selected item's label or clear.
-                if (onAdd && searchTerm && !options.some(opt => opt.label.toLowerCase() === searchTerm.toLowerCase())) {
-                    onAdd(searchTerm);
-                } else if (selectedItem) {
+                if (selectedItem) {
                     setSearchTerm(selectedItem.label);
-                } else {
+                } else if (!onAdd) {
                     setSearchTerm('');
+                    onChange(null);
                 }
             }
         }, 150);
     };
 
     const handleAddNew = () => {
-        if (onAdd && searchTerm && !filteredItems.some(item => item.label.toLowerCase() === searchTerm.toLowerCase())) {
-            onAdd(searchTerm);
-            setIsOpen(false);
+        if (onAdd && searchTerm) {
+            const existingOption = options.find(item => item.label.toLowerCase() === searchTerm.toLowerCase());
+            if (existingOption) {
+                handleSelect(existingOption);
+            } else {
+                onAdd(searchTerm);
+                onChange(searchTerm); // Set the form value to the new item
+                setIsOpen(false);
+            }
         }
-    }
+    };
 
     return (
         <div className="relative w-full" ref={dropdownRef}>
@@ -162,7 +160,10 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                             filteredItems.map((item, index) => (
                                 <li
                                     key={`${item.value}-${index}`}
-                                    onClick={() => handleSelect(item)}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelect(item);
+                                    }}
                                     className={cn(
                                         "cursor-pointer px-4 py-2 text-sm hover:bg-accent",
                                         selectedItem?.value === item.value ? 'bg-accent font-medium' : ''
@@ -174,9 +175,12 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                         ) : (
                              !onAdd && <li className="px-4 py-2 text-sm text-muted-foreground text-center">{noItemsPlaceholder}</li>
                         )}
-                         {onAdd && searchTerm && !filteredItems.some(item => item.label.toLowerCase() === searchTerm.toLowerCase()) && (
+                         {onAdd && searchTerm && !options.some(item => item.label.toLowerCase() === searchTerm.toLowerCase()) && (
                             <li
-                                onClick={handleAddNew}
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleAddNew();
+                                }}
                                 className="cursor-pointer px-4 py-2 text-sm hover:bg-accent text-primary font-medium"
                             >
                                 Add "{searchTerm}"
