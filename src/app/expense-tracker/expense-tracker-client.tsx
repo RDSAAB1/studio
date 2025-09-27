@@ -174,9 +174,9 @@ export default function IncomeExpenseClient() {
   }, [income, expenses]);
 
   const uniquePayees = useMemo(() => {
-      const payees = new Set((expenses || []).map(t => toTitleCase(t.payee)));
+      const payees = new Set((allTransactions || []).map(t => toTitleCase(t.payee)));
       return Array.from(payees).sort();
-  }, [expenses]);
+  }, [allTransactions]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
       const prefix = type === 'Income' ? 'IN' : 'EX';
@@ -592,9 +592,9 @@ export default function IncomeExpenseClient() {
     };
 
     const handlePayeeSelect = (payee: string) => {
-        setValue('payee', payee);
+        setValue('payee', payee, { shouldDirty: true });
         setIsPayeePopoverOpen(false);
-        handlePayeeBlur(payee);
+        setTimeout(() => handlePayeeBlur(payee), 100);
     };
     
     const getDisplayId = (transaction: DisplayTransaction): string => {
@@ -603,7 +603,7 @@ export default function IncomeExpenseClient() {
     };
 
   if(isPageLoading) {
-    return <div>Loading...</div>
+    return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin" /></div>
   }
 
   return (
@@ -760,13 +760,14 @@ export default function IncomeExpenseClient() {
                                         />
                                     </InputWithIcon>
                                 </PopoverTrigger>
+                                {isPayeePopoverOpen && (
                                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                                     <Command>
                                         <CommandList>
                                             <CommandEmpty>No suggestions found.</CommandEmpty>
                                             <CommandGroup>
                                                 {payeeSuggestions.map((payee) => (
-                                                    <CommandItem key={payee} onSelect={() => handlePayeeSelect(payee)}>
+                                                    <CommandItem key={payee} value={payee} onSelect={() => handlePayeeSelect(payee)}>
                                                         {payee}
                                                     </CommandItem>
                                                 ))}
@@ -774,6 +775,7 @@ export default function IncomeExpenseClient() {
                                         </CommandList>
                                     </Command>
                                 </PopoverContent>
+                                )}
                             </Popover>
                            {errors.payee && <p className="text-xs text-destructive mt-1">{errors.payee.message}</p>}
                        </div>
@@ -1030,3 +1032,4 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
