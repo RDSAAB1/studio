@@ -225,6 +225,8 @@ export default function IncomeExpenseClient() {
 
   const handleTransactionIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       let value = e.target.value.trim();
+      if (!value) return;
+
       const prefix = selectedTransactionType === 'Income' ? 'IN' : 'EX';
       if (value && !isNaN(parseInt(value)) && isFinite(Number(value))) {
           value = formatTransactionId(parseInt(value), prefix);
@@ -235,6 +237,7 @@ export default function IncomeExpenseClient() {
           handleEdit(foundTransaction);
       } else {
         if (isEditing) {
+            // Keep the form data, just mark as not editing
             setIsEditing(null);
             setEditingTransaction(null);
         }
@@ -253,14 +256,16 @@ export default function IncomeExpenseClient() {
     setActiveTab("form");
   }, [reset, getNextTransactionId]);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
+    // Determine the correct subCategory value before resetting the form
     const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
         ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
         : transaction.subCategory;
 
+    // Reset the form with all values from the transaction
     reset({
         ...transaction,
         date: new Date(transaction.date),
@@ -272,12 +277,14 @@ export default function IncomeExpenseClient() {
         subCategory: subCategoryToSet,
     });
     
+    // Set UI state toggles
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
 
+    // Switch to the form tab
     setActiveTab("form");
-  }, [editingTransaction, reset, loans]);
+}, [editingTransaction, reset, loans]);
 
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
     setIsEditing(transaction.id);
@@ -776,7 +783,12 @@ export default function IncomeExpenseClient() {
                         <Controller name="category" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Category</Label>
-                            <CustomDropdown options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} {...field} placeholder="Select Category" />
+                            <CustomDropdown 
+                                key={availableCategories.map(c => c.id).join('-')}
+                                options={availableCategories.map(cat => ({ value: cat.name, label: cat.name }))} 
+                                {...field} 
+                                placeholder="Select Category" 
+                            />
                             {errors.category && <p className="text-xs text-destructive mt-1">{errors.category.message}</p>}
                           </div>
                         )} />
@@ -784,7 +796,12 @@ export default function IncomeExpenseClient() {
                         <Controller name="subCategory" control={control} render={({ field }) => (
                           <div className="space-y-1">
                             <Label className="text-xs">Sub-Category</Label>
-                            <CustomDropdown options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} {...field} placeholder="Select Sub-Category" />
+                            <CustomDropdown 
+                                key={availableSubCategories.join('-')}
+                                options={availableSubCategories.map(subCat => ({ value: subCat, label: subCat }))} 
+                                {...field} 
+                                placeholder="Select Sub-Category" 
+                            />
                             {errors.subCategory && <p className="text-xs text-destructive mt-1">{errors.subCategory.message}</p>}
                           </div>
                         )} />
@@ -1021,14 +1038,3 @@ export default function IncomeExpenseClient() {
 }
 
     
-
-      
-
-
-    
-
-
-    
-
-
-
