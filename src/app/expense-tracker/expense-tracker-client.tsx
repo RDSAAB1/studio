@@ -258,6 +258,10 @@ useEffect(() => {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
+    const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
+        ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
+        : transaction.subCategory;
+        
     reset({
         ...transaction,
         date: new Date(transaction.date),
@@ -266,27 +270,15 @@ useEffect(() => {
         rate: transaction.rate || 0,
         isCalculated: transaction.isCalculated || false,
         nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
+        subCategory: subCategoryToSet,
     });
-    
-    setTimeout(() => {
-        setValue('expenseNature', transaction.expenseNature);
-        setTimeout(() => {
-            setValue('category', transaction.category);
-            setTimeout(() => {
-                 const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
-                    ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
-                    : transaction.subCategory;
-                setValue('subCategory', subCategoryToSet);
-            }, 50);
-        }, 50);
-    }, 0);
     
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
     
     setActiveTab("form");
-}, [editingTransaction, reset, setValue, loans]);
+}, [editingTransaction, reset, loans]);
 
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
     setIsEditing(transaction.id);
@@ -573,7 +565,7 @@ useEffect(() => {
   }, [income, expenses, allTransactions]);
   
 const handleAutoFill = useCallback((payeeName: string) => {
-    if (isEditing) return; // Don't auto-fill when editing an entry
+    if (isEditing) return;
     
     const trimmedPayeeName = toTitleCase(payeeName.trim());
     if (!trimmedPayeeName) return;
@@ -757,11 +749,9 @@ const handleAutoFill = useCallback((payeeName: string) => {
                                     onChange={(value) => {
                                         const capitalizedValue = value ? toTitleCase(value) : '';
                                         field.onChange(capitalizedValue);
-                                    }}
-                                    onBlur={() => {
-                                        const currentPayeeValue = form.getValues('payee');
-                                        if (currentPayeeValue && uniquePayees.includes(currentPayeeValue)) {
-                                            handleAutoFill(currentPayeeValue);
+                                        // Auto-fill only when an existing payee is selected from the list
+                                        if (value && uniquePayees.includes(value)) {
+                                            handleAutoFill(value);
                                         }
                                     }}
                                     onAdd={(newValue) => {
