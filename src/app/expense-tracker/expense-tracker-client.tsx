@@ -138,7 +138,7 @@ export default function IncomeExpenseClient() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<DisplayTransaction | null>(null);
   const [activeTab, setActiveTab] = useState("form");
-  const [sortConfig, setSortConfig = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayTransaction; direction: 'ascending' | 'descending' } | null>(null);
   
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -304,7 +304,7 @@ export default function IncomeExpenseClient() {
                 }
             }, 50);
         }, 50);
-    }, 0);
+    }, 50);
     
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
@@ -1035,6 +1035,10 @@ export default function IncomeExpenseClient() {
     </div>
   );
 }
+
+    
+
+    
 
     
 
