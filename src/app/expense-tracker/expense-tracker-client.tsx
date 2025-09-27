@@ -248,54 +248,11 @@ export default function IncomeExpenseClient() {
     setActiveTab("form");
   }, [reset, getNextTransactionId]);
 
-    useEffect(() => {
-        if (!editingTransaction) return;
-
-        const transaction = editingTransaction;
-        
-        const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
-            ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
-            : transaction.subCategory;
-            
-        reset({
-            ...transaction,
-            date: new Date(transaction.date),
-            taxAmount: transaction.taxAmount || 0,
-            quantity: transaction.quantity || 0,
-            rate: transaction.rate || 0,
-            isCalculated: transaction.isCalculated || false,
-            nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
-            subCategory: subCategoryToSet,
-        });
-
-        // Use setTimeout to ensure the state updates from reset have propagated
-        // before trying to set category/sub-category values, which depend on expenseNature.
-        setTimeout(() => {
-            if (transaction.expenseNature) {
-                setValue('expenseNature', transaction.expenseNature);
-            }
-            if (transaction.category) {
-                setValue('category', transaction.category);
-            }
-            if (subCategoryToSet) {
-                 setValue('subCategory', subCategoryToSet);
-            }
-        }, 50);
-        
-        setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
-        setIsCalculated(transaction.isCalculated || false);
-        setIsRecurring(transaction.isRecurring || false);
-        
-        setActiveTab("form");
-    }, [editingTransaction, reset, loans, setValue]);
-
-  const handleEdit = useCallback((transaction: DisplayTransaction) => {
-    setEditingTransaction(transaction);
-  }, []);
+    const handleEdit = useCallback((transaction: DisplayTransaction) => {
+        setEditingTransaction(transaction);
+    }, []);
 
   const handleAutoFill = useCallback((payeeName: string) => {
-    if (editingTransaction) return;
-    
     const trimmedPayeeName = toTitleCase(payeeName.trim());
     if (!trimmedPayeeName) return;
 
@@ -306,10 +263,8 @@ export default function IncomeExpenseClient() {
     if (latestTransaction && latestTransaction.transactionType === 'Expense' && latestTransaction.expenseNature) {
         setTimeout(() => {
             setValue('expenseNature', latestTransaction.expenseNature);
-            // We need another timeout to allow the category dropdown to re-render with new options
             setTimeout(() => {
                 setValue('category', latestTransaction.category);
-                 // And another one for sub-category
                 setTimeout(() => {
                      setValue('subCategory', latestTransaction.subCategory);
                 }, 50)
@@ -317,7 +272,48 @@ export default function IncomeExpenseClient() {
         }, 0);
         toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
     }
-  }, [allTransactions, setValue, toast, editingTransaction]);
+  }, [allTransactions, setValue, toast]);
+
+
+  useEffect(() => {
+    if (!editingTransaction) return;
+
+    const transaction = editingTransaction;
+
+    const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
+        ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
+        : transaction.subCategory;
+
+    reset({
+        ...transaction,
+        date: new Date(transaction.date),
+        taxAmount: transaction.taxAmount || 0,
+        quantity: transaction.quantity || 0,
+        rate: transaction.rate || 0,
+        isCalculated: transaction.isCalculated || false,
+        nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
+    });
+
+    setTimeout(() => {
+        if (transaction.expenseNature) {
+            setValue('expenseNature', transaction.expenseNature);
+        }
+        if (transaction.category) {
+            setValue('category', transaction.category);
+        }
+        setTimeout(() => {
+            if (subCategoryToSet) {
+                 setValue('subCategory', subCategoryToSet);
+            }
+        }, 50); 
+    }, 0);
+    
+    setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
+    setIsCalculated(transaction.isCalculated || false);
+    setIsRecurring(transaction.isRecurring || false);
+    
+    setActiveTab("form");
+  }, [editingTransaction]);
 
   useEffect(() => {
     const loanId = searchParams.get('loanId');
