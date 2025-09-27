@@ -234,6 +234,7 @@ export default function IncomeExpenseClient() {
           handleEdit(foundTransaction);
       } else {
         if (isEditing) {
+            // Do not reset the form, just exit edit mode
             setIsEditing(null);
         }
       }
@@ -379,7 +380,6 @@ export default function IncomeExpenseClient() {
     
     reset({
       ...transaction,
-      subCategory: subCategoryToSet,
       date: new Date(transaction.date), 
       taxAmount: transaction.taxAmount || 0,
       quantity: transaction.quantity || 0,
@@ -387,12 +387,16 @@ export default function IncomeExpenseClient() {
       isCalculated: transaction.isCalculated || false,
       nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
     });
+    
+    setValue('expenseNature', transaction.expenseNature);
+    setValue('category', transaction.category);
+    setValue('subCategory', subCategoryToSet);
 
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
     setActiveTab("form");
-  }, [reset, loans]);
+  }, [reset, loans, setValue]);
 
 
   const handleDelete = async (transaction: DisplayTransaction) => {
@@ -418,8 +422,6 @@ export default function IncomeExpenseClient() {
         let amountToCheck = values.amount;
         if (isEditing) {
             const originalTx = allTransactions.find(tx => tx.id === isEditing);
-            // If the account hasn't changed, we adjust the check amount.
-            // If it has changed, we must check the full amount against the new account.
             if (originalTx && (originalTx.bankAccountId || 'CashInHand') === (values.bankAccountId || 'CashInHand')) {
                  amountToCheck = values.amount - originalTx.amount;
             }
@@ -1023,3 +1025,4 @@ export default function IncomeExpenseClient() {
 
 
     
+
