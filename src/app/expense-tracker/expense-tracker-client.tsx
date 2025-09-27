@@ -237,7 +237,7 @@ export default function IncomeExpenseClient() {
           handleEdit(foundTransaction);
       } else {
         if (isEditing) {
-            setIsEditing(null);
+            handleNew();
         }
       }
   };
@@ -254,7 +254,7 @@ export default function IncomeExpenseClient() {
     setActiveTab("form");
   }, [reset, getNextTransactionId]);
 
- useEffect(() => {
+useEffect(() => {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
@@ -572,7 +572,9 @@ export default function IncomeExpenseClient() {
     };
   }, [income, expenses, allTransactions]);
   
-  const handleAutoFill = useCallback((payeeName: string) => {
+const handleAutoFill = useCallback((payeeName: string) => {
+    if (isEditing) return; // Don't auto-fill when editing an entry
+    
     const trimmedPayeeName = toTitleCase(payeeName.trim());
     if (!trimmedPayeeName) return;
 
@@ -590,7 +592,7 @@ export default function IncomeExpenseClient() {
         }, 50);
         toast({ title: 'Auto-filled!', description: `Details for ${trimmedPayeeName} loaded.` });
     }
-  }, [allTransactions, setValue, toast]);
+}, [allTransactions, setValue, toast, isEditing]);
     
   const getDisplayId = (transaction: DisplayTransaction): string => {
     if (transaction.category === 'Supplier Payments') {
