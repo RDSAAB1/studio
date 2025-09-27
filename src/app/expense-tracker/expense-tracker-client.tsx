@@ -733,18 +733,20 @@ export default function IncomeExpenseClient() {
                             <Label htmlFor="payee" className="text-xs">
                                 {selectedTransactionType === 'Income' ? 'Payer (Received From)' : 'Payee (Paid To)'}
                             </Label>
-                            <Controller name="payee" control={control} render={({ field }) => (
+                           <Controller name="payee" control={control} render={({ field }) => (
                                 <CustomDropdown
                                     options={uniquePayees.map(p => ({ value: p, label: p }))}
                                     value={field.value}
                                     onChange={(value) => {
-                                        field.onChange(value);
-                                        if (value && uniquePayees.includes(toTitleCase(value))) {
-                                            handleAutoFill(value);
+                                        const capitalizedValue = value ? toTitleCase(value) : null;
+                                        field.onChange(capitalizedValue);
+                                        if (capitalizedValue && uniquePayees.includes(capitalizedValue)) {
+                                            handleAutoFill(capitalizedValue);
                                         }
                                     }}
                                     onAdd={(newValue) => {
-                                        setValue('payee', toTitleCase(newValue));
+                                        const capitalizedValue = toTitleCase(newValue);
+                                        setValue('payee', capitalizedValue);
                                     }}
                                     placeholder="Search or add payee..."
                                 />
@@ -778,27 +780,30 @@ export default function IncomeExpenseClient() {
                           </div>
                         )} />
                       
-                        <div className="space-y-1">
-                            <Label htmlFor="paymentMethod" className="text-xs">Payment Method</Label>
-                            <CustomDropdown
-                                options={[
-                                    { value: "Cash", label: "Cash" },
-                                    ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})` }))
-                                ]}
-                                value={selectedPaymentMethod === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === watch('bankAccountId'))?.id}
-                                onChange={(value) => {
-                                    if (value === 'Cash') {
-                                        setValue('paymentMethod', 'Cash');
-                                        setValue('bankAccountId', undefined);
-                                    } else {
-                                        const account = bankAccounts.find(acc => acc.id === value);
-                                        setValue('paymentMethod', account?.bankName || '');
-                                        setValue('bankAccountId', value);
-                                    }
-                                }}
-                                placeholder="Select Payment Method"
-                            />
-                        </div>
+                        <Controller name="paymentMethod" control={control} render={({ field }) => (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Payment Method</Label>
+                              <CustomDropdown
+                                  options={[
+                                      { value: "Cash", label: "Cash" },
+                                      ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.bankName} (...${acc.accountNumber.slice(-4)})` }))
+                                  ]}
+                                  value={field.value === 'Cash' ? 'Cash' : bankAccounts.find(acc => acc.id === watch('bankAccountId'))?.id}
+                                  onChange={(value) => {
+                                      if (value === 'Cash') {
+                                          setValue('paymentMethod', 'Cash');
+                                          setValue('bankAccountId', undefined);
+                                      } else {
+                                          const account = bankAccounts.find(acc => acc.id === value);
+                                          setValue('paymentMethod', account?.bankName || '');
+                                          setValue('bankAccountId', value);
+                                      }
+                                      field.onChange(value);
+                                  }}
+                                  placeholder="Select Payment Method"
+                              />
+                          </div>
+                        )} />
 
                     </div>
 
