@@ -251,12 +251,16 @@ export default function IncomeExpenseClient() {
     setIsCalculated(false);
     setIsRecurring(false);
     setActiveTab("form");
-  }, [reset, getNextTransactionId, setValue]);
+  }, [reset, getNextTransactionId]);
 
   useEffect(() => {
     if (!editingTransaction) return;
 
     const transaction = editingTransaction;
+    const subCategoryToSet = (transaction.category === 'Interest & Loan Payments' && transaction.loanId)
+        ? loans.find(l => l.id === transaction.loanId)?.loanName || transaction.subCategory
+        : transaction.subCategory;
+
     reset({
         ...transaction,
         date: new Date(transaction.date),
@@ -265,25 +269,15 @@ export default function IncomeExpenseClient() {
         rate: transaction.rate || 0,
         isCalculated: transaction.isCalculated || false,
         nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
+        subCategory: subCategoryToSet,
     });
+    
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
 
-    setTimeout(() => {
-        setValue('expenseNature', transaction.expenseNature);
-        setValue('category', transaction.category);
-
-        let subCategoryToSet = transaction.subCategory;
-        if (transaction.category === 'Interest & Loan Payments' && transaction.loanId) {
-            const loan = loans.find(l => l.id === transaction.loanId);
-            if (loan) subCategoryToSet = loan.loanName;
-        }
-        setValue('subCategory', subCategoryToSet);
-    }, 50);
-
     setActiveTab("form");
-  }, [editingTransaction, reset, setValue, loans]);
+  }, [editingTransaction, reset, loans]);
 
   const handleEdit = useCallback((transaction: DisplayTransaction) => {
     setIsEditing(transaction.id);
@@ -637,8 +631,8 @@ export default function IncomeExpenseClient() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="cursor-pointer" onClick={() => requestSort('transactionId')}>ID <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                         <TableHead className="cursor-pointer" onClick={() => requestSort('date')}>Date <ArrowUpDown className="inline h-3 w-3 ml-1"/> </TableHead>
-                        <TableHead>ID</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead className="cursor-pointer" onClick={() => requestSort('category')}>Category <ArrowUpDown className="inline h-3 w-3 ml-1"/></TableHead>
                         <TableHead>Sub-Category</TableHead>
@@ -651,8 +645,8 @@ export default function IncomeExpenseClient() {
                     <TableBody>
                       {sortedTransactions.map((transaction) => (
                         <TableRow key={transaction.id}>
-                          <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
                           <TableCell className="font-mono text-xs">{getDisplayId(transaction)}</TableCell>
+                          <TableCell>{format(new Date(transaction.date), "dd-MMM-yy")}</TableCell>
                           <TableCell><Badge variant={transaction.transactionType === 'Income' ? 'default' : 'destructive'} className={transaction.transactionType === 'Income' ? 'bg-green-500/80' : 'bg-red-500/80'}>{transaction.transactionType}</Badge></TableCell>
                           <TableCell>{transaction.category}</TableCell>
                           <TableCell>{transaction.subCategory}</TableCell>
@@ -1035,5 +1029,6 @@ export default function IncomeExpenseClient() {
 
 
     
+
 
 
