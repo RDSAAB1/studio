@@ -233,9 +233,11 @@ export default function IncomeExpenseClient() {
       if (foundTransaction) {
           handleEdit(foundTransaction);
       } else {
-          if (isEditing) {
-              setIsEditing(null);
-          }
+        if (isEditing) {
+            // User loaded an entry but changed the ID to a new one.
+            // Keep the form data but mark as not editing.
+            setIsEditing(null);
+        }
       }
   };
 
@@ -368,31 +370,35 @@ export default function IncomeExpenseClient() {
     setValue('subCategory', '');
   }, [selectedCategory, setValue]);
 
-  const handleEdit = (transaction: DisplayTransaction) => {
+  const handleEdit = useCallback((transaction: DisplayTransaction) => {
     setIsEditing(transaction.id);
     let subCategoryToSet = transaction.subCategory;
-    
+
     if (transaction.category === 'Interest & Loan Payments' && transaction.loanId) {
         const loan = loans.find(l => l.id === transaction.loanId);
         if (loan) subCategoryToSet = loan.loanName;
     }
     
+    // Use reset to set all form values at once
     reset({
       ...transaction,
-      transactionId: transaction.transactionId,
       date: new Date(transaction.date), 
       taxAmount: transaction.taxAmount || 0,
       quantity: transaction.quantity || 0,
       rate: transaction.rate || 0,
       isCalculated: transaction.isCalculated || false,
       nextDueDate: transaction.nextDueDate ? new Date(transaction.nextDueDate) : undefined,
-      subCategory: subCategoryToSet,
     });
+    
+    // Manually set subCategory after reset as it might depend on async data
+    setValue('subCategory', subCategoryToSet);
+
     setIsAdvanced(!!(transaction.status || transaction.taxAmount || transaction.expenseType || transaction.mill || transaction.projectId));
     setIsCalculated(transaction.isCalculated || false);
     setIsRecurring(transaction.isRecurring || false);
     setActiveTab("form");
-  };
+  }, [reset, loans, setValue]);
+
 
   const handleDelete = async (transaction: DisplayTransaction) => {
     try {
@@ -1016,6 +1022,9 @@ export default function IncomeExpenseClient() {
     
 
       
+
+
+    
 
 
     
