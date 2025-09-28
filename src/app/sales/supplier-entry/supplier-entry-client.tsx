@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -368,7 +367,7 @@ export default function SupplierEntryClient() {
         const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
         
         const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
-        const soDist = levenshteinDistance(supSoNorm, currentSoNorm);
+        const soDist = levenshteinDistance(supSoNorm, supSoNorm);
         const totalDist = nameDist + soDist;
         
         if (totalDist > 0 && totalDist < 3 && totalDist < minDistance) {
@@ -760,9 +759,9 @@ export default function SupplierEntryClient() {
                 <AlertDialogDescription>
                     A supplier with a very similar name already exists. Is this the same person?
                     <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
-                        <div><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</div>
-                        <div><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</div>
-                        <div><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</div>
+                        <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
+                        <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
+                        <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
                     </div>
                 </AlertDialogDescription>
             </AlertDialogHeader>
@@ -822,4 +821,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
