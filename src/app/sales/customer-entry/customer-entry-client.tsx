@@ -83,8 +83,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo')) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) as CustomerPayment[] | undefined || [];
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -143,6 +143,35 @@ export default function CustomerEntryClient() {
     }
   }, []);
 
+  useEffect(() => {
+    if (isClient) {
+      const unsub = getCustomersRealtime((data) => {
+        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'customers' })));
+      }, console.error);
+
+      const unsubPayments = getCustomerPaymentsRealtime((data) => {
+        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'customer_payments' })));
+      }, console.error);
+
+      return () => {
+        unsub();
+        unsubPayments();
+      };
+    }
+  }, [isClient]);
+
+  useEffect(() => {
+    if (customers !== undefined) {
+        setIsLoading(false);
+        if (isInitialLoad.current && customers.length > 0) {
+            handleNew();
+            isInitialLoad.current = false;
+        } else if (isInitialLoad.current && customers.length === 0) {
+            // Still loading from firestore, might need a better loader state
+        }
+    }
+  }, [customers]);
+
   const handleNew = useCallback(() => {
     setIsEditing(false);
     let nextSrNum = 1;
@@ -161,11 +190,11 @@ export default function CustomerEntryClient() {
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   useEffect(() => {
-    if (customers !== undefined) {
+    if (customers !== undefined && isInitialLoad.current) {
         setIsLoading(false);
-        if (isInitialLoad.current && customers) {
-            handleNew();
-            isInitialLoad.current = false;
+        if (customers.length > 0 || !isInitialLoad.current) {
+             handleNew();
+             isInitialLoad.current = false;
         }
     }
   }, [customers, form, handleNew]);
@@ -355,7 +384,7 @@ export default function CustomerEntryClient() {
         vehicleNo: toTitleCase(formValues.vehicleNo),
         variety: toTitleCase(formValues.variety),
         paymentType: formValues.paymentType,
-        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${toTitleCase(formValues.companyName || '').toLowerCase()}`,
+        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
         grossWeight: formValues.grossWeight,
         teirWeight: formValues.teirWeight,
         rate: formValues.rate,

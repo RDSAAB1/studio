@@ -182,7 +182,13 @@ export default function SupplierEntryClient() {
   const handleNew = useCallback(() => {
     setIsEditing(false);
     setSuggestedSupplier(null);
-    const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+    let nextSrNum = 1;
+    if (safeSuppliers.length > 0) {
+      const lastSrNo = safeSuppliers[safeSuppliers.length - 1]?.srNo;
+      if (lastSrNo) {
+        nextSrNum = parseInt(lastSrNo.substring(1), 10) + 1;
+      }
+    }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'S');
     const today = new Date();
@@ -201,9 +207,26 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
+    if (isClient) {
+      const unsub = getSuppliersRealtime((data) => {
+        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'suppliers' })));
+      }, console.error);
+
+      const unsubPayments = getPaymentsRealtime((data) => {
+        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'payments' })));
+      }, console.error);
+
+      return () => {
+        unsub();
+        unsubPayments();
+      };
+    }
+  }, [isClient]);
+
+  useEffect(() => {
     if (suppliers !== undefined) {
         setIsLoading(false);
-        if (isInitialLoad.current && suppliers) {
+        if (isInitialLoad.current) {
             handleNew();
             isInitialLoad.current = false;
         }
@@ -395,7 +418,7 @@ export default function SupplierEntryClient() {
         address: toTitleCase(values.address),
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
         forceUnique: values.forceUnique,
     };
 
@@ -791,4 +814,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
