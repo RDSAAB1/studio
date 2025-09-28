@@ -176,22 +176,25 @@ export default function SupplierEntryClient() {
   }, [form, performCalculations]);
 
   const handleNew = useCallback(() => {
-    setIsEditing(false);
-    setSuggestedSupplier(null);
-    let nextSrNum = 1;
-    if (safeSuppliers && safeSuppliers.length > 0) {
-      const maxSrNo = Math.max(...safeSuppliers.map(s => parseInt(s.srNo.substring(1), 10) || 0));
-      nextSrNum = maxSrNo + 1;
-    }
-    const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum, 'S');
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    newState.date = today.toISOString().split('T')[0];
-    newState.dueDate = today.toISOString().split('T')[0];
-    resetFormToState(newState);
-    form.setValue('date', new Date()); // Set today's date
-    setTimeout(() => form.setFocus('srNo'), 50);
+      setIsEditing(false);
+      setSuggestedSupplier(null);
+      let nextSrNum = 1;
+      if (safeSuppliers && safeSuppliers.length > 0) {
+          const maxSrNoNum = safeSuppliers.reduce((maxNum, s) => {
+              const currentNum = parseInt(s.srNo.substring(1), 10);
+              return isNaN(currentNum) ? maxNum : Math.max(maxNum, currentNum);
+          }, 0);
+          nextSrNum = maxSrNoNum + 1;
+      }
+      const newState = getInitialFormState(lastVariety, lastPaymentType);
+      newState.srNo = formatSrNo(nextSrNum, 'S');
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      newState.date = today.toISOString().split('T')[0];
+      newState.dueDate = today.toISOString().split('T')[0];
+      resetFormToState(newState);
+      form.setValue('date', new Date()); // Set today's date
+      setTimeout(() => form.setFocus('srNo'), 50);
   }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   useEffect(() => {
@@ -812,5 +815,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
