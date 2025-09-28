@@ -29,6 +29,8 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
+const paymentsCollection = collection(firestoreDB, "payments");
+
 
 type PaymentOption = {
   quantity: number;
@@ -418,6 +420,21 @@ export default function SupplierPaymentsClient() {
     }
     setSelectedEntryIds(newSet);
   };
+  
+  const handlePaymentIdBlur = () => {
+    let value = paymentId.trim();
+    if (!value) return;
+
+    if (value && !isNaN(parseInt(value)) && isFinite(Number(value))) {
+        value = formatPaymentId(parseInt(value));
+        setPaymentId(value);
+    }
+
+    const foundPayment = paymentHistory.find(p => p.paymentId === value);
+    if (foundPayment) {
+        handleEditPayment(foundPayment);
+    }
+  };
 
 const processPayment = async () => {
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
@@ -549,7 +566,7 @@ const processPayment = async () => {
                 paymentDataBase.bankAccountId = selectedAccountId;
             }
             
-            const newPaymentRef = doc(collection(firestoreDB, "payments"));
+            const newPaymentRef = doc(paymentsCollection, paymentId);
             transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
             finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
         });
@@ -844,7 +861,7 @@ const processPayment = async () => {
                         isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                        handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
@@ -912,7 +929,7 @@ const processPayment = async () => {
             isOpen={!!detailsSupplierEntry}
             onOpenChange={() => setDetailsSupplierEntry(null)}
             customer={detailsSupplierEntry}
-            paymentHistory={paymentHistory}
+            paymentHistory={paymentsForDetailsEntry}
         />
         
         <PaymentDetailsDialog
