@@ -318,7 +318,8 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    const getGroupingKey = (s: Supplier) => `${toTitleCase(s.name)}|${toTitleCase(s.so || '')}`;
+    const normalizeString = (str: string) => str.toLowerCase().replace(/\s+/g, '');
+    const getGroupingKey = (s: Supplier) => `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
 
     // Initialize map with all unique suppliers based on the new grouping key
     filteredSuppliers.forEach(s => {

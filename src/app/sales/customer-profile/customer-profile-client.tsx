@@ -234,7 +234,8 @@ export default function CustomerProfileClient() {
     const { filteredCustomers, filteredCustomerPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    const getGroupingKey = (c: Customer) => `${toTitleCase(c.name)}|${toTitleCase(c.companyName || '')}`;
+    const normalizeString = (str: string) => str.toLowerCase().replace(/\s+/g, '');
+    const getGroupingKey = (c: Customer) => `${normalizeString(c.name)}|${normalizeString(c.companyName || '')}`;
     
     filteredCustomers.forEach(s => {
         const groupingKey = getGroupingKey(s);
@@ -284,8 +285,9 @@ export default function CustomerProfileClient() {
 
     const customerMapForPayments = new Map<string, string>();
     filteredCustomers.forEach(c => {
+        const groupingKey = getGroupingKey(c);
         if (!customerMapForPayments.has(c.customerId)) {
-            customerMapForPayments.set(c.customerId, getGroupingKey(c));
+            customerMapForPayments.set(c.customerId, groupingKey);
         }
     });
 
