@@ -22,6 +22,7 @@ import {
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
+import { db } from './database';
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const customersCollection = collection(firestoreDB, "customers");
@@ -287,6 +288,7 @@ export async function deleteSupplier(id: string): Promise<void> {
   }
   const docRef = doc(suppliersCollection, id);
   await deleteDoc(docRef);
+  await db.mainDataStore.delete(id); // Also delete from Dexie
 }
 
 export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
@@ -341,8 +343,8 @@ export async function deleteCustomer(id: string): Promise<void> {
       console.error("deleteCustomer requires a valid ID.");
       return;
     }
-    const docRef = doc(customersCollection, id);
-    await deleteDoc(docRef);
+    await deleteDoc(doc(customersCollection, id));
+    await db.mainDataStore.delete(id);
 }
 
 // --- Inventory Item Functions ---
@@ -390,6 +392,43 @@ export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void>
       batch.delete(doc.ref);
   });
   await batch.commit();
+}
+
+export async function deletePayment(id: string, isEditing: boolean = false): Promise<void> {
+    const paymentDocRef = doc(supplierPaymentsCollection, id);
+
+    await runTransaction(firestoreDB, async (transaction) => {
+        const paymentDoc = await transaction.get(paymentDocRef);
+        if (!paymentDoc.exists()) {
+            throw new Error("Payment document not found!");
+        }
+
+        const paymentData = paymentDoc.data() as Payment;
+
+        // Restore supplier net amounts
+        if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
+            for (const detail of paymentData.paidFor) {
+                const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                const supplierDocsSnapshot = await getDocs(q); // Use getDocs, not inside transaction
+                if (!supplierDocsSnapshot.empty) {
+                    const customerDoc = supplierDocsSnapshot.docs[0];
+                    const currentSupplier = customerDoc.data() as Customer;
+                    const amountToRestore = detail.amount;
+                    const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                    transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                }
+            }
+        }
+        
+        // Delete associated expense
+        if (paymentData.expenseTransactionId) {
+            const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
+            transaction.delete(expenseDocRef);
+        }
+
+        // Delete the payment
+        transaction.delete(paymentDocRef);
+    });
 }
 
 
@@ -523,43 +562,6 @@ export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'
     const newPayment = { ...paymentData, id: docRef.id };
     await setDoc(docRef, newPayment);
     return newPayment;
-}
-
-export async function deletePayment(id: string, isEditing: boolean = false): Promise<void> {
-    const paymentDocRef = doc(supplierPaymentsCollection, id);
-
-    await runTransaction(firestoreDB, async (transaction) => {
-        const paymentDoc = await transaction.get(paymentDocRef);
-        if (!paymentDoc.exists()) {
-            throw new Error("Payment document not found!");
-        }
-
-        const paymentData = paymentDoc.data() as Payment;
-
-        // Restore supplier net amounts
-        if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
-            for (const detail of paymentData.paidFor) {
-                const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                const supplierDocsSnapshot = await getDocs(q); // Use getDocs, not inside transaction
-                if (!supplierDocsSnapshot.empty) {
-                    const customerDoc = supplierDocsSnapshot.docs[0];
-                    const currentSupplier = customerDoc.data() as Customer;
-                    const amountToRestore = detail.amount;
-                    const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                    transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                }
-            }
-        }
-        
-        // Delete associated expense
-        if (paymentData.expenseTransactionId) {
-            const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
-            transaction.delete(expenseDocRef);
-        }
-
-        // Delete the payment
-        transaction.delete(paymentDocRef);
-    });
 }
 
 export async function deleteCustomerPayment(id: string): Promise<void> {
