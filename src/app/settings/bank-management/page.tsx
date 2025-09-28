@@ -93,27 +93,21 @@ export default function BankManagementPage() {
             toast({ title: "All branch fields are required.", variant: "destructive" });
             return;
         }
-        
-        const branchExists = branches.some(b => 
-            b.bankName.toLowerCase() === currentBranch.bankName?.toLowerCase() &&
-            b.branchName.toLowerCase() === currentBranch.branchName?.toLowerCase() &&
-            b.id !== currentBranch.id
-        );
 
-        if (branchExists) {
-            toast({ title: "Duplicate Branch", description: "This branch name already exists for this bank.", variant: "destructive" });
-            return;
+        try {
+            if (currentBranch.id) {
+                await updateBankBranch(currentBranch.id, currentBranch);
+                toast({ title: "Branch Updated", variant: "success" });
+            } else {
+                await addBankBranch(currentBranch as Omit<BankBranch, 'id'>);
+                toast({ title: "Branch Added", variant: "success" });
+            }
+            setCurrentBranch({});
+            setIsBranchDialogOpen(false);
+        } catch (error: any) {
+            console.error("Error saving branch:", error);
+            toast({ title: "Save Failed", description: error.message, variant: "destructive" });
         }
-
-        if (currentBranch.id) {
-            await updateBankBranch(currentBranch.id, currentBranch);
-            toast({ title: "Branch Updated", variant: "success" });
-        } else {
-            await addBankBranch(currentBranch as Omit<BankBranch, 'id'>);
-            toast({ title: "Branch Added", variant: "success" });
-        }
-        setCurrentBranch({});
-        setIsBranchDialogOpen(false);
     };
 
     const handleBranchNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {

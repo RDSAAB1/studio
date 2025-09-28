@@ -228,12 +228,15 @@ export async function deleteBank(id: string): Promise<void> {
 }
 
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
-    const q = query(bankBranchesCollection, where("bankName", "==", branchData.bankName), where("branchName", "==", branchData.branchName));
-    const existing = await getDocs(q);
-    if (!existing.empty) {
-        throw new Error("This branch name already exists for this bank.");
-    }
+    if (!branchData.ifscCode) throw new Error("IFSC code is required to add a branch.");
     const docRef = doc(firestoreDB, 'bankBranches', branchData.ifscCode);
+    
+    // Check if a document with this IFSC code already exists
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        throw new Error(`A branch with IFSC code ${branchData.ifscCode} already exists.`);
+    }
+
     await setDoc(docRef, branchData);
     return { id: docRef.id, ...branchData };
 }
@@ -269,11 +272,11 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 
 // --- Supplier Functions ---
-export async function addSupplier(supplierData: Omit<Customer, 'id'>): Promise<Customer> {
+export async function addSupplier(supplierData: Customer): Promise<Customer> {
     const docRef = doc(suppliersCollection, supplierData.srNo);
-    const newSupplier = { ...supplierData, id: docRef.id };
-    await setDoc(docRef, newSupplier);
-    return newSupplier;
+    await setDoc(docRef, supplierData);
+    await db.mainDataStore.put({ ...supplierData, collection: 'suppliers' });
+    return supplierData;
 }
 
 export async function updateSupplier(id: string, supplierData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
@@ -283,6 +286,7 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
   }
   const docRef = doc(suppliersCollection, id);
   await updateDoc(docRef, supplierData);
+  await db.mainDataStore.update(id, supplierData);
   return true;
 }
 
@@ -302,6 +306,7 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
     for (const srNo of srNos) {
         const supplierDocRef = doc(suppliersCollection, srNo);
         batch.delete(supplierDocRef);
+        await db.mainDataStore.delete(srNo);
         const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo }));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         
@@ -325,11 +330,11 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
 
 
 // --- Customer Functions ---
-export async function addCustomer(customerData: Omit<Customer, 'id'>): Promise<Customer> {
+export async function addCustomer(customerData: Customer): Promise<Customer> {
     const docRef = doc(customersCollection, customerData.srNo);
-    const newCustomer = { ...customerData, id: docRef.id };
-    await setDoc(docRef, newCustomer);
-    return newCustomer;
+    await setDoc(docRef, customerData);
+    await db.mainDataStore.put({ ...customerData, collection: 'customers' });
+    return customerData;
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id'>>): Promise<boolean> {
@@ -339,6 +344,7 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
     }
     const docRef = doc(customersCollection, id);
     await updateDoc(docRef, customerData);
+    await db.mainDataStore.update(id, customerData);
     return true;
 }
 
@@ -374,6 +380,7 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   const batch = writeBatch(firestoreDB);
   snapshot.forEach(doc => {
       batch.delete(doc.ref);
+      db.mainDataStore.delete(doc.id);
   });
   await batch.commit();
 }
@@ -409,28 +416,25 @@ export async function deletePayment(id: string, isEditing: boolean = false): Pro
 
         const paymentData = paymentDoc.data() as Payment;
 
-        // Restore supplier net amounts
         if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
             for (const detail of paymentData.paidFor) {
                 const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                const supplierDocsSnapshot = await getDocs(q); // Use getDocs, not inside transaction
+                const supplierDocsSnapshot = await getDocs(q); 
                 if (!supplierDocsSnapshot.empty) {
                     const customerDoc = supplierDocsSnapshot.docs[0];
                     const currentSupplier = customerDoc.data() as Customer;
-                    const amountToRestore = detail.amount;
+                    const amountToRestore = detail.amount + (paymentData.cdApplied ? paymentData.cdAmount || 0 : 0) / paymentData.paidFor.length;
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
                 }
             }
         }
         
-        // Delete associated expense
         if (paymentData.expenseTransactionId) {
             const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
             transaction.delete(expenseDocRef);
         }
 
-        // Delete the payment
         transaction.delete(paymentDocRef);
     });
 }
@@ -897,3 +901,4 @@ export async function initialDataSync() {
     // it's less critical. It can be useful for warming up the cache on app start.
     console.log("Initial data sync would happen here if it were still implemented.");
 }
+
