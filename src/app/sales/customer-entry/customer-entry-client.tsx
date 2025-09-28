@@ -83,7 +83,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
+  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo')) || [];
   const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) as CustomerPayment[] | undefined || [];
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
@@ -143,18 +143,32 @@ export default function CustomerEntryClient() {
     }
   }, []);
 
+  const handleNew = useCallback(() => {
+    setIsEditing(false);
+    let nextSrNum = 1;
+    if (safeCustomers.length > 0) {
+        const lastSrNo = safeCustomers.sort((a, b) => a.srNo.localeCompare(b.srNo)).pop()?.srNo || 'C00000';
+        nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
+    }
+    const newState = getInitialFormState(lastVariety, lastPaymentType);
+    newState.srNo = formatSrNo(nextSrNum, 'C');
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    newState.date = today.toISOString().split('T')[0];
+    newState.dueDate = today.toISOString().split('T')[0];
+    resetFormToState(newState);
+    setTimeout(() => form.setFocus('srNo'), 50);
+}, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
+
   useEffect(() => {
     if (customers !== undefined) {
         setIsLoading(false);
         if (isInitialLoad.current && customers) {
-            const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'C');
-            form.setValue('srNo', initialSrNo);
-            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+            handleNew();
             isInitialLoad.current = false;
         }
     }
-  }, [customers, form]);
+  }, [customers, form, handleNew]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -255,19 +269,6 @@ export default function CustomerEntryClient() {
     form.reset(formValues);
     performCalculations(formValues);
   }, [form, performCalculations]);
-
-  const handleNew = useCallback(() => {
-    setIsEditing(false);
-    const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-    const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum, 'C');
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    newState.date = today.toISOString().split('T')[0];
-    newState.dueDate = today.toISOString().split('T')[0];
-    resetFormToState(newState);
-    setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);

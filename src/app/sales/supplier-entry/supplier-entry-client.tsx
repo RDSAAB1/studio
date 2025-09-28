@@ -125,10 +125,10 @@ export default function SupplierEntryClient() {
         let description = warning;
         if (warning.includes('holiday')) {
             title = 'Holiday on Due Date';
-            description = `Try Term: ${'\'\'\''}{suggestedTerm}\'\'\'\' days`;
+            description = `Try Term: ${String(suggestedTerm)} days`;
         } else if (warning.includes('limit')) {
             title = 'Daily Limit Reached';
-            description = `Try Term: ${'\'\'\''}{suggestedTerm}\'\'\'\' days`;
+            description = `Try Term: ${String(suggestedTerm)} days`;
         }
         
         toast({ title, description, variant: 'destructive', duration: 7000 });
@@ -174,7 +174,11 @@ export default function SupplierEntryClient() {
   const handleNew = useCallback(() => {
     setIsEditing(false);
     setSuggestedSupplier(null);
-    const nextSrNum = safeSuppliers.length > 0 ? Math.max(0, ...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+    let nextSrNum = 1;
+    if (safeSuppliers.length > 0) {
+        const lastSrNo = safeSuppliers.sort((a, b) => a.srNo.localeCompare(b.srNo)).pop()?.srNo || 'S00000';
+        nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
+    }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'S');
     const today = new Date();
@@ -195,7 +199,7 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (suppliers !== undefined) {
       setIsLoading(false);
-      if (isInitialLoad.current) {
+      if (isInitialLoad.current && suppliers) {
         handleNew();
         isInitialLoad.current = false;
       }
@@ -499,7 +503,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, holidays, dailyPaymentLimit, suppliers);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -583,7 +587,7 @@ export default function SupplierEntryClient() {
 
                     await addSupplier(supplierData);
                 }
-                toast({title: "Import Successful", description: `${'\'\'\''}{json.length}\'\'\'\' supplier entries have been imported.`});
+                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
             } catch (error) {
                 console.error("Import failed:", error);
                 toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
