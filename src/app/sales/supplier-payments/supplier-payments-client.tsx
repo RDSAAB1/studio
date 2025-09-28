@@ -327,7 +327,7 @@ export default function SupplierPaymentsClient() {
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId]);
+  }, [isClient, stableToast]);
 
     useEffect(() => {
         if (!editingPayment) {
@@ -719,6 +719,7 @@ const processPayment = async () => {
                     }
                 }
                 
+                // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
@@ -1019,5 +1020,4 @@ const processPayment = async () => {
 
 
 
-
-
+    

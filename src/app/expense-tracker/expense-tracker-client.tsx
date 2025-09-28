@@ -236,6 +236,14 @@ export default function IncomeExpenseClient() {
   const rate = watch('rate');
 
 
+    useEffect(() => {
+        if (!editingTransaction) {
+            const nextId = getNextTransactionId(selectedTransactionType);
+            setValue('transactionId', nextId);
+        }
+    }, [selectedTransactionType, editingTransaction, getNextTransactionId, setValue, payments, expenses]);
+
+
   const handleTransactionIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       let value = e.target.value.trim();
       if (!value) return;
@@ -1065,3 +1073,6 @@ export default function IncomeExpenseClient() {
 
     
 
+
+
+    
