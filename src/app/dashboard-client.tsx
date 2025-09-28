@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment, CustomerPayment } from '@/lib/definitions';
+import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +41,8 @@ export default function DashboardClient() {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [payments, setPayments] = useState<Payment[]>([]);
+    const [supplierPayments, setSupplierPayments] = useState<Payment[]>([]);
+    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
@@ -69,7 +70,8 @@ export default function DashboardClient() {
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
         const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, console.error);
         const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, console.error);
-        const unsubPayments = getPaymentsRealtime(setPayments, console.error);
+        const unsubSupplierPayments = getPaymentsRealtime(setSupplierPayments, console.error);
+        const unsubCustomerPayments = getCustomerPaymentsRealtime(setCustomerPayments, console.error);
         
         const unsubIncomes = getIncomeRealtime((data) => { setIncomes(data); }, console.error);
         const unsubExpenses = getExpensesRealtime((data) => { 
@@ -81,17 +83,18 @@ export default function DashboardClient() {
             unsubSuppliers(); unsubCustomers(); unsubFunds();
             unsubAccounts(); unsubIncomes(); unsubExpenses();
             unsubLoans(); unsubProjects(); unsubExpCats(); unsubIncCats();
-            unsubPayments();
+            unsubSupplierPayments(); unsubCustomerPayments();
         };
     }, []);
     
-    const allExpenses = useMemo(() => {
-        return [...expenses, ...payments];
-    }, [expenses, payments]);
-
     const filteredData = useMemo(() => {
         if (!date || !date.from) {
-            return { filteredIncomes: incomes, filteredExpenses: allExpenses, filteredSuppliers: suppliers, filteredCustomers: customers };
+            return { 
+                filteredIncomes: incomes, 
+                filteredExpenses: expenses, 
+                filteredSupplierPayments: supplierPayments,
+                filteredCustomerPayments: customerPayments,
+            };
         }
         
         const interval = { 
@@ -102,20 +105,30 @@ export default function DashboardClient() {
 
         return {
             filteredIncomes: incomes.filter(filterFn),
-            filteredExpenses: allExpenses.filter(filterFn),
-            filteredSuppliers: suppliers.filter(filterFn),
-            filteredCustomers: customers.filter(filterFn),
+            filteredExpenses: expenses.filter(filterFn),
+            filteredSupplierPayments: supplierPayments.filter(filterFn),
+            filteredCustomerPayments: customerPayments.filter(filterFn),
         };
-    }, [date, incomes, allExpenses, suppliers, customers]);
+    }, [date, incomes, expenses, supplierPayments, customerPayments]);
 
 
-    const allTransactions: (Income | Expense | Payment)[] = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredExpenses], [filteredData]);
+    const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
+    const allIncomes = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments], [filteredData]);
     
     const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables } = useMemo(() => {
+        const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
+        const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
+
+        const expenseFromEntries = filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
+        const expenseForSuppliers = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
+        
+        const currentTotalIncome = incomeFromEntries + incomeFromCustomers;
+        const currentTotalExpense = expenseFromEntries + expenseForSuppliers;
+
         return {
-            totalIncome: filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0),
-            totalExpense: filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0),
-            netProfit: filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0) - filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0),
+            totalIncome: currentTotalIncome,
+            totalExpense: currentTotalExpense,
+            netProfit: currentTotalIncome - currentTotalExpense,
             totalSupplierDues: suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
             totalCustomerReceivables: customers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0)
         }
@@ -136,51 +149,58 @@ export default function DashboardClient() {
             }
         });
         
-        [...incomes, ...allExpenses].forEach(t => {
+        [...incomes, ...customerPayments].forEach(t => {
             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
-                if (t.transactionType === 'Income') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
-                } else if (t.transactionType === 'Expense') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
-                }
+                 balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
             }
         });
         
+        [...expenses, ...supplierPayments].forEach(t => {
+             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' || ('receiptType' in t && t.receiptType === 'Cash') ? 'CashInHand' : '');
+             if (balanceKey && balances.has(balanceKey)) {
+                 balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
+             }
+        });
+
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         const totalLoanLiabilities = loans.reduce((sum, loan) => sum + (loan.remainingAmount || 0), 0);
         const totalLiabilities = totalLoanLiabilities + totalSupplierDues;
         const workingCapital = totalAssets - totalLiabilities;
         
         return { balances, totalAssets, totalLiabilities, workingCapital };
-    }, [fundTransactions, incomes, allExpenses, bankAccounts, loans, totalSupplierDues]);
+    }, [fundTransactions, incomes, expenses, supplierPayments, customerPayments, bankAccounts, loans, totalSupplierDues]);
 
     // --- Chart Data Calculation ---
     const level1Data = useMemo(() => {
-        const totalIncome = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
-        const totalExpense = filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
         return [{ name: 'Income', value: totalIncome }, { name: 'Expenses', value: totalExpense }];
-    }, [filteredData]);
+    }, [totalIncome, totalExpense]);
 
     const level2Data = useMemo(() => {
         if (!level1) return [];
         if (level1 === 'Expenses') {
             const permanent = filteredData.filteredExpenses.filter(e => e.expenseNature === 'Permanent').reduce((sum, item) => sum + item.amount, 0);
             const seasonal = filteredData.filteredExpenses.filter(e => e.expenseNature === 'Seasonal').reduce((sum, item) => sum + item.amount, 0);
-            return [{ name: 'Permanent', value: permanent }, { name: 'Seasonal', value: seasonal }];
+            const supplier = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
+            return [{ name: 'Permanent', value: permanent }, { name: 'Seasonal', value: seasonal }, { name: 'Supplier Payments', value: supplier }];
         }
         if (level1 === 'Income') {
-            return groupDataByField(filteredData.filteredIncomes, 'category');
+             const fromSales = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
+             const byCategory = groupDataByField(filteredData.filteredIncomes, 'category');
+             const salesData = { name: 'From Sales', value: fromSales };
+             return [salesData, ...byCategory];
         }
         return [];
     }, [level1, filteredData, incomeCategories]);
 
     const level3Data = useMemo(() => {
         if (!level1 || !level2) return [];
-        let sourceData: (Income | Expense | Payment)[] = [];
+        let sourceData: any[] = [];
         if (level1 === 'Expenses') {
+            if (level2 === 'Supplier Payments') return []; // No further breakdown
             sourceData = filteredData.filteredExpenses.filter(e => e.expenseNature === level2);
-        } else if (level1 === 'Income' && incomeCategories.some(c => c.name === level2)) {
+        } else if (level1 === 'Income') {
+             if (level2 === 'From Sales') return []; // No further breakdown
              sourceData = filteredData.filteredIncomes.filter(i => i.category === level2);
              return groupDataByField(sourceData, 'subCategory');
         }
@@ -194,15 +214,18 @@ export default function DashboardClient() {
     }, [level1, level2, level3, filteredData]);
     
     const incomeExpenseChartData = useMemo(() => {
-        const grouped = [...filteredData.filteredIncomes, ...filteredData.filteredExpenses].reduce((acc, t) => {
+        const grouped = [...allIncomes, ...allExpenses].reduce((acc, t) => {
             const day = format(new Date(t.date), 'MMM dd');
             if (!acc[day]) acc[day] = { date: day, income: 0, expense: 0 };
-            if (t.transactionType === 'Income') acc[day].income += t.amount;
-            else acc[day].expense += t.amount;
+            if ('transactionType' in t && t.transactionType === 'Income' || 'customerId' in t) {
+                acc[day].income += t.amount;
+            } else {
+                 acc[day].expense += t.amount;
+            }
             return acc;
         }, {} as Record<string, { date: string, income: number, expense: number }>);
         return Object.values(grouped).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    }, [filteredData]);
+    }, [allIncomes, allExpenses]);
     
     const assetsLiabilitiesData = useMemo(() => {
         return [
@@ -224,14 +247,14 @@ export default function DashboardClient() {
 
 
     const paymentMethodData = useMemo(() => {
-        const groupedBySource = allTransactions.reduce((acc, item) => {
+        const groupedBySource = [...allIncomes, ...allExpenses].reduce((acc, item) => {
             let key = 'Other';
             if(item.bankAccountId) {
                  const bank = bankAccounts.find(b => b.id === item.bankAccountId);
                  key = bank ? bank.accountHolderName : 'Other Bank';
-            } else if (item.paymentMethod === 'Cash') {
+            } else if (item.paymentMethod === 'Cash' || ('receiptType' in item && item.receiptType === 'Cash')) {
                 key = 'Cash in Hand';
-            } else if (item.paymentMethod === 'RTGS') {
+            } else if (item.paymentMethod === 'RTGS' || ('receiptType' in item && item.receiptType === 'RTGS')) {
                 key = 'RTGS';
             }
             acc[key] = (acc[key] || 0) + item.amount;
@@ -239,12 +262,12 @@ export default function DashboardClient() {
         }, {} as { [key: string]: number });
     
         return Object.entries(groupedBySource).map(([name, value]) => ({ name: toTitleCase(name), value }));
-    }, [allTransactions, bankAccounts]);
+    }, [allIncomes, allExpenses, bankAccounts]);
     
 
-    function groupDataByField(data: (Income | Expense | Payment)[], field: keyof (Income|Expense|Payment)) {
+    function groupDataByField(data: any[], field: string) {
         const grouped = data.reduce((acc, item) => {
-            const key = (item as any)[field] || 'Uncategorized';
+            const key = item[field] || 'Uncategorized';
             acc[key] = (acc[key] || 0) + item.amount;
             return acc;
         }, {} as { [key: string]: number });

@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { FundTransaction, Income, Expense, Loan, BankAccount, Customer, Payment } from "@/lib/definitions";
+import type { FundTransaction, Income, Expense, Loan, BankAccount, Customer, Payment, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-fns";
 
-import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction, getSuppliersRealtime } from "@/lib/firestore";
+import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getCustomerPaymentsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction, getSuppliersRealtime } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -61,7 +60,8 @@ export default function CashBankClient() {
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [payments, setPayments] = useState<Payment[]>([]);
+    const [supplierPayments, setSupplierPayments] = useState<Payment[]>([]);
+    const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -77,7 +77,8 @@ export default function CashBankClient() {
         const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
         const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
-        const unsubPayments = getPaymentsRealtime(setPayments, console.error);
+        const unsubSupplierPayments = getPaymentsRealtime(setSupplierPayments, console.error);
+        const unsubCustomerPayments = getCustomerPaymentsRealtime(setCustomerPayments, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
@@ -86,16 +87,17 @@ export default function CashBankClient() {
             unsubFundTransactions();
             unsubIncomes();
             unsubExpenses();
-            unsubPayments();
+            unsubSupplierPayments();
+            unsubCustomerPayments();
             unsubLoans();
             unsubBankAccounts();
             unsubSuppliers();
         };
     }, []);
 
-    const allTransactions = useMemo(() => {
-        return [...incomes, ...expenses, ...payments] as (Income | Expense | Payment)[];
-    }, [incomes, expenses, payments]);
+    const allExpenses = useMemo(() => [...expenses, ...supplierPayments], [expenses, supplierPayments]);
+    const allIncomes = useMemo(() => [...incomes, ...customerPayments], [incomes, customerPayments]);
+
 
     const formSourcesAndDestinations = useMemo(() => {
         const accounts = bankAccounts.map(acc => ({
@@ -122,7 +124,7 @@ export default function CashBankClient() {
     
     const loansWithCalculatedRemaining = useMemo(() => {
         return loans.map(loan => {
-            const paidTransactions = allTransactions.filter(t => t.loanId === loan.id && t.transactionType === 'Expense');
+            const paidTransactions = allExpenses.filter(t => ('loanId' in t) && t.loanId === loan.id);
             const totalPaidTowardsPrincipal = paidTransactions.reduce((sum, t) => sum + t.amount, 0);
             
             let accumulatedInterest = 0;
@@ -138,7 +140,7 @@ export default function CashBankClient() {
             const remainingAmount = loan.totalAmount + accumulatedInterest - totalPaid;
             return { ...loan, remainingAmount, amountPaid: totalPaid };
         });
-    }, [loans, allTransactions]);
+    }, [loans, allExpenses]);
 
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
@@ -155,14 +157,17 @@ export default function CashBankClient() {
             }
         });
         
-        allTransactions.forEach(t => {
+        allIncomes.forEach(t => {
             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
-                if (t.transactionType === 'Income') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
-                } else if (t.transactionType === 'Expense') {
-                    balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
-                }
+                 balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+            }
+        });
+
+        allExpenses.forEach(t => {
+            const balanceKey = t.bankAccountId || (('receiptType' in t && t.receiptType === 'Cash') || t.paymentMethod === 'Cash' ? 'CashInHand' : '');
+             if (balanceKey && balances.has(balanceKey)) {
+                 balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
             }
         });
         
@@ -172,7 +177,7 @@ export default function CashBankClient() {
         const totalAssets = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
         
         return { balances, totalAssets, totalLiabilities };
-    }, [fundTransactions, allTransactions, loansWithCalculatedRemaining, bankAccounts, suppliers]);
+    }, [fundTransactions, allIncomes, allExpenses, loansWithCalculatedRemaining, bankAccounts, suppliers]);
 
     const handleAddFundTransaction = (transaction: Omit<FundTransaction, 'id' | 'date'>) => {
         return addFundTransaction(transaction)
@@ -535,7 +540,7 @@ export default function CashBankClient() {
                                 <CustomDropdown options={[{value: 'OwnerCapital', label: "Owner's Capital"}, {value: 'Product', label: 'Product Loan'}, {value: 'Bank', label: 'Bank Loan'}, {value: 'Outsider', label: 'Outsider Loan'}]} value={currentLoan?.loanType || 'Product'} onChange={(value) => setCurrentLoan(prev => ({...prev, loanType: value as 'Product' | 'Bank' | 'Outsider' | 'OwnerCapital'}))} />
                             </div>
 
-                            {currentLoan.loanType === 'OwnerCapital' && (<div className="space-y-4">
+                            {currentLoan.loanType === 'OwnerCapital' && (<div>
                                 <div className="space-y-1"><Label htmlFor="totalAmount">Capital Amount</Label><Input id="totalAmount" name="totalAmount" type="number" value={currentLoan?.totalAmount || 0} onChange={handleLoanNumberInputChange} /></div>
                             </div>)}
                             

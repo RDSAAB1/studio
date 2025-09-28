@@ -2,10 +2,10 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense } from "@/lib/definitions";
+import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense, CustomerPayment } from "@/lib/definitions";
 import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome, updateSupplier, deleteIncome } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, getCustomerPaymentsRealtime, addIncome, updateSupplier, deleteIncome } from "@/lib/firestore";
 import { firestoreDB } from "@/lib/firebase";
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -50,6 +50,7 @@ export default function SupplierPaymentsClient() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [customerPayments, setCustomerPayments] = useState<CustomerPayment[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -106,7 +107,8 @@ export default function SupplierPaymentsClient() {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [roundFigureToggle, setRoundFigureToggle] = useState(false);
 
-  const allTransactions = useMemo(() => [...incomes, ...expenses, ...paymentHistory], [incomes, expenses, paymentHistory]);
+  const allExpenses = useMemo(() => [...expenses, ...paymentHistory], [expenses, paymentHistory]);
+  const allIncomes = useMemo(() => [...incomes, ...customerPayments], [incomes, customerPayments]);
 
 
   const stableToast = useCallback(toast, []);
@@ -173,10 +175,10 @@ export default function SupplierPaymentsClient() {
   
   const financialState = useMemo(() => {
     const balances = new Map<string, number>();
-    (bankAccounts || []).forEach(acc => balances.set(acc.id, 0));
+    bankAccounts.forEach(acc => balances.set(acc.id, 0));
     balances.set('CashInHand', 0);
 
-    (fundTransactions || []).forEach(t => {
+    fundTransactions.forEach(t => {
         if (t.type === 'CapitalInflow') {
             if (balances.has(t.destination)) {
                 balances.set(t.destination, (balances.get(t.destination) || 0) + t.amount);
@@ -191,19 +193,22 @@ export default function SupplierPaymentsClient() {
         }
     });
     
-    allTransactions.forEach(t => {
+    allIncomes.forEach(t => {
         const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
          if (balanceKey && balances.has(balanceKey)) {
-            if (t.transactionType === 'Income') {
-                balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
-            } else { // Expense or Payment
-                balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
-            }
+            balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
+        }
+    });
+    
+    allExpenses.forEach(t => {
+        const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' || ('receiptType' in t && t.receiptType === 'Cash') ? 'CashInHand' : '');
+         if (balanceKey && balances.has(balanceKey)) {
+             balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
         }
     });
     
     return { balances };
-  }, [fundTransactions, allTransactions, bankAccounts]);
+  }, [fundTransactions, allIncomes, allExpenses, bankAccounts]);
 
   const selectedEntries = useMemo(() => {
     if (!Array.isArray(suppliers)) return [];
@@ -281,6 +286,7 @@ export default function SupplierPaymentsClient() {
     const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
     const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
     const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+    const unsubCustomerPayments = getCustomerPaymentsRealtime(setCustomerPayments, console.error);
     
     const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
       if(isSubscribed) console.error("Error fetching banks:", error);
@@ -307,6 +313,7 @@ export default function SupplierPaymentsClient() {
       unsubExpenses();
       unsubFunds();
       unsubBankAccounts();
+      unsubCustomerPayments();
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
@@ -702,29 +709,26 @@ const processPayment = async () => {
 
         const rawOptions: PaymentOption[] = [];
         const generatedUniqueRemainingAmounts = new Map<number, number>();
-        const roundingUnit = roundFigureToggle ? 100 : 5;
-        
-        // This process finds ideal rates for each quantity to produce round-figure amounts
-        const maxQuantityToSearch = Math.min(300, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
+        const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
 
         for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
-            const idealRate = calcTargetAmount / q;
-            const startRate = Math.max(calcMinRate, Math.floor(idealRate / 5) * 5 - 25);
-            const endRate = Math.min(calcMaxRate, Math.ceil(idealRate / 5) * 5 + 25);
+            for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
+                if (currentRate % 5 !== 0) continue;
 
-            for (let currentRate = startRate; currentRate <= endRate; currentRate += 5) {
-                const calculatedAmount = q * currentRate;
-                
-                // Check if calculated amount matches rounding rules
-                if (calculatedAmount % roundingUnit !== 0) continue;
+                let calculatedAmount = q * currentRate;
+                if (roundFigureToggle) {
+                    calculatedAmount = Math.round(calculatedAmount / 100) * 100;
+                } else {
+                    calculatedAmount = Math.round(calculatedAmount / 5) * 5;
+                }
+
                 if (calculatedAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
                 if (amountRemaining < 0) continue;
-                
-                // Limit the number of options for each unique remaining amount
+
                 const count = generatedUniqueRemainingAmounts.get(amountRemaining) || 0;
-                if (count < 5) { // Limit options per unique remaining amount
+                if (count < 5) {
                     rawOptions.push({
                         quantity: q,
                         rate: currentRate,
@@ -872,12 +876,11 @@ const processPayment = async () => {
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
-                        parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        parchiNo={parchiNo} setParchiNo={setParchiNo} checkNo={checkNo} setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                        setCheckNo={setCheckNo}
+                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -933,7 +936,7 @@ const processPayment = async () => {
             isOpen={!!detailsSupplierEntry}
             onOpenChange={() => setDetailsSupplierEntry(null)}
             customer={detailsSupplierEntry}
-            paymentHistory={paymentsForDetailsEntry}
+            paymentHistory={paymentHistory}
         />
         
         <PaymentDetailsDialog
