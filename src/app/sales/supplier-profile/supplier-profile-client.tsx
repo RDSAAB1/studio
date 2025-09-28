@@ -324,7 +324,7 @@ export default function SupplierProfileClient() {
 
     const findBestMatchKey = (supplier: Supplier, existingKeys: string[]): string | null => {
         if (supplier.forceUnique) {
-            return `${normalizeString(supplier.name)}|${normalizeString(supplier.so || '')}|${supplier.id}`;
+            return `${normalizeString(supplier.name)}|${normalizeString(supplier.contact)}|${supplier.id}`;
         }
         
         const supNameNorm = normalizeString(supplier.name);
@@ -334,7 +334,7 @@ export default function SupplierProfileClient() {
 
         for (const key of existingKeys) {
             const keyParts = key.split('|');
-            if (keyParts.length < 2) continue; // Skip malformed or forceUnique keys
+            if (keyParts.length > 2) continue; // Skip forceUnique keys
             
             const [keyNameNorm, keySoNorm] = keyParts;
             const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);

@@ -410,6 +410,9 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    
+    const isForcedUnique = values.forceUnique || false;
+
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
@@ -422,14 +425,12 @@ export default function SupplierEntryClient() {
         address: toTitleCase(values.address),
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
-        forceUnique: values.forceUnique,
+        customerId: isForcedUnique 
+            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
+            : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        forceUnique: isForcedUnique,
     };
 
-    if (suggestedSupplier && completeEntry.forceUnique) {
-        // User clicked "No" to suggestion, ensure this is treated as unique
-        completeEntry.customerId = `${completeEntry.customerId}|${Date.now()}`;
-    }
 
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
@@ -821,3 +822,4 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
