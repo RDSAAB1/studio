@@ -174,11 +174,7 @@ export default function SupplierEntryClient() {
   const handleNew = useCallback(() => {
     setIsEditing(false);
     setSuggestedSupplier(null);
-    let nextSrNum = 1;
-    if (safeSuppliers.length > 0) {
-        const lastSrNo = safeSuppliers.sort((a, b) => a.srNo.localeCompare(b.srNo)).pop()?.srNo || 'S00000';
-        nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
-    }
+    const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'S');
     const today = new Date();
@@ -197,14 +193,17 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (suppliers !== undefined) {
-      setIsLoading(false);
-      if (isInitialLoad.current && suppliers) {
-        handleNew();
-        isInitialLoad.current = false;
-      }
+    if (suppliers.length > 0) {
+        setIsLoading(false);
+        if (isInitialLoad.current) {
+            const nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const initialSrNo = formatSrNo(nextSrNum, 'S');
+            form.setValue('srNo', initialSrNo);
+            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+            isInitialLoad.current = false;
+        }
     }
-  }, [suppliers, handleNew]);
+  }, [suppliers, form]);
 
 
   useEffect(() => {
@@ -301,7 +300,7 @@ export default function SupplierEntryClient() {
   }
 
   const handleContactBlur = (contactValue: string) => {
-    if (contactValue.length === 10 && suppliers.length > 0) {
+    if (contactValue.length === 10 && suppliers) {
       const latestEntryForContact = suppliers
           .filter(c => c.contact === contactValue)
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
@@ -382,16 +381,11 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
-    const localDate = new Date(values.date);
-    const timezoneOffset = localDate.getTimezoneOffset() * 60000;
-    const correctedDate = new Date(localDate.getTime() - timezoneOffset);
-
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
-        id: values.srNo,
-        srNo: values.srNo,
-        date: correctedDate.toISOString().split("T")[0],
+        id: values.srNo, // Use srNo as ID
+        date: values.date.toISOString().split("T")[0],
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
