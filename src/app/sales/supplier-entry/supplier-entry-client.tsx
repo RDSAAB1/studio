@@ -24,6 +24,8 @@ import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -44,6 +46,7 @@ const formSchema = z.object({
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
+    forceUnique: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -395,6 +398,7 @@ export default function SupplierEntryClient() {
         vehicleNo: toTitleCase(values.vehicleNo),
         variety: toTitleCase(values.variety),
         customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
+        forceUnique: values.forceUnique,
     };
 
     if (suggestedSupplier && completeEntry.forceUnique) {
@@ -584,7 +588,7 @@ export default function SupplierEntryClient() {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${toTitleCase(item['S/O'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -700,24 +704,6 @@ export default function SupplierEntryClient() {
                 handleDeleteOption={deleteOption}
                 allSuppliers={safeSuppliers}
             />
-
-            {suggestedSupplier && (
-                <div className="flex items-center justify-center gap-2 p-2 text-sm bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-800 rounded-lg">
-                    <Lightbulb className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                    <p className="text-yellow-800 dark:text-yellow-300">
-                        Did you mean: <strong className="font-semibold">{toTitleCase(suggestedSupplier.name)}</strong> s/o <strong className="font-semibold">{toTitleCase(suggestedSupplier.so)}</strong> from <strong className="font-semibold">{toTitleCase(suggestedSupplier.address)}</strong>?
-                    </p>
-                    <Button type="button" size="sm" variant="link" className="text-primary h-auto p-0" onClick={applySuggestion}>
-                        Yes, use this one
-                    </Button>
-                    <Button type="button" size="sm" variant="link" className="text-destructive h-auto p-0" onClick={() => {
-                        form.setValue('forceUnique', true, { shouldDirty: true });
-                        setSuggestedSupplier(null);
-                    }}>
-                        No
-                    </Button>
-                </div>
-            )}
             
             <CalculatedSummary 
                 customer={currentSupplier}
@@ -734,6 +720,32 @@ export default function SupplierEntryClient() {
             />
         </form>
       </FormProvider>      
+
+      <AlertDialog open={!!suggestedSupplier} onOpenChange={() => setSuggestedSupplier(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5 text-yellow-500" />
+                    Did you mean this supplier?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                    A supplier with a very similar name already exists. Is this the same person?
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
+                        <p><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</p>
+                        <p><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</p>
+                        <p><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</p>
+                    </div>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => {
+                    form.setValue('forceUnique', true);
+                    setSuggestedSupplier(null);
+                }}>No, Create New</AlertDialogCancel>
+                <AlertDialogAction onClick={applySuggestion}>Yes, Use This One</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       <EntryTable 
         entries={filteredSuppliers} 
@@ -781,4 +793,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
