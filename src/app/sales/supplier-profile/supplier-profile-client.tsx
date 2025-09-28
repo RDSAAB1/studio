@@ -318,10 +318,13 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    // Initialize map with all unique suppliers
+    const getGroupingKey = (s: Supplier) => `${toTitleCase(s.name)}|${toTitleCase(s.so || '')}`;
+
+    // Initialize map with all unique suppliers based on the new grouping key
     filteredSuppliers.forEach(s => {
-        if (s.customerId && !summary.has(s.customerId)) {
-            summary.set(s.customerId, {
+        const groupingKey = getGroupingKey(s);
+        if (!summary.has(groupingKey)) {
+            summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
@@ -338,8 +341,8 @@ export default function SupplierProfileClient() {
     let supplierRateSum: { [key: string]: { rate: number, karta: number, laboury: number, count: number } } = {};
 
     filteredSuppliers.forEach(s => {
-        if (!s.customerId) return;
-        const data = summary.get(s.customerId)!;
+        const groupingKey = getGroupingKey(s);
+        const data = summary.get(groupingKey)!;
         data.totalAmount += s.amount || 0;
         data.totalOriginalAmount += s.originalNetAmount || 0;
         data.totalGrossWeight! += s.grossWeight;
@@ -352,23 +355,32 @@ export default function SupplierProfileClient() {
         data.totalKanta! += s.kanta;
         data.totalOtherCharges! += s.otherCharges || 0;
         data.totalTransactions! += 1;
-        if (!supplierRateSum[s.customerId]) {
-            supplierRateSum[s.customerId] = { rate: 0, karta: 0, laboury: 0, count: 0 };
+        if (!supplierRateSum[groupingKey]) {
+            supplierRateSum[groupingKey] = { rate: 0, karta: 0, laboury: 0, count: 0 };
         }
         if (s.rate > 0) {
-            supplierRateSum[s.customerId].rate += s.rate;
-            supplierRateSum[s.customerId].karta += s.kartaPercentage;
-            supplierRateSum[s.customerId].laboury += s.labouryRate;
-            supplierRateSum[s.customerId].count++;
+            supplierRateSum[groupingKey].rate += s.rate;
+            supplierRateSum[groupingKey].karta += s.kartaPercentage;
+            supplierRateSum[groupingKey].laboury += s.labouryRate;
+            supplierRateSum[groupingKey].count++;
         }
         data.allTransactions!.push(s);
         const variety = toTitleCase(s.variety) || 'Unknown';
         data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
     });
+    
+    // Find supplier from payment and group payments
+    const supplierMapForPayments = new Map<string, string>();
+    filteredSuppliers.forEach(s => {
+        if (!supplierMapForPayments.has(s.customerId)) {
+            supplierMapForPayments.set(s.customerId, getGroupingKey(s));
+        }
+    });
 
     filteredPayments.forEach(p => {
-        if (p.customerId && summary.has(p.customerId)) {
-            const data = summary.get(p.customerId)!;
+        const groupingKey = supplierMapForPayments.get(p.customerId);
+        if (groupingKey && summary.has(groupingKey)) {
+            const data = summary.get(groupingKey)!;
             data.totalPaid += p.amount;
             data.totalCdAmount! += (p.cdAmount || 0);
             data.paymentHistory.push(p);

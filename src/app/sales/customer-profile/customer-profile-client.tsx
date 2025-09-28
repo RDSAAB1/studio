@@ -234,9 +234,12 @@ export default function CustomerProfileClient() {
     const { filteredCustomers, filteredCustomerPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
+    const getGroupingKey = (c: Customer) => `${toTitleCase(c.name)}|${toTitleCase(c.companyName || '')}`;
+    
     filteredCustomers.forEach(s => {
-        if (s.customerId && !summary.has(s.customerId)) {
-            summary.set(s.customerId, {
+        const groupingKey = getGroupingKey(s);
+        if (!summary.has(groupingKey)) {
+            summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address, companyName: s.companyName,
                 acNo: s.acNo, ifscCode: s.ifscCode, bank: s.bank, branch: s.branch,
                 totalAmount: 0, totalPaid: 0, totalOutstanding: 0, totalOriginalAmount: 0,
@@ -254,8 +257,8 @@ export default function CustomerProfileClient() {
     let customerRateSum: { [key: string]: { rate: number, count: number } } = {};
 
     filteredCustomers.forEach(s => {
-        if (!s.customerId) return;
-        const data = summary.get(s.customerId)!;
+        const groupingKey = getGroupingKey(s);
+        const data = summary.get(groupingKey)!;
         data.totalOriginalAmount += parseFloat(String(s.originalNetAmount)) || 0;
         data.totalAmount += s.amount || 0;
         data.totalBrokerage! += parseFloat(String(s.brokerage)) || 0;
@@ -267,21 +270,29 @@ export default function CustomerProfileClient() {
         data.totalNetWeight! += s.netWeight || 0;
         data.totalTransactions! += 1;
         
-        if (!customerRateSum[s.customerId]) {
-            customerRateSum[s.customerId] = { rate: 0, count: 0 };
+        if (!customerRateSum[groupingKey]) {
+            customerRateSum[groupingKey] = { rate: 0, count: 0 };
         }
         if (s.rate > 0) {
-            customerRateSum[s.customerId].rate += s.rate;
-            customerRateSum[s.customerId].count++;
+            customerRateSum[groupingKey].rate += s.rate;
+            customerRateSum[groupingKey].count++;
         }
         data.allTransactions!.push(s);
         const variety = toTitleCase(s.variety) || 'Unknown';
         data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
     });
 
+    const customerMapForPayments = new Map<string, string>();
+    filteredCustomers.forEach(c => {
+        if (!customerMapForPayments.has(c.customerId)) {
+            customerMapForPayments.set(c.customerId, getGroupingKey(c));
+        }
+    });
+
     filteredCustomerPayments.forEach(p => {
-        if (p.customerId && summary.has(p.customerId)) {
-            const data = summary.get(p.customerId)!;
+        const groupingKey = customerMapForPayments.get(p.customerId);
+        if (groupingKey && summary.has(groupingKey)) {
+            const data = summary.get(groupingKey)!;
             data.totalPaid += p.amount;
             data.paymentHistory.push(p);
             data.allPayments!.push(p);
