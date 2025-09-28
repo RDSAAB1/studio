@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense, CustomerPayment } from "@/lib/definitions";
-import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/lib/utils";
+import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo, generateReadableId } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, getCustomerPaymentsRealtime, addIncome, updateSupplier, deleteIncome } from "@/lib/firestore";
 import { firestoreDB } from "@/lib/firebase";
@@ -113,28 +113,42 @@ export default function SupplierPaymentsClient() {
 
   const stableToast = useCallback(toast, []);
 
-  const getNextPaymentId = useCallback((currentPayments: Payment[]) => {
-    if (!currentPayments || currentPayments.length === 0) {
-        return formatPaymentId(1);
-    }
-    const lastPaymentNum = currentPayments.reduce((max, p) => {
-        const numMatch = p.paymentId.match(/^P(\d+)$/);
-        const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-        return num > max ? num : max;
-    }, 0);
-    return formatPaymentId(lastPaymentNum + 1);
-  }, []);
-
-  const getNextRtgsSrNo = useCallback((currentPayments: Payment[]) => {
-        const rtgsPayments = currentPayments.filter(p => p.rtgsSrNo);
-        if (rtgsPayments.length === 0) return formatSrNo(1, 'R');
-        const lastRtgsNum = rtgsPayments.reduce((max, p) => {
-            const numMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
+    const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
+        if (method === 'RTGS') {
+            const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
+            const lastNum = rtgsPayments.reduce((max, p) => {
+                const numMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
+                const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+                return num > max ? num : max;
+            }, 0);
+            return generateReadableId('RT', lastNum, 5);
+        }
+        if (method === 'Online') {
+            const onlinePayments = paymentHistory.filter(p => p.receiptType === 'Online');
+            const lastNum = onlinePayments.reduce((max, p) => {
+                const numMatch = p.paymentId.match(/^P(\d+)$/);
+                const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+                return num > max ? num : max;
+            }, 0);
+            return generateReadableId('P', lastNum, 6);
+        }
+        // For 'Cash', it shares sequence with 'expenses'
+        const cashPayments = paymentHistory.filter(p => p.receiptType === 'Cash');
+        const lastCashNum = cashPayments.reduce((max, p) => {
+            const numMatch = p.paymentId.match(/^EX(\d+)$/);
             const num = numMatch ? parseInt(numMatch[1], 10) : 0;
             return num > max ? num : max;
         }, 0);
-        return formatSrNo(lastRtgsNum + 1, 'R');
-    }, []);
+
+        const lastExpenseNum = expenses.reduce((max, e) => {
+            const numMatch = e.transactionId?.match(/^EX(\d+)$/);
+            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+            return num > max ? num : max;
+        }, 0);
+
+        const lastNum = Math.max(lastCashNum, lastExpenseNum);
+        return generateReadableId('EX', lastNum, 5);
+    }, [paymentHistory, expenses]);
   
   const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
   
@@ -270,10 +284,6 @@ export default function SupplierPaymentsClient() {
     const unsubPayments = getPaymentsRealtime((fetchedPayments) => {
       if(isSubscribed) {
         setPaymentHistory(fetchedPayments);
-        if (!editingPayment) {
-          setPaymentId(getNextPaymentId(fetchedPayments));
-          setRtgsSrNo(getNextRtgsSrNo(fetchedPayments));
-        }
       }
     }, (error) => {
         if(isSubscribed) {
@@ -317,7 +327,16 @@ export default function SupplierPaymentsClient() {
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId]);
+
+    useEffect(() => {
+        if (!editingPayment) {
+            setPaymentId(getNextPaymentId(paymentMethod as 'Cash' | 'Online' | 'RTGS'));
+            if (paymentMethod === 'RTGS') {
+                setRtgsSrNo(getNextPaymentId('RTGS'));
+            }
+        }
+    }, [paymentHistory, expenses, editingPayment, paymentMethod, getNextPaymentId]);
   
   useEffect(() => {
     autoSetCDToggle();
@@ -411,14 +430,14 @@ export default function SupplierPaymentsClient() {
     setRtgsRate(0);
     setRtgsAmount(0);
     setPaymentOptions([]);
-    setPaymentId(getNextPaymentId(paymentHistory));
-    setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
+    setPaymentId(getNextPaymentId(paymentMethod as 'Cash' | 'Online' | 'RTGS'));
+    setRtgsSrNo(getNextPaymentId('RTGS'));
     if (isOutsider) {
       setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
       setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
       setPaymentType('Full');
     }
-  }, [getNextPaymentId, getNextRtgsSrNo, paymentHistory]);
+  }, [getNextPaymentId, paymentHistory, paymentMethod, expenses]);
 
   const handleFullReset = useCallback(() => {
     setSelectedCustomerKey(null);
@@ -457,20 +476,23 @@ export default function SupplierPaymentsClient() {
     setSelectedEntryIds(newSet);
   };
   
-  const handlePaymentIdBlur = () => {
-    let value = paymentId.trim();
-    if (!value) return;
+    const handlePaymentIdBlur = () => {
+        let value = paymentId.trim();
+        if (!value) return;
 
-    if (value && !isNaN(parseInt(value)) && isFinite(Number(value))) {
-        value = formatPaymentId(parseInt(value));
-        setPaymentId(value);
-    }
-
-    const foundPayment = paymentHistory.find(p => p.paymentId === value);
-    if (foundPayment) {
-        handleEditPayment(foundPayment);
-    }
-  };
+        if (paymentMethod === 'Cash') {
+            const foundExpense = expenses.find(e => e.transactionId === value);
+            if (foundExpense) {
+                toast({ title: 'ID Occupied', description: `This ID is already used in expenses for payee: ${foundExpense.payee}`, variant: 'destructive' });
+                return;
+            }
+        }
+        
+        const foundPayment = paymentHistory.find(p => p.paymentId === value);
+        if (foundPayment) {
+            handleEditPayment(foundPayment);
+        }
+    };
 
 const processPayment = async () => {
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
@@ -697,7 +719,6 @@ const processPayment = async () => {
                     }
                 }
                 
-                // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
@@ -995,6 +1016,7 @@ const processPayment = async () => {
     
 
     
+
 
 
 

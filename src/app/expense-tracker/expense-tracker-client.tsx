@@ -5,8 +5,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense } from "@/lib/definitions";
-import { toTitleCase, cn, formatCurrency, formatTransactionId } from "@/lib/utils";
+import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment } from "@/lib/definitions";
+import { toTitleCase, cn, formatCurrency, formatTransactionId, generateReadableId } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,7 +26,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryManagerDialog } from "./category-manager-dialog";
-import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime } from "@/lib/firestore";
+import { getIncomeCategories, getExpenseCategories, addCategory, updateCategoryName, deleteCategory, addSubCategory, deleteSubCategory, addIncome, addExpense, deleteIncome, deleteExpense, updateLoan, updateIncome, updateExpense, getIncomeRealtime, getExpensesRealtime, getFundTransactionsRealtime, getLoansRealtime, getBankAccountsRealtime, getProjectsRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { firestoreDB } from "@/lib/firebase"; 
 
@@ -129,6 +129,7 @@ export default function IncomeExpenseClient() {
 
   const [income, setIncome] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -152,13 +153,14 @@ export default function IncomeExpenseClient() {
     useEffect(() => {
         const unsubIncome = getIncomeRealtime(setIncome, console.error);
         const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
+        const unsubPayments = getPaymentsRealtime(setPayments, console.error);
         const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
 
         return () => {
-            unsubIncome(); unsubExpenses(); unsubFunds(); unsubLoans(); unsubAccounts(); unsubProjects();
+            unsubIncome(); unsubExpenses(); unsubFunds(); unsubLoans(); unsubAccounts(); unsubProjects(); unsubPayments();
         }
     }, []);
 
@@ -179,23 +181,35 @@ export default function IncomeExpenseClient() {
   }, [allTransactions]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
-    const prefix = type === 'Income' ? 'IN' : 'EX';
-    const relevantTransactions = allTransactions.filter(t => t.transactionType === type && t.transactionId);
-    if (!relevantTransactions || relevantTransactions.length === 0) {
-        return formatTransactionId(1, prefix);
-    }
-    
-    const lastNum = relevantTransactions.reduce((max, t) => {
-        const numMatch = t.transactionId?.match(/^(?:IN|EX)(\d+)$/);
-        if (numMatch && numMatch[1]) {
-          const num = parseInt(numMatch[1], 10);
-          return num > max ? num : max;
-        }
-        return max;
-    }, 0);
+    if (type === 'Income') {
+        const relevantTransactions = allTransactions.filter(t => t.transactionType === 'Income');
+        const lastNum = relevantTransactions.reduce((max, t) => {
+            const numMatch = t.transactionId?.match(/^IN(\d+)$/);
+            if (numMatch && numMatch[1]) {
+                const num = parseInt(numMatch[1], 10);
+                return num > max ? num : max;
+            }
+            return max;
+        }, 0);
+        return generateReadableId('IN', lastNum, 5);
+    } else { // Expense
+        const cashPayments = payments.filter(p => p.receiptType === 'Cash');
+        const lastCashNum = cashPayments.reduce((max, p) => {
+            const numMatch = p.paymentId.match(/^EX(\d+)$/);
+            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+            return num > max ? num : max;
+        }, 0);
+        
+        const lastExpenseNum = expenses.reduce((max, e) => {
+            const numMatch = e.transactionId?.match(/^EX(\d+)$/);
+            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
+            return num > max ? num : max;
+        }, 0);
 
-    return formatTransactionId(lastNum + 1, prefix);
-  }, [allTransactions]);
+        const lastNum = Math.max(lastCashNum, lastExpenseNum);
+        return generateReadableId('EX', lastNum, 5);
+    }
+  }, [allTransactions, payments, expenses]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -228,12 +242,17 @@ export default function IncomeExpenseClient() {
 
       const prefix = selectedTransactionType === 'Income' ? 'IN' : 'EX';
       if (value && !isNaN(parseInt(value)) && isFinite(Number(value))) {
-          value = formatTransactionId(parseInt(value), prefix);
+          value = generateReadableId(prefix, parseInt(value) - 1, 5);
           setValue('transactionId', value);
       }
       const foundTransaction = allTransactions.find(t => t.transactionId === value);
       if (foundTransaction) {
           handleEdit(foundTransaction);
+      } else if (prefix === 'EX') {
+          const foundPayment = payments.find(p => p.paymentId === value);
+          if (foundPayment) {
+              toast({ title: 'ID Occupied', description: `This ID is used for a supplier payment to: ${foundPayment.supplierName}`, variant: 'destructive'});
+          }
       }
   };
 
@@ -1045,3 +1064,4 @@ export default function IncomeExpenseClient() {
     
 
     
+
