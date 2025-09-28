@@ -325,7 +325,7 @@ export default function SupplierPaymentsClient() {
   
   useEffect(() => {
     if (paymentType === 'Full') {
-        setCdAt('on_full_amount');
+        setCdAt('full_amount');
     } else if (paymentType === 'Partial') {
         setCdAt('partial_on_paid');
     }
@@ -778,7 +778,7 @@ const processPayment = async () => {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setCdAt('on_full_amount');
+        setCdAt('full_amount');
         setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
@@ -995,6 +995,7 @@ const processPayment = async () => {
     
 
     
+
 
 
 
