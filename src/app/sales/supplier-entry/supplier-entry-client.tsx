@@ -6,14 +6,14 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { format, addDays, isSunday } from "date-fns";
-import { Hourglass } from "lucide-react";
+import { Hourglass, Lightbulb } from "lucide-react";
 
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -22,6 +22,7 @@ import { DetailsDialog } from "@/components/sales/details-dialog";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
+import { Button } from "@/components/ui/button";
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -89,6 +90,8 @@ export default function SupplierEntryClient() {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
 
+  const [suggestedSupplier, setSuggestedSupplier] = useState<Customer | null>(null);
+
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
   
   const filteredSuppliers = useMemo(() => {
@@ -133,6 +136,7 @@ export default function SupplierEntryClient() {
   }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
 
   const resetFormToState = useCallback((customerState: Customer) => {
+    setSuggestedSupplier(null);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     let formDate;
@@ -169,6 +173,7 @@ export default function SupplierEntryClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
+    setSuggestedSupplier(null);
     const nextSrNum = safeSuppliers.length > 0 ? Math.max(0, ...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'S');
@@ -291,17 +296,53 @@ export default function SupplierEntryClient() {
     }
   }
 
-  const handleContactBlur = (contactValue: string) => {
-    if (contactValue.length === 10 && suppliers) {
-      const foundCustomer = suppliers.find(c => c.contact === contactValue);
-      if (foundCustomer && foundCustomer.id !== currentSupplier.id) {
-        form.setValue('name', foundCustomer.name);
-        form.setValue('so', foundCustomer.so);
-        form.setValue('address', foundCustomer.address);
-        toast({ title: "Supplier Found: Details auto-filled." });
-      }
+  const findAndSuggestSimilarSupplier = () => {
+    const { name, so } = form.getValues();
+    if (!name || isEditing) {
+        setSuggestedSupplier(null);
+        return;
     }
-  }
+
+    const currentNameNorm = name.replace(/\s+/g, '').toLowerCase();
+    const currentSoNorm = (so || '').replace(/\s+/g, '').toLowerCase();
+    
+    if (currentNameNorm.length < 3) {
+      setSuggestedSupplier(null);
+      return;
+    }
+    
+    let bestMatch: Customer | null = null;
+    let minDistance = Infinity;
+
+    const uniqueSuppliers = Array.from(new Map(suppliers.map(s => [s.customerId, s])).values());
+    
+    for (const supplier of uniqueSuppliers) {
+        const supNameNorm = supplier.name.replace(/\s+/g, '').toLowerCase();
+        const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
+        
+        const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
+        const soDist = levenshteinDistance(currentSoNorm, supSoNorm);
+        const totalDist = nameDist + soDist;
+        
+        if (totalDist > 0 && totalDist < 3 && totalDist < minDistance) {
+            minDistance = totalDist;
+            bestMatch = supplier;
+        }
+    }
+    setSuggestedSupplier(bestMatch);
+  };
+  
+  const applySuggestion = () => {
+    if (suggestedSupplier) {
+        form.setValue('name', toTitleCase(suggestedSupplier.name));
+        form.setValue('so', toTitleCase(suggestedSupplier.so));
+        form.setValue('address', toTitleCase(suggestedSupplier.address));
+        form.setValue('contact', suggestedSupplier.contact);
+        setSuggestedSupplier(null);
+        toast({ title: "Details Updated", description: "Supplier details have been corrected." });
+    }
+  };
+
 
   const handleDelete = async (id: string) => {
     if (!id) {
@@ -335,7 +376,7 @@ export default function SupplierEntryClient() {
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so || '').toLowerCase()}`,
     };
 
     try {
@@ -520,7 +561,7 @@ export default function SupplierEntryClient() {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${toTitleCase(item['S/O'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -625,8 +666,7 @@ export default function SupplierEntryClient() {
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
-                handleContactBlur={handleContactBlur}
-                handleTermBlur={() => performCalculations(form.getValues(), true)}
+                handleNameOrSoBlur={findAndSuggestSimilarSupplier}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
@@ -636,6 +676,21 @@ export default function SupplierEntryClient() {
                 handleDeleteOption={deleteOption}
                 allSuppliers={safeSuppliers}
             />
+
+            {suggestedSupplier && (
+                <div className="flex items-center justify-center gap-2 p-2 text-sm bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-800 rounded-lg">
+                    <Lightbulb className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    <p className="text-yellow-800 dark:text-yellow-300">
+                        Did you mean: <strong className="font-semibold">{toTitleCase(suggestedSupplier.name)}</strong> s/o <strong className="font-semibold">{toTitleCase(suggestedSupplier.so)}</strong>?
+                    </p>
+                    <Button type="button" size="sm" variant="link" className="text-primary h-auto p-0" onClick={applySuggestion}>
+                        Yes, use this one
+                    </Button>
+                    <Button type="button" size="sm" variant="link" className="text-destructive h-auto p-0" onClick={() => setSuggestedSupplier(null)}>
+                        No
+                    </Button>
+                </div>
+            )}
             
             <CalculatedSummary 
                 customer={currentSupplier}

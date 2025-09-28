@@ -28,7 +28,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTermBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers }: any) => {
+export const SupplierForm = ({ form, handleSrNoBlur, handleNameOrSoBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers }: any) => {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -105,7 +105,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTe
                         <div className="space-y-1">
                             <Label htmlFor="term" className="text-xs">Term (Days)</Label>
                                 <InputWithIcon icon={<Hourglass className="h-4 w-4 text-muted-foreground" />}>
-                                <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} onBlur={handleTermBlur} className="h-8 text-sm pl-10" />
+                                <Input id="term" type="number" {...form.register('term')} onFocus={handleFocus} onBlur={() => handleNameOrSoBlur()} className="h-8 text-sm pl-10" />
                             </InputWithIcon>
                         </div>
                         <div className="space-y-1">
@@ -144,7 +144,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTe
                                 <div className="space-y-1">
                                     <Label htmlFor="contact" className="text-xs">Contact</Label>
                                     <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
-                                       <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} type="tel" maxLength={10} onChange={handleNumericInput} onBlur={e => handleContactBlur(e.target.value)} className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} /> )}/>
+                                       <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} type="tel" maxLength={10} onChange={handleNumericInput} onBlur={handleNameOrSoBlur} className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} /> )}/>
                                     </InputWithIcon>
                                 </div>
                                 <div className="space-y-1">
@@ -152,7 +152,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTe
                                     <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                                         <PopoverTrigger asChild>
                                             <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => setTimeout(() => setIsNamePopoverOpen(false), 150)} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
+                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => { handleNameOrSoBlur(); setTimeout(() => setIsNamePopoverOpen(false), 200); }} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
                                             </InputWithIcon>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -166,7 +166,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleContactBlur, handleTe
                             <div className="space-y-1">
                                 <Label htmlFor="so" className="text-xs">S/O</Label>
                                 <InputWithIcon icon={<UserSquare className="h-4 w-4 text-muted-foreground" />}>
-                                    <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} className="h-8 text-sm pl-10" /> )}/>
+                                    <Controller name="so" control={form.control} render={({ field }) => ( <Input {...field} onChange={handleCapitalizeOnChange} onBlur={handleNameOrSoBlur} className="h-8 text-sm pl-10" /> )}/>
                                 </InputWithIcon>
                             </div>
                             <div className="space-y-1">
