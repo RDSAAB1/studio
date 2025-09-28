@@ -722,24 +722,27 @@ const processPayment = async () => {
 
         const rawOptions: PaymentOption[] = [];
         const generatedUniqueRemainingAmounts = new Map<number, number>();
-        const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
-
         const roundingUnit = roundFigureToggle ? 100 : 5;
+        
+        // This process finds ideal rates for each quantity to produce round-figure amounts
+        const maxQuantityToSearch = Math.min(300, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
 
         for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
-            const minRateForQ = Math.max(calcMinRate, Math.ceil((calcTargetAmount - roundingUnit) / q));
-            
-            for (let currentRate = Math.ceil(minRateForQ / 5) * 5; currentRate <= calcMaxRate; currentRate += 5) {
-                if (currentRate < calcMinRate) continue;
-                
-                const calculatedAmount = q * currentRate;
+            const idealRate = calcTargetAmount / q;
+            const startRate = Math.max(calcMinRate, Math.floor(idealRate / 5) * 5 - 25);
+            const endRate = Math.min(calcMaxRate, Math.ceil(idealRate / 5) * 5 + 25);
 
+            for (let currentRate = startRate; currentRate <= endRate; currentRate += 5) {
+                const calculatedAmount = q * currentRate;
+                
+                // Check if calculated amount matches rounding rules
                 if (calculatedAmount % roundingUnit !== 0) continue;
                 if (calculatedAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
                 if (amountRemaining < 0) continue;
                 
+                // Limit the number of options for each unique remaining amount
                 const count = generatedUniqueRemainingAmounts.get(amountRemaining) || 0;
                 if (count < 5) { // Limit options per unique remaining amount
                     rawOptions.push({
@@ -884,7 +887,6 @@ const processPayment = async () => {
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
                         handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
-                        paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
@@ -985,5 +987,7 @@ const processPayment = async () => {
 
 
 
+
+    
 
     
