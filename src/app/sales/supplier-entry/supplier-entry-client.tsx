@@ -749,14 +749,14 @@ export default function SupplierEntryClient() {
                     <Lightbulb className="h-5 w-5 text-yellow-500" />
                     Did you mean this supplier?
                 </AlertDialogTitle>
-                <AlertDialogDescription>
+                <div className="text-sm text-muted-foreground pt-2">
                     A supplier with a very similar name already exists. Is this the same person?
                     <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
                         <p><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</p>
                         <p><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</p>
                         <p><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</p>
                     </div>
-                </AlertDialogDescription>
+                </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogAction onClick={() => {
