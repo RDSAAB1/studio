@@ -183,10 +183,8 @@ export default function SupplierEntryClient() {
     setSuggestedSupplier(null);
     let nextSrNum = 1;
     if (safeSuppliers.length > 0) {
-      const lastSrNo = safeSuppliers[safeSuppliers.length - 1]?.srNo;
-      if (lastSrNo) {
-        nextSrNum = parseInt(lastSrNo.substring(1), 10) + 1;
-      }
+      const lastSrNo = safeSuppliers.reduce((maxSr, s) => (s.srNo > maxSr ? s.srNo : maxSr), "S00000");
+      nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
     }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'S');
