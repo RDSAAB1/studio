@@ -29,8 +29,6 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
-const expensesCollection = collection(firestoreDB, "expenses");
-
 
 type PaymentOption = {
   quantity: number;
@@ -107,7 +105,7 @@ export default function SupplierPaymentsClient() {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [roundFigureToggle, setRoundFigureToggle] = useState(false);
 
-  const allTransactions = useMemo(() => [...incomes, ...expenses], [incomes, expenses]);
+  const allTransactions = useMemo(() => [...incomes, ...expenses, ...paymentHistory], [incomes, expenses, paymentHistory]);
 
 
   const stableToast = useCallback(toast, []);
@@ -505,49 +503,52 @@ const processPayment = async () => {
                 }
             }
             
-            const expenseTransactionRef = doc(collection(firestoreDB, 'expenses'));
-            const expenseData: Partial<Expense> = {
-                id: expenseTransactionRef.id,
-                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0],
+            const paymentDataBase: Omit<Payment, 'id'> = {
+                paymentId: paymentId,
+                customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
+                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : new Date().toISOString().split("T")[0],
+                amount: Math.round(finalPaymentAmount),
+                cdAmount: Math.round(calculatedCdAmount),
+                cdApplied: cdEnabled,
+                type: paymentType,
+                receiptType: paymentMethod,
+                notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
+                paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
+                sixRNo: sixRNo,
+                sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
+                parchiNo,
+                utrNo,
+                checkNo,
+                quantity: rtgsQuantity,
+                rate: rtgsRate,
+                rtgsAmount,
+                supplierName: toTitleCase(supplierDetails.name),
+                supplierFatherName: toTitleCase(supplierDetails.fatherName),
+                supplierAddress: toTitleCase(supplierDetails.address),
+                bankName: bankDetails.bank,
+                bankBranch: bankDetails.branch,
+                bankAcNo: bankDetails.acNo,
+                bankIfsc: bankDetails.ifscCode,
+                rtgsFor: rtgsFor,
                 transactionType: 'Expense',
                 category: 'Supplier Payments',
                 subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-                amount: finalPaymentAmount,
                 payee: supplierDetails.name,
                 description: `Payment ${paymentId} to ${supplierDetails.name}`,
                 paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
                 status: 'Paid',
                 isRecurring: false,
             };
-            if (paymentMethod !== 'Cash') {
-                expenseData.bankAccountId = selectedAccountId;
-            }
-            transaction.set(expenseTransactionRef, expenseData);
-
-            const paymentDataBase: Omit<Payment, 'id'> = {
-                paymentId: paymentId,
-                customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
-                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : new Date().toISOString().split("T")[0], amount: Math.round(finalPaymentAmount),
-                cdAmount: Math.round(calculatedCdAmount), cdApplied: cdEnabled, type: paymentType,
-                receiptType: paymentMethod, notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,
-                paidFor: rtgsFor === 'Supplier' ? paidForDetails : [],
-                sixRNo: sixRNo, sixRDate: sixRDate ? format(sixRDate, 'yyyy-MM-dd') : '',
-                parchiNo, utrNo, checkNo, quantity: rtgsQuantity, rate: rtgsRate, rtgsAmount,
-                supplierName: toTitleCase(supplierDetails.name), supplierFatherName: toTitleCase(supplierDetails.fatherName),
-                supplierAddress: toTitleCase(supplierDetails.address), bankName: bankDetails.bank,
-                bankBranch: bankDetails.branch, bankAcNo: bankDetails.acNo, bankIfsc: bankDetails.ifscCode,
-                rtgsFor: rtgsFor,
-                expenseTransactionId: expenseTransactionRef.id,
-            };
             
             if (paymentMethod === 'RTGS') {
                 paymentDataBase.rtgsSrNo = rtgsSrNo;
+            } else {
+                 delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
+            }
+             if (paymentMethod !== 'Cash') {
+                paymentDataBase.bankAccountId = selectedAccountId;
             }
             
-            if (paymentMethod !== 'RTGS') {
-                delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
-            }
-
             const newPaymentRef = doc(collection(firestoreDB, "payments"));
             transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
             finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
@@ -651,12 +652,6 @@ const processPayment = async () => {
                     }
                 }
                 
-                // Delete the associated expense transaction, if it exists
-                if (paymentToDelete.expenseTransactionId) {
-                    const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
-                    transaction.delete(expenseDocRef);
-                }
-                
                 // Delete the payment itself
                 transaction.delete(paymentRef);
             });
@@ -730,7 +725,7 @@ const processPayment = async () => {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setCdAt('on_full_amount');
+        setCdAt('full_amount');
         setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
@@ -859,7 +854,7 @@ const processPayment = async () => {
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
                         editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
                         setCheckNo={setCheckNo}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
@@ -917,7 +912,7 @@ const processPayment = async () => {
             isOpen={!!detailsSupplierEntry}
             onOpenChange={() => setDetailsSupplierEntry(null)}
             customer={detailsSupplierEntry}
-            paymentHistory={paymentsForDetailsEntry}
+            paymentHistory={paymentHistory}
         />
         
         <PaymentDetailsDialog
@@ -943,13 +938,3 @@ const processPayment = async () => {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-
-
-    

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -93,21 +94,7 @@ export default function CashBankClient() {
     }, []);
 
     const allTransactions = useMemo(() => {
-        const mappedPayments = payments.map(p => ({
-            id: p.id,
-            date: p.date,
-            transactionType: 'Expense',
-            category: 'Supplier Payments',
-            subCategory: p.rtgsFor === 'Outsider' ? 'Outsider Payment' : 'Supplier Payment',
-            amount: p.amount,
-            payee: p.supplierName || 'N/A',
-            description: p.notes || `Payment ${p.paymentId}`,
-            paymentMethod: p.receiptType,
-            status: 'Paid',
-            isRecurring: false,
-            bankAccountId: p.bankAccountId,
-        }));
-        return [...incomes, ...expenses, ...mappedPayments] as (Income | Expense)[];
+        return [...incomes, ...expenses, ...payments] as (Income | Expense | Payment)[];
     }, [incomes, expenses, payments]);
 
     const formSourcesAndDestinations = useMemo(() => {

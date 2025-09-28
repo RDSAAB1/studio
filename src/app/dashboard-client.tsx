@@ -86,21 +86,7 @@ export default function DashboardClient() {
     }, []);
     
     const allExpenses = useMemo(() => {
-        const mappedPayments = payments.map(p => ({
-            id: p.id,
-            date: p.date,
-            transactionType: 'Expense',
-            category: 'Supplier Payments',
-            subCategory: p.rtgsFor === 'Outsider' ? 'Outsider Payment' : 'Supplier Payment',
-            amount: p.amount,
-            payee: p.supplierName || 'N/A',
-            description: p.notes || `Payment ${p.paymentId}`,
-            paymentMethod: p.receiptType,
-            status: 'Paid',
-            isRecurring: false,
-            bankAccountId: p.bankAccountId,
-        }));
-        return [...expenses, ...mappedPayments];
+        return [...expenses, ...payments];
     }, [expenses, payments]);
 
     const filteredData = useMemo(() => {
@@ -123,7 +109,7 @@ export default function DashboardClient() {
     }, [date, incomes, allExpenses, suppliers, customers]);
 
 
-    const allTransactions: (Income | Expense)[] = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredExpenses], [filteredData]);
+    const allTransactions: (Income | Expense | Payment)[] = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredExpenses], [filteredData]);
     
     const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables } = useMemo(() => {
         return {
@@ -191,7 +177,7 @@ export default function DashboardClient() {
 
     const level3Data = useMemo(() => {
         if (!level1 || !level2) return [];
-        let sourceData: (Income | Expense)[] = [];
+        let sourceData: (Income | Expense | Payment)[] = [];
         if (level1 === 'Expenses') {
             sourceData = filteredData.filteredExpenses.filter(e => e.expenseNature === level2);
         } else if (level1 === 'Income' && incomeCategories.some(c => c.name === level2)) {
@@ -256,7 +242,7 @@ export default function DashboardClient() {
     }, [allTransactions, bankAccounts]);
     
 
-    function groupDataByField(data: (Income | Expense)[], field: keyof (Income|Expense)) {
+    function groupDataByField(data: (Income | Expense | Payment)[], field: keyof (Income|Expense|Payment)) {
         const grouped = data.reduce((acc, item) => {
             const key = (item as any)[field] || 'Uncategorized';
             acc[key] = (acc[key] || 0) + item.amount;
@@ -551,7 +537,3 @@ export default function DashboardClient() {
         </div>
     );
 }
-
-    
-
-    
