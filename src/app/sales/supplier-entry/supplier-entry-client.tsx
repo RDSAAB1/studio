@@ -125,10 +125,10 @@ export default function SupplierEntryClient() {
         let description = warning;
         if (warning.includes('holiday')) {
             title = 'Holiday on Due Date';
-            description = `Try Term: ${suggestedTerm} days`;
+            description = `Try Term: ${'\'\'\''}{suggestedTerm}\'\'\'\' days`;
         } else if (warning.includes('limit')) {
             title = 'Daily Limit Reached';
-            description = `Try Term: ${suggestedTerm} days`;
+            description = `Try Term: ${'\'\'\''}{suggestedTerm}\'\'\'\' days`;
         }
         
         toast({ title, description, variant: 'destructive', duration: 7000 });
@@ -293,6 +293,21 @@ export default function SupplierEntryClient() {
             const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
             resetFormToState(newState);
         }
+    }
+  }
+
+  const handleContactBlur = (contactValue: string) => {
+    if (contactValue.length === 10 && suppliers.length > 0) {
+      const latestEntryForContact = suppliers
+          .filter(c => c.contact === contactValue)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          
+      if (latestEntryForContact && latestEntryForContact.id !== currentSupplier.id) {
+          form.setValue('name', latestEntryForContact.name);
+          form.setValue('so', latestEntryForContact.so);
+          form.setValue('address', latestEntryForContact.address);
+          toast({ title: "Supplier Found: Details auto-filled from last entry." });
+      }
     }
   }
 
@@ -568,7 +583,7 @@ export default function SupplierEntryClient() {
 
                     await addSupplier(supplierData);
                 }
-                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
+                toast({title: "Import Successful", description: `${'\'\'\''}{json.length}\'\'\'\' supplier entries have been imported.`});
             } catch (error) {
                 console.error("Import failed:", error);
                 toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
@@ -666,6 +681,7 @@ export default function SupplierEntryClient() {
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
+                handleContactBlur={handleContactBlur}
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
@@ -754,3 +770,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    
