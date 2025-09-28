@@ -115,14 +115,15 @@ export default function DashboardClient() {
     const allExpenses = useMemo(() => [...filteredData.filteredExpenses, ...filteredData.filteredSupplierPayments], [filteredData]);
     const allIncomes = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredCustomerPayments], [filteredData]);
     
-    const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables } = useMemo(() => {
+    const { totalIncome, totalExpense, netProfit, totalSupplierDues, totalCustomerReceivables, totalCdReceived } = useMemo(() => {
         const incomeFromEntries = filteredData.filteredIncomes.reduce((sum, item) => sum + item.amount, 0);
         const incomeFromCustomers = filteredData.filteredCustomerPayments.reduce((sum, item) => sum + item.amount, 0);
-
+        const cdReceived = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + (item.cdAmount || 0), 0);
+        
         const expenseFromEntries = filteredData.filteredExpenses.reduce((sum, item) => sum + item.amount, 0);
         const expenseForSuppliers = filteredData.filteredSupplierPayments.reduce((sum, item) => sum + item.amount, 0);
         
-        const currentTotalIncome = incomeFromEntries + incomeFromCustomers;
+        const currentTotalIncome = incomeFromEntries + incomeFromCustomers + cdReceived;
         const currentTotalExpense = expenseFromEntries + expenseForSuppliers;
 
         return {
@@ -130,7 +131,8 @@ export default function DashboardClient() {
             totalExpense: currentTotalExpense,
             netProfit: currentTotalIncome - currentTotalExpense,
             totalSupplierDues: suppliers.reduce((sum, s) => sum + (Number(s.netAmount) || 0), 0),
-            totalCustomerReceivables: customers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0)
+            totalCustomerReceivables: customers.reduce((sum, c) => sum + (Number(c.netAmount) || 0), 0),
+            totalCdReceived: cdReceived,
         }
     }, [filteredData, suppliers, customers]);
     
@@ -397,10 +399,11 @@ export default function DashboardClient() {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <StatCard title="Total Income" value={formatCurrency(totalIncome)} icon={<TrendingUp />} colorClass="text-green-500" isLoading={isLoading}/>
                 <StatCard title="Total Expense" value={formatCurrency(totalExpense)} icon={<TrendingDown />} colorClass="text-red-500" isLoading={isLoading}/>
                 <StatCard title="Net Profit/Loss" value={formatCurrency(netProfit)} icon={<DollarSign />} colorClass={netProfit >= 0 ? "text-green-500" : "text-red-500"} isLoading={isLoading}/>
+                <StatCard title="Total CD Received" value={formatCurrency(totalCdReceived)} icon={<HandCoins />} colorClass="text-blue-500" isLoading={isLoading}/>
                 <StatCard title="Supplier Dues" value={formatCurrency(totalSupplierDues)} icon={<Users />} colorClass="text-amber-500" isLoading={isLoading}/>
                 <StatCard title="Customer Receivables" value={formatCurrency(totalCustomerReceivables)} icon={<Users />} colorClass="text-blue-500" isLoading={isLoading}/>
             </div>
@@ -560,3 +563,5 @@ export default function DashboardClient() {
         </div>
     );
 }
+
+    
