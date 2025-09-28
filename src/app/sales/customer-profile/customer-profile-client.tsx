@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, CustomerPayment } from "@/lib/definitions";
-import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency, levenshteinDistance } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { getCustomersRealtime, getCustomerPaymentsRealtime } from '@/lib/firestore';
@@ -233,12 +233,32 @@ export default function CustomerProfileClient() {
   const customerSummaryMap = useMemo(() => {
     const { filteredCustomers, filteredCustomerPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
+    const LEVENSHTEIN_THRESHOLD = 2;
 
-    const normalizeString = (str: string) => str.toLowerCase().replace(/\s+/g, '');
-    const getGroupingKey = (c: Customer) => `${normalizeString(c.name)}|${normalizeString(c.companyName || '')}`;
+    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+
+    const findBestMatchKey = (customer: Customer, existingKeys: string[]): string | null => {
+        const custNameNorm = normalizeString(customer.name);
+        const custCompanyNorm = normalizeString(customer.companyName || '');
+        let bestMatch: string | null = null;
+        let minDistance = Infinity;
+
+        for (const key of existingKeys) {
+            const [keyNameNorm, keyCompanyNorm] = key.split('|');
+            const nameDist = levenshteinDistance(custNameNorm, keyNameNorm);
+            const companyDist = levenshteinDistance(custCompanyNorm, keyCompanyNorm);
+            const totalDist = nameDist + companyDist;
+
+            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+                minDistance = totalDist;
+                bestMatch = key;
+            }
+        }
+        return bestMatch;
+    };
     
     filteredCustomers.forEach(s => {
-        const groupingKey = getGroupingKey(s);
+        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.companyName || '')}`;
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address, companyName: s.companyName,
@@ -253,55 +273,35 @@ export default function CustomerProfileClient() {
                 totalBrokerage: 0, totalCd: 0,
             });
         }
-    });
-
-    let customerRateSum: { [key: string]: { rate: number, count: number } } = {};
-
-    filteredCustomers.forEach(s => {
-        const groupingKey = getGroupingKey(s);
         const data = summary.get(groupingKey)!;
-        data.totalOriginalAmount += parseFloat(String(s.originalNetAmount)) || 0;
-        data.totalAmount += s.amount || 0;
-        data.totalBrokerage! += parseFloat(String(s.brokerage)) || 0;
-        data.totalCd! += parseFloat(String(s.cd)) || 0;
-        data.totalOtherCharges! += s.advanceFreight || 0;
-        data.totalGrossWeight! += parseFloat(String(s.grossWeight)) || 0;
-        data.totalTeirWeight! += parseFloat(String(s.teirWeight)) || 0;
-        data.totalFinalWeight! += s.weight || 0;
-        data.totalNetWeight! += s.netWeight || 0;
-        data.totalTransactions! += 1;
-        
-        if (!customerRateSum[groupingKey]) {
-            customerRateSum[groupingKey] = { rate: 0, count: 0 };
-        }
-        if (s.rate > 0) {
-            customerRateSum[groupingKey].rate += s.rate;
-            customerRateSum[groupingKey].count++;
-        }
         data.allTransactions!.push(s);
-        const variety = toTitleCase(s.variety) || 'Unknown';
-        data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
     });
 
-    const customerMapForPayments = new Map<string, string>();
-    filteredCustomers.forEach(c => {
-        const groupingKey = getGroupingKey(c);
-        if (!customerMapForPayments.has(c.customerId)) {
-            customerMapForPayments.set(c.customerId, groupingKey);
-        }
-    });
+    summary.forEach(data => {
+        data.allTransactions!.forEach(s => {
+            data.totalOriginalAmount += parseFloat(String(s.originalNetAmount)) || 0;
+            data.totalAmount += s.amount || 0;
+            data.totalBrokerage! += parseFloat(String(s.brokerage)) || 0;
+            data.totalCd! += parseFloat(String(s.cd)) || 0;
+            data.totalOtherCharges! += s.advanceFreight || 0;
+            data.totalGrossWeight! += parseFloat(String(s.grossWeight)) || 0;
+            data.totalTeirWeight! += parseFloat(String(s.teirWeight)) || 0;
+            data.totalFinalWeight! += s.weight || 0;
+            data.totalNetWeight! += s.netWeight || 0;
+            data.totalTransactions! += 1;
+            const variety = toTitleCase(s.variety) || 'Unknown';
+            data.transactionsByVariety![variety] = (data.transactionsByVariety![variety] || 0) + 1;
+        });
 
-    filteredCustomerPayments.forEach(p => {
-        const groupingKey = customerMapForPayments.get(p.customerId);
-        if (groupingKey && summary.has(groupingKey)) {
-            const data = summary.get(groupingKey)!;
+        const customerIds = new Set(data.allTransactions!.map(t => t.customerId));
+        const relevantPayments = filteredCustomerPayments.filter(p => customerIds.has(p.customerId));
+        
+        relevantPayments.forEach(p => {
             data.totalPaid += p.amount;
             data.paymentHistory.push(p);
             data.allPayments!.push(p);
-        }
-    });
+        });
 
-    summary.forEach((data, key) => {
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.outstandingEntryIds = data.allTransactions!.filter(t => (t.netAmount || 0) > 0).map(t => t.id);
