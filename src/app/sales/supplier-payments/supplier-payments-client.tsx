@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo } from "@/
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, addIncome, updateSupplier, deleteIncome } from "@/lib/firestore";
 import { firestoreDB } from "@/lib/firebase";
-import { collection, doc, getDocs, limit, query, runTransaction, where, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -29,7 +30,6 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const expensesCollection = collection(firestoreDB, "expenses");
-const incomesCollection = collection(firestoreDB, "incomes");
 
 
 type PaymentOption = {
@@ -47,15 +47,14 @@ type SortConfig = {
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [bankBranches, setBankBranches] = useState<any[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
-  
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   
@@ -85,7 +84,7 @@ export default function SupplierPaymentsClient() {
 
   const [cdEnabled, setCdEnabled] = useState(false);
   const [cdPercent, setCdPercent] = useState(2);
-  const [cdAt, setCdAt] = useState<'partial_on_paid' | 'on_previously_paid' | 'on_unpaid_amount' | 'on_full_amount'>('on_unpaid_amount');
+  const [cdAt, setCdAt] = useState('unpaid_amount');
   const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
 
   const [isClient, setIsClient] = useState(false);
@@ -525,24 +524,6 @@ const processPayment = async () => {
             }
             transaction.set(expenseTransactionRef, expenseData);
 
-            if (cdEnabled && calculatedCdAmount > 0) {
-                const incomeTransactionRef = doc(collection(firestoreDB, 'incomes'));
-                 const incomeData: Partial<Income> = {
-                    id: incomeTransactionRef.id,
-                    date: new Date().toISOString().split('T')[0],
-                    transactionType: 'Income',
-                    category: 'Cash Discount Received',
-                    subCategory: 'Supplier CD',
-                    amount: calculatedCdAmount,
-                    payee: supplierDetails.name,
-                    description: `CD received on payment ${paymentId}`,
-                    paymentMethod: 'Other',
-                    status: 'Paid',
-                    isRecurring: false,
-                };
-                transaction.set(incomeTransactionRef, incomeData);
-            }
-
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: paymentId,
                 customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
@@ -643,18 +624,6 @@ const processPayment = async () => {
 
         toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save."});
     };
-
-    const handlePaymentIdBlur = () => {
-        let formattedId = paymentId.trim();
-        if (formattedId && !isNaN(parseInt(formattedId)) && isFinite(Number(formattedId))) {
-            formattedId = formatPaymentId(parseInt(formattedId));
-            setPaymentId(formattedId);
-        }
-        const foundPayment = paymentHistory.find(p => p.paymentId === formattedId);
-        if (foundPayment) {
-            handleEditPayment(foundPayment);
-        }
-    }
 
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
         const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
@@ -880,7 +849,7 @@ const processPayment = async () => {
                         isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                        handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
@@ -888,11 +857,11 @@ const processPayment = async () => {
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
-                        checkNo={checkNo} setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} 
+                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -983,3 +952,4 @@ const processPayment = async () => {
 
 
 
+    
