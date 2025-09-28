@@ -9,6 +9,9 @@ import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from '@/lib/database';
+
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -66,8 +69,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo'));
+  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -122,7 +125,7 @@ export default function SupplierEntryClient() {
   });
 
   const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers);
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers || []);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
         let title = 'Date Warning';
@@ -198,15 +201,12 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (suppliers.length > 0) {
+    if (suppliers !== undefined) {
         setIsLoading(false);
-        if (isInitialLoad.current) {
+        if (isInitialLoad.current && suppliers) {
             handleNew();
             isInitialLoad.current = false;
         }
-    } else if (suppliers.length === 0 && !isInitialLoad.current) {
-        // This handles the case where all suppliers are deleted
-        handleNew();
     }
   }, [suppliers, handleNew]);
 
@@ -228,8 +228,6 @@ export default function SupplierEntryClient() {
 
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
-    const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
-    const unsubPayments = getPaymentsRealtime(setPaymentHistory, console.error);
 
     const savedVariety = localStorage.getItem('lastSelectedVariety');
     if (savedVariety) {
@@ -248,8 +246,6 @@ export default function SupplierEntryClient() {
     return () => {
       unsubVarieties();
       unsubPaymentTypes();
-      unsubSuppliers();
-      unsubPayments();
     };
   }, [isClient, form, toast]);
   
@@ -304,7 +300,8 @@ export default function SupplierEntryClient() {
     }
   }
 
-  const handleContactBlur = (contactValue: string) => {
+  const handleContactChange = (contactValue: string) => {
+    form.setValue('contact', contactValue);
     if (contactValue.length === 10 && suppliers) {
       const latestEntryForContact = suppliers
           .filter(c => c.contact === contactValue)
@@ -694,7 +691,7 @@ export default function SupplierEntryClient() {
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
-                handleContactBlur={handleContactBlur}
+                onContactChange={handleContactChange}
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
@@ -739,10 +736,10 @@ export default function SupplierEntryClient() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => {
+                <AlertDialogAction onClick={() => {
                     form.setValue('forceUnique', true);
                     setSuggestedSupplier(null);
-                }}>No, Create New</AlertDialogCancel>
+                }}>No, Create New</AlertDialogAction>
                 <AlertDialogAction onClick={applySuggestion}>Yes, Use This One</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
@@ -794,3 +791,4 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+

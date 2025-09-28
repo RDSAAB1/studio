@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -28,7 +29,7 @@ const InputWithIcon = ({ icon, children }: { icon: React.ReactNode, children: Re
     </div>
 );
 
-export const SupplierForm = ({ form, handleSrNoBlur, handleNameOrSoBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers }: any) => {
+export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleNameOrSoBlur, varietyOptions, paymentTypeOptions, setLastVariety, setLastPaymentType, handleAddOption, handleUpdateOption, handleDeleteOption, allSuppliers }: any) => {
     
     const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
     const [managementType, setManagementType] = useState<'variety' | 'paymentType' | null>(null);
@@ -86,7 +87,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleNameOrSoBlur, variety
     const handleNumericInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         if (/^\d*$/.test(value)) {
-            form.setValue('contact', value);
+            onContactChange(value);
         }
     }
 
@@ -144,7 +145,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, handleNameOrSoBlur, variety
                                 <div className="space-y-1">
                                     <Label htmlFor="contact" className="text-xs">Contact</Label>
                                     <InputWithIcon icon={<Phone className="h-4 w-4 text-muted-foreground" />}>
-                                       <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} type="tel" maxLength={10} onChange={handleNumericInput} onBlur={handleNameOrSoBlur} className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} /> )}/>
+                                       <Controller name="contact" control={form.control} render={({ field }) => ( <Input {...field} type="tel" maxLength={10} onChange={handleNumericInput} onBlur={(e) => handleNameOrSoBlur(e.target.value)} className={cn("h-8 text-sm pl-10", form.formState.errors.contact && "border-destructive")} /> )}/>
                                     </InputWithIcon>
                                 </div>
                                 <div className="space-y-1">
