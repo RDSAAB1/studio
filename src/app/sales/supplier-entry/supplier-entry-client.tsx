@@ -179,9 +179,9 @@ export default function SupplierEntryClient() {
     setIsEditing(false);
     setSuggestedSupplier(null);
     let nextSrNum = 1;
-    if (safeSuppliers.length > 0) {
-      const lastSrNo = safeSuppliers.reduce((maxSr, s) => (s.srNo > maxSr ? s.srNo : maxSr), "S00000");
-      nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
+    if (safeSuppliers && safeSuppliers.length > 0) {
+      const maxSrNo = Math.max(...safeSuppliers.map(s => parseInt(s.srNo.substring(1), 10) || 0));
+      nextSrNum = maxSrNo + 1;
     }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'S');
@@ -204,8 +204,8 @@ export default function SupplierEntryClient() {
     if (isClient) {
       const unsubSuppliers = getSuppliersRealtime((data) => {
         setSuppliers(data);
-        if (isInitialLoad.current && data.length > 0) {
-          handleNew();
+        if (isInitialLoad.current) {
+          handleNew(); // Call handleNew once after initial data is set
           isInitialLoad.current = false;
         }
         setIsLoading(false);
