@@ -30,6 +30,7 @@ export type Customer = {
   receiptType: string;
   paymentType: string;
   customerId: string;
+  forceUnique?: boolean;
   
   // Fields from RTGS form
   fatherName?: string;

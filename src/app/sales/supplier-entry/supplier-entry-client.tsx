@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -396,6 +397,11 @@ export default function SupplierEntryClient() {
         customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
     };
 
+    if (suggestedSupplier && completeEntry.forceUnique) {
+        // User clicked "No" to suggestion, ensure this is treated as unique
+        completeEntry.customerId = `${completeEntry.customerId}|${Date.now()}`;
+    }
+
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
           await deleteSupplier(currentSupplier.id);
@@ -578,7 +584,7 @@ export default function SupplierEntryClient() {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${toTitleCase(item['S/O'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -704,7 +710,10 @@ export default function SupplierEntryClient() {
                     <Button type="button" size="sm" variant="link" className="text-primary h-auto p-0" onClick={applySuggestion}>
                         Yes, use this one
                     </Button>
-                    <Button type="button" size="sm" variant="link" className="text-destructive h-auto p-0" onClick={() => setSuggestedSupplier(null)}>
+                    <Button type="button" size="sm" variant="link" className="text-destructive h-auto p-0" onClick={() => {
+                        form.setValue('forceUnique', true, { shouldDirty: true });
+                        setSuggestedSupplier(null);
+                    }}>
                         No
                     </Button>
                 </div>
@@ -772,3 +781,4 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+

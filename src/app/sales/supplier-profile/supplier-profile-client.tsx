@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -322,13 +323,20 @@ export default function SupplierProfileClient() {
     const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
     const findBestMatchKey = (supplier: Supplier, existingKeys: string[]): string | null => {
+        if (supplier.forceUnique) {
+            return `${normalizeString(supplier.name)}|${normalizeString(supplier.so || '')}|${supplier.id}`;
+        }
+        
         const supNameNorm = normalizeString(supplier.name);
         const supSoNorm = normalizeString(supplier.so || '');
         let bestMatch: string | null = null;
         let minDistance = Infinity;
 
         for (const key of existingKeys) {
-            const [keyNameNorm, keySoNorm] = key.split('|');
+            const keyParts = key.split('|');
+            if (keyParts.length < 2) continue; // Skip malformed or forceUnique keys
+            
+            const [keyNameNorm, keySoNorm] = keyParts;
             const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
             const soDist = levenshteinDistance(supSoNorm, keySoNorm);
             const totalDist = nameDist + soDist;
@@ -546,3 +554,6 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
+
+
+    
