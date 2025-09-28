@@ -69,8 +69,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo'));
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -210,10 +210,12 @@ export default function SupplierEntryClient() {
     if (isClient) {
       const unsub = getSuppliersRealtime((data) => {
         db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'suppliers' })));
+        setSuppliers(data);
       }, console.error);
 
       const unsubPayments = getPaymentsRealtime((data) => {
         db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'payments' })));
+        setPaymentHistory(data);
       }, console.error);
 
       return () => {
@@ -372,7 +374,7 @@ export default function SupplierEntryClient() {
         const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
         
         const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
-        const soDist = levenshteinDistance(currentSoNorm, supSoNorm);
+        const soDist = levenshteinDistance(supSoNorm, currentSoNorm);
         const totalDist = nameDist + soDist;
         
         if (totalDist > 0 && totalDist < 3 && totalDist < minDistance) {
@@ -761,14 +763,14 @@ export default function SupplierEntryClient() {
                     Did you mean this supplier?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                    <div>
+                    &lt;div&gt;
                         A supplier with a very similar name already exists. Is this the same person?
-                        <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
-                            <p><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</p>
-                            <p><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</p>
-                            <p><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</p>
-                        </div>
-                    </div>
+                        &lt;div className="mt-4 p-4 bg-muted rounded-lg text-sm"&gt;
+                            &lt;div&gt;&lt;strong&gt;Name:&lt;/strong&gt; {toTitleCase(suggestedSupplier?.name || '')}&lt;/div&gt;
+                            &lt;div&gt;&lt;strong&gt;S/O:&lt;/strong&gt; {toTitleCase(suggestedSupplier?.so || '')}&lt;/div&gt;
+                            &lt;div&gt;&lt;strong&gt;Address:&lt;/strong&gt; {toTitleCase(suggestedSupplier?.address || '')}&lt;/div&gt;
+                        &lt;/div&gt;
+                    &lt;/div&gt;
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
