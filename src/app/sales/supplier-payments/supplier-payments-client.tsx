@@ -547,24 +547,6 @@ const processPayment = async () => {
                     }
                 }
             }
-            
-            if (cdEnabled && calculatedCdAmount > 0) {
-                const incomeTransactionRef = doc(collection(firestoreDB, 'incomes'));
-                 const incomeData: Partial<Income> = {
-                    id: incomeTransactionRef.id,
-                    date: new Date().toISOString().split('T')[0],
-                    transactionType: 'Income',
-                    category: 'Cash Discount Received',
-                    subCategory: 'Supplier CD',
-                    amount: calculatedCdAmount,
-                    payee: supplierDetails.name,
-                    description: `CD received on payment ${paymentId}`,
-                    paymentMethod: 'Other',
-                    status: 'Paid',
-                    isRecurring: false,
-                };
-                transaction.set(incomeTransactionRef, incomeData);
-            }
 
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: paymentId,
@@ -936,7 +918,7 @@ const processPayment = async () => {
             isOpen={!!detailsSupplierEntry}
             onOpenChange={() => setDetailsSupplierEntry(null)}
             customer={detailsSupplierEntry}
-            paymentHistory={paymentHistory}
+            paymentHistory={paymentsForDetailsEntry}
         />
         
         <PaymentDetailsDialog
@@ -962,3 +944,11 @@ const processPayment = async () => {
     </div>
   );
 }
+
+    
+
+    
+
+    
+
+
