@@ -29,7 +29,7 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
-const paymentsCollection = collection(firestoreDB, "payments");
+const expensesCollection = collection(firestoreDB, "expenses");
 
 
 type PaymentOption = {
@@ -229,6 +229,7 @@ export default function SupplierPaymentsClient() {
     );
   }, [detailsSupplierEntry, paymentHistory]);
 
+  const isLoadingInitial = loading && suppliers.length === 0;
   
   useEffect(() => {
     setIsClient(true);
@@ -238,26 +239,57 @@ export default function SupplierPaymentsClient() {
     }
   }, []);
 
-  useEffect(() => {
-    if (suppliers.length > 0) {
-      setLoading(false);
-    }
-  }, [suppliers]);
-
   const handleSetSelectedAccount = (accountId: string) => {
     setSelectedAccountId(accountId);
     localStorage.setItem('lastSelectedAccountId', accountId);
   }
-  
+
   useEffect(() => {
     if(!isClient) return;
     
     let isSubscribed = true;
+    setLoading(true);
+
+    const unsubSuppliers = getSuppliersRealtime((fetchedSuppliers) => {
+      if (isSubscribed) {
+          setSuppliers(fetchedSuppliers);
+          setLoading(false);
+      }
+    }, (error) => {
+        if(isSubscribed) {
+            console.error("Error fetching suppliers:", error);
+            stableToast({ title: "Failed to load supplier data.", variant: 'destructive' });
+            setLoading(false);
+        }
+    });
+
+    const unsubPayments = getPaymentsRealtime((fetchedPayments) => {
+      if(isSubscribed) {
+        setPaymentHistory(fetchedPayments);
+        if (!editingPayment) {
+          setPaymentId(getNextPaymentId(fetchedPayments));
+          setRtgsSrNo(getNextRtgsSrNo(fetchedPayments));
+        }
+      }
+    }, (error) => {
+        if(isSubscribed) {
+            console.error("Error fetching payments:", error);
+            stableToast({ title: "Failed to load payment history.", variant: 'destructive' });
+        }
+    });
     
-    if (paymentHistory && !editingPayment) {
-        setPaymentId(getNextPaymentId(paymentHistory));
-        setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
-    }
+    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
+    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
+    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
+    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
+    
+    const unsubscribeBanks = getBanksRealtime(setBanks, (error) => {
+      if(isSubscribed) console.error("Error fetching banks:", error);
+    });
+
+    const unsubscribeBankBranches = getBankBranchesRealtime(setBankBranches, (error) => {
+      if(isSubscribed) console.error("Error fetching bank branches:", error);
+    });
     
     const fetchSettings = async () => {
         const settings = await getReceiptSettings();
@@ -267,14 +299,6 @@ export default function SupplierPaymentsClient() {
     };
     fetchSettings();
 
-    const unsubSuppliers = getSuppliersRealtime(setSuppliers, (error) => console.error("Error fetching suppliers:", error));
-    const unsubPayments = getPaymentsRealtime(setPaymentHistory, (error) => console.error("Error fetching payments:", error));
-    const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
-    const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
-    const unsubFunds = getFundTransactionsRealtime(setFundTransactions, console.error);
-    const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
-    const unsubscribeBanks = getBanksRealtime(setBanks, (error) => console.error("Error fetching banks:", error));
-    const unsubscribeBankBranches = getBankBranchesRealtime(setBankBranches, (error) => console.error("Error fetching bank branches:", error));
 
     return () => {
       isSubscribed = false;
@@ -287,7 +311,7 @@ export default function SupplierPaymentsClient() {
       unsubscribeBanks();
       unsubscribeBankBranches();
     };
-  }, [isClient, editingPayment, getNextPaymentId, getNextRtgsSrNo]);
+  }, [isClient, editingPayment, stableToast, getNextPaymentId, getNextRtgsSrNo]);
   
   useEffect(() => {
     autoSetCDToggle();
@@ -373,10 +397,8 @@ export default function SupplierPaymentsClient() {
     setRtgsRate(0);
     setRtgsAmount(0);
     setPaymentOptions([]);
-    if (paymentHistory) {
-      setPaymentId(getNextPaymentId(paymentHistory));
-      setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
-    }
+    setPaymentId(getNextPaymentId(paymentHistory));
+    setRtgsSrNo(getNextRtgsSrNo(paymentHistory));
     if (isOutsider) {
       setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
       setBankDetails({ acNo: '', ifscCode: '', bank: '', branch: '' });
@@ -452,7 +474,7 @@ const processPayment = async () => {
     const availableBalance = financialState.balances.get(accountIdForPayment) || 0;
     
     if (finalPaymentAmount > availableBalance) {
-        const accountName = (bankAccounts || []).find(acc => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
+        const accountName = bankAccounts.find(acc => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
         toast({
             title: "Insufficient Balance",
             description: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.`,
@@ -520,6 +542,43 @@ const processPayment = async () => {
                 }
             }
             
+            const expenseTransactionRef = doc(collection(firestoreDB, 'expenses'));
+            const expenseData: Partial<Expense> = {
+                id: expenseTransactionRef.id,
+                date: new Date().toISOString().split('T')[0],
+                transactionType: 'Expense',
+                category: 'Supplier Payments',
+                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
+                amount: finalPaymentAmount,
+                payee: supplierDetails.name,
+                description: `Payment ${paymentId} to ${supplierDetails.name}`,
+                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
+                status: 'Paid',
+                isRecurring: false,
+            };
+            if (paymentMethod !== 'Cash') {
+                expenseData.bankAccountId = selectedAccountId;
+            }
+            transaction.set(expenseTransactionRef, expenseData);
+
+            if (cdEnabled && calculatedCdAmount > 0) {
+                const incomeTransactionRef = doc(collection(firestoreDB, 'incomes'));
+                 const incomeData: Partial<Income> = {
+                    id: incomeTransactionRef.id,
+                    date: new Date().toISOString().split('T')[0],
+                    transactionType: 'Income',
+                    category: 'Cash Discount Received',
+                    subCategory: 'Supplier CD',
+                    amount: calculatedCdAmount,
+                    payee: supplierDetails.name,
+                    description: `CD received on payment ${paymentId}`,
+                    paymentMethod: 'Other',
+                    status: 'Paid',
+                    isRecurring: false,
+                };
+                transaction.set(incomeTransactionRef, incomeData);
+            }
+
             const paymentDataBase: Omit<Payment, 'id'> = {
                 paymentId: paymentId,
                 customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
@@ -547,14 +606,7 @@ const processPayment = async () => {
                 bankAcNo: bankDetails.acNo,
                 bankIfsc: bankDetails.ifscCode,
                 rtgsFor: rtgsFor,
-                transactionType: 'Expense',
-                category: 'Supplier Payments',
-                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-                payee: supplierDetails.name,
-                description: `Payment ${paymentId} to ${supplierDetails.name}`,
-                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
-                status: 'Paid',
-                isRecurring: false,
+                expenseTransactionId: expenseTransactionRef.id,
             };
             
             if (paymentMethod === 'RTGS') {
@@ -566,7 +618,7 @@ const processPayment = async () => {
                 paymentDataBase.bankAccountId = selectedAccountId;
             }
             
-            const newPaymentRef = doc(paymentsCollection, paymentId);
+            const newPaymentRef = doc(collection(firestoreDB, "payments"));
             transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
             finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
         });
@@ -644,43 +696,13 @@ const processPayment = async () => {
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
-        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
-        if (!paymentToDelete || !paymentToDelete.id) {
-            toast({ title: "Payment not found or ID missing.", variant: "destructive" });
-            return;
+        await deletePaymentFromDB(paymentIdToDelete, isEditing);
+        if (!isEditing) {
+            const payment = paymentHistory.find(p => p.id === paymentIdToDelete);
+            toast({ title: `Payment ${payment?.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
         }
-
-        try {
-            await runTransaction(firestoreDB, async (transaction) => {
-                const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
-                
-                // Revert supplier netAmount
-                if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
-                    for (const detail of paymentToDelete.paidFor) {
-                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                        const supplierDocsSnapshot = await getDocs(q);
-                        if (!supplierDocsSnapshot.empty) {
-                            const customerDoc = supplierDocsSnapshot.docs[0];
-                            const currentSupplier = customerDoc.data() as Customer;
-                            const amountToRestore = detail.amount;
-                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                        }
-                    }
-                }
-                
-                // Delete the payment itself
-                transaction.delete(paymentRef);
-            });
-            if (!isEditing) {
-                toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
-            }
-            if (editingPayment?.id === paymentIdToDelete) {
-              resetPaymentForm();
-            }
-        } catch (error) {
-            console.error("Error deleting payment:", error);
-            toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
+        if (editingPayment?.id === paymentIdToDelete) {
+            resetPaymentForm();
         }
     };
     
@@ -774,7 +796,7 @@ const processPayment = async () => {
         return sortableItems;
     }, [paymentOptions, sortConfig]);
 
-    if (loading) {
+    if (!isClient || isLoadingInitial) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -868,12 +890,11 @@ const processPayment = async () => {
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
-                        parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        parchiNo={parchiNo} setParchiNo={setParchiNo} checkNo={checkNo} setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                        setCheckNo={setCheckNo}
+                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -955,3 +976,11 @@ const processPayment = async () => {
     </div>
   );
 }
+
+    
+
+    
+
+    
+
+

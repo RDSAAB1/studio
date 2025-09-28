@@ -525,9 +525,41 @@ export async function addCustomerPayment(paymentData: Omit<CustomerPayment, 'id'
     return newPayment;
 }
 
-export async function deletePayment(id: string): Promise<void> {
-    const docRef = doc(supplierPaymentsCollection, id);
-    await deleteDoc(docRef);
+export async function deletePayment(id: string, isEditing: boolean = false): Promise<void> {
+    const paymentDocRef = doc(supplierPaymentsCollection, id);
+
+    await runTransaction(firestoreDB, async (transaction) => {
+        const paymentDoc = await transaction.get(paymentDocRef);
+        if (!paymentDoc.exists()) {
+            throw new Error("Payment document not found!");
+        }
+
+        const paymentData = paymentDoc.data() as Payment;
+
+        // Restore supplier net amounts
+        if (paymentData.rtgsFor === 'Supplier' && paymentData.paidFor) {
+            for (const detail of paymentData.paidFor) {
+                const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                const supplierDocsSnapshot = await getDocs(q); // Use getDocs, not inside transaction
+                if (!supplierDocsSnapshot.empty) {
+                    const customerDoc = supplierDocsSnapshot.docs[0];
+                    const currentSupplier = customerDoc.data() as Customer;
+                    const amountToRestore = detail.amount;
+                    const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                    transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                }
+            }
+        }
+        
+        // Delete associated expense
+        if (paymentData.expenseTransactionId) {
+            const expenseDocRef = doc(expensesCollection, paymentData.expenseTransactionId);
+            transaction.delete(expenseDocRef);
+        }
+
+        // Delete the payment
+        transaction.delete(paymentDocRef);
+    });
 }
 
 export async function deleteCustomerPayment(id: string): Promise<void> {

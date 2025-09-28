@@ -312,14 +312,17 @@ export default function SupplierEntryClient() {
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
-    } else {
-        if (isEditing) {
-            setIsEditing(false);
-            const currentId = currentSupplier.srNo;
-            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
-            resetFormToState(newState);
-        }
+    } else if (isEditing) {
+        // If it was editing, but the new SR No doesn't exist,
+        // keep the form data but switch to "new entry" mode for that SR No.
+        setIsEditing(false);
+        const currentData = form.getValues();
+        setCurrentSupplier(prev => ({
+            ...prev,
+            srNo: formattedSrNo,
+            id: formattedSrNo // The new ID will be the SR No
+        }));
+        form.setValue('srNo', formattedSrNo);
     }
   }
 
@@ -456,7 +459,6 @@ export default function SupplierEntryClient() {
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
      if (suggestedSupplier) {
-        // If a suggestion is active, don't submit. Let the user resolve it first.
         return;
     }
     if (isEditing) {
