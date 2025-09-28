@@ -394,8 +394,12 @@ export default function SupplierEntryClient() {
         date: correctedDate.toISOString().split("T")[0],
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
-        name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so || '').toLowerCase()}`,
+        name: toTitleCase(values.name),
+        so: toTitleCase(values.so),
+        address: toTitleCase(values.address),
+        vehicleNo: toTitleCase(values.vehicleNo),
+        variety: toTitleCase(values.variety),
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
     };
 
     try {
@@ -774,5 +778,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
-    
