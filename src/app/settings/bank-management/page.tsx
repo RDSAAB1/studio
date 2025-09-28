@@ -99,6 +99,7 @@ export default function BankManagementPage() {
                 await updateBankBranch(currentBranch.id, currentBranch);
                 toast({ title: "Branch Updated", variant: "success" });
             } else {
+                // The duplication check is now in the `addBankBranch` function itself.
                 await addBankBranch(currentBranch as Omit<BankBranch, 'id'>);
                 toast({ title: "Branch Added", variant: "success" });
             }
@@ -281,3 +282,5 @@ export default function BankManagementPage() {
         </div>
     );
 }
+
+    

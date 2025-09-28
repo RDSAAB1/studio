@@ -228,18 +228,26 @@ export async function deleteBank(id: string): Promise<void> {
 }
 
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
-    if (!branchData.ifscCode) throw new Error("IFSC code is required to add a branch.");
-    const docRef = doc(firestoreDB, 'bankBranches', branchData.ifscCode);
+    const { bankName, branchName, ifscCode } = branchData;
+    if (!bankName || !branchName || !ifscCode) {
+        throw new Error("Bank name, branch name, and IFSC code are required.");
+    }
     
-    // Check if a document with this IFSC code already exists
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-        throw new Error(`A branch with IFSC code ${branchData.ifscCode} already exists.`);
+    // Check for duplicates based on the combination
+    const q = query(bankBranchesCollection, 
+        where("bankName", "==", bankName), 
+        where("branchName", "==", branchName), 
+        where("ifscCode", "==", ifscCode)
+    );
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+        throw new Error(`This exact branch (${branchName}, ${ifscCode}) already exists for ${bankName}.`);
     }
 
-    await setDoc(docRef, branchData);
+    const docRef = await addDoc(bankBranchesCollection, branchData);
     return { id: docRef.id, ...branchData };
 }
+
 
 export async function updateBankBranch(id: string, branchData: Partial<BankBranch>): Promise<void> {
     const docRef = doc(firestoreDB, "bankBranches", id);
@@ -902,3 +910,6 @@ export async function initialDataSync() {
     console.log("Initial data sync would happen here if it were still implemented.");
 }
 
+
+
+    
