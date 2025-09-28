@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -197,7 +196,7 @@ export default function SupplierPaymentsClient() {
          if (balanceKey && balances.has(balanceKey)) {
             if (t.transactionType === 'Income') {
                 balances.set(balanceKey, (balances.get(balanceKey) || 0) + t.amount);
-            } else if (t.transactionType === 'Expense') {
+            } else { // Expense or Payment
                 balances.set(balanceKey, (balances.get(balanceKey) || 0) - t.amount);
             }
         }
@@ -542,25 +541,6 @@ const processPayment = async () => {
                 }
             }
             
-            const expenseTransactionRef = doc(collection(firestoreDB, 'expenses'));
-            const expenseData: Partial<Expense> = {
-                id: expenseTransactionRef.id,
-                date: new Date().toISOString().split('T')[0],
-                transactionType: 'Expense',
-                category: 'Supplier Payments',
-                subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
-                amount: finalPaymentAmount,
-                payee: supplierDetails.name,
-                description: `Payment ${paymentId} to ${supplierDetails.name}`,
-                paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
-                status: 'Paid',
-                isRecurring: false,
-            };
-            if (paymentMethod !== 'Cash') {
-                expenseData.bankAccountId = selectedAccountId;
-            }
-            transaction.set(expenseTransactionRef, expenseData);
-
             if (cdEnabled && calculatedCdAmount > 0) {
                 const incomeTransactionRef = doc(collection(firestoreDB, 'incomes'));
                  const incomeData: Partial<Income> = {
@@ -606,7 +586,7 @@ const processPayment = async () => {
                 bankAcNo: bankDetails.acNo,
                 bankIfsc: bankDetails.ifscCode,
                 rtgsFor: rtgsFor,
-                expenseTransactionId: expenseTransactionRef.id,
+                transactionType: 'Expense', // To ensure it is picked up by financial state calc
             };
             
             if (paymentMethod === 'RTGS') {
@@ -892,11 +872,12 @@ const processPayment = async () => {
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
-                        parchiNo={parchiNo} setParchiNo={setParchiNo} checkNo={checkNo} setCheckNo={setCheckNo}
+                        parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
+                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -978,16 +959,3 @@ const processPayment = async () => {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-
-
-
-    
-
-    
