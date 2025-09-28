@@ -14,7 +14,7 @@ import { db } from '@/lib/database';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -288,10 +288,6 @@ export default function CustomerEntryClient() {
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
-    } else {
-        if (isEditing) {
-            setIsEditing(false);
-        }
     }
   }
 
@@ -342,10 +338,9 @@ export default function CustomerEntryClient() {
   const executeSubmit = async (deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     const formValues = form.getValues();
     
-    const dataToSave: Customer = {
+    const dataToSave: Omit<Customer, 'id'> = {
         ...currentCustomer,
         srNo: formValues.srNo,
-        id: formValues.srNo,
         date: formValues.date.toISOString().split('T')[0],
         term: '0', 
         dueDate: formValues.date.toISOString().split('T')[0],
@@ -359,7 +354,7 @@ export default function CustomerEntryClient() {
         vehicleNo: toTitleCase(formValues.vehicleNo),
         variety: toTitleCase(formValues.variety),
         paymentType: formValues.paymentType,
-        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${formValues.contact.toLowerCase()}`,
+        customerId: `${toTitleCase(formValues.name).toLowerCase()}|${toTitleCase(formValues.companyName || '').toLowerCase()}`,
         grossWeight: formValues.grossWeight,
         teirWeight: formValues.teirWeight,
         rate: formValues.rate,
@@ -383,27 +378,25 @@ export default function CustomerEntryClient() {
         labouryRate: 0,
         labouryAmount: 0,
         barcode: '',
-        receiptType: 'Cash',
-        cd: formValues.cd || 0,
-        brokerage: formValues.brokerage || 0,
+        receiptType: 'Cash'
     };
     
     try {
-        if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.id) {
+        if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
             await deleteCustomer(currentCustomer.id);
         }
         
         if (deletePayments) {
             await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
-            const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount };
-            await addCustomer(entryWithRestoredAmount);
+            const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
+            await addCustomer(entryWithRestoredAmount as Customer);
             toast({ title: "Entry updated, payments deleted.", variant: "success" });
-            if (callback) callback(entryWithRestoredAmount); else handleNew();
+            if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
         } else {
-            const entryToSave = { ...dataToSave };
-            await addCustomer(entryToSave);
+            const entryToSave = { ...dataToSave, id: dataToSave.srNo };
+            await addCustomer(entryToSave as Customer);
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-            if (callback) callback(entryToSave); else handleNew();
+            if (callback) callback(entryToSave as Customer); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);

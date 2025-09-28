@@ -318,7 +318,6 @@ export default function SupplierProfileClient() {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
 
-    // Initialize map with all unique suppliers
     filteredSuppliers.forEach(s => {
         if (s.customerId && !summary.has(s.customerId)) {
             summary.set(s.customerId, {

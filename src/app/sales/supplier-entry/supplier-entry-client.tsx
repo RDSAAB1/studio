@@ -283,6 +283,10 @@ export default function SupplierEntryClient() {
     } else {
         if (isEditing) {
             setIsEditing(false);
+            const currentId = currentSupplier.srNo;
+            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
+            resetFormToState(newState);
         }
     }
   }
@@ -331,7 +335,7 @@ export default function SupplierEntryClient() {
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        customerId: `${toTitleCase(values.name).toLowerCase()}|${toTitleCase(values.so).toLowerCase()}`,
     };
 
     try {
@@ -516,7 +520,7 @@ export default function SupplierEntryClient() {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${toTitleCase(item['S/O'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };

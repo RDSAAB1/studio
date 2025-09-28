@@ -358,11 +358,11 @@ export default function CustomerProfileClient() {
                 </Popover>
                  <Popover>
                     <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full sm:w-[200px] justify-start text-left font-normal h-9", !endDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{endDate ? format(endDate, "PPP") : <span>End Date</span>}</Button></PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus /></PopoverContent>
+                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={endDate} onSelect={setEndDate} /></PopoverContent>
                 </Popover>
                 <div className="w-full sm:w-[300px]">
                     <CustomDropdown
-                        options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.contact ? `(${data.contact})` : ''}`.trim() }))}
+                        options={Array.from(customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} ${data.companyName ? `(${data.companyName})` : ''}`.trim() }))}
                         value={selectedCustomerKey}
                         onChange={(value: string | null) => setSelectedCustomerKey(value as string)}
                         placeholder="Search and select profile..."
@@ -406,4 +406,3 @@ export default function CustomerProfileClient() {
     </div>
   );
 }
-
