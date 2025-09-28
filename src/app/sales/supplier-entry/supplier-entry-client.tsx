@@ -8,9 +8,6 @@ import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
-
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -205,27 +202,23 @@ export default function SupplierEntryClient() {
 
   useEffect(() => {
     if (isClient) {
-      getSuppliersRealtime((data) => {
-        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'suppliers' })));
+      const unsubSuppliers = getSuppliersRealtime((data) => {
         setSuppliers(data);
-      }, console.error);
-
-      getPaymentsRealtime((data) => {
-        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'payments' })));
-        setPaymentHistory(data);
-      }, console.error);
-    }
-  }, [isClient]);
-
-  useEffect(() => {
-    if (suppliers !== undefined) {
-        setIsLoading(false);
-        if (isInitialLoad.current) {
-            handleNew();
-            isInitialLoad.current = false;
+        if (isInitialLoad.current && data.length > 0) {
+          handleNew();
+          isInitialLoad.current = false;
         }
+        setIsLoading(false);
+      }, console.error);
+
+      const unsubPayments = getPaymentsRealtime(setPaymentHistory, console.error);
+      
+      return () => {
+        unsubSuppliers();
+        unsubPayments();
+      };
     }
-  }, [suppliers, handleNew]);
+  }, [isClient, handleNew]);
 
 
   useEffect(() => {
@@ -819,3 +812,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    
