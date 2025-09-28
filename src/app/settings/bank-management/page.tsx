@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -93,9 +94,14 @@ export default function BankManagementPage() {
             return;
         }
         
-        const branchExists = branches.some(b => b.ifscCode.toLowerCase() === currentBranch.ifscCode?.toLowerCase() && b.id !== currentBranch.id);
-        if(branchExists) {
-            toast({ title: "Duplicate Branch", description: "A branch with this IFSC code already exists.", variant: "destructive" });
+        const branchExists = branches.some(b => 
+            b.bankName.toLowerCase() === currentBranch.bankName?.toLowerCase() &&
+            b.branchName.toLowerCase() === currentBranch.branchName?.toLowerCase() &&
+            b.id !== currentBranch.id
+        );
+
+        if (branchExists) {
+            toast({ title: "Duplicate Branch", description: "This branch name already exists for this bank.", variant: "destructive" });
             return;
         }
 

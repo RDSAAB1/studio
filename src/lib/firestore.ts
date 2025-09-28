@@ -228,6 +228,11 @@ export async function deleteBank(id: string): Promise<void> {
 }
 
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
+    const q = query(bankBranchesCollection, where("bankName", "==", branchData.bankName), where("branchName", "==", branchData.branchName));
+    const existing = await getDocs(q);
+    if (!existing.empty) {
+        throw new Error("This branch name already exists for this bank.");
+    }
     const docRef = doc(firestoreDB, 'bankBranches', branchData.ifscCode);
     await setDoc(docRef, branchData);
     return { id: docRef.id, ...branchData };
@@ -286,8 +291,7 @@ export async function deleteSupplier(id: string): Promise<void> {
     console.error("deleteSupplier requires a valid ID.");
     return;
   }
-  const docRef = doc(suppliersCollection, id);
-  await deleteDoc(docRef);
+  await deleteDoc(doc(suppliersCollection, id));
   await db.mainDataStore.delete(id); // Also delete from Dexie
 }
 
