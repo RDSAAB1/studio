@@ -317,14 +317,13 @@ export default function SupplierProfileClient() {
   const supplierSummaryMap = useMemo(() => {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
-    const LEVENSHTEIN_THRESHOLD = 2; // Allow up to 2 character differences
+    const LEVENSHTEIN_THRESHOLD = 2;
 
     const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
     const findBestMatchKey = (supplier: Supplier, existingKeys: string[]): string | null => {
         const supNameNorm = normalizeString(supplier.name);
         const supSoNorm = normalizeString(supplier.so || '');
-
         let bestMatch: string | null = null;
         let minDistance = Infinity;
 
@@ -341,10 +340,9 @@ export default function SupplierProfileClient() {
         }
         return bestMatch;
     };
-
+    
     filteredSuppliers.forEach(s => {
         const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
-
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -366,8 +364,8 @@ export default function SupplierProfileClient() {
         let supplierRateSum = { rate: 0, karta: 0, laboury: 0, count: 0 };
         
         data.allTransactions!.forEach(s => {
-            data.totalAmount += s.amount || 0;
             data.totalOriginalAmount += s.originalNetAmount || 0;
+            data.totalAmount += s.amount || 0;
             data.totalGrossWeight! += s.grossWeight;
             data.totalTeirWeight! += s.teirWeight;
             data.totalFinalWeight! += s.weight;
@@ -394,8 +392,8 @@ export default function SupplierProfileClient() {
             data.averageLabouryRate = supplierRateSum.laboury / supplierRateSum.count;
         }
 
-        const supplierCustomerIds = new Set(data.allTransactions!.map(t => t.customerId));
-        const relevantPayments = filteredPayments.filter(p => supplierCustomerIds.has(p.customerId));
+        const customerIds = new Set(data.allTransactions!.map(t => t.customerId));
+        const relevantPayments = filteredPayments.filter(p => customerIds.has(p.customerId));
         
         relevantPayments.forEach(p => {
             data.totalPaid += p.amount;

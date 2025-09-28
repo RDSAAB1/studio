@@ -196,14 +196,14 @@ export default function SupplierEntryClient() {
     if (suppliers.length > 0) {
         setIsLoading(false);
         if (isInitialLoad.current) {
-            const nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'S');
-            form.setValue('srNo', initialSrNo);
-            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
+            handleNew();
             isInitialLoad.current = false;
         }
+    } else if (suppliers.length === 0 && !isInitialLoad.current) {
+        // This handles the case where all suppliers are deleted
+        handleNew();
     }
-  }, [suppliers, form]);
+  }, [suppliers, handleNew]);
 
 
   useEffect(() => {
@@ -312,7 +312,7 @@ export default function SupplierEntryClient() {
           toast({ title: "Supplier Found: Details auto-filled from last entry." });
       }
     }
-  }
+  };
 
   const findAndSuggestSimilarSupplier = () => {
     const { name, so } = form.getValues();
@@ -578,7 +578,7 @@ export default function SupplierEntryClient() {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${toTitleCase(item['S/O'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -699,7 +699,7 @@ export default function SupplierEntryClient() {
                 <div className="flex items-center justify-center gap-2 p-2 text-sm bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-800 rounded-lg">
                     <Lightbulb className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                     <p className="text-yellow-800 dark:text-yellow-300">
-                        Did you mean: <strong className="font-semibold">{toTitleCase(suggestedSupplier.name)}</strong> s/o <strong className="font-semibold">{toTitleCase(suggestedSupplier.so)}</strong>?
+                        Did you mean: <strong className="font-semibold">{toTitleCase(suggestedSupplier.name)}</strong> s/o <strong className="font-semibold">{toTitleCase(suggestedSupplier.so)}</strong> from <strong className="font-semibold">{toTitleCase(suggestedSupplier.address)}</strong>?
                     </p>
                     <Button type="button" size="sm" variant="link" className="text-primary h-auto p-0" onClick={applySuggestion}>
                         Yes, use this one
