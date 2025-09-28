@@ -323,7 +323,7 @@ export default function SupplierEntryClient() {
     }
   }
 
-  const handleContactChange = (contactValue: string) => {
+  const onContactChange = (contactValue: string) => {
     form.setValue('contact', contactValue);
     if (contactValue.length === 10 && suppliers) {
       const latestEntryForContact = suppliers
@@ -340,8 +340,13 @@ export default function SupplierEntryClient() {
   };
 
   const findAndSuggestSimilarSupplier = () => {
+    if (form.formState.isSubmitting || isEditing) {
+        setSuggestedSupplier(null);
+        return;
+    }
+
     const { name, so } = form.getValues();
-    if (!name || isEditing) {
+    if (!name) {
         setSuggestedSupplier(null);
         return;
     }
@@ -450,6 +455,10 @@ export default function SupplierEntryClient() {
   };
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+     if (suggestedSupplier) {
+        // If a suggestion is active, don't submit. Let the user resolve it first.
+        return;
+    }
     if (isEditing) {
         const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
         if (hasPayments) {
@@ -714,7 +723,7 @@ export default function SupplierEntryClient() {
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
-                onContactChange={handleContactChange}
+                onContactChange={onContactChange}
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
@@ -749,14 +758,16 @@ export default function SupplierEntryClient() {
                     <Lightbulb className="h-5 w-5 text-yellow-500" />
                     Did you mean this supplier?
                 </AlertDialogTitle>
-                <div className="text-sm text-muted-foreground pt-2">
-                    A supplier with a very similar name already exists. Is this the same person?
-                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
-                        <p><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</p>
-                        <p><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</p>
-                        <p><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</p>
+                <AlertDialogDescription>
+                    <div>
+                        A supplier with a very similar name already exists. Is this the same person?
+                        <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
+                            <p><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</p>
+                            <p><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</p>
+                            <p><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</p>
+                        </div>
                     </div>
-                </div>
+                </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogAction onClick={() => {
