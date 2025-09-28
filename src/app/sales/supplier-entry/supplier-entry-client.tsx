@@ -168,6 +168,7 @@ export default function SupplierEntryClient() {
         labouryRate: customerState.labouryRate,
         kanta: customerState.kanta,
         paymentType: customerState.paymentType || 'Full',
+        forceUnique: customerState.forceUnique || false,
     };
 
     setCurrentSupplier(customerState);
