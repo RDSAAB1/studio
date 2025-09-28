@@ -324,6 +324,14 @@ export default function SupplierPaymentsClient() {
   }, [selectedEntryIds, autoSetCDToggle]);
   
   useEffect(() => {
+    if (paymentType === 'Full') {
+        setCdAt('on_full_amount');
+    } else if (paymentType === 'Partial') {
+        setCdAt('partial_on_paid');
+    }
+  }, [paymentType]);
+
+  useEffect(() => {
     if (!cdEnabled) {
         setCalculatedCdAmount(0);
         return;
@@ -575,7 +583,6 @@ const processPayment = async () => {
                 bankAcNo: bankDetails.acNo,
                 bankIfsc: bankDetails.ifscCode,
                 rtgsFor: rtgsFor,
-                transactionType: 'Expense', // To ensure it is picked up by financial state calc
             };
             
             if (paymentMethod === 'RTGS') {
@@ -665,13 +672,48 @@ const processPayment = async () => {
     };
 
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
-        await deletePaymentFromDB(paymentIdToDelete, isEditing);
-        if (!isEditing) {
-            const payment = paymentHistory.find(p => p.id === paymentIdToDelete);
-            toast({ title: `Payment ${payment?.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
+        const paymentToDelete = paymentHistory.find(p => p.id === paymentIdToDelete);
+        if (!paymentToDelete || !paymentToDelete.id) {
+            toast({ title: "Payment not found or ID missing.", variant: "destructive" });
+            return;
         }
-        if (editingPayment?.id === paymentIdToDelete) {
-            resetPaymentForm();
+
+        try {
+            await runTransaction(firestoreDB, async (transaction) => {
+                const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
+                
+                // Revert supplier netAmount
+                if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
+                    for (const detail of paymentToDelete.paidFor) {
+                        const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                        const supplierDocsSnapshot = await getDocs(q); 
+                        if (!supplierDocsSnapshot.empty) {
+                            const customerDoc = supplierDocsSnapshot.docs[0];
+                            const currentSupplier = customerDoc.data() as Customer;
+                            const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? paymentToDelete.cdAmount || 0 : 0) / paymentToDelete.paidFor.length;
+                            const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
+                            transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                        }
+                    }
+                }
+                
+                // Delete the associated expense transaction, if it exists
+                if (paymentToDelete.expenseTransactionId) {
+                    const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
+                    transaction.delete(expenseDocRef);
+                }
+
+                transaction.delete(paymentRef);
+            });
+            if (!isEditing) {
+                toast({ title: `Payment ${paymentToDelete.paymentId} deleted successfully.`, variant: 'success', duration: 3000 });
+            }
+            if (editingPayment?.id === paymentIdToDelete) {
+              resetPaymentForm();
+            }
+        } catch (error) {
+            console.error("Error deleting payment:", error);
+            toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" });
         }
     };
     
@@ -690,35 +732,38 @@ const processPayment = async () => {
         }
 
         const rawOptions: PaymentOption[] = [];
-        const generatedUniqueRemainingAmounts = new Map<number, number>();
-        const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
+        
+        for (let q = 0.10; q <= 200; q = parseFloat((q + 0.01).toFixed(2))) {
+            const minPossibleAmount = q * calcMinRate;
+            if (minPossibleAmount > calcTargetAmount) break;
 
-        for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
-            for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
-                if (currentRate % 5 !== 0) continue;
+            const idealRate = calcTargetAmount / q;
+            
+            if (idealRate > calcMaxRate) continue;
+
+            const baseRate = Math.max(calcMinRate, idealRate);
+            
+            for (let offset = -10; offset <= 10; offset += 5) {
+                const currentRate = Math.round(baseRate / 5) * 5 + offset;
+                if (currentRate < calcMinRate || currentRate > calcMaxRate) continue;
 
                 let calculatedAmount = q * currentRate;
-                if (roundFigureToggle) {
+                 if (roundFigureToggle) {
                     calculatedAmount = Math.round(calculatedAmount / 100) * 100;
                 } else {
                     calculatedAmount = Math.round(calculatedAmount / 5) * 5;
                 }
-
+                
                 if (calculatedAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
-                if (amountRemaining < 0) continue;
-
-                const count = generatedUniqueRemainingAmounts.get(amountRemaining) || 0;
-                if (count < 5) {
-                    rawOptions.push({
-                        quantity: q,
-                        rate: currentRate,
-                        calculatedAmount: calculatedAmount,
-                        amountRemaining: amountRemaining
-                    });
-                    generatedUniqueRemainingAmounts.set(amountRemaining, count + 1);
-                }
+                
+                rawOptions.push({
+                    quantity: q,
+                    rate: currentRate,
+                    calculatedAmount: calculatedAmount,
+                    amountRemaining: amountRemaining
+                });
             }
         }
         
@@ -733,7 +778,7 @@ const processPayment = async () => {
 
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
-        setCdAt('full_amount');
+        setCdAt('on_full_amount');
         setPaymentAmount(option.calculatedAmount); 
         setRtgsQuantity(option.quantity);
         setRtgsRate(option.rate);
@@ -862,7 +907,7 @@ const processPayment = async () => {
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
                         processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -950,5 +995,6 @@ const processPayment = async () => {
     
 
     
+
 
 

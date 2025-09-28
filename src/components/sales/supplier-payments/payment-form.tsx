@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -22,7 +21,6 @@ import { Separator } from '@/components/ui/separator';
 
 const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
-    { value: 'on_previously_paid', label: 'CD on Previously Paid Amount' },
     { value: 'on_unpaid_amount', label: 'CD on Unpaid Amount' },
     { value: 'on_full_amount', label: 'Full CD (Paid + Unpaid)' },
 ];
