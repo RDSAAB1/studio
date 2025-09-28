@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { FundTransaction, Income, Expense, Loan, BankAccount, Customer } from "@/lib/definitions";
+import type { FundTransaction, Income, Expense, Loan, BankAccount, Customer, Payment } from "@/lib/definitions";
 import { toTitleCase, cn, formatCurrency } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { PiggyBank, Landmark, HandCoins, PlusCircle, MinusCircle, DollarSign, Scale, ArrowLeftRight, Save, Banknote, Edit, Trash2, Home, Pen } from "lucide-react";
 import { format, addMonths, differenceInMonths, parseISO, isValid } from "date-fns";
 
-import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction, getSuppliersRealtime } from "@/lib/firestore";
+import { addFundTransaction, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, addLoan, updateLoan, deleteLoan, getLoansRealtime, getBankAccountsRealtime, updateFundTransaction, deleteFundTransaction, getSuppliersRealtime } from "@/lib/firestore";
 import { cashBankFormSchemas, type TransferValues } from "./formSchemas.ts";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -60,6 +60,7 @@ export default function CashBankClient() {
     const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -75,6 +76,7 @@ export default function CashBankClient() {
         const unsubFundTransactions = getFundTransactionsRealtime(setFundTransactions, console.error);
         const unsubIncomes = getIncomeRealtime(setIncomes, console.error);
         const unsubExpenses = getExpensesRealtime(setExpenses, console.error);
+        const unsubPayments = getPaymentsRealtime(setPayments, console.error);
         const unsubLoans = getLoansRealtime(setLoans, console.error);
         const unsubBankAccounts = getBankAccountsRealtime(setBankAccounts, console.error);
         const unsubSuppliers = getSuppliersRealtime(setSuppliers, console.error);
@@ -83,13 +85,30 @@ export default function CashBankClient() {
             unsubFundTransactions();
             unsubIncomes();
             unsubExpenses();
+            unsubPayments();
             unsubLoans();
             unsubBankAccounts();
             unsubSuppliers();
         };
     }, []);
 
-    const allTransactions = useMemo(() => [...(incomes || []), ...(expenses || [])], [incomes, expenses]);
+    const allTransactions = useMemo(() => {
+        const mappedPayments = payments.map(p => ({
+            id: p.id,
+            date: p.date,
+            transactionType: 'Expense',
+            category: 'Supplier Payments',
+            subCategory: p.rtgsFor === 'Outsider' ? 'Outsider Payment' : 'Supplier Payment',
+            amount: p.amount,
+            payee: p.supplierName || 'N/A',
+            description: p.notes || `Payment ${p.paymentId}`,
+            paymentMethod: p.receiptType,
+            status: 'Paid',
+            isRecurring: false,
+            bankAccountId: p.bankAccountId,
+        }));
+        return [...incomes, ...expenses, ...mappedPayments] as (Income | Expense)[];
+    }, [incomes, expenses, payments]);
 
     const formSourcesAndDestinations = useMemo(() => {
         const accounts = bankAccounts.map(acc => ({
@@ -376,7 +395,7 @@ export default function CashBankClient() {
             <Tabs defaultValue="funds" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="funds">Fund Management</TabsTrigger>
-                    <TabsTrigger value="loans">Loan &amp; Capital Management</TabsTrigger>
+                    <TabsTrigger value="loans">Loan & Capital Management</TabsTrigger>
                 </TabsList>
                 <TabsContent value="funds" className="mt-6">
                      <Card>
@@ -420,7 +439,7 @@ export default function CashBankClient() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <CardTitle className="text-xl font-semibold">Loan &amp; Capital Management</CardTitle>
+                                <CardTitle className="text-xl font-semibold">Loan & Capital Management</CardTitle>
                                 <CardDescription>Track all your loans and add capital injections here.</CardDescription>
                             </div>
                             <Button onClick={openLoanDialogForAdd}><PlusCircle className="mr-2 h-4 w-4"/>Add New Entry</Button>

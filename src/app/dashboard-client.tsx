@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project } from '@/lib/definitions';
-import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
+import type { Customer, Loan, FundTransaction, Income, Expense, BankAccount, ExpenseCategory, IncomeCategory, Project, Payment } from '@/lib/definitions';
+import { getSuppliersRealtime, getCustomersRealtime, getLoansRealtime, getFundTransactionsRealtime, getIncomeRealtime, getExpensesRealtime, getPaymentsRealtime, getBankAccountsRealtime, getProjectsRealtime, getExpenseCategories as getExpenseCategoriesFromDB, getIncomeCategories as getIncomeCategoriesFromDB } from "@/lib/firestore";
 import { formatCurrency, toTitleCase, cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +41,7 @@ export default function DashboardClient() {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [incomes, setIncomes] = useState<Income[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
@@ -68,6 +69,7 @@ export default function DashboardClient() {
         const unsubProjects = getProjectsRealtime(setProjects, console.error);
         const unsubExpCats = getExpenseCategoriesFromDB(setExpenseCategories, console.error);
         const unsubIncCats = getIncomeCategoriesFromDB(setIncomeCategories, console.error);
+        const unsubPayments = getPaymentsRealtime(setPayments, console.error);
         
         const unsubIncomes = getIncomeRealtime((data) => { setIncomes(data); }, console.error);
         const unsubExpenses = getExpensesRealtime((data) => { 
@@ -79,12 +81,31 @@ export default function DashboardClient() {
             unsubSuppliers(); unsubCustomers(); unsubFunds();
             unsubAccounts(); unsubIncomes(); unsubExpenses();
             unsubLoans(); unsubProjects(); unsubExpCats(); unsubIncCats();
+            unsubPayments();
         };
     }, []);
+    
+    const allExpenses = useMemo(() => {
+        const mappedPayments = payments.map(p => ({
+            id: p.id,
+            date: p.date,
+            transactionType: 'Expense',
+            category: 'Supplier Payments',
+            subCategory: p.rtgsFor === 'Outsider' ? 'Outsider Payment' : 'Supplier Payment',
+            amount: p.amount,
+            payee: p.supplierName || 'N/A',
+            description: p.notes || `Payment ${p.paymentId}`,
+            paymentMethod: p.receiptType,
+            status: 'Paid',
+            isRecurring: false,
+            bankAccountId: p.bankAccountId,
+        }));
+        return [...expenses, ...mappedPayments];
+    }, [expenses, payments]);
 
     const filteredData = useMemo(() => {
         if (!date || !date.from) {
-            return { filteredIncomes: incomes, filteredExpenses: expenses, filteredSuppliers: suppliers, filteredCustomers: customers };
+            return { filteredIncomes: incomes, filteredExpenses: allExpenses, filteredSuppliers: suppliers, filteredCustomers: customers };
         }
         
         const interval = { 
@@ -95,11 +116,11 @@ export default function DashboardClient() {
 
         return {
             filteredIncomes: incomes.filter(filterFn),
-            filteredExpenses: expenses.filter(filterFn),
+            filteredExpenses: allExpenses.filter(filterFn),
             filteredSuppliers: suppliers.filter(filterFn),
             filteredCustomers: customers.filter(filterFn),
         };
-    }, [date, incomes, expenses, suppliers, customers]);
+    }, [date, incomes, allExpenses, suppliers, customers]);
 
 
     const allTransactions: (Income | Expense)[] = useMemo(() => [...filteredData.filteredIncomes, ...filteredData.filteredExpenses], [filteredData]);
@@ -129,7 +150,7 @@ export default function DashboardClient() {
             }
         });
         
-        [...incomes, ...expenses].forEach(t => {
+        [...incomes, ...allExpenses].forEach(t => {
             const balanceKey = t.bankAccountId || (t.paymentMethod === 'Cash' ? 'CashInHand' : '');
             if (balanceKey && balances.has(balanceKey)) {
                 if (t.transactionType === 'Income') {
@@ -146,7 +167,7 @@ export default function DashboardClient() {
         const workingCapital = totalAssets - totalLiabilities;
         
         return { balances, totalAssets, totalLiabilities, workingCapital };
-    }, [fundTransactions, incomes, expenses, bankAccounts, loans, totalSupplierDues]);
+    }, [fundTransactions, incomes, allExpenses, bankAccounts, loans, totalSupplierDues]);
 
     // --- Chart Data Calculation ---
     const level1Data = useMemo(() => {
