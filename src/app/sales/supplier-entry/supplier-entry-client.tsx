@@ -208,20 +208,15 @@ export default function SupplierEntryClient() {
 
   useEffect(() => {
     if (isClient) {
-      const unsub = getSuppliersRealtime((data) => {
+      getSuppliersRealtime((data) => {
         db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'suppliers' })));
         setSuppliers(data);
       }, console.error);
 
-      const unsubPayments = getPaymentsRealtime((data) => {
+      getPaymentsRealtime((data) => {
         db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'payments' })));
         setPaymentHistory(data);
       }, console.error);
-
-      return () => {
-        unsub();
-        unsubPayments();
-      };
     }
   }, [isClient]);
 
@@ -315,8 +310,7 @@ export default function SupplierEntryClient() {
         setIsEditing(true);
         resetFormToState(foundCustomer);
     } else if (isEditing) {
-        // If it was editing, but the new SR No doesn't exist,
-        // keep the form data but switch to "new entry" mode for that SR No.
+        // Keep the form data but switch to "new entry" mode for that SR No.
         setIsEditing(false);
         const currentData = form.getValues();
         setCurrentSupplier(prev => ({
@@ -460,8 +454,8 @@ export default function SupplierEntryClient() {
   };
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
-     if (suggestedSupplier) {
-        return;
+    if (suggestedSupplier && !values.forceUnique) {
+      return; // Do not submit if a suggestion is active and user hasn't chosen an action
     }
     if (isEditing) {
         const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
@@ -763,14 +757,12 @@ export default function SupplierEntryClient() {
                     Did you mean this supplier?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                    &lt;div&gt;
-                        A supplier with a very similar name already exists. Is this the same person?
-                        &lt;div className="mt-4 p-4 bg-muted rounded-lg text-sm"&gt;
-                            &lt;div&gt;&lt;strong&gt;Name:&lt;/strong&gt; {toTitleCase(suggestedSupplier?.name || '')}&lt;/div&gt;
-                            &lt;div&gt;&lt;strong&gt;S/O:&lt;/strong&gt; {toTitleCase(suggestedSupplier?.so || '')}&lt;/div&gt;
-                            &lt;div&gt;&lt;strong&gt;Address:&lt;/strong&gt; {toTitleCase(suggestedSupplier?.address || '')}&lt;/div&gt;
-                        &lt;/div&gt;
-                    &lt;/div&gt;
+                    A supplier with a very similar name already exists. Is this the same person?
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
+                        <div><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</div>
+                        <div><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</div>
+                        <div><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</div>
+                    </div>
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
