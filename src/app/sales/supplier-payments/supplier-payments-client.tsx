@@ -724,24 +724,24 @@ const processPayment = async () => {
         const generatedUniqueRemainingAmounts = new Map<number, number>();
         const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
 
+        const roundingUnit = roundFigureToggle ? 100 : 5;
+
         for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
-            for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
-                if (currentRate % 5 !== 0) continue;
+            const minRateForQ = Math.max(calcMinRate, Math.ceil((calcTargetAmount - roundingUnit) / q));
+            
+            for (let currentRate = Math.ceil(minRateForQ / 5) * 5; currentRate <= calcMaxRate; currentRate += 5) {
+                if (currentRate < calcMinRate) continue;
+                
+                const calculatedAmount = q * currentRate;
 
-                let calculatedAmount = q * currentRate;
-                if (roundFigureToggle) {
-                    calculatedAmount = Math.round(calculatedAmount / 100) * 100;
-                } else {
-                    calculatedAmount = Math.round(calculatedAmount / 5) * 5;
-                }
-
+                if (calculatedAmount % roundingUnit !== 0) continue;
                 if (calculatedAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
                 if (amountRemaining < 0) continue;
-
+                
                 const count = generatedUniqueRemainingAmounts.get(amountRemaining) || 0;
-                if (count < 5) {
+                if (count < 5) { // Limit options per unique remaining amount
                     rawOptions.push({
                         quantity: q,
                         rate: currentRate,
@@ -893,7 +893,7 @@ const processPayment = async () => {
                         parchiNo={parchiNo} setParchiNo={setParchiNo} checkNo={checkNo} setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
                         editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
@@ -984,3 +984,6 @@ const processPayment = async () => {
     
 
 
+
+
+    
