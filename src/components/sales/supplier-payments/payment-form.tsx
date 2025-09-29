@@ -85,6 +85,20 @@ export const PaymentForm = ({
         const uniqueNames = Array.from(new Set(combinedNames));
         return uniqueNames.sort().map(name => ({ value: name, label: name }));
     }, [banks]);
+    
+    const formatSixRNo = (e: React.FocusEvent<HTMLInputElement>) => {
+        const value = e.target.value.trim();
+        if (value && !isNaN(parseInt(value))) {
+            setSixRNo(String(parseInt(value)).padStart(5, '0'));
+        }
+    };
+    
+    const formatCheckNo = (e: React.FocusEvent<HTMLInputElement>) => {
+        const value = e.target.value.trim();
+        if (value && !isNaN(parseInt(value))) {
+            setCheckNo(String(parseInt(value)).padStart(6, '0'));
+        }
+    };
 
     return (
         <div className="space-y-3">
@@ -252,8 +266,8 @@ export const PaymentForm = ({
                             <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
-                            <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} className="h-8 text-xs"/></div>
-                            <div className="space-y-1"><Label className="text-xs">9R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} className="h-8 text-xs"/></div>
+                            <div className="space-y-1"><Label className="text-xs">Check No.</Label><Input value={checkNo} onChange={e => setCheckNo(e.target.value)} onBlur={formatCheckNo} className="h-8 text-xs"/></div>
+                            <div className="space-y-1"><Label className="text-xs">6R No.</Label><Input value={sixRNo} onChange={e => setSixRNo(e.target.value)} onBlur={formatSixRNo} className="h-8 text-xs"/></div>
                             <div className="space-y-1"><Label className="text-xs">6R Date</Label>
                                 <Popover>
                                     <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal h-8 text-xs">{sixRDate ? format(sixRDate, "PPP") : "Select date"}<CalendarIcon className="ml-auto h-4 w-4 opacity-50"/></Button></PopoverTrigger>
