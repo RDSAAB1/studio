@@ -6,6 +6,7 @@ import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import type { Customer, Payment, PaidFor, Expense, Income } from "@/lib/definitions";
 import { format } from 'date-fns';
+import { updateSupplierInLocalDB, deletePaymentFromLocalDB } from './database';
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const expensesCollection = collection(firestoreDB, "expenses");
@@ -49,22 +50,6 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
 
     let finalPaymentData: Payment | null = null;
     await runTransaction(firestoreDB, async (transaction) => {
-        const supplierDocsToGet = new Set<string>();
-        if (rtgsFor === 'Supplier') {
-            selectedEntryIds.forEach((id: string) => supplierDocsToGet.add(id));
-        }
-
-        const supplierDocs = new Map<string, any>();
-        for (const id of supplierDocsToGet) {
-            const docRef = doc(firestoreDB, "suppliers", id);
-            const supplierDoc = await transaction.get(docRef);
-            if (supplierDoc.exists()) {
-                supplierDocs.set(id, supplierDoc.data());
-            } else {
-                throw new Error(`Supplier with ID ${id} not found.`);
-            }
-        }
-
         let paidForDetails: PaidFor[] = [];
         if (rtgsFor === 'Supplier') {
             let amountToDistribute = Math.round(totalPaidAmount);
@@ -72,8 +57,9 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
 
             for (const entryData of sortedEntries) {
                 if (amountToDistribute <= 0) break;
-                const supplierData = supplierDocs.get(entryData.id);
-                let outstanding = Number(supplierData.netAmount);
+                
+                // Directly use data from selectedEntries, which comes from local state
+                const outstanding = Number(entryData.netAmount);
                 const paymentForThisEntry = Math.min(outstanding, amountToDistribute);
 
                 if (paymentForThisEntry > 0) {
@@ -83,7 +69,10 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
                         supplierContact: entryData.contact,
                     });
                     const supplierRef = doc(firestoreDB, "suppliers", entryData.id);
-                    transaction.update(supplierRef, { netAmount: outstanding - paymentForThisEntry });
+                    const newNetAmount = outstanding - paymentForThisEntry;
+                    transaction.update(supplierRef, { netAmount: newNetAmount });
+                    // Queue update for local DB
+                    await updateSupplierInLocalDB(entryData.id, { netAmount: newNetAmount });
                     amountToDistribute -= paymentForThisEntry;
                 }
             }
@@ -146,7 +135,8 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         setPaymentAmount, setPaymentType, setPaymentMethod, setSelectedAccountId,
         setCdEnabled, setCalculatedCdAmount, setRtgsFor, setUtrNo, setCheckNo,
         setSixRNo, setSixRDate, setParchiNo, setRtgsQuantity, setRtgsRate, setRtgsAmount,
-        setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds
+        setSupplierDetails, setBankDetails, setSelectedCustomerKey, setSelectedEntryIds,
+        suppliers, // assuming suppliers are available from context
     } = context;
 
     if (!paymentToEdit.id) throw new Error("Payment ID is missing.");
@@ -183,15 +173,11 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
         setSelectedCustomerKey(paymentToEdit.customerId);
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
         if (srNosInPayment.length > 0) {
-            const q = query(suppliersCollection, where('srNo', 'in', srNosInPayment));
-            const supplierDocs = await getDocs(q);
-            const foundSrNos = new Set(supplierDocs.docs.map(d => d.data().srNo));
-            if (foundSrNos.size !== srNosInPayment.length) {
-                throw new Error("One or more original entries for this payment are missing.");
+            const selectedSupplierEntries = suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
+            if (selectedSupplierEntries.length !== srNosInPayment.length) {
+                 throw new Error("One or more original entries for this payment are missing from local data.");
             }
-            const newSelectedEntryIds = new Set<string>();
-            supplierDocs.forEach(doc => newSelectedEntryIds.add(doc.id));
-            setSelectedEntryIds(newSelectedEntryIds);
+            setSelectedEntryIds(new Set(selectedSupplierEntries.map((s: Customer) => s.id)));
         } else {
             setSelectedEntryIds(new Set());
         }
@@ -211,14 +197,16 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
         const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
         if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
             for (const detail of paymentToDelete.paidFor) {
-                const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
-                const supplierDocsSnapshot = await getDocs(q);
-                if (!supplierDocsSnapshot.empty) {
-                    const customerDoc = supplierDocsSnapshot.docs[0];
-                    const currentSupplier = customerDoc.data() as Customer;
-                    const amountToRestore = detail.amount + (paymentToDelete.cdApplied ? paymentToDelete.cdAmount || 0 : 0) / paymentToDelete.paidFor.length;
+                // We're assuming the supplier entry is already in sync and will be updated via snapshot.
+                // For immediate UI update, we restore locally. This requires suppliers to be in context.
+                const supplierDocRef = doc(suppliersCollection, detail.srNo);
+                const supplierDoc = await transaction.get(supplierDocRef);
+                if (supplierDoc.exists()) {
+                    const currentSupplier = supplierDoc.data() as Customer;
+                    const amountToRestore = detail.amount + (paymentToDelete.cdApplied && paymentToDelete.cdAmount ? paymentToDelete.cdAmount / paymentToDelete.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                    transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    transaction.update(supplierDocRef, { netAmount: Math.round(newNetAmount) });
+                    await updateSupplierInLocalDB(supplierDoc.id, { netAmount: Math.round(newNetAmount) });
                 }
             }
         }
@@ -227,5 +215,8 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
             transaction.delete(expenseDocRef);
         }
         transaction.delete(paymentRef);
+        await deletePaymentFromLocalDB(paymentIdToDelete);
     });
 };
+
+    

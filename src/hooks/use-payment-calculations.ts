@@ -27,7 +27,7 @@ export const usePaymentCalculations = (data: any, form: any) => {
     } = useCashDiscount({
         paymentAmount,
         paymentType,
-        selectedEntries: selectedEntries,
+        selectedEntries: selectedEntries, // Pass the locally computed selectedEntries
         paymentHistory,
     });
     
@@ -98,11 +98,13 @@ export const usePaymentCalculations = (data: any, form: any) => {
     return {
         customerSummaryMap,
         financialState,
-        selectedEntries,
-        totalOutstandingForSelected,
+        selectedEntries, // Expose for use in payment logic
+        totalOutstandingForSelected, // Expose for use in payment logic
         cdEnabled, setCdEnabled,
         cdPercent, setCdPercent,
         cdAt, setCdAt,
         calculatedCdAmount
     };
 };
+
+    

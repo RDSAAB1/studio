@@ -27,6 +27,7 @@ export const useSupplierPayments = () => {
 
     const handleCustomerSelect = (key: string | null) => {
         form.setSelectedCustomerKey(key);
+        form.resetPaymentForm(); 
         if (key) {
             const customerData = calculations.customerSummaryMap.get(key);
             if (customerData) {
@@ -45,8 +46,6 @@ export const useSupplierPayments = () => {
                 // Open the modal only after a selection is confirmed
                  setTimeout(() => setIsOutstandingModalOpen(true), 100);
             }
-        } else {
-            form.resetPaymentForm();
         }
     };
 
@@ -98,15 +97,8 @@ export const useSupplierPayments = () => {
             toast({ title: "No Entries Selected.", variant: "destructive" });
             return;
         }
-
-        const totalOutstanding = calculations.totalOutstandingForSelected;
-        
-        if (form.paymentType === 'Full') {
-            form.setPaymentAmount(totalOutstanding);
-        } else {
-            form.setPaymentAmount(0); // Let user enter partial amount
-        }
-
+        // This function now just closes the modal.
+        // The actual amount calculation is handled by useEffect in usePaymentCalculations
         setIsOutstandingModalOpen(false);
     };
 
@@ -142,3 +134,5 @@ export const useSupplierPayments = () => {
         addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }
     };
 };
+
+    
