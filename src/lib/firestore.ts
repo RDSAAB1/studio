@@ -763,6 +763,75 @@ export async function getDailyPaymentLimit(): Promise<number> {
     return 800000; // Default limit
 }
 
+// --- PAGINATED/INITIAL DATA FETCHING ---
+export async function getInitialSuppliers(count = 50) {
+  const q = query(suppliersCollection, orderBy("srNo", "desc"), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
+export async function getMoreSuppliers(startAfterDoc: QueryDocumentSnapshot<DocumentData> | null, count = 50) {
+  if (!startAfterDoc) return { data: [], lastVisible: null, hasMore: false };
+  const q = query(suppliersCollection, orderBy("srNo", "desc"), startAfter(startAfterDoc), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
+export async function getInitialCustomers(count = 50) {
+  const q = query(customersCollection, orderBy("srNo", "desc"), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
+export async function getMoreCustomers(startAfterDoc: QueryDocumentSnapshot<DocumentData> | null, count = 50) {
+  if (!startAfterDoc) return { data: [], lastVisible: null, hasMore: false };
+  const q = query(customersCollection, orderBy("srNo", "desc"), startAfter(startAfterDoc), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
+export async function getInitialPayments(count = 100) {
+  const q = query(supplierPaymentsCollection, orderBy("date", "desc"), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
+export async function getMorePayments(startAfterDoc: QueryDocumentSnapshot<DocumentData> | null, count = 100) {
+  if (!startAfterDoc) return { data: [], lastVisible: null, hasMore: false };
+  const q = query(supplierPaymentsCollection, orderBy("date", "desc"), startAfter(startAfterDoc), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
+export async function getInitialCustomerPayments(count = 100) {
+  const q = query(customerPaymentsCollection, orderBy("date", "desc"), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
+export async function getMoreCustomerPayments(startAfterDoc: QueryDocumentSnapshot<DocumentData> | null, count = 100) {
+  if (!startAfterDoc) return { data: [], lastVisible: null, hasMore: false };
+  const q = query(customerPaymentsCollection, orderBy("date", "desc"), startAfter(startAfterDoc), limit(count));
+  const snapshot = await getDocs(q);
+  const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerPayment));
+  const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  return { data, lastVisible, hasMore: data.length === count };
+}
+
 // =================================================================
 // --- Realtime Data Fetching Functions using onSnapshot ---
 // =================================================================
@@ -916,3 +985,4 @@ export async function initialDataSync() {
     // it's less critical. It can be useful for warming up the cache on app start.
     console.log("Initial data sync would happen here if it were still implemented.");
 }
+
