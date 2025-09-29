@@ -14,6 +14,8 @@ import { Calendar as CalendarIcon, RefreshCw, Loader2 } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { RtgsForm } from './rtgs-form';
+import { PaymentCombinationGenerator } from './payment-combination-generator';
+
 
 const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
@@ -30,8 +32,9 @@ export const PaymentForm = (props: any) => {
         paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
         cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount,
         processPayment, isProcessing, resetPaymentForm, editingPayment,
-        // Bank Account Props
-        bankAccounts, selectedAccountId, setSelectedAccountId, financialState
+        bankAccounts, selectedAccountId, setSelectedAccountId, financialState,
+        calcTargetAmount,
+        selectPaymentAmount
     } = props;
 
 
