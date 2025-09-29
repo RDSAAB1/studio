@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Separator } from '@/components/ui/separator';
 import { PaymentCombinationGenerator } from './payment-combination-generator';
 import { useSupplierData } from '@/hooks/use-supplier-data';
+import { addBank } from '@/lib/firestore';
 
 
 const SectionTitle = ({ title, onEdit, editingPayment }: { title: string, onEdit?: () => void, editingPayment?: boolean }) => (
@@ -56,7 +56,7 @@ export const RtgsForm = (props: any) => {
         return bankBranches
             .filter((branch: any) => branch.bankName === bankDetails.bank)
             .map((branch: any) => ({
-                value: branch.id,
+                value: branch.branchName,
                 label: branch.branchName
             }));
     }, [bankDetails.bank, bankBranches]);
@@ -70,21 +70,29 @@ export const RtgsForm = (props: any) => {
         });
     };
 
-    const handleBranchSelect = (branchId: string | null) => {
-        if (!branchId || !Array.isArray(bankBranches)) {
-            setBankDetails((prev: any) => ({ ...prev, branch: '', ifscCode: '' }));
-            return;
-        }
-        const selectedBranch = bankBranches.find((b: any) => b.id === branchId);
-        if(selectedBranch) {
-          setBankDetails((prev: any) => ({
-              ...prev, 
-              branch: selectedBranch.branchName, 
-              ifscCode: selectedBranch.ifscCode
+    const handleBranchSelect = (branchName: string | null) => {
+        const selectedBranch = bankBranches.find((b: any) => b.bankName === bankDetails.bank && b.branchName === branchName);
+        setBankDetails((prev: any) => ({
+            ...prev,
+            branch: branchName || '',
+            ifscCode: selectedBranch ? selectedBranch.ifscCode : prev.ifscCode
+        }));
+    };
+    
+    const handleIfscBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        const ifsc = e.target.value.toUpperCase();
+        setBankDetails((prev: any) => ({...prev, ifscCode: ifsc}));
+        const matchingBranch = bankBranches.find((b: any) => b.ifscCode === ifsc);
+        if (matchingBranch) {
+            setBankDetails((prev: any) => ({
+                ...prev,
+                bank: matchingBranch.bankName,
+                branch: matchingBranch.branchName,
+                ifscCode: ifsc
             }));
         }
     };
-    
+
     const formatSixRNo = (e: React.FocusEvent<HTMLInputElement>) => {
         const value = e.target.value.trim();
         if (value && !isNaN(parseInt(value))) {
@@ -131,30 +139,31 @@ export const RtgsForm = (props: any) => {
             <Separator />
             
             <SectionTitle title="Bank Details" onEdit={() => setIsBankSettingsOpen(true)} />
-             <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
-                <div className="space-y-1 col-span-2 md:col-span-1">
+             <div className="p-2 border rounded-lg bg-background grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 items-end">
+                <div className="space-y-1">
                     <Label className="text-xs">Bank</Label>
                     <CustomDropdown
                         options={bankOptions}
                         value={bankDetails.bank}
                         onChange={handleBankSelect}
-                        placeholder="Select a bank"
+                        onAdd={(newBank) => { addBank(newBank); handleBankSelect(newBank); }}
+                        placeholder="Select or add bank"
                     />
                 </div>
-                <div className="space-y-1 col-span-2 md:col-span-2">
+                <div className="space-y-1">
                     <Label className="text-xs">Branch</Label>
                      <CustomDropdown
                         options={availableBranchOptions}
-                        value={availableBranchOptions.find((opt: any) => opt.label === bankDetails.branch)?.value || null}
+                        value={bankDetails.branch}
                         onChange={handleBranchSelect}
-                        placeholder="Select a branch"
+                        placeholder="Select or add branch"
                     />
                 </div>
                  <div className="space-y-1">
                     <Label className="text-xs">IFSC</Label>
-                    <Input value={bankDetails.ifscCode} readOnly disabled className="h-8 text-xs bg-muted/50 font-mono"/>
+                    <Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} onBlur={handleIfscBlur} className="h-8 text-xs font-mono uppercase"/>
                 </div>
-                <div className="space-y-1 col-span-full">
+                <div className="space-y-1">
                     <Label className="text-xs">A/C No.</Label>
                     <Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs font-mono"/>
                 </div>
