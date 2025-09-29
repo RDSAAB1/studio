@@ -1,18 +1,18 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, Payment, ReceiptSettings } from "@/lib/definitions";
-import { toTitleCase } from "@/lib/utils";
+import { toTitleCase, formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import { useSupplierPayments } from '@/hooks/use-supplier-payments';
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
@@ -25,6 +25,9 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 
 export default function SupplierPaymentsClient() {
+    const { toast } = useToast();
+    const [activeTab, setActiveTab] = useState('processing');
+
     const hook = useSupplierPayments();
 
     const transactionsForSelectedSupplier = useMemo(() => {
@@ -76,7 +79,7 @@ export default function SupplierPaymentsClient() {
                 </div>
             )}
 
-            <Tabs value={hook.activeTab} onValueChange={hook.setActiveTab}>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="processing">Payment Processing</TabsTrigger>
                     <TabsTrigger value="history">Full History</TabsTrigger>
