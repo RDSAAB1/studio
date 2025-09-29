@@ -786,38 +786,35 @@ const processPayment = async () => {
         }
 
         const rawOptions: PaymentOption[] = [];
-        
-        for (let q = 0.10; q <= 200; q = parseFloat((q + 0.01).toFixed(2))) {
-            const minPossibleAmount = q * calcMinRate;
-            if (minPossibleAmount > calcTargetAmount) break;
+        const generatedUniqueRemainingAmounts = new Map<number, number>();
+        const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
 
-            const idealRate = calcTargetAmount / q;
-            
-            if (idealRate > calcMaxRate) continue;
-
-            const baseRate = Math.max(calcMinRate, idealRate);
-            
-            for (let offset = -10; offset <= 10; offset += 5) {
-                const currentRate = Math.round(baseRate / 5) * 5 + offset;
-                if (currentRate < calcMinRate || currentRate > calcMaxRate) continue;
+        for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
+            for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
+                if (currentRate % 5 !== 0) continue;
 
                 let calculatedAmount = q * currentRate;
-                 if (roundFigureToggle) {
+                if (roundFigureToggle) {
                     calculatedAmount = Math.round(calculatedAmount / 100) * 100;
                 } else {
                     calculatedAmount = Math.round(calculatedAmount / 5) * 5;
                 }
-                
+
                 if (calculatedAmount > calcTargetAmount) continue;
 
                 const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
-                
-                rawOptions.push({
-                    quantity: q,
-                    rate: currentRate,
-                    calculatedAmount: calculatedAmount,
-                    amountRemaining: amountRemaining
-                });
+                if (amountRemaining < 0) continue;
+
+                const count = generatedUniqueRemainingAmounts.get(amountRemaining) || 0;
+                if (count < 5) {
+                    rawOptions.push({
+                        quantity: q,
+                        rate: currentRate,
+                        calculatedAmount: calculatedAmount,
+                        amountRemaining: amountRemaining
+                    });
+                    generatedUniqueRemainingAmounts.set(amountRemaining, count + 1);
+                }
             }
         }
         
@@ -960,7 +957,7 @@ const processPayment = async () => {
                         parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
                         editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
                         setCheckNo={setCheckNo}
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}

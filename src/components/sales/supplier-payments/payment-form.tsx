@@ -15,7 +15,6 @@ import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from '@/components/ui/switch';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { bankNames } from '@/lib/data';
 import { Separator } from '@/components/ui/separator';
 
 
@@ -60,12 +59,19 @@ export const PaymentForm = ({
     const availableBranches = React.useMemo(() => {
         if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
         
-        return bankBranches
-            .filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase())
-            .map((branch: any) => ({
-                value: branch.id, // Use unique document ID as the value
-                label: `${branch.branchName} (${branch.ifscCode})`,
-            }));
+        const branchesForBank = bankBranches.filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase());
+        
+        // Use a Map to ensure uniqueness based on the document ID
+        const uniqueBranches = new Map();
+        branchesForBank.forEach((branch: any) => {
+            if (!uniqueBranches.has(branch.id)) {
+                uniqueBranches.set(branch.id, {
+                    value: branch.id,
+                    label: `${branch.branchName} (${branch.ifscCode})`
+                });
+            }
+        });
+        return Array.from(uniqueBranches.values());
             
     }, [bankDetails.bank, bankBranches]);
 
@@ -79,9 +85,8 @@ export const PaymentForm = ({
     };
     
     const allBankOptions = React.useMemo(() => {
-        const combinedNames = [...bankNames, ...banks.map((b: any) => b.name)];
-        const uniqueNames = Array.from(new Set(combinedNames));
-        return uniqueNames.sort().map(name => ({ value: name, label: name }));
+        const combinedNames = [...new Set([...(banks?.map((b: any) => b.name) || [])])];
+        return combinedNames.sort().map(name => ({ value: name, label: name }));
     }, [banks]);
     
     const formatSixRNo = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -102,7 +107,7 @@ export const PaymentForm = ({
         <div className="space-y-3">
         <Card>
             <CardContent className="p-3 space-y-3">
-                <SectionTitle title="Supplier/Payee Details" onEdit={() => setIsPayeeEditing(true)} isEditing={isEditing} />
+                <SectionTitle title="Supplier/Payee Details" onEdit={() => setIsPayeeEditing(true)} isEditing={editingPayment} />
                 {isPayeeEditing ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 p-2 border rounded-lg bg-background">
                         <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
