@@ -209,37 +209,37 @@ export default function SupplierEntryClient() {
     }
   }, []);
   
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+        const [suppliersResult, paymentsResult] = await Promise.all([
+            getInitialSuppliers(),
+            getInitialPayments()
+        ]);
+        
+        setSuppliers(suppliersResult.data);
+        setLastVisibleSupplier(suppliersResult.lastVisible);
+        setHasMoreSuppliers(suppliersResult.hasMore);
+
+        setPaymentHistory(paymentsResult.data);
+        setLastVisiblePayment(paymentsResult.lastVisible);
+        setHasMorePayments(paymentsResult.hasMore);
+
+        handleNew();
+
+    } catch (error) {
+        console.error("Error loading initial data:", error);
+        toast({ title: 'Error loading data', variant: 'destructive' });
+    }
+    setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]);
+
   useEffect(() => {
-    if (!isClient) return;
-
-    const loadInitialData = async () => {
-        setIsLoading(true);
-        try {
-            const [suppliersResult, paymentsResult] = await Promise.all([
-                getInitialSuppliers(),
-                getInitialPayments()
-            ]);
-            
-            setSuppliers(suppliersResult.data);
-            setLastVisibleSupplier(suppliersResult.lastVisible);
-            setHasMoreSuppliers(suppliersResult.hasMore);
-
-            setPaymentHistory(paymentsResult.data);
-            setLastVisiblePayment(paymentsResult.lastVisible);
-            setHasMorePayments(paymentsResult.hasMore);
-
-            handleNew();
-
-        } catch (error) {
-            console.error("Error loading initial data:", error);
-            toast({ title: 'Error loading data', variant: 'destructive' });
-        }
-        setIsLoading(false);
-    };
-
-    loadInitialData();
-  }, [isClient, handleNew, toast]);
-
+    if(isClient) {
+        loadInitialData();
+    }
+  }, [isClient, loadInitialData]);
 
   const loadMoreData = useCallback(async () => {
     if (!hasMoreSuppliers || isLoadingMore) return;
@@ -862,3 +862,5 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+
+    
