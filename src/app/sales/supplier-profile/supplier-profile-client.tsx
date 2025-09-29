@@ -151,7 +151,7 @@ export const StatementPreview = ({ data }: { data: CustomerSummary | null }) => 
              <DialogTitle>Account Statement for {data.name}</DialogTitle>
              <DialogDescription className="sr-only">A detailed summary and transaction history for {data.name}.</DialogDescription>
         </DialogHeader>
-        <div ref={statementRef} className="printable-area bg-white p-4 sm:p-6 font-sans text-black">
+        <div ref={statementRef} className="printable-statement bg-white p-4 sm:p-6 font-sans text-black">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start pb-4 border-b border-gray-300 mb-4">
                 <div className="mb-4 sm:mb-0">
@@ -318,39 +318,17 @@ export default function SupplierProfileClient() {
   const supplierSummaryMap = useMemo(() => {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
-    const LEVENSHTEIN_THRESHOLD = 2;
 
-    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
-
-    const findBestMatchKey = (supplier: Supplier, existingKeys: string[]): string | null => {
-        if (supplier.forceUnique) {
-            return `${normalizeString(supplier.name)}|${normalizeString(supplier.contact)}|${supplier.id}`;
-        }
-        
-        const supNameNorm = normalizeString(supplier.name);
-        const supSoNorm = normalizeString(supplier.so || '');
-        let bestMatch: string | null = null;
-        let minDistance = Infinity;
-
-        for (const key of existingKeys) {
-            const keyParts = key.split('|');
-            if (keyParts.length > 2) continue; // Skip forceUnique keys
-            
-            const [keyNameNorm, keySoNorm] = keyParts;
-            const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
-            const soDist = levenshteinDistance(supSoNorm, keySoNorm);
-            const totalDist = nameDist + soDist;
-
-            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
-                minDistance = totalDist;
-                bestMatch = key;
-            }
-        }
-        return bestMatch;
+    // This function creates a consistent key for a supplier based on name and contact.
+    const getGroupKey = (supplier: Supplier): string => {
+      const name = toTitleCase(supplier.name || '').trim();
+      const contact = (supplier.contact || '').trim();
+      return `${name}|${contact}`;
     };
     
+    // Group all transactions by the consistent key.
     filteredSuppliers.forEach(s => {
-        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
+        const groupingKey = getGroupKey(s);
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -400,8 +378,11 @@ export default function SupplierProfileClient() {
             data.averageLabouryRate = supplierRateSum.laboury / supplierRateSum.count;
         }
 
-        const customerIds = new Set(data.allTransactions!.map(t => t.customerId));
-        const relevantPayments = filteredPayments.filter(p => customerIds.has(p.customerId));
+        const supplierGroupKey = getGroupKey(data as Supplier);
+        const relevantPayments = filteredPayments.filter(p => {
+             const paymentGroupKey = `${toTitleCase(p.supplierName || '').trim()}|${(p.paidFor?.[0]?.supplierContact || '').trim()}`;
+             return paymentGroupKey === supplierGroupKey;
+        });
         
         relevantPayments.forEach(p => {
             data.totalPaid += p.amount;
@@ -555,5 +536,7 @@ export default function SupplierProfileClient() {
   );
 }
 
+
+    
 
     

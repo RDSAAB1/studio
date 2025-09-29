@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -24,7 +25,7 @@ const cdOptions = [
     { value: 'on_full_amount', label: 'Full CD (Paid + Unpaid)' },
 ];
 
-const SectionTitle = ({ title, onEdit, isEditing }: { title: string, onEdit?: () => void, isEditing?: boolean }) => (
+const SectionTitle = ({ title, onEdit, editingPayment }: { title: string, onEdit?: () => void, editingPayment?: boolean }) => (
     <div className="flex items-center justify-between mt-3 mb-2">
         <h3 className="text-sm font-semibold flex items-center gap-2">
             {title === 'Supplier/Payee Details' && <User size={14}/>}
@@ -32,7 +33,7 @@ const SectionTitle = ({ title, onEdit, isEditing }: { title: string, onEdit?: ()
             {title === 'RTGS Details' && <Wallet size={14}/>}
             {title}
         </h3>
-        {onEdit && !isEditing && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Pen className="h-4 w-4"/></Button>}
+        {onEdit && !editingPayment && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Pen className="h-4 w-4"/></Button>}
     </div>
 );
 
@@ -107,7 +108,7 @@ export const PaymentForm = ({
         <div className="space-y-3">
         <Card>
             <CardContent className="p-3 space-y-3">
-                <SectionTitle title="Supplier/Payee Details" onEdit={() => setIsPayeeEditing(true)} isEditing={editingPayment} />
+                <SectionTitle title="Supplier/Payee Details" onEdit={() => setIsPayeeEditing(true)} editingPayment={editingPayment} />
                 {isPayeeEditing ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 p-2 border rounded-lg bg-background">
                         <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
@@ -145,9 +146,7 @@ export const PaymentForm = ({
                     {rtgsFor === 'Supplier' && (
                     <>
                         <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs font-mono" /></div>
-                        {paymentMethod !== 'RTGS' && (
                         <div className="space-y-1"><Label className="text-xs">Payment Type</Label><Select value={paymentType} onValueChange={setPaymentType}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full">Full</SelectItem><SelectItem value="Partial">Partial</SelectItem></SelectContent></Select></div>
-                        )}
                         <div className="space-y-1"><Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label><Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" /></div>
                     </>
                     )}
@@ -303,3 +302,5 @@ export const PaymentForm = ({
         </div>
     );
 };
+
+    
