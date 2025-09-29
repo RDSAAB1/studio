@@ -14,7 +14,8 @@ import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Separator } from '@/components/ui/separator';
 import { PaymentCombinationGenerator } from './payment-combination-generator';
 import { useSupplierData } from '@/hooks/use-supplier-data';
-import { addBank } from '@/lib/firestore';
+import { addBank, addBankBranch } from '@/lib/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 
 const SectionTitle = ({ title, onEdit, editingPayment }: { title: string, onEdit?: () => void, editingPayment?: boolean }) => (
@@ -29,6 +30,7 @@ const SectionTitle = ({ title, onEdit, editingPayment }: { title: string, onEdit
 );
 
 export const RtgsForm = (props: any) => {
+    const { toast } = useToast();
     const {
         rtgsFor, supplierDetails, setSupplierDetails,
         isPayeeEditing, setIsPayeeEditing,
@@ -57,7 +59,7 @@ export const RtgsForm = (props: any) => {
             .filter((branch: any) => branch.bankName === bankDetails.bank)
             .map((branch: any) => ({
                 value: branch.branchName,
-                label: branch.branchName
+                label: toTitleCase(branch.branchName)
             }));
     }, [bankDetails.bank, bankBranches]);
 
@@ -88,9 +90,17 @@ export const RtgsForm = (props: any) => {
                 ...prev,
                 bank: matchingBranch.bankName,
                 branch: matchingBranch.branchName,
-                ifscCode: ifsc
             }));
         }
+    };
+    
+    const handleAddBranch = async (newBranchName: string) => {
+        if (!bankDetails.bank) {
+            toast({ title: "Please select a bank first.", variant: 'destructive' });
+            return;
+        }
+        await addBankBranch({ bankName: bankDetails.bank, branchName: newBranchName, ifscCode: '' });
+        handleBranchSelect(newBranchName);
     };
 
     const formatSixRNo = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -156,6 +166,7 @@ export const RtgsForm = (props: any) => {
                         options={availableBranchOptions}
                         value={bankDetails.branch}
                         onChange={handleBranchSelect}
+                        onAdd={handleAddBranch}
                         placeholder="Select or add branch"
                     />
                 </div>
