@@ -8,7 +8,7 @@ import { toTitleCase } from '@/lib/utils';
 
 export const usePaymentCalculations = (data: any, form: any) => {
     const { suppliers, paymentHistory, bankAccounts, fundTransactions, incomes, expenses, customerPayments } = data;
-    const { paymentAmount, paymentType, selectedEntryIds } = form;
+    const { paymentAmount, paymentType, selectedEntryIds, paymentDate } = form; // Added paymentDate
 
     const selectedEntries = useMemo(() => {
         if (!suppliers || !selectedEntryIds) return [];
@@ -27,8 +27,9 @@ export const usePaymentCalculations = (data: any, form: any) => {
     } = useCashDiscount({
         paymentAmount,
         paymentType,
-        selectedEntries: selectedEntries, // Pass the locally computed selectedEntries
+        selectedEntries: selectedEntries,
         paymentHistory,
+        paymentDate: paymentDate, // Pass paymentDate
     });
     
     useEffect(() => {
@@ -106,5 +107,3 @@ export const usePaymentCalculations = (data: any, form: any) => {
         calculatedCdAmount
     };
 };
-
-    

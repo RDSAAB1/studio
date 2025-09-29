@@ -8,6 +8,7 @@ interface UseCashDiscountProps {
     paymentType: string;
     selectedEntries: any[];
     paymentHistory: any[];
+    paymentDate: Date | undefined; // Added paymentDate
 }
 
 export const useCashDiscount = ({
@@ -15,6 +16,7 @@ export const useCashDiscount = ({
     paymentType,
     selectedEntries = [], // Fallback to an empty array
     paymentHistory,
+    paymentDate, // Receive paymentDate
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
     const [cdPercent, setCdPercent] = useState(2);
@@ -27,18 +29,18 @@ export const useCashDiscount = ({
             return;
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
+        effectivePaymentDate.setHours(0, 0, 0, 0);
 
         let baseAmountForCd = 0;
         
         if (cdAt === 'partial_on_paid') {
             baseAmountForCd = paymentAmount;
         } else {
-            const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
+            const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= effectivePaymentDate);
             if (cdAt === 'on_unpaid_amount') {
                 baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-            } else {
+            } else { // 'on_full_amount' or 'on_previously_paid'
                 const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
                 const paymentsForSelectedEntries = (paymentHistory || []).filter(p => 
                     p.paidFor?.some((pf: any) => selectedSrNos.has(pf.srNo))
@@ -67,7 +69,7 @@ export const useCashDiscount = ({
         
         setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
 
-    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentType]);
+    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentDate]);
     
     useEffect(() => {
         if (paymentType === 'Full') {

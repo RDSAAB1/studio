@@ -14,7 +14,8 @@ export const useSupplierPayments = () => {
     const { toast } = useToast();
     const data = useSupplierData();
     const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses);
-    const calculations = usePaymentCalculations(data, form);
+    // Pass paymentDate to usePaymentCalculations
+    const calculations = usePaymentCalculations(data, { ...form, paymentDate: form.paymentDate });
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
@@ -134,5 +135,3 @@ export const useSupplierPayments = () => {
         addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }
     };
 };
-
-    
