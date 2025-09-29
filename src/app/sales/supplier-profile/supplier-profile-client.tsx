@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -318,17 +317,34 @@ export default function SupplierProfileClient() {
   const supplierSummaryMap = useMemo(() => {
     const { filteredSuppliers, filteredPayments } = filteredData;
     const summary = new Map<string, CustomerSummary>();
+    const LEVENSHTEIN_THRESHOLD = 2;
 
-    // This function creates a consistent key for a supplier based on name and contact.
-    const getGroupKey = (supplier: Supplier): string => {
-      const name = toTitleCase(supplier.name || '').trim();
-      const contact = (supplier.contact || '').trim();
-      return `${name}|${contact}`;
+    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+
+    const findBestMatchKey = (supplier: Supplier, existingKeys: string[]): string | null => {
+        const supNameNorm = normalizeString(supplier.name);
+        const supContactNorm = normalizeString(supplier.contact || '');
+        let bestMatch: string | null = null;
+        let minDistance = Infinity;
+
+        for (const key of existingKeys) {
+            const [keyNameNorm, keyContactNorm] = key.split('|');
+            const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
+            const contactDist = levenshteinDistance(supContactNorm, keyContactNorm);
+            
+            if (nameDist <= LEVENSHTEIN_THRESHOLD && contactDist === 0) {
+                 const totalDist = nameDist + contactDist;
+                 if (totalDist < minDistance) {
+                    minDistance = totalDist;
+                    bestMatch = key;
+                }
+            }
+        }
+        return bestMatch;
     };
     
-    // Group all transactions by the consistent key.
     filteredSuppliers.forEach(s => {
-        const groupingKey = getGroupKey(s);
+        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.contact || '')}`;
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -378,10 +394,15 @@ export default function SupplierProfileClient() {
             data.averageLabouryRate = supplierRateSum.laboury / supplierRateSum.count;
         }
 
-        const supplierGroupKey = getGroupKey(data as Supplier);
+        const supplierNameNorm = normalizeString(data.name);
+        const supplierContactNorm = normalizeString(data.contact);
+
         const relevantPayments = filteredPayments.filter(p => {
-             const paymentGroupKey = `${toTitleCase(p.supplierName || '').trim()}|${(p.paidFor?.[0]?.supplierContact || '').trim()}`;
-             return paymentGroupKey === supplierGroupKey;
+             const paymentNameNorm = normalizeString(p.supplierName || '');
+             const paymentContactNorm = normalizeString(p.paidFor?.[0]?.supplierContact || '');
+             const nameDist = levenshteinDistance(supplierNameNorm, paymentNameNorm);
+             const contactDist = levenshteinDistance(supplierContactNorm, paymentContactNorm);
+             return nameDist <= LEVENSHTEIN_THRESHOLD && contactDist === 0;
         });
         
         relevantPayments.forEach(p => {
@@ -393,7 +414,8 @@ export default function SupplierProfileClient() {
         
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
         data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
-        data.totalOutstandingTransactions = (data.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).length;
+        data.outstandingEntryIds = (data.allTransactions || []).filter(t => parseFloat(String(t.netAmount)) >= 1).map(t => t.id);
+        data.totalOutstandingTransactions = data.outstandingEntryIds.length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
     });
@@ -535,8 +557,5 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
-
-
-    
 
     
