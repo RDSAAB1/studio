@@ -144,34 +144,11 @@ export default function SupplierPaymentsClient() {
  const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
     const summary = new Map<string, CustomerSummary>();
-    const LEVENSHTEIN_THRESHOLD = 2;
-
-    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
-    
-    const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
-        const supNameNorm = normalizeString(supplier.name);
-        const supSoNorm = normalizeString(supplier.so || '');
-        let bestMatch: string | null = null;
-        let minDistance = Infinity;
-
-        for (const key of existingKeys) {
-            const [keyNameNorm, keySoNorm] = key.split('|');
-            const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
-            const soDist = levenshteinDistance(supSoNorm, keySoNorm);
-            const totalDist = nameDist + soDist;
-
-            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
-                minDistance = totalDist;
-                bestMatch = key;
-            }
-        }
-        return bestMatch;
-    };
     
     safeSuppliers.forEach(s => {
-        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
-        if (!summary.has(groupingKey)) {
-            summary.set(groupingKey, {
+        if (!s.customerId) return;
+        if (!summary.has(s.customerId)) {
+            summary.set(s.customerId, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
                 totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
                 totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
@@ -179,11 +156,12 @@ export default function SupplierPaymentsClient() {
                 allTransactions: []
             } as CustomerSummary);
         }
-        const data = summary.get(groupingKey)!;
+        const data = summary.get(s.customerId)!;
         data.allTransactions!.push(s);
     });
 
     summary.forEach(data => {
+        data.totalOutstanding = 0;
         data.allTransactions!.forEach(supplier => {
             const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
             data.totalOutstanding += netAmount;
@@ -719,7 +697,6 @@ const processPayment = async () => {
             await runTransaction(firestoreDB, async (transaction) => {
                 const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
                 
-                // Revert supplier netAmount
                 if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
                     for (const detail of paymentToDelete.paidFor) {
                         const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
@@ -865,7 +842,7 @@ const processPayment = async () => {
                         isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                        handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
@@ -952,3 +929,5 @@ const processPayment = async () => {
     </div>
   );
 }
+
+    
