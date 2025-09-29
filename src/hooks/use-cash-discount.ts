@@ -31,45 +31,35 @@ export const useCashDiscount = ({
 
         const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
         effectivePaymentDate.setHours(0, 0, 0, 0);
+        
+        // Correctly filter for entries that are eligible for CD based on the payment date.
+        // An entry is eligible if the payment is being made on or before its due date.
+        const eligibleEntriesForCd = selectedEntries.filter(e => {
+            const dueDate = new Date(e.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            return effectivePaymentDate <= dueDate;
+        });
 
         let baseAmountForCd = 0;
         
         if (cdAt === 'partial_on_paid') {
-            baseAmountForCd = paymentAmount;
+            // Only apply CD on paid amount if at least one selected entry is eligible
+            if (eligibleEntriesForCd.length > 0) {
+                 baseAmountForCd = paymentAmount;
+            }
         } else {
-            const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= effectivePaymentDate);
             if (cdAt === 'on_unpaid_amount') {
-                baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-            } else { // 'on_full_amount' or 'on_previously_paid'
-                const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-                const paymentsForSelectedEntries = (paymentHistory || []).filter(p => 
-                    p.paidFor?.some((pf: any) => selectedSrNos.has(pf.srNo))
-                );
-                
-                let eligiblePaidAmount = 0;
-                paymentsForSelectedEntries.forEach(p => {
-                    if (!p.cdApplied) {
-                        p.paidFor?.forEach((pf: any) => {
-                            const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
-                            if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) {
-                                eligiblePaidAmount += pf.amount;
-                            }
-                        });
-                    }
-                });
-
-                if (cdAt === 'on_previously_paid') {
-                    baseAmountForCd = eligiblePaidAmount;
-                } else if (cdAt === 'on_full_amount') {
-                    const eligibleUnpaid = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-                    baseAmountForCd = eligibleUnpaid + eligiblePaidAmount;
-                }
+                // CD only on the unpaid amount of eligible entries
+                baseAmountForCd = eligibleEntriesForCd.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
+            } else if (cdAt === 'on_full_amount') { // 'on_full_amount'
+                 // CD on the full original amount of eligible entries
+                baseAmountForCd = eligibleEntriesForCd.reduce((sum, entry) => sum + (entry.originalNetAmount || 0), 0);
             }
         }
         
         setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
 
-    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory, paymentDate]);
+    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentDate]);
     
     useEffect(() => {
         if (paymentType === 'Full') {
