@@ -773,8 +773,9 @@ const processPayment = async () => {
 
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!selectedCustomerKey || !suppliers) return [];
-        return suppliers.filter(s => s.customerId === selectedCustomerKey);
-    }, [selectedCustomerKey, suppliers]);
+        const summary = customerSummaryMap.get(selectedCustomerKey);
+        return summary ? summary.allTransactions || [] : [];
+    }, [selectedCustomerKey, suppliers, customerSummaryMap]);
 
 
     if (!isClient || isLoadingInitial) {
@@ -884,6 +885,12 @@ const processPayment = async () => {
                         financialState={financialState}
                     />
                 )}
+                 {selectedCustomerKey && (
+                    <TransactionTable
+                        suppliers={transactionsForSelectedSupplier}
+                        onShowDetails={setDetailsSupplierEntry}
+                    />
+                 )}
             </TabsContent>
             <TabsContent value="history">
                  <div className="space-y-3">
@@ -893,10 +900,6 @@ const processPayment = async () => {
                         onDelete={handleDeletePayment}
                         onShowDetails={setSelectedPaymentForDetails}
                         onPrintRtgs={setRtgsReceiptData}
-                    />
-                    <TransactionTable
-                        suppliers={transactionsForSelectedSupplier}
-                        onShowDetails={setDetailsSupplierEntry}
                     />
                  </div>
             </TabsContent>
@@ -923,7 +926,7 @@ const processPayment = async () => {
             isOpen={!!detailsSupplierEntry}
             onOpenChange={() => setDetailsSupplierEntry(null)}
             customer={detailsSupplierEntry}
-            paymentHistory={paymentsForDetailsEntry}
+            paymentHistory={paymentHistory}
         />
         
         <PaymentDetailsDialog
