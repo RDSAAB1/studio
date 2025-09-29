@@ -11,9 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
-import { db } from "@/lib/database";
-import { useLiveQuery } from "dexie-react-hooks";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
 import { format, addDays, isSunday } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 
@@ -67,13 +65,19 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray(), []);
-  const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [lastVisibleSupplier, setLastVisibleSupplier] = useState<any>(null);
+  const [hasMoreSuppliers, setHasMoreSuppliers] = useState(true);
+
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [lastVisiblePayment, setLastVisiblePayment] = useState<any>(null);
+  const [hasMorePayments, setHasMorePayments] = useState(true);
 
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const [detailsSupplier, setDetailsSupplier] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
@@ -84,7 +88,6 @@ export default function SupplierEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
-  const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
@@ -124,7 +127,7 @@ export default function SupplierEntryClient() {
   });
 
   const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory || [], holidays, dailyPaymentLimit, suppliers || []);
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers || []);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
         let title = 'Date Warning';
@@ -205,16 +208,53 @@ export default function SupplierEntryClient() {
       setIsClient(true);
     }
   }, []);
-
+  
   useEffect(() => {
-    if (suppliers !== undefined) {
-      if (isInitialLoad.current) {
-        handleNew();
-        isInitialLoad.current = false;
-      }
-      setIsLoading(false);
+    if (!isClient) return;
+
+    const loadInitialData = async () => {
+        setIsLoading(true);
+        try {
+            const [suppliersResult, paymentsResult] = await Promise.all([
+                getInitialSuppliers(),
+                getInitialPayments()
+            ]);
+            
+            setSuppliers(suppliersResult.data);
+            setLastVisibleSupplier(suppliersResult.lastVisible);
+            setHasMoreSuppliers(suppliersResult.hasMore);
+
+            setPaymentHistory(paymentsResult.data);
+            setLastVisiblePayment(paymentsResult.lastVisible);
+            setHasMorePayments(paymentsResult.hasMore);
+
+            handleNew();
+
+        } catch (error) {
+            console.error("Error loading initial data:", error);
+            toast({ title: 'Error loading data', variant: 'destructive' });
+        }
+        setIsLoading(false);
+    };
+
+    loadInitialData();
+  }, [isClient, handleNew, toast]);
+
+
+  const loadMoreData = useCallback(async () => {
+    if (!hasMoreSuppliers || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+        const result = await getMoreSuppliers(lastVisibleSupplier);
+        setSuppliers(prev => [...prev, ...result.data]);
+        setLastVisibleSupplier(result.lastVisible);
+        setHasMoreSuppliers(result.hasMore);
+    } catch(e) {
+        console.error("Failed to load more suppliers", e);
+        toast({title: 'Error', description: 'Could not load more entries.', variant: 'destructive'});
     }
-  }, [suppliers, handleNew]);
+    setIsLoadingMore(false);
+  }, [hasMoreSuppliers, isLoadingMore, lastVisibleSupplier, toast]);
 
 
   useEffect(() => {
@@ -385,6 +425,7 @@ export default function SupplierEntryClient() {
     try {
       await deleteSupplier(id);
       await deletePaymentsForSrNo(currentSupplier.srNo);
+      setSuppliers(prev => prev.filter(s => s.id !== id));
       toast({ title: "Entry and payments deleted.", variant: "success" });
       if (currentSupplier.id === id) {
         handleNew();
@@ -421,16 +462,19 @@ export default function SupplierEntryClient() {
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
           await deleteSupplier(currentSupplier.id);
+          setSuppliers(prev => prev.filter(s => s.id !== currentSupplier.id));
         }
 
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
             const savedEntry = await addSupplier(updatedEntry);
+            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
             toast({ title: "Entry updated and payments deleted.", variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
+            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         }
@@ -445,7 +489,7 @@ export default function SupplierEntryClient() {
       return; // Do not submit if a suggestion is active and user hasn't chosen an action
     }
     if (isEditing) {
-        const hasPayments = (paymentHistory || []).some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
+        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
         if (hasPayments) {
             setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
             setIsUpdateConfirmOpen(true);
@@ -526,7 +570,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory || [], [], 800000, []);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -623,6 +667,8 @@ export default function SupplierEntryClient() {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
+            setSuppliers([]);
+            setPaymentHistory([]);
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
@@ -771,7 +817,15 @@ export default function SupplierEntryClient() {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-        
+      
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
