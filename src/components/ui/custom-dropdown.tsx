@@ -38,7 +38,13 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const selectedItem = useMemo(() => options.find(option => option.value === value), [options, value]);
 
     useEffect(() => {
-        setSearchTerm(selectedItem?.label || value || '');
+        // Only update search term if a valid selection is made and it differs
+        // This prevents overwriting user's typing
+        if (selectedItem) {
+            setSearchTerm(selectedItem.label);
+        } else if (!value) {
+            setSearchTerm('');
+        }
     }, [value, selectedItem]);
     
     const filteredItems = useMemo(() => {
@@ -55,9 +61,6 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
             setIsOpen(false);
             if (selectedItem) {
                 setSearchTerm(selectedItem.label);
-                if (value !== selectedItem.value) {
-                    onChange(selectedItem.value);
-                }
             } else if (value) {
                  const matchingOption = options.find(opt => opt.value === value || opt.label === value);
                  if (matchingOption) {
@@ -67,6 +70,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                  }
             } else {
                 setSearchTerm('');
+                onChange(null); // Clear value if nothing valid is selected
             }
         }
     }, [selectedItem, value, options, onChange]);
@@ -96,21 +100,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
-        if (!isOpen) {
-            setIsOpen(true);
-        }
-        if (onAdd || !options.some(opt => opt.label === newSearchTerm)) {
-             onChange(newSearchTerm);
-        }
+        setIsOpen(true);
     };
     
     const handleInputClick = () => {
-        if (!isOpen) {
-           setIsOpen(true);
-           if(!searchTerm && selectedItem) {
-                setSearchTerm(selectedItem.label);
-           }
-        }
+        setIsOpen(true);
     };
 
     const handleAddNew = () => {

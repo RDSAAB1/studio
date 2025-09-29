@@ -42,8 +42,9 @@ export const useSupplierPayments = () => {
                     bank: customerData.bank || '',
                     branch: customerData.branch || '',
                 });
+                // Open the modal only after a selection is confirmed
+                 setTimeout(() => setIsOutstandingModalOpen(true), 100);
             }
-             setIsOutstandingModalOpen(true);
         } else {
             form.resetPaymentForm();
         }
