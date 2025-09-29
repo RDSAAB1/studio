@@ -228,16 +228,19 @@ export async function deleteBank(id: string): Promise<void> {
 }
 
 export async function addBankBranch(branchData: Omit<BankBranch, 'id'>): Promise<BankBranch> {
-    const { ifscCode } = branchData;
-    if (!ifscCode) {
-        throw new Error("IFSC code is required.");
+    const { ifscCode, branchName } = branchData;
+    if (!ifscCode || !branchName) {
+        throw new Error("IFSC code and branch name are required.");
     }
     
-    // Check for duplicates based on the IFSC code.
-    const q = query(bankBranchesCollection, where("ifscCode", "==", ifscCode.toUpperCase()));
+    // Check for duplicates based on the combination of IFSC code and branch name.
+    const q = query(bankBranchesCollection, 
+        where("ifscCode", "==", ifscCode.toUpperCase()),
+        where("branchName", "==", branchName)
+    );
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
-        throw new Error(`This IFSC code already exists.`);
+        throw new Error(`This combination of IFSC code and branch name already exists.`);
     }
 
     const docRef = await addDoc(bankBranchesCollection, branchData);
