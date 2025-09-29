@@ -207,6 +207,7 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (!isClient) return;
     
+    setIsLoading(true);
     // Background sync listeners
     const unsubSuppliers = getSuppliersRealtime(async (data) => { if (db) await db.suppliers.bulkPut(data); }, console.error);
     const unsubPayments = getPaymentsRealtime(async (data) => { if (db) await db.payments.bulkPut(data); }, console.error);
@@ -241,6 +242,7 @@ export default function SupplierEntryClient() {
     }
 
     form.setValue('date', new Date());
+    setIsLoading(false);
 
     return () => {
       unsubSuppliers();
@@ -754,14 +756,6 @@ export default function SupplierEntryClient() {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-      
-       {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
 
       <DetailsDialog
         isOpen={!!detailsSupplier}
