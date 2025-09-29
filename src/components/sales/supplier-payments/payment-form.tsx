@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -55,7 +54,7 @@ export const PaymentForm = (props: any) => {
                         </Popover>
                     </div>
 
-                    {rtgsFor === 'Supplier' && (
+                    {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
                     <>
                         <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={handlePaymentIdBlur} className="h-8 text-xs font-mono" /></div>
                         <div className="space-y-1"><Label className="text-xs">Payment Type</Label><Select value={paymentType} onValueChange={setPaymentType}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full">Full</SelectItem><SelectItem value="Partial">Partial</SelectItem></SelectContent></Select></div>
@@ -76,7 +75,7 @@ export const PaymentForm = (props: any) => {
                     )}
                 </div>
                 
-                {rtgsFor === 'Supplier' && (
+                {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
                 <>
                 <div className="flex items-center justify-between mt-4 mb-2">
                     <h3 className="text-sm font-semibold">Cash Discount (CD)</h3>
