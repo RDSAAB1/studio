@@ -2,12 +2,11 @@
 "use client";
 
 import React from 'react';
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon, Settings, Pen, User, Landmark } from "lucide-react";
@@ -39,28 +38,45 @@ export const RtgsForm = (props: any) => {
         editingPayment, setIsBankSettingsOpen,
         calcTargetAmount, setCalcTargetAmount,
         selectPaymentAmount,
+        banks, bankBranches
     } = props;
     
-    const bankBranches = props.bankBranches || [];
-
-    const branchOptions = React.useMemo(() => {
-        if (!Array.isArray(bankBranches)) return [];
-        return bankBranches.map((branch: any) => ({
-            value: branch.id,
-            label: `${branch.branchName} - ${branch.ifscCode} (${branch.bankName})`
+    const bankOptions = React.useMemo(() => {
+        if (!Array.isArray(banks)) return [];
+        return banks.map((bank: any) => ({
+            value: bank.name,
+            label: toTitleCase(bank.name)
         }));
-    }, [bankBranches]);
+    }, [banks]);
+
+    const availableBranchOptions = React.useMemo(() => {
+        if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
+        return bankBranches
+            .filter((branch: any) => branch.bankName === bankDetails.bank)
+            .map((branch: any) => ({
+                value: branch.id,
+                label: `${branch.branchName} - ${branch.ifscCode}`
+            }));
+    }, [bankDetails.bank, bankBranches]);
+
+    const handleBankSelect = (bankName: string | null) => {
+        setBankDetails({
+            bank: bankName || '',
+            branch: '',
+            acNo: bankDetails.acNo, // Preserve account number
+            ifscCode: ''
+        });
+    };
 
     const handleBranchSelect = (branchId: string | null) => {
         if (!branchId) {
-            setBankDetails({ bank: '', branch: '', acNo: bankDetails.acNo, ifscCode: '' });
+            setBankDetails((prev: any) => ({ ...prev, branch: '', ifscCode: '' }));
             return;
         }
         const selectedBranch = bankBranches.find((b: any) => b.id === branchId);
         if(selectedBranch) {
           setBankDetails((prev: any) => ({
               ...prev, 
-              bank: selectedBranch.bankName, 
               branch: selectedBranch.branchName, 
               ifscCode: selectedBranch.ifscCode
             }));
@@ -113,19 +129,33 @@ export const RtgsForm = (props: any) => {
             <Separator />
             
             <SectionTitle title="Bank Details" onEdit={() => setIsBankSettingsOpen(true)} />
-            <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
-                <div className="space-y-1 col-span-2 md:col-span-2"><Label className="text-xs">Search Branch or IFSC</Label>
-                    <CustomDropdown 
-                        options={branchOptions}
-                        value={bankDetails.ifscCode} 
-                        onChange={handleBranchSelect} 
-                        placeholder="Search by branch name or IFSC code" 
+             <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
+                <div className="space-y-1 col-span-2 md:col-span-1">
+                    <Label className="text-xs">Bank</Label>
+                    <CustomDropdown
+                        options={bankOptions}
+                        value={bankDetails.bank}
+                        onChange={handleBankSelect}
+                        placeholder="Select a bank"
                     />
                 </div>
-                 <div className="space-y-1"><Label className="text-xs">Bank</Label><Input value={bankDetails.bank} readOnly disabled className="h-8 text-xs bg-muted/50" /></div>
-                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} readOnly disabled className="h-8 text-xs bg-muted/50"/></div>
-                <div className="space-y-1"><Label className="text-xs">Branch</Label><Input value={bankDetails.branch} readOnly disabled className="h-8 text-xs bg-muted/50"/></div>
-                <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
+                <div className="space-y-1 col-span-2 md:col-span-2">
+                    <Label className="text-xs">Branch</Label>
+                     <CustomDropdown
+                        options={availableBranchOptions}
+                        value={availableBranchOptions.find((opt: any) => opt.label.includes(bankDetails.branch))?.value || null}
+                        onChange={handleBranchSelect}
+                        placeholder="Select a branch"
+                    />
+                </div>
+                 <div className="space-y-1">
+                    <Label className="text-xs">IFSC</Label>
+                    <Input value={bankDetails.ifscCode} readOnly disabled className="h-8 text-xs bg-muted/50 font-mono"/>
+                </div>
+                <div className="space-y-1 col-span-full">
+                    <Label className="text-xs">A/C No.</Label>
+                    <Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs font-mono"/>
+                </div>
             </div>
 
             <Separator />
