@@ -41,8 +41,10 @@ export const useSupplierPayments = () => {
                     branch: customerData.branch || '',
                 });
             }
+             setIsOutstandingModalOpen(true);
+        } else {
+            form.resetPaymentForm();
         }
-        form.resetPaymentForm();
     };
 
     const processPayment = async () => {
@@ -92,6 +94,16 @@ export const useSupplierPayments = () => {
             toast({ title: "No Entries Selected.", variant: "destructive" });
             return;
         }
+
+        const selectedEntries = data.suppliers.filter(s => form.selectedEntryIds.has(s.id));
+        const totalOutstanding = selectedEntries.reduce((acc, entry) => acc + (Number(entry.netAmount) || 0), 0);
+        
+        if (form.paymentType === 'Full') {
+            form.setPaymentAmount(totalOutstanding);
+        } else {
+            form.setPaymentAmount(0); // Let user enter partial amount
+        }
+
         setIsOutstandingModalOpen(false);
     };
 
