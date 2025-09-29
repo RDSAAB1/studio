@@ -128,7 +128,7 @@ export const useSupplierPayments = () => {
         
         return summary;
     }, [suppliers]);
-
+    
     const financialState = useMemo(() => {
         const balances = new Map<string, number>();
         bankAccounts.forEach(acc => balances.set(acc.id, 0));
@@ -177,6 +177,11 @@ export const useSupplierPayments = () => {
         const lastUsedAccount = localStorage.getItem('lastSelectedAccountId');
         if (lastUsedAccount) setSelectedAccountId(lastUsedAccount);
     }, []);
+
+    const handleSetSelectedAccount = (accountId: string) => {
+        setSelectedAccountId(accountId);
+        localStorage.setItem('lastSelectedAccountId', accountId);
+    }
 
     useEffect(() => {
         if(!isClient) return;
@@ -359,7 +364,7 @@ export const useSupplierPayments = () => {
         setRtgsFor(paymentToEdit.rtgsFor || 'Supplier'); setUtrNo(paymentToEdit.utrNo || ''); setCheckNo(paymentToEdit.checkNo || '');
         setSixRNo(paymentToEdit.sixRNo || ''); setSixRDate(paymentToEdit.sixRDate ? new Date(paymentToEdit.sixRDate) : undefined);
         setParchiNo(paymentToEdit.parchiNo || ''); setRtgsQuantity(paymentToEdit.quantity || 0); setRtgsRate(paymentToEdit.rate || 0); setRtgsAmount(paymentToEdit.rtgsAmount || 0);
-        setSupplierDetails({ name: paymentToEdit.supplierName || '', fatherName: paymentToedit.supplierFatherName || '', address: paymentToEdit.supplierAddress || '', contact: '' });
+        setSupplierDetails({ name: paymentToEdit.supplierName || '', fatherName: paymentToEdit.supplierFatherName || '', address: paymentToEdit.supplierAddress || '', contact: '' });
         setBankDetails({ acNo: paymentToEdit.bankAcNo || '', ifscCode: paymentToEdit.bankIfsc || '', bank: paymentToEdit.bankName || '', branch: paymentToEdit.bankBranch || '' });
         if (paymentToEdit.rtgsFor === 'Supplier') {
             setSelectedCustomerKey(paymentToEdit.customerId);
@@ -412,9 +417,13 @@ export const useSupplierPayments = () => {
         setIsOutstandingModalOpen(false);
     };
 
-    const selectPaymentAmount = (option: PaymentOption) => {
-        setPaymentType('Partial'); setCdAt('full_amount'); setPaymentAmount(option.calculatedAmount); 
-        setRtgsQuantity(option.quantity); setRtgsRate(option.rate); setRtgsAmount(option.calculatedAmount);
+    const selectPaymentAmount = (option: any) => {
+        setPaymentType('Partial'); 
+        setCdAt('full_amount'); 
+        setPaymentAmount(option.calculatedAmount); 
+        setRtgsQuantity(option.quantity); 
+        setRtgsRate(option.rate); 
+        setRtgsAmount(option.calculatedAmount);
         toast({ title: `Amount ${formatCurrency(option.calculatedAmount)} selected.`, variant: 'success' });
     };
 

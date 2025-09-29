@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Separator } from '@/components/ui/separator';
 import { PaymentCombinationGenerator } from './payment-combination-generator';
+import { usePaymentCombination } from '@/hooks/use-payment-combination';
 
 
 const SectionTitle = ({ title, onEdit, editingPayment }: { title: string, onEdit?: () => void, editingPayment?: boolean }) => (
@@ -78,6 +79,11 @@ export const RtgsForm = (props: any) => {
             setCheckNo(String(parseInt(value)).padStart(6, '0'));
         }
     };
+    
+     const paymentCombinationProps = usePaymentCombination({
+        calcTargetAmount,
+        selectPaymentAmount
+    });
 
     return (
         <div className="space-y-3">
@@ -102,10 +108,7 @@ export const RtgsForm = (props: any) => {
             
             <Separator />
 
-            <PaymentCombinationGenerator
-               calcTargetAmount={calcTargetAmount}
-               selectPaymentAmount={selectPaymentAmount}
-            />
+            <PaymentCombinationGenerator {...paymentCombinationProps} />
 
             <Separator />
             
