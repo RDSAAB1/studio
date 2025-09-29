@@ -8,10 +8,16 @@ import { toTitleCase } from '@/lib/utils';
 
 export const usePaymentCalculations = (data: any, form: any) => {
     const { suppliers, paymentHistory, bankAccounts, fundTransactions, incomes, expenses, customerPayments } = data;
-    const { paymentAmount, paymentType, selectedEntries, totalOutstandingForSelected } = form;
+    const { paymentAmount, paymentType, selectedEntryIds } = form;
 
-    const allExpenses = useMemo(() => [...(expenses || []), ...(paymentHistory || [])], [expenses, paymentHistory]);
-    const allIncomes = useMemo(() => [...(incomes || []), ...(customerPayments || [])], [incomes, customerPayments]);
+    const selectedEntries = useMemo(() => {
+        if (!suppliers || !selectedEntryIds) return [];
+        return suppliers.filter((s: Customer) => selectedEntryIds.has(s.id));
+    }, [suppliers, selectedEntryIds]);
+
+    const totalOutstandingForSelected = useMemo(() => {
+        return selectedEntries.reduce((acc: number, entry: Customer) => acc + (Number(entry.netAmount) || 0), 0);
+    }, [selectedEntries]);
     
     const {
         cdEnabled, setCdEnabled,
@@ -21,7 +27,7 @@ export const usePaymentCalculations = (data: any, form: any) => {
     } = useCashDiscount({
         paymentAmount,
         paymentType,
-        selectedEntries,
+        selectedEntries: selectedEntries,
         paymentHistory,
     });
     
@@ -32,6 +38,9 @@ export const usePaymentCalculations = (data: any, form: any) => {
         }
     }, [totalOutstandingForSelected, calculatedCdAmount, paymentType, form.setCalcTargetAmount, form.setPaymentAmount]);
 
+    const allExpenses = useMemo(() => [...(expenses || []), ...(paymentHistory || [])], [expenses, paymentHistory]);
+    const allIncomes = useMemo(() => [...(incomes || []), ...(customerPayments || [])], [incomes, customerPayments]);
+    
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
         const summary = new Map<string, CustomerSummary>();
@@ -89,6 +98,8 @@ export const usePaymentCalculations = (data: any, form: any) => {
     return {
         customerSummaryMap,
         financialState,
+        selectedEntries,
+        totalOutstandingForSelected,
         cdEnabled, setCdEnabled,
         cdPercent, setCdPercent,
         cdAt, setCdAt,

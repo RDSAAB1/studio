@@ -113,7 +113,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         paymentType, setPaymentType,
         paymentMethod, setPaymentMethod,
         selectedAccountId, setSelectedAccountId,
-        handleSetSelectedAccount,
         supplierDetails, setSupplierDetails,
         bankDetails, setBankDetails,
         isPayeeEditing, setIsPayeeEditing,
@@ -130,5 +129,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         calcTargetAmount, setCalcTargetAmount,
         resetPaymentForm,
         handleFullReset,
+        handleSetSelectedAccount,
     };
 };

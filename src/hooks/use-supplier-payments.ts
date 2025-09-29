@@ -98,8 +98,7 @@ export const useSupplierPayments = () => {
             return;
         }
 
-        const selectedEntries = data.suppliers.filter(s => form.selectedEntryIds.has(s.id));
-        const totalOutstanding = selectedEntries.reduce((acc, entry) => acc + (Number(entry.netAmount) || 0), 0);
+        const totalOutstanding = calculations.totalOutstandingForSelected;
         
         if (form.paymentType === 'Full') {
             form.setPaymentAmount(totalOutstanding);
