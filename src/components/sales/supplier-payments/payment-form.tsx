@@ -42,7 +42,7 @@ export const PaymentForm = ({
     isPayeeEditing, setIsPayeeEditing,
     bankDetails, setBankDetails, banks, bankBranches, paymentId, setPaymentId, handlePaymentIdBlur,
     rtgsSrNo, setRtgsSrNo, paymentType, setPaymentType, paymentDate, setPaymentDate, paymentAmount, setPaymentAmount, cdEnabled, setCdEnabled,
-    cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo, sixRDate,
+    cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount, sixRNo, setSixRNo,
     setSixRDate, utrNo, setUtrNo, 
     parchiNo, setParchiNo, checkNo, setCheckNo,
     rtgsQuantity, setRtgsQuantity,
@@ -53,26 +53,24 @@ export const PaymentForm = ({
     handleGeneratePaymentOptions, paymentOptions, selectPaymentAmount, requestSort, sortedPaymentOptions,
     roundFigureToggle, setRoundFigureToggle,
     // Bank Account Props
-    bankAccounts, selectedAccountId, setSelectedAccountId, financialState
+    bankAccounts, selectedAccountId, setSelectedAccountId, financialState,
+    sixRDate
 }: any) => {
 
     const availableBranches = React.useMemo(() => {
         if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
         
-        const uniqueBranches = new Map<string, { value: string; label: string }>();
-        bankBranches
+        return bankBranches
             .filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase())
-            .forEach((branch: any) => {
-                // Use IFSC as the unique value, as branch names can be duplicated.
-                if (!uniqueBranches.has(branch.ifscCode)) {
-                    uniqueBranches.set(branch.ifscCode, { value: branch.ifscCode, label: branch.branchName });
-                }
-            });
-        return Array.from(uniqueBranches.values());
+            .map((branch: any) => ({
+                value: branch.id, // Use unique document ID as the value
+                label: `${branch.branchName} (${branch.ifscCode})`,
+            }));
+            
     }, [bankDetails.bank, bankBranches]);
 
-    const handleBranchSelect = (ifscCode: string | null) => {
-        const selectedBranch = bankBranches.find((b: any) => b.ifscCode === ifscCode);
+    const handleBranchSelect = (branchId: string | null) => {
+        const selectedBranch = bankBranches.find((b: any) => b.id === branchId);
         if(selectedBranch) {
           setBankDetails((prev: any) => ({...prev, branch: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
         } else {
@@ -104,7 +102,7 @@ export const PaymentForm = ({
         <div className="space-y-3">
         <Card>
             <CardContent className="p-3 space-y-3">
-                <SectionTitle title="Supplier/Payee Details" onEdit={() => setIsPayeeEditing(true)} isEditing={isPayeeEditing} />
+                <SectionTitle title="Supplier/Payee Details" onEdit={() => setIsPayeeEditing(true)} isEditing={isEditing} />
                 {isPayeeEditing ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 p-2 border rounded-lg bg-background">
                         <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
