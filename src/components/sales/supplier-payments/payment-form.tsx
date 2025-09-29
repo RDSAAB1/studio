@@ -35,7 +35,6 @@ export const PaymentForm = (props: any) => {
         bankAccounts, selectedAccountId, handleSetSelectedAccount, financialState,
         calcTargetAmount, setCalcTargetAmount,
         selectPaymentAmount,
-        banks, bankBranches
     } = props;
 
 
@@ -103,7 +102,7 @@ export const PaymentForm = (props: any) => {
                 </>
                 )}
                 
-                {paymentMethod === 'RTGS' && <RtgsForm {...props} banks={banks} bankBranches={bankBranches} />}
+                {paymentMethod === 'RTGS' && <RtgsForm {...props} />}
                  
                  <CardFooter className="p-0 pt-3">
                     <Card className="bg-muted/30 w-full p-2">
