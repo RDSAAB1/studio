@@ -13,7 +13,7 @@ interface UseCashDiscountProps {
 export const useCashDiscount = ({
     paymentAmount,
     paymentType,
-    selectedEntries,
+    selectedEntries = [], // Fallback to an empty array
     paymentHistory,
 }: UseCashDiscountProps) => {
     const [cdEnabled, setCdEnabled] = useState(false);
