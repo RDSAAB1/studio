@@ -53,15 +53,12 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleClickOutside = useCallback((event: MouseEvent) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
             setIsOpen(false);
-            // If there's a selected item, revert to its label
             if (selectedItem) {
                 setSearchTerm(selectedItem.label);
-                // Ensure form value is correct if user typed something else but didn't select
                 if (value !== selectedItem.value) {
                     onChange(selectedItem.value);
                 }
             } else if (value) {
-                // If there's a value (like a new entry) but no matching selectedItem, keep it
                  const matchingOption = options.find(opt => opt.value === value || opt.label === value);
                  if (matchingOption) {
                     setSearchTerm(matchingOption.label);
@@ -69,7 +66,6 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     setSearchTerm(value);
                  }
             } else {
-                // If no value and no selected item, clear the search
                 setSearchTerm('');
             }
         }
@@ -100,20 +96,17 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
-        // Only call onChange if we intend to allow new values to be set directly
-        // This is crucial for the "add new" functionality
-        if (onAdd || !options.some(opt => opt.label === newSearchTerm)) {
-             onChange(newSearchTerm);
-        }
         if (!isOpen) {
             setIsOpen(true);
+        }
+        if (onAdd || !options.some(opt => opt.label === newSearchTerm)) {
+             onChange(newSearchTerm);
         }
     };
     
     const handleInputClick = () => {
         if (!isOpen) {
            setIsOpen(true);
-           // When opening, if there is a selected value but the search term is empty, populate it.
            if(!searchTerm && selectedItem) {
                 setSearchTerm(selectedItem.label);
            }
@@ -127,7 +120,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 handleSelect(existingOption);
             } else {
                 onAdd(searchTerm);
-                onChange(searchTerm); // Set the form value to the new item
+                onChange(searchTerm); 
                 setIsOpen(false);
             }
         }
