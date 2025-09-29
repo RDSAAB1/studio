@@ -57,7 +57,7 @@ export const RtgsForm = (props: any) => {
             .filter((branch: any) => branch.bankName === bankDetails.bank)
             .map((branch: any) => ({
                 value: branch.id,
-                label: branch.ifscCode
+                label: branch.branchName
             }));
     }, [bankDetails.bank, bankBranches]);
 
@@ -142,12 +142,12 @@ export const RtgsForm = (props: any) => {
                     />
                 </div>
                 <div className="space-y-1 col-span-2 md:col-span-2">
-                    <Label className="text-xs">Branch (by IFSC)</Label>
+                    <Label className="text-xs">Branch</Label>
                      <CustomDropdown
                         options={availableBranchOptions}
-                        value={availableBranchOptions.find((opt: any) => opt.label.includes(bankDetails.ifscCode))?.value || null}
+                        value={availableBranchOptions.find((opt: any) => opt.label === bankDetails.branch)?.value || null}
                         onChange={handleBranchSelect}
-                        placeholder="Select a branch by IFSC"
+                        placeholder="Select a branch"
                     />
                 </div>
                  <div className="space-y-1">
