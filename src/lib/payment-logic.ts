@@ -38,16 +38,9 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
     
     let accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
     
-    if (paymentMethod === 'RTGS') {
-        const settingsDoc = await getDocs(query(settingsCollection, where("id", "==", "companyDetails")));
-        if (settingsDoc.empty) {
-            throw new Error("Company settings not found.");
-        }
-        const settings = settingsDoc.docs[0].data() as RtgsSettings;
-        if (!settings.defaultBankAccountId) {
-            throw new Error("Default bank account for RTGS is not set in company settings.");
-        }
-        accountIdForPayment = settings.defaultBankAccountId;
+    // For RTGS, it now uses the selectedAccountId, not the default.
+    if (paymentMethod === 'RTGS' && !accountIdForPayment) {
+        throw new Error("Please select an account to pay from for RTGS.");
     }
 
 
@@ -190,7 +183,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     if (paymentToEdit.rtgsFor === 'Supplier') {
         setSelectedCustomerKey(paymentToEdit.customerId);
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-        if (srNosInPayment.length > 0) {
+        if (srNosInPpayment.length > 0) {
             const selectedSupplierEntries = suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
             if (selectedSupplierEntries.length !== srNosInPayment.length) {
                  throw new Error("One or more original entries for this payment are missing from local data.");
@@ -236,3 +229,5 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
         await deletePaymentFromLocalDB(paymentIdToDelete);
     });
 };
+
+    
