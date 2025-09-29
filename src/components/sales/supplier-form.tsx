@@ -51,10 +51,8 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                 s.name.toLowerCase().startsWith(value.toLowerCase()) || s.contact.startsWith(value)
             );
             setNameSuggestions(filtered);
-            if (!isNamePopoverOpen) setIsNamePopoverOpen(true);
         } else {
             setNameSuggestions([]);
-            setIsNamePopoverOpen(false);
         }
     };
     
@@ -68,7 +66,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
 
     const handleInputClick = () => {
         if (!isNamePopoverOpen) {
-            setIsNamePopoverOpen(true);
+           setIsNamePopoverOpen(true);
         }
     };
     
@@ -158,7 +156,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                                     <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                                         <PopoverTrigger asChild>
                                             <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => { handleNameOrSoBlur(); setTimeout(() => setIsNamePopoverOpen(false), 200); }} onClick={handleInputClick} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={handleInputClick}/>
+                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => { handleNameOrSoBlur(); setTimeout(() => setIsNamePopoverOpen(false), 200); }} onClick={handleInputClick} onFocus={handleInputClick} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" />
                                             </InputWithIcon>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
