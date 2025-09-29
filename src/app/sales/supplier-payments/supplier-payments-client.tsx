@@ -266,28 +266,6 @@ export default function SupplierPaymentsClient() {
 
   const isLoadingInitial = loading && suppliers.length === 0;
   
-  const allBankOptions = useMemo(() => {
-        const safeBanks = banks || [];
-        const combinedNames = [...new Set(safeBanks.map((b: any) => b.name))];
-        return combinedNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
-    }, [banks]);
-    
-    const availableBranches = useMemo(() => {
-        if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
-        const branchesForBank = bankBranches.filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase());
-        const uniqueBranches = new Map<string, { value: string; label: string }>();
-        branchesForBank.forEach((branch: any) => {
-            if (!uniqueBranches.has(branch.id)) { 
-                uniqueBranches.set(branch.id, {
-                    value: branch.id,
-                    label: `${branch.branchName} (${branch.ifscCode})`
-                });
-            }
-        });
-        return Array.from(uniqueBranches.values());
-            
-    }, [bankDetails.bank, bankBranches]);
-
   useEffect(() => {
     setIsClient(true);
     const lastUsedAccount = localStorage.getItem('lastSelectedAccountId');
@@ -803,7 +781,7 @@ const processPayment = async () => {
 
         const rawOptions: PaymentOption[] = [];
         const generatedUniqueRemainingAmounts = new Map<number, number>();
-        const maxQuantityToSearch = Math.min(200, Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50);
+        const maxQuantityToSearch = Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50;
 
         for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
             for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
@@ -813,7 +791,7 @@ const processPayment = async () => {
                 if (roundFigureToggle) {
                     calculatedAmount = Math.round(calculatedAmount / 100) * 100;
                 } else {
-                    calculatedAmount = Math.round(calculatedAmount);
+                    calculatedAmount = Math.round(calculatedAmount / 5) * 5;
                 }
 
                 if (calculatedAmount > calcTargetAmount) continue;
@@ -1076,5 +1054,13 @@ const processPayment = async () => {
     </div>
   );
 }
+
+    
+
+    
+
+    
+
+
 
     
