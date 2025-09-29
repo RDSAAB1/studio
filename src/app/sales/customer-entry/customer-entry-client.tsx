@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -12,7 +13,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -24,6 +25,9 @@ import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
 import { Hourglass } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/database';
 
 
 export const formSchema = z.object({
@@ -81,8 +85,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const paymentHistory = useLiveQuery(() => db.customerPayments.toArray(), []);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -159,18 +163,6 @@ export default function CustomerEntryClient() {
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   useEffect(() => {
-    if (isClient) {
-        const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
-        const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, console.error);
-
-        return () => {
-            unsubCustomers();
-            unsubPayments();
-        };
-    }
-  }, [isClient]);
-
-  useEffect(() => {
     if (customers !== undefined) {
         setIsLoading(false);
         if (isInitialLoad.current) {
@@ -230,7 +222,7 @@ export default function CustomerEntryClient() {
   }
 
   const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const calculatedState = calculateCustomerEntry(data, paymentHistory);
+    const calculatedState = calculateCustomerEntry(data, paymentHistory || []);
     setCurrentCustomer(prev => ({...prev, ...calculatedState}));
   }, [paymentHistory]);
   
@@ -417,7 +409,7 @@ export default function CustomerEntryClient() {
 
   const onSubmit = async (callback?: (savedEntry: Customer) => void) => {
     if (isEditing) {
-        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
+        const hasPayments = (paymentHistory || []).some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
         if (hasPayments) {
             setUpdateAction(() => (deletePayments: boolean) => executeSubmit(deletePayments, callback));
             setIsUpdateConfirmOpen(true);
@@ -556,7 +548,7 @@ export default function CustomerEntryClient() {
                         isBrokerageIncluded: item.isBrokerageIncluded === 'TRUE' || item.isBrokerageIncluded === true,
                         paymentType: item.paymentType || 'Full',
                     };
-                    const calculated = calculateCustomerEntry(customerData, paymentHistory);
+                    const calculated = calculateCustomerEntry(customerData, paymentHistory || []);
                     await addCustomer({ ...customerData, ...calculated } as Omit<Customer, 'id'>);
                 }
                 toast({title: "Import Successful", description: `${json.length} customer entries have been imported.`});
@@ -661,7 +653,7 @@ export default function CustomerEntryClient() {
         customer={detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
         onPrint={handleOpenPrintPreview}
-        paymentHistory={paymentHistory}
+        paymentHistory={paymentHistory || []}
       />
         
       <DocumentPreviewDialog

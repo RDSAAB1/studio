@@ -28,36 +28,25 @@ export const useSupplierData = () => {
         if (!isClient) return;
 
         let isSubscribed = true;
-        let dataLoaded = 0;
-        const totalDataSources = 9;
-
-        const handleDataLoad = () => {
-            dataLoaded++;
-            if (dataLoaded === totalDataSources) {
-                setLoading(false);
-            }
-        };
-
+        
         const unsubFunctions = [
-            getSuppliersRealtime(data => { if (isSubscribed) { setSuppliers(data); handleDataLoad(); } }, error => { console.error("Suppliers fetch error:", error); handleDataLoad(); }),
-            getPaymentsRealtime(data => { if (isSubscribed) { setPaymentHistory(data); handleDataLoad(); } }, error => { console.error("Payments fetch error:", error); handleDataLoad(); }),
-            getCustomerPaymentsRealtime(data => { if (isSubscribed) { setCustomerPayments(data); handleDataLoad(); } }, error => { console.error("Customer Payments fetch error:", error); handleDataLoad(); }),
-            getIncomeRealtime(data => { if (isSubscribed) { setIncomes(data); handleDataLoad(); } }, error => { console.error("Incomes fetch error:", error); handleDataLoad(); }),
-            getExpensesRealtime(data => { if (isSubscribed) { setExpenses(data); handleDataLoad(); } }, error => { console.error("Expenses fetch error:", error); handleDataLoad(); }),
-            getFundTransactionsRealtime(data => { if (isSubscribed) { setFundTransactions(data); handleDataLoad(); } }, error => { console.error("Fund Transactions fetch error:", error); handleDataLoad(); }),
-            getBanksRealtime(data => { if (isSubscribed) { setBanks(data); handleDataLoad(); } }, error => { console.error("Banks fetch error:", error); handleDataLoad(); }),
-            getBankAccountsRealtime(data => { if (isSubscribed) { setBankAccounts(data); handleDataLoad(); } }, error => { console.error("Bank Accounts fetch error:", error); handleDataLoad(); }),
+            getSuppliersRealtime(data => { if (isSubscribed) setSuppliers(data); }, error => console.error("Suppliers fetch error:", error)),
+            getPaymentsRealtime(data => { if (isSubscribed) setPaymentHistory(data); }, error => console.error("Payments fetch error:", error)),
+            getCustomerPaymentsRealtime(data => { if (isSubscribed) setCustomerPayments(data); }, error => console.error("Customer Payments fetch error:", error)),
+            getIncomeRealtime(data => { if (isSubscribed) setIncomes(data); }, error => console.error("Incomes fetch error:", error)),
+            getExpensesRealtime(data => { if (isSubscribed) setExpenses(data); }, error => console.error("Expenses fetch error:", error)),
+            getFundTransactionsRealtime(data => { if (isSubscribed) setFundTransactions(data); }, error => console.error("Fund Transactions fetch error:", error)),
+            getBanksRealtime(data => { if (isSubscribed) setBanks(data); }, error => console.error("Banks fetch error:", error)),
+            getBankAccountsRealtime(data => { if (isSubscribed) setBankAccounts(data); }, error => console.error("Bank Accounts fetch error:", error)),
         ];
 
         getReceiptSettings().then(settings => {
-            if (isSubscribed) {
-                setReceiptSettings(settings);
-                handleDataLoad();
-            }
+            if (isSubscribed) setReceiptSettings(settings);
         }).catch(error => {
             console.error("Receipt settings fetch error:", error);
-            handleDataLoad();
         });
+
+        setLoading(false); // Set loading to false once listeners are attached.
 
         return () => {
             isSubscribed = false;
