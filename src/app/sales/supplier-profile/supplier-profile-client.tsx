@@ -323,28 +323,26 @@ export default function SupplierProfileClient() {
 
     const findBestMatchKey = (supplier: Supplier, existingKeys: string[]): string | null => {
         const supNameNorm = normalizeString(supplier.name);
-        const supContactNorm = normalizeString(supplier.contact || '');
+        const supSoNorm = normalizeString(supplier.so || '');
         let bestMatch: string | null = null;
         let minDistance = Infinity;
 
         for (const key of existingKeys) {
-            const [keyNameNorm, keyContactNorm] = key.split('|');
+            const [keyNameNorm, keySoNorm] = key.split('|');
             const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
-            const contactDist = levenshteinDistance(supContactNorm, keyContactNorm);
-            
-            if (nameDist <= LEVENSHTEIN_THRESHOLD && contactDist === 0) {
-                 const totalDist = nameDist + contactDist;
-                 if (totalDist < minDistance) {
-                    minDistance = totalDist;
-                    bestMatch = key;
-                }
+            const soDist = levenshteinDistance(supSoNorm, keySoNorm);
+            const totalDist = nameDist + soDist;
+
+            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+                minDistance = totalDist;
+                bestMatch = key;
             }
         }
         return bestMatch;
     };
     
     filteredSuppliers.forEach(s => {
-        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.contact || '')}`;
+        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -394,15 +392,15 @@ export default function SupplierProfileClient() {
             data.averageLabouryRate = supplierRateSum.laboury / supplierRateSum.count;
         }
 
-        const supplierNameNorm = normalizeString(data.name);
-        const supplierContactNorm = normalizeString(data.contact);
+        const supNameNorm = normalizeString(data.name);
+        const supSoNorm = normalizeString(data.so || '');
 
         const relevantPayments = filteredPayments.filter(p => {
              const paymentNameNorm = normalizeString(p.supplierName || '');
-             const paymentContactNorm = normalizeString(p.paidFor?.[0]?.supplierContact || '');
-             const nameDist = levenshteinDistance(supplierNameNorm, paymentNameNorm);
-             const contactDist = levenshteinDistance(supplierContactNorm, paymentContactNorm);
-             return nameDist <= LEVENSHTEIN_THRESHOLD && contactDist === 0;
+             const paymentSoNorm = normalizeString(p.supplierFatherName || '');
+             const nameDist = levenshteinDistance(supNameNorm, paymentNameNorm);
+             const soDist = levenshteinDistance(supSoNorm, paymentSoNorm);
+             return nameDist <= LEVENSHTEIN_THRESHOLD && soDist <= LEVENSHTEIN_THRESHOLD;
         });
         
         relevantPayments.forEach(p => {
@@ -557,5 +555,3 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
-
-    
