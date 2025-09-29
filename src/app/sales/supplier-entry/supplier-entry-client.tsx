@@ -11,7 +11,9 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
+import { db } from "@/lib/database";
+import { useLiveQuery } from "dexie-react-hooks";
 import { format, addDays, isSunday } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 
@@ -65,8 +67,9 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Customer[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const suppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray(), []);
+  const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
+
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -121,7 +124,7 @@ export default function SupplierEntryClient() {
   });
 
   const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
-      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers || []);
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory || [], holidays, dailyPaymentLimit, suppliers || []);
       setCurrentSupplier(prev => ({...prev, ...calculatedState}));
       if (showWarning && warning) {
         let title = 'Date Warning';
@@ -204,24 +207,14 @@ export default function SupplierEntryClient() {
   }, []);
 
   useEffect(() => {
-    if (isClient) {
-      const unsubSuppliers = getSuppliersRealtime((data) => {
-        setSuppliers(data);
-        if (isInitialLoad.current) {
-          handleNew(); // Call handleNew once after initial data is set
-          isInitialLoad.current = false;
-        }
+    if (suppliers !== undefined) {
         setIsLoading(false);
-      }, console.error);
-
-      const unsubPayments = getPaymentsRealtime(setPaymentHistory, console.error);
-      
-      return () => {
-        unsubSuppliers();
-        unsubPayments();
-      };
+        if (isInitialLoad.current) {
+            handleNew();
+            isInitialLoad.current = false;
+        }
     }
-  }, [isClient, handleNew]);
+  }, [suppliers, form, handleNew]);
 
 
   useEffect(() => {
@@ -433,9 +426,9 @@ export default function SupplierEntryClient() {
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            const savedEntry = await addSupplier(updatedEntry);
+            await addSupplier(updatedEntry);
             toast({ title: "Entry updated and payments deleted.", variant: "success" });
-            if (callback) callback(savedEntry); else handleNew();
+            if (callback) callback(updatedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
@@ -452,7 +445,7 @@ export default function SupplierEntryClient() {
       return; // Do not submit if a suggestion is active and user hasn't chosen an action
     }
     if (isEditing) {
-        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
+        const hasPayments = (paymentHistory || []).some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
         if (hasPayments) {
             setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
             setIsUpdateConfirmOpen(true);
@@ -533,7 +526,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory || [], [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -815,3 +808,4 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
+

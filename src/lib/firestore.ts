@@ -25,7 +25,6 @@ import {
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
-import { db, addSupplierToLocalDB, updateSupplierInLocalDB, deleteSupplierFromLocalDB, addPaymentToLocalDB, deletePaymentFromLocalDB, bulkDeletePaymentsFromLocalDB, bulkDeleteSuppliersFromLocalDB, clearAllLocalData } from './database';
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const customersCollection = collection(firestoreDB, "customers");
@@ -286,7 +285,6 @@ export async function deleteBankAccount(id: string): Promise<void> {
 export async function addSupplier(supplierData: Customer): Promise<Customer> {
     const docRef = doc(suppliersCollection, supplierData.srNo);
     await setDoc(docRef, supplierData);
-    await addSupplierToLocalDB(supplierData);
     return supplierData;
 }
 
@@ -297,7 +295,6 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
   }
   const docRef = doc(suppliersCollection, id);
   await updateDoc(docRef, supplierData);
-  await updateSupplierInLocalDB(id, supplierData);
   return true;
 }
 
@@ -307,7 +304,6 @@ export async function deleteSupplier(id: string): Promise<void> {
     return;
   }
   await deleteDoc(doc(suppliersCollection, id));
-  await deleteSupplierFromLocalDB(id);
 }
 
 export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
@@ -336,7 +332,6 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
     }
     await batch.commit();
     await paymentsBatch.commit();
-    await bulkDeleteSuppliersFromLocalDB(srNos);
 }
 
 
@@ -386,13 +381,10 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: srNo }));
   const snapshot = await getDocs(paymentsQuery);
   const batch = writeBatch(firestoreDB);
-  const localIdsToDelete: string[] = [];
   snapshot.forEach(doc => {
       batch.delete(doc.ref);
-      localIdsToDelete.push(doc.id);
   });
   await batch.commit();
-  await bulkDeletePaymentsFromLocalDB(localIdsToDelete);
 }
 
 export async function deleteAllPayments(): Promise<void> {
@@ -402,7 +394,6 @@ export async function deleteAllPayments(): Promise<void> {
         batch.delete(doc.ref);
     });
     await batch.commit();
-    await db.payments.clear();
 }
 
 export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
@@ -437,7 +428,6 @@ export async function deletePayment(id: string, isEditing: boolean = false): Pro
                     const amountToRestore = detail.amount + (paymentData.cdApplied ? paymentData.cdAmount || 0 : 0) / paymentData.paidFor.length;
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                    await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                 }
             }
         }
@@ -448,7 +438,6 @@ export async function deletePayment(id: string, isEditing: boolean = false): Pro
         }
 
         transaction.delete(paymentDocRef);
-        await deletePaymentFromLocalDB(id);
     });
 }
 
@@ -705,7 +694,6 @@ export async function deleteAllSuppliers(): Promise<void> {
   const batch = writeBatch(firestoreDB);
   allDocs.forEach(doc => batch.delete(doc.ref));
   await batch.commit();
-  await db.suppliers.clear();
 }
 
 
@@ -841,7 +829,6 @@ export function getSuppliersRealtime(callback: (data: Customer[]) => void, onErr
     return onSnapshot(q, (snapshot) => {
         const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         callback(suppliers);
-        db.suppliers.bulkPut(suppliers);
     }, onError);
 }
 
@@ -979,10 +966,3 @@ export function getInventoryItemsRealtime(callback: (data: InventoryItem[]) => v
         callback(items);
     }, onError);
 }
-
-export async function initialDataSync() {
-    // This function can be used to pre-fetch data if needed, but with realtime listeners,
-    // it's less critical. It can be useful for warming up the cache on app start.
-    console.log("Initial data sync would happen here if it were still implemented.");
-}
-
