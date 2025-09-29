@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getIncomeRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomesRealtime } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomeRealtime } from "@/lib/firestore";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings } from "@/lib/definitions";
 
 export const useSupplierData = () => {
@@ -34,7 +34,7 @@ export const useSupplierData = () => {
             getSuppliersRealtime(data => isSubscribed && setSuppliers(data), error => console.error("Suppliers fetch error:", error)),
             getPaymentsRealtime(data => isSubscribed && setPaymentHistory(data), error => console.error("Payments fetch error:", error)),
             getCustomerPaymentsRealtime(data => isSubscribed && setCustomerPayments(data), error => console.error("Customer Payments fetch error:", error)),
-            getIncomesRealtime(data => isSubscribed && setIncomes(data), error => console.error("Incomes fetch error:", error)),
+            getIncomeRealtime(data => isSubscribed && setIncomes(data), error => console.error("Incomes fetch error:", error)),
             getExpensesRealtime(data => isSubscribed && setExpenses(data), error => console.error("Expenses fetch error:", error)),
             getFundTransactionsRealtime(data => isSubscribed && setFundTransactions(data), error => console.error("Fund Transactions fetch error:", error)),
             getBanksRealtime(data => isSubscribed && setBanks(data), error => console.error("Banks fetch error:", error)),
