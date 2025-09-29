@@ -16,11 +16,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PaymentCombinationGeneratorProps {
     calcTargetAmount: number;
+    setCalcTargetAmount: (value: number) => void;
     selectPaymentAmount: (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => void;
 }
 
 export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorProps> = ({
     calcTargetAmount,
+    setCalcTargetAmount,
     selectPaymentAmount,
 }) => {
     const {
@@ -56,7 +58,7 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
             </div>
             <div className="space-y-1 flex-1 min-w-[120px]">
                 <Label className="text-xs">Target Amount</Label>
-                <Input type="number" value={calcTargetAmount} readOnly className="h-8 text-xs bg-muted" />
+                <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
             </div>
             <div className="space-y-1 flex-1 min-w-[100px]">
                 <Label className="text-xs">Min Rate</Label>

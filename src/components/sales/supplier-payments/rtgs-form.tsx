@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -34,7 +35,7 @@ export const RtgsForm = (props: any) => {
         utrNo, setUtrNo, parchiNo, setParchiNo, checkNo, setCheckNo,
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
         editingPayment, setIsBankSettingsOpen,
-        calcTargetAmount,
+        calcTargetAmount, setCalcTargetAmount,
         selectPaymentAmount
     } = props;
     
@@ -56,6 +57,7 @@ export const RtgsForm = (props: any) => {
     }, [bankDetails.bank, bankBranches]);
 
     const handleBranchSelect = (branchId: string | null) => {
+        if (!bankBranches) return;
         const selectedBranch = bankBranches.find((b: any) => b.id === branchId);
         if(selectedBranch) {
           setBankDetails((prev: any) => ({...prev, branch: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
@@ -103,6 +105,7 @@ export const RtgsForm = (props: any) => {
 
             <PaymentCombinationGenerator 
                 calcTargetAmount={calcTargetAmount}
+                setCalcTargetAmount={props.setCalcTargetAmount}
                 selectPaymentAmount={selectPaymentAmount}
             />
 
