@@ -62,7 +62,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                 s.name.toLowerCase().startsWith(value.toLowerCase()) || s.contact.startsWith(value)
             );
             setNameSuggestions(filtered);
-            setIsNamePopoverOpen(true);
+            if (!isNamePopoverOpen) setIsNamePopoverOpen(true);
         } else {
             setNameSuggestions([]);
             setIsNamePopoverOpen(false);
@@ -78,6 +78,12 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
         form.setValue('stateName', customer.stateName || '');
         form.setValue('stateCode', customer.stateCode || '');
         setIsNamePopoverOpen(false);
+    };
+
+    const handleInputClick = () => {
+        if (!isNamePopoverOpen) {
+            setIsNamePopoverOpen(true);
+        }
     };
 
     const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +190,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                             <PopoverTrigger asChild>
                                 <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                    <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => setTimeout(() => setIsNamePopoverOpen(false), 150)} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
+                                    <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => setTimeout(() => setIsNamePopoverOpen(false), 150)} onClick={handleInputClick} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={handleInputClick}/>
                                 </InputWithIcon>
                             </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -262,15 +268,15 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
                         </InputWithIcon>
                     </div>
                     <div className="space-y-1">
-                        <Label htmlFor="cdRate" className="text-xs">CD %</Label>
+                        <Label htmlFor="cd" className="text-xs">CD</Label>
                         <InputWithIcon icon={<Percent className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="cdRate" control={form.control} render={({ field }) => (<Input id="cdRate" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                            <Controller name="cd" control={form.control} render={({ field }) => (<Input id="cd" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                         </InputWithIcon>
                     </div>
                     <div className="space-y-1">
-                        <Label htmlFor="brokerageRate" className="text-xs">Brokerage Rate</Label>
+                        <Label htmlFor="brokerage" className="text-xs">Brokerage Rate</Label>
                         <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                            <Controller name="brokerageRate" control={form.control} render={({ field }) => (<Input id="brokerageRate" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
+                            <Controller name="brokerage" control={form.control} render={({ field }) => (<Input id="brokerage" type="number" {...field} onFocus={handleFocus} className="h-8 text-sm pl-10" />)} />
                         </InputWithIcon>
                     </div>
                     <div className="space-y-1">

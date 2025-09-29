@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState } from "react";
@@ -52,7 +51,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                 s.name.toLowerCase().startsWith(value.toLowerCase()) || s.contact.startsWith(value)
             );
             setNameSuggestions(filtered);
-            setIsNamePopoverOpen(true);
+            if (!isNamePopoverOpen) setIsNamePopoverOpen(true);
         } else {
             setNameSuggestions([]);
             setIsNamePopoverOpen(false);
@@ -65,6 +64,12 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
         form.setValue('address', toTitleCase(supplier.address));
         form.setValue('contact', supplier.contact);
         setIsNamePopoverOpen(false);
+    };
+
+    const handleInputClick = () => {
+        if (!isNamePopoverOpen) {
+            setIsNamePopoverOpen(true);
+        }
     };
     
     const handleCapitalizeOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,7 +158,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                                     <Popover open={isNamePopoverOpen} onOpenChange={setIsNamePopoverOpen}>
                                         <PopoverTrigger asChild>
                                             <InputWithIcon icon={<User className="h-4 w-4 text-muted-foreground" />}>
-                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => { handleNameOrSoBlur(); setTimeout(() => setIsNamePopoverOpen(false), 200); }} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={e => { if (e.target.value.length > 1 && nameSuggestions.length > 0) { setIsNamePopoverOpen(true); }}}/>
+                                                <Input id="name" value={form.watch('name')} onChange={handleNameChange} onBlur={() => { handleNameOrSoBlur(); setTimeout(() => setIsNamePopoverOpen(false), 200); }} onClick={handleInputClick} autoComplete="off" className={cn("h-8 text-sm pl-10", form.formState.errors.name && "border-destructive")} name="name" onFocus={handleInputClick}/>
                                             </InputWithIcon>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
