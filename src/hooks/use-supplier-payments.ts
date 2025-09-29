@@ -7,7 +7,7 @@ import { getSuppliersRealtime, getPaymentsRealtime, addBank, getBanksRealtime, g
 import { firestoreDB } from "@/lib/firebase";
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { toTitleCase, generateReadableId } from "@/lib/utils";
+import { toTitleCase, generateReadableId, formatCurrency } from "@/lib/utils";
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense, CustomerPayment } from "@/lib/definitions";
 import { useCashDiscount } from './use-cash-discount';
 
@@ -221,7 +221,7 @@ export const useSupplierPayments = () => {
     useEffect(() => { autoSetCDToggle(); }, [selectedEntryIds, autoSetCDToggle]);
     
     useEffect(() => {
-        if (paymentType === 'Full') setCdAt('full_amount');
+        if (paymentType === 'Full') setCdAt('on_unpaid_amount');
         else if (paymentType === 'Partial') setCdAt('partial_on_paid');
     }, [paymentType, setCdAt]);
     
@@ -265,7 +265,7 @@ export const useSupplierPayments = () => {
         }
         resetPaymentForm();
     };
-
+    
     const processPayment = async () => {
         if (rtgsFor === 'Supplier' && !selectedCustomerKey) { toast({ title: "No supplier selected", variant: 'destructive' }); return; }
         if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) { toast({ title: "Please select entries to pay", variant: "destructive" }); return; }
@@ -390,7 +390,7 @@ export const useSupplierPayments = () => {
             if (editingPayment?.id === paymentIdToDelete) resetPaymentForm();
         } catch (error) { console.error("Error deleting payment:", error); toast({ title: "Failed to delete payment.", description: (error as Error).message, variant: "destructive" }); }
     };
-
+    
     const handlePaySelectedOutstanding = () => {
         if (selectedEntryIds.size === 0) { toast({ title: "No Entries Selected.", variant: "destructive" }); return; }
         setIsOutstandingModalOpen(false);
