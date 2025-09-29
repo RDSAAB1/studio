@@ -33,7 +33,7 @@ export const PaymentForm = (props: any) => {
         cdPercent, setCdPercent, cdAt, setCdAt, calculatedCdAmount,
         processPayment, isProcessing, resetPaymentForm, editingPayment,
         bankAccounts, selectedAccountId, handleSetSelectedAccount, financialState,
-        calcTargetAmount,
+        calcTargetAmount, setCalcTargetAmount,
         selectPaymentAmount
     } = props;
 
