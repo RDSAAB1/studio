@@ -113,7 +113,7 @@ export default function SupplierPaymentsClient() {
                     )}
 
                     {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
-                        <PaymentForm {...hook} />
+                        <PaymentForm {...hook} handleSetSelectedAccount={hook.handleSetSelectedAccount} bankBranches={hook.bankBranches} />
                     )}
                      {hook.selectedCustomerKey && (
                          <TransactionTable
