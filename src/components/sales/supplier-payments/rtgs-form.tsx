@@ -32,41 +32,38 @@ export const RtgsForm = (props: any) => {
     const {
         rtgsFor, supplierDetails, setSupplierDetails,
         isPayeeEditing, setIsPayeeEditing,
-        bankDetails, setBankDetails, banks,
+        bankDetails, setBankDetails,
         rtgsSrNo, setRtgsSrNo, sixRNo, setSixRNo, sixRDate, setSixRDate,
         utrNo, setUtrNo, parchiNo, setParchiNo, checkNo, setCheckNo,
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
         editingPayment, setIsBankSettingsOpen,
         calcTargetAmount, setCalcTargetAmount,
-        selectPaymentAmount
+        selectPaymentAmount,
     } = props;
     
-    const bankBranches = props.bankBranches;
+    const bankBranches = props.bankBranches || [];
 
-    const allBankOptions = React.useMemo(() => {
-        const combinedNames = [...new Set([...(banks?.map((b: any) => b.name) || [])])];
-        return combinedNames.sort().map(name => ({ value: name, label: name }));
-    }, [banks]);
-    
-    const availableBranches = React.useMemo(() => {
-        if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
-        const branchesForBank = bankBranches.filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase());
-        const uniqueBranches = new Map();
-        branchesForBank.forEach((branch: any) => {
-            if (!uniqueBranches.has(branch.id)) {
-                uniqueBranches.set(branch.id, { value: branch.id, label: `${branch.branchName} (${branch.ifscCode})` });
-            }
-        });
-        return Array.from(uniqueBranches.values());
-    }, [bankDetails.bank, bankBranches]);
+    const branchOptions = React.useMemo(() => {
+        if (!Array.isArray(bankBranches)) return [];
+        return bankBranches.map((branch: any) => ({
+            value: branch.id,
+            label: `${branch.branchName} - ${branch.ifscCode} (${branch.bankName})`
+        }));
+    }, [bankBranches]);
 
     const handleBranchSelect = (branchId: string | null) => {
-        if (!bankBranches) return;
+        if (!branchId) {
+            setBankDetails({ bank: '', branch: '', acNo: bankDetails.acNo, ifscCode: '' });
+            return;
+        }
         const selectedBranch = bankBranches.find((b: any) => b.id === branchId);
         if(selectedBranch) {
-          setBankDetails((prev: any) => ({...prev, branch: selectedBranch.branchName, ifscCode: selectedBranch.ifscCode}));
-        } else {
-            setBankDetails((prev: any) => ({...prev, branch: '', ifscCode: '' }));
+          setBankDetails((prev: any) => ({
+              ...prev, 
+              bank: selectedBranch.bankName, 
+              branch: selectedBranch.branchName, 
+              ifscCode: selectedBranch.ifscCode
+            }));
         }
     };
     
@@ -117,17 +114,18 @@ export const RtgsForm = (props: any) => {
             
             <SectionTitle title="Bank Details" onEdit={() => setIsBankSettingsOpen(true)} />
             <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
-                <div className="space-y-1"><Label className="text-xs">Bank</Label>
-                <CustomDropdown 
-                    options={allBankOptions}
-                    value={bankDetails.bank} 
-                    onChange={(val) => setBankDetails({ ...bankDetails, bank: val || '', branch: '', ifscCode: '' })} 
-                    placeholder="Select bank" 
-                 />
+                <div className="space-y-1 col-span-2 md:col-span-2"><Label className="text-xs">Search Branch or IFSC</Label>
+                    <CustomDropdown 
+                        options={branchOptions}
+                        value={bankDetails.ifscCode} 
+                        onChange={handleBranchSelect} 
+                        placeholder="Search by branch name or IFSC code" 
+                    />
                 </div>
-                <div className="space-y-1"><Label className="text-xs">Branch</Label><CustomDropdown options={availableBranches} value={bankDetails.ifscCode} onChange={handleBranchSelect} placeholder="Select branch" /></div>
+                 <div className="space-y-1"><Label className="text-xs">Bank</Label><Input value={bankDetails.bank} readOnly disabled className="h-8 text-xs bg-muted/50" /></div>
+                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} readOnly disabled className="h-8 text-xs bg-muted/50"/></div>
+                <div className="space-y-1"><Label className="text-xs">Branch</Label><Input value={bankDetails.branch} readOnly disabled className="h-8 text-xs bg-muted/50"/></div>
                 <div className="space-y-1"><Label className="text-xs">A/C No.</Label><Input value={bankDetails.acNo} onChange={e => setBankDetails({...bankDetails, acNo: e.target.value})} className="h-8 text-xs"/></div>
-                <div className="space-y-1"><Label className="text-xs">IFSC</Label><Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value.toUpperCase()})} className="h-8 text-xs uppercase"/></div>
             </div>
 
             <Separator />
