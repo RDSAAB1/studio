@@ -22,6 +22,21 @@ export const useCashDiscount = ({
     const [cdPercent, setCdPercent] = useState(2);
     const [cdAt, setCdAt] = useState('on_unpaid_amount');
 
+    const eligibleForCd = useMemo(() => {
+        const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
+        effectivePaymentDate.setHours(0, 0, 0, 0);
+
+        return selectedEntries.some(e => {
+            const dueDate = new Date(e.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            return effectivePaymentDate <= dueDate;
+        });
+    }, [selectedEntries, paymentDate]);
+
+    useEffect(() => {
+        setCdEnabled(eligibleForCd);
+    }, [eligibleForCd]);
+
     const calculatedCdAmount = useMemo(() => {
         if (!cdEnabled) {
             return 0;
