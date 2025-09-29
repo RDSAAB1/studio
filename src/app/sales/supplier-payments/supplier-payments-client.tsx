@@ -780,40 +780,31 @@ const processPayment = async () => {
         }
 
         const rawOptions: PaymentOption[] = [];
-        const generatedUniqueRemainingAmounts = new Map<number, number>();
-        const maxQuantityToSearch = Math.ceil(calcTargetAmount / (calcMinRate > 0 ? calcMinRate : 1)) + 50;
+        const step = roundFigureToggle ? 100 : 5;
 
-        for (let q = 0.10; q <= maxQuantityToSearch; q = parseFloat((q + 0.10).toFixed(2))) {
+        // Iterate through potential 'clean' amounts
+        for (let amount = Math.floor(calcTargetAmount / step) * step; amount > 0; amount -= step) {
+            // For each clean amount, find valid quantity/rate combinations
             for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
-                if (currentRate % 5 !== 0) continue;
+                if (currentRate === 0) continue;
 
-                let calculatedAmount = q * currentRate;
-                if (roundFigureToggle) {
-                    calculatedAmount = Math.round(calculatedAmount / 100) * 100;
-                } else {
-                    calculatedAmount = Math.round(calculatedAmount / 5) * 5;
-                }
-
-                if (calculatedAmount > calcTargetAmount) continue;
-
-                const amountRemaining = parseFloat((calcTargetAmount - calculatedAmount).toFixed(2));
-                if (amountRemaining < 0) continue;
-
-                const count = generatedUniqueRemainingAmounts.get(amountRemaining) || 0;
-                if (count < 5) {
+                const quantity = parseFloat((amount / currentRate).toFixed(2));
+                
+                // We can add constraints to quantity if needed, e.g., quantity > 0
+                if (quantity > 0) {
+                    const amountRemaining = parseFloat((calcTargetAmount - amount).toFixed(2));
                     rawOptions.push({
-                        quantity: q,
+                        quantity: quantity,
                         rate: currentRate,
-                        calculatedAmount: calculatedAmount,
+                        calculatedAmount: amount,
                         amountRemaining: amountRemaining
                     });
-                    generatedUniqueRemainingAmounts.set(amountRemaining, count + 1);
                 }
             }
         }
         
         const sortedOptions = rawOptions.sort((a, b) => a.amountRemaining - b.amountRemaining);
-        const limitedOptions = sortedOptions.slice(0, 100);
+        const limitedOptions = sortedOptions.slice(0, 200); // Limit to a reasonable number
 
         setPaymentOptions(limitedOptions);
         setSortConfig(null);
@@ -1054,13 +1045,5 @@ const processPayment = async () => {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-
 
     
