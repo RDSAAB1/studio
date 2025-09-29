@@ -1,7 +1,8 @@
 
+
 'use server';
 
-import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit } from 'firebase/firestore';
+import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
@@ -36,9 +37,8 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
 
     const finalPaymentAmount = rtgsAmount || paymentAmount;
     
-    let accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
+    const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
     
-    // For RTGS, it now uses the selectedAccountId, not the default.
     if (paymentMethod === 'RTGS' && !accountIdForPayment) {
         throw new Error("Please select an account to pay from for RTGS.");
     }
@@ -161,7 +161,8 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     setPaymentMethod(paymentToEdit.receiptType);
     setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand');
     setCdEnabled(paymentToEdit.cdApplied);
-    setCalculatedCdAmount(paymentToEdit.cdAmount);
+    // This needs to be recalculated, so we set the user's inputs
+    // setCalculatedCdAmount(paymentToEdit.cdAmount);
     setRtgsFor(paymentToEdit.rtgsFor || 'Supplier');
     setUtrNo(paymentToEdit.utrNo || '');
     setCheckNo(paymentToEdit.checkNo || '');
@@ -183,7 +184,7 @@ export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: an
     if (paymentToEdit.rtgsFor === 'Supplier') {
         setSelectedCustomerKey(paymentToEdit.customerId);
         const srNosInPayment = (paymentToEdit.paidFor || []).map(pf => pf.srNo);
-        if (srNosInPpayment.length > 0) {
+        if (srNosInPayment.length > 0) {
             const selectedSupplierEntries = suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
             if (selectedSupplierEntries.length !== srNosInPayment.length) {
                  throw new Error("One or more original entries for this payment are missing from local data.");
@@ -206,28 +207,31 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
 
     await runTransaction(firestoreDB, async (transaction) => {
         const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
+        
         if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
             for (const detail of paymentToDelete.paidFor) {
-                // We're assuming the supplier entry is already in sync and will be updated via snapshot.
-                // For immediate UI update, we restore locally. This requires suppliers to be in context.
-                const supplierDocRef = doc(suppliersCollection, detail.srNo);
-                const supplierDoc = await transaction.get(supplierDocRef);
-                if (supplierDoc.exists()) {
-                    const currentSupplier = supplierDoc.data() as Customer;
+                const q = query(suppliersCollection, where('srNo', '==', detail.srNo), limit(1));
+                const supplierDocsSnapshot = await getDocs(q); 
+                 if (!supplierDocsSnapshot.empty) {
+                    const customerDoc = supplierDocsSnapshot.docs[0];
+                    const currentSupplier = customerDoc.data() as Customer;
                     const amountToRestore = detail.amount + (paymentToDelete.cdApplied && paymentToDelete.cdAmount ? paymentToDelete.cdAmount / paymentToDelete.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
-                    transaction.update(supplierDocRef, { netAmount: Math.round(newNetAmount) });
-                    await updateSupplierInLocalDB(supplierDoc.id, { netAmount: Math.round(newNetAmount) });
+                    transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
+                    await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                 }
             }
         }
+        
+        // Instead of deleting, mark as deleted to preserve transaction history but reverse financial impact
         if (paymentToDelete.expenseTransactionId) {
             const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
-            transaction.delete(expenseDocRef);
+            transaction.update(expenseDocRef, { isDeleted: true });
         }
-        transaction.delete(paymentRef);
-        await deletePaymentFromLocalDB(paymentIdToDelete);
+        
+        // Mark the payment itself as deleted instead of removing it
+        transaction.update(paymentRef, { isDeleted: true });
+
+        await deletePaymentFromLocalDB(paymentIdToDelete); // This should be updated to handle soft deletes if needed
     });
 };
-
-    
