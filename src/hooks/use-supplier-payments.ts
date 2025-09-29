@@ -9,6 +9,8 @@ import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleEditPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { toTitleCase } from '@/lib/utils';
 import { addBank } from '@/lib/firestore';
+import type { Customer } from '@/lib/definitions';
+
 
 export const useSupplierPayments = () => {
     const { toast } = useToast();
@@ -98,8 +100,14 @@ export const useSupplierPayments = () => {
             toast({ title: "No Entries Selected.", variant: "destructive" });
             return;
         }
-        // This function now just closes the modal.
-        // The actual amount calculation is handled by useEffect in usePaymentCalculations
+        
+        const srNos = Array.from(form.selectedEntryIds).map(id => {
+            const entry = data.suppliers.find((s: Customer) => s.id === id);
+            return entry ? entry.srNo : '';
+        }).filter(Boolean);
+        
+        form.setParchiNo(srNos.join(', '));
+        
         setIsOutstandingModalOpen(false);
     };
 
