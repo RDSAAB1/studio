@@ -54,6 +54,20 @@ if (typeof window !== 'undefined') {
 // Export the db instance. It will be undefined on the server.
 export { db };
 
+// --- Local DB Helper Functions ---
+export async function updateSupplierInLocalDB(id: string, data: Partial<Customer>) {
+    if (db) {
+        await db.suppliers.update(id, data);
+    }
+}
+
+export async function deletePaymentFromLocalDB(paymentId: string) {
+    if (db) {
+        await db.payments.delete(paymentId);
+    }
+}
+
+
 // Generic function to clear all data from all tables
 export async function clearAllLocalData() {
     if (db) {
