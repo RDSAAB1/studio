@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
 import { db } from "@/lib/database";
 import { useLiveQuery } from "dexie-react-hooks";
 import { format, addDays, isSunday } from "date-fns";
@@ -209,7 +209,7 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (suppliers !== undefined) {
         setIsLoading(false);
-        if (isInitialLoad.current) {
+        if (isInitialLoad.current && suppliers) {
             handleNew();
             isInitialLoad.current = false;
         }
@@ -426,9 +426,9 @@ export default function SupplierEntryClient() {
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            await addSupplier(updatedEntry);
+            const savedEntry = await addSupplier(updatedEntry);
             toast({ title: "Entry updated and payments deleted.", variant: "success" });
-            if (callback) callback(updatedEntry); else handleNew();
+            if (callback) callback(savedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
@@ -808,4 +808,3 @@ export default function SupplierEntryClient() {
     </div>
   );
 }
-
