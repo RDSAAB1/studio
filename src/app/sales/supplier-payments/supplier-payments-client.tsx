@@ -117,7 +117,7 @@ export default function SupplierPaymentsClient() {
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
             const lastNum = rtgsPayments.reduce((max, p) => {
-                const numMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
+                const numMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
                 const num = numMatch ? parseInt(numMatch[1], 10) : 0;
                 return num > max ? num : max;
             }, 0);
@@ -274,10 +274,28 @@ export default function SupplierPaymentsClient() {
   
   const allBankOptions = useMemo(() => {
         const safeBanks = banks || [];
-        const combinedNames = [...new Set([...safeBanks.map((b: any) => b.name)])];
+        const combinedNames = [...new Set(safeBanks.map((b: any) => b.name))];
         return combinedNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
     }, [banks]);
     
+  const availableBranches = useMemo(() => {
+        if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
+        
+        const branchesForBank = bankBranches.filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase());
+        
+        const uniqueBranches = new Map<string, { value: string; label: string }>();
+        branchesForBank.forEach((branch: any) => {
+            if (!uniqueBranches.has(branch.id)) { // Use Firestore document ID as the key
+                uniqueBranches.set(branch.id, {
+                    value: branch.id,
+                    label: `${branch.branchName} (${branch.ifscCode})`
+                });
+            }
+        });
+        return Array.from(uniqueBranches.values());
+            
+    }, [bankDetails.bank, bankBranches]);
+
   useEffect(() => {
     setIsClient(true);
     const lastUsedAccount = localStorage.getItem('lastSelectedAccountId');
@@ -740,8 +758,8 @@ const processPayment = async () => {
         }
 
         try {
-            await runTransaction(firestoreDB, async (transaction) => {
-                const paymentRef = doc(firestoreDB, "payments", paymentIdToDelete);
+            await runTransaction(db, async (transaction) => {
+                const paymentRef = doc(db, "payments", paymentIdToDelete);
                 
                 // Revert supplier netAmount
                 if (paymentToDelete.rtgsFor === 'Supplier' && paymentToDelete.paidFor) {
@@ -803,7 +821,7 @@ const processPayment = async () => {
                 if (roundFigureToggle) {
                     calculatedAmount = Math.round(calculatedAmount / 100) * 100;
                 } else {
-                    calculatedAmount = calculatedAmount;
+                    calculatedAmount = Math.round(calculatedAmount);
                 }
 
                 if (calculatedAmount > calcTargetAmount) continue;
@@ -816,8 +834,8 @@ const processPayment = async () => {
                     rawOptions.push({
                         quantity: q,
                         rate: currentRate,
-                        calculatedAmount: Math.round(calculatedAmount),
-                        amountRemaining: Math.round(amountRemaining)
+                        calculatedAmount: calculatedAmount,
+                        amountRemaining: amountRemaining
                     });
                     generatedUniqueRemainingAmounts.set(amountRemaining, count + 1);
                 }
@@ -868,9 +886,18 @@ const processPayment = async () => {
     }, [paymentOptions, sortConfig]);
     
     const transactionsForSelectedSupplier = useMemo(() => {
-        if (!selectedCustomerKey || !suppliers) return [];
-        return suppliers.filter(s => s.customerId === selectedCustomerKey);
-    }, [selectedCustomerKey, suppliers]);
+    if (!selectedCustomerKey || !suppliers) return [];
+
+    const groupedData = customerSummaryMap.get(selectedCustomerKey);
+    if (!groupedData) return [];
+    
+    // Get all unique customerIds from the grouped entries
+    const customerIdsInGroup = new Set(groupedData.allTransactions?.map(t => t.customerId));
+
+    // Filter all suppliers to find entries that belong to this group
+    return suppliers.filter(s => customerIdsInGroup.has(s.customerId));
+}, [selectedCustomerKey, suppliers, customerSummaryMap]);
+
 
     if (!isClient || isLoadingInitial) {
         return (
@@ -1054,3 +1081,5 @@ const processPayment = async () => {
     </div>
   );
 }
+
+    
