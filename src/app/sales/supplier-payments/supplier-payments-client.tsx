@@ -886,10 +886,10 @@ const processPayment = async () => {
                     />
                 )}
                  {selectedCustomerKey && (
-                    <TransactionTable
+                     <TransactionTable
                         suppliers={transactionsForSelectedSupplier}
                         onShowDetails={setDetailsSupplierEntry}
-                    />
+                     />
                  )}
             </TabsContent>
             <TabsContent value="history">
@@ -926,7 +926,7 @@ const processPayment = async () => {
             isOpen={!!detailsSupplierEntry}
             onOpenChange={() => setDetailsSupplierEntry(null)}
             customer={detailsSupplierEntry}
-            paymentHistory={paymentHistory}
+            paymentHistory={paymentsForDetailsEntry}
         />
         
         <PaymentDetailsDialog
