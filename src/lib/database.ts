@@ -23,9 +23,9 @@ export class AppDatabase extends Dexie {
     
     constructor() {
         super('bizsuiteDB');
-        this.version(1).stores({
-            suppliers: '&srNo, name, contact, date, customerId',
-            customers: '&srNo, name, contact, date, customerId',
+        this.version(2).stores({
+            suppliers: '&id, &srNo, name, contact, date, customerId',
+            customers: '&id, &srNo, name, contact, date, customerId',
             payments: '++id, paymentId, customerId, date',
             customerPayments: '++id, paymentId, customerId, date',
             transactions: '++id, transactionId, date, category, subCategory, type',
@@ -39,7 +39,7 @@ export class AppDatabase extends Dexie {
             fundTransactions: '++id, date, type',
             employees: '++id, employeeId, name',
             payroll: '++id, employeeId, payPeriod',
-            attendance: '++id, &compoundId, employeeId, date', 
+            attendance: '&id, employeeId, date', 
             inventoryItems: '++id, sku, name',
         });
     }
