@@ -9,6 +9,7 @@ import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteD
 import { format } from 'date-fns';
 import { toTitleCase, generateReadableId } from "@/lib/utils";
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense, CustomerPayment } from "@/lib/definitions";
+import { useCashDiscount } from './use-cash-discount';
 
 export const useSupplierPayments = () => {
     const { toast } = useToast();
@@ -46,12 +47,7 @@ export const useSupplierPayments = () => {
     const [rtgsRate, setRtgsRate] = useState(0);
     const [rtgsAmount, setRtgsAmount] = useState(0);
     const [rtgsFor, setRtgsFor] = useState<'Supplier' | 'Outsider'>('Supplier');
-
-    const [cdEnabled, setCdEnabled] = useState(false);
-    const [cdPercent, setCdPercent] = useState(2);
-    const [cdAt, setCdAt] = useState('unpaid_amount');
-    const [calculatedCdAmount, setCalculatedCdAmount] = useState(0);
-
+    
     const [isClient, setIsClient] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -62,12 +58,33 @@ export const useSupplierPayments = () => {
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<Payment | null>(null);
     const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
-
+    
     const [calcTargetAmount, setCalcTargetAmount] = useState(0);
-
+    
     const allExpenses = useMemo(() => [...expenses, ...paymentHistory], [expenses, paymentHistory]);
     const allIncomes = useMemo(() => [...incomes, ...customerPayments], [incomes, customerPayments]);
+    
+    const selectedEntries = useMemo(() => {
+        if (!Array.isArray(suppliers)) return [];
+        return suppliers.filter(s => selectedEntryIds.has(s.id));
+    }, [suppliers, selectedEntryIds]);
+    
+    const totalOutstandingForSelected = useMemo(() => {
+        return Math.round(selectedEntries.reduce((acc, entry) => acc + (entry.netAmount || 0), 0));
+    }, [selectedEntries]);
 
+    const {
+        cdEnabled, setCdEnabled,
+        cdPercent, setCdPercent,
+        cdAt, setCdAt,
+        calculatedCdAmount,
+    } = useCashDiscount({
+        paymentAmount,
+        paymentType,
+        selectedEntries,
+        paymentHistory,
+    });
+    
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
@@ -101,6 +118,8 @@ export const useSupplierPayments = () => {
         const lastNum = Math.max(lastCashNum, lastExpenseNum);
         return generateReadableId('EX', lastNum, 5);
     }, [paymentHistory, expenses]);
+    
+    const customerIdKey = selectedCustomerKey ? selectedCustomerKey : '';
     
     const customerSummaryMap = useMemo(() => {
         const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
@@ -156,15 +175,7 @@ export const useSupplierPayments = () => {
         return { balances };
       }, [fundTransactions, allIncomes, allExpenses, bankAccounts]);
 
-    const selectedEntries = useMemo(() => {
-        if (!Array.isArray(suppliers)) return [];
-        return suppliers.filter(s => selectedEntryIds.has(s.id));
-    }, [suppliers, selectedEntryIds]);
     
-    const totalOutstandingForSelected = useMemo(() => {
-        return Math.round(selectedEntries.reduce((acc, entry) => acc + (entry.netAmount || 0), 0));
-    }, [selectedEntries]);
-
     const autoSetCDToggle = useCallback(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -212,39 +223,8 @@ export const useSupplierPayments = () => {
     useEffect(() => {
         if (paymentType === 'Full') setCdAt('full_amount');
         else if (paymentType === 'Partial') setCdAt('partial_on_paid');
-    }, [paymentType]);
+    }, [paymentType, setCdAt]);
     
-    useEffect(() => {
-        if (!cdEnabled) { setCalculatedCdAmount(0); return; }
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        let baseAmountForCd = 0;
-        if (cdAt === 'partial_on_paid') { baseAmountForCd = paymentAmount; } 
-        else {
-            const eligibleEntries = selectedEntries.filter(e => new Date(e.dueDate) >= today);
-            if (cdAt === 'on_unpaid_amount') { baseAmountForCd = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0); } 
-            else {
-                const selectedSrNos = new Set(selectedEntries.map(e => e.srNo));
-                const paymentsForSelectedEntries = (paymentHistory || []).filter(p => p.paidFor?.some(pf => selectedSrNos.has(pf.srNo)));
-                let eligiblePaidAmount = 0;
-                paymentsForSelectedEntries.forEach(p => {
-                    if (!p.cdApplied) {
-                        p.paidFor?.forEach(pf => {
-                            const originalEntry = selectedEntries.find(s => s.srNo === pf.srNo);
-                            if (originalEntry && new Date(p.date) <= new Date(originalEntry.dueDate)) eligiblePaidAmount += pf.amount;
-                        });
-                    }
-                });
-                if (cdAt === 'on_previously_paid') { baseAmountForCd = eligiblePaidAmount; } 
-                else if (cdAt === 'on_full_amount') {
-                    const eligibleUnpaid = eligibleEntries.reduce((sum, entry) => sum + (entry.netAmount || 0), 0);
-                    baseAmountForCd = eligibleUnpaid + eligiblePaidAmount;
-                }
-            }
-        }
-        setCalculatedCdAmount(Math.round((baseAmountForCd * cdPercent) / 100));
-    }, [cdEnabled, cdPercent, cdAt, paymentAmount, selectedEntries, paymentHistory]);
-
     useEffect(() => {
         const finalAmount = Math.round(totalOutstandingForSelected - calculatedCdAmount);
         setCalcTargetAmount(finalAmount > 0 ? finalAmount : 0);
@@ -357,7 +337,6 @@ export const useSupplierPayments = () => {
     const handleEditPayment = async (paymentToEdit: Payment) => {
         if (!paymentToEdit.id) return;
         await handleDeletePayment(paymentToEdit.id, true);
-        setActiveTab('processing');
         setEditingPayment(paymentToEdit); setPaymentId(paymentToEdit.paymentId); setRtgsSrNo(paymentToEdit.rtgsSrNo || '');
         setPaymentAmount(paymentToEdit.amount); setPaymentType(paymentToEdit.type); setPaymentMethod(paymentToEdit.receiptType);
         setSelectedAccountId(paymentToEdit.bankAccountId || 'CashInHand'); setCdEnabled(paymentToEdit.cdApplied); setCalculatedCdAmount(paymentToEdit.cdAmount);
