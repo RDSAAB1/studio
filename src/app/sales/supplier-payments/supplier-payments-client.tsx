@@ -272,6 +272,12 @@ export default function SupplierPaymentsClient() {
 
   const isLoadingInitial = loading && suppliers.length === 0;
   
+  const allBankOptions = useMemo(() => {
+        const safeBanks = banks || [];
+        const combinedNames = [...new Set([...safeBanks.map((b: any) => b.name)])];
+        return combinedNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
+    }, [banks]);
+    
   useEffect(() => {
     setIsClient(true);
     const lastUsedAccount = localStorage.getItem('lastSelectedAccountId');
@@ -797,7 +803,7 @@ const processPayment = async () => {
                 if (roundFigureToggle) {
                     calculatedAmount = Math.round(calculatedAmount / 100) * 100;
                 } else {
-                    calculatedAmount = Math.round(calculatedAmount / 5) * 5;
+                    calculatedAmount = calculatedAmount;
                 }
 
                 if (calculatedAmount > calcTargetAmount) continue;
@@ -810,8 +816,8 @@ const processPayment = async () => {
                     rawOptions.push({
                         quantity: q,
                         rate: currentRate,
-                        calculatedAmount: calculatedAmount,
-                        amountRemaining: amountRemaining
+                        calculatedAmount: Math.round(calculatedAmount),
+                        amountRemaining: Math.round(amountRemaining)
                     });
                     generatedUniqueRemainingAmounts.set(amountRemaining, count + 1);
                 }
@@ -860,6 +866,11 @@ const processPayment = async () => {
         }
         return sortableItems;
     }, [paymentOptions, sortConfig]);
+    
+    const transactionsForSelectedSupplier = useMemo(() => {
+        if (!selectedCustomerKey || !suppliers) return [];
+        return suppliers.filter(s => s.customerId === selectedCustomerKey);
+    }, [selectedCustomerKey, suppliers]);
 
     if (!isClient || isLoadingInitial) {
         return (
@@ -948,18 +959,19 @@ const processPayment = async () => {
                         isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                        handlePaymentIdBlur={() => {}} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType} paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
-                        parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        parchiNo={parchiNo} setParchiNo={setParchiNo} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
                         processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                        setCheckNo={setCheckNo}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen}
+                        // Combination Generator Props
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -970,6 +982,7 @@ const processPayment = async () => {
                         sortedPaymentOptions={sortedPaymentOptions}
                         roundFigureToggle={roundFigureToggle}
                         setRoundFigureToggle={setRoundFigureToggle}
+                        // Bank Account Props
                         bankAccounts={bankAccounts}
                         selectedAccountId={selectedAccountId}
                         setSelectedAccountId={handleSetSelectedAccount}
@@ -987,7 +1000,7 @@ const processPayment = async () => {
                         onPrintRtgs={setRtgsReceiptData}
                     />
                     <TransactionTable
-                        suppliers={suppliers}
+                        suppliers={transactionsForSelectedSupplier}
                         onShowDetails={setDetailsSupplierEntry}
                     />
                  </div>
@@ -1041,11 +1054,3 @@ const processPayment = async () => {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-
