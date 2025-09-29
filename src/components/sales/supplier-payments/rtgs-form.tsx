@@ -38,7 +38,8 @@ export const RtgsForm = (props: any) => {
         editingPayment, setIsBankSettingsOpen,
         calcTargetAmount, setCalcTargetAmount,
         selectPaymentAmount,
-        banks, bankBranches
+        banks,
+        bankBranches
     } = props;
     
     const bankOptions = React.useMemo(() => {
@@ -61,15 +62,15 @@ export const RtgsForm = (props: any) => {
 
     const handleBankSelect = (bankName: string | null) => {
         setBankDetails({
+            ...bankDetails,
             bank: bankName || '',
             branch: '',
-            acNo: bankDetails.acNo, // Preserve account number
             ifscCode: ''
         });
     };
 
     const handleBranchSelect = (branchId: string | null) => {
-        if (!branchId) {
+        if (!branchId || !Array.isArray(bankBranches)) {
             setBankDetails((prev: any) => ({ ...prev, branch: '', ifscCode: '' }));
             return;
         }
