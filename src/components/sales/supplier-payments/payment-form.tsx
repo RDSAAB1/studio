@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -11,12 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, Settings, RefreshCw, Bot, ArrowUpDown, Pen, HandCoins, User, Building, Home, Landmark, Hash, Wallet, CircleDollarSign, Weight, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Settings, RefreshCw, Pen, HandCoins, User, Landmark, Hash, Wallet, CircleDollarSign, Weight, Loader2 } from "lucide-react";
 import { format } from 'date-fns';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from '@/components/ui/switch';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Separator } from '@/components/ui/separator';
+import { PaymentCombinationGenerator } from './payment-combination-generator';
 
 
 const cdOptions = [
@@ -49,9 +47,8 @@ export const PaymentForm = ({
     rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount, processPayment, isProcessing, resetPaymentForm,
     editingPayment, setIsBankSettingsOpen,
     // Combination Generator Props
-    calcTargetAmount, setCalcTargetAmount, calcMinRate, setCalcMinRate, calcMaxRate, setCalcMaxRate,
-    handleGeneratePaymentOptions, paymentOptions, selectPaymentAmount, requestSort, sortedPaymentOptions,
-    roundFigureToggle, setRoundFigureToggle,
+    calcTargetAmount,
+    selectPaymentAmount,
     // Bank Account Props
     bankAccounts, selectedAccountId, setSelectedAccountId, financialState,
     sixRDate
@@ -62,7 +59,6 @@ export const PaymentForm = ({
         
         const branchesForBank = bankBranches.filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase());
         
-        // Use a Map to ensure uniqueness based on the document ID
         const uniqueBranches = new Map();
         branchesForBank.forEach((branch: any) => {
             if (!uniqueBranches.has(branch.id)) {
@@ -192,59 +188,11 @@ export const PaymentForm = ({
                 
                 {paymentMethod === 'RTGS' && (
                     <>
-                         <Separator className="my-3"/>
-                        <Card>
-                            <CardHeader className="p-2 pb-1 flex flex-row items-center justify-between">
-                                <CardTitle className="text-sm">Payment Combination Generator</CardTitle>
-                                <div className="flex items-center gap-2">
-                                        <Label htmlFor="round-figure-toggle" className="text-xs">Round Figure</Label>
-                                        <Switch id="round-figure-toggle" checked={roundFigureToggle} onCheckedChange={setRoundFigureToggle} />
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-2 space-y-2">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Target Amount</Label>
-                                        <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Min Amount</Label>
-                                        <Input type="number" value={calcMinRate} onChange={(e) => setCalcMinRate(Number(e.target.value))} className="h-8 text-xs" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Max Amount</Label>
-                                        <Input type="number" value={calcMaxRate} onChange={(e) => setCalcMaxRate(Number(e.target.value))} className="h-8 text-xs" />
-                                    </div>
-                                </div>
-                                <Button onClick={handleGeneratePaymentOptions} size="sm" className="h-8 text-xs"><Bot className="mr-2 h-4 w-4" />Generate Combinations</Button>
-                                <div className="p-2 border rounded-lg bg-background min-h-[100px] max-h-60 overflow-y-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('quantity')} className="text-xs p-1">Qty <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('rate')} className="text-xs p-1">Rate <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('calculatedAmount')} className="text-xs p-1">Amount <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                                <TableHead className="h-8 p-1"><Button variant="ghost" size="sm" onClick={() => requestSort('amountRemaining')} className="text-xs p-1">Remain <ArrowUpDown className="inline h-3 w-3" /></Button></TableHead>
-                                                <TableHead className="h-8 p-1">Action</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {sortedPaymentOptions.length > 0 ? sortedPaymentOptions.map((option: any, index: number) => (
-                                                <TableRow key={index}>
-                                                    <TableCell className="p-1 text-xs">{option.quantity.toFixed(2)}</TableCell>
-                                                    <TableCell className="p-1 text-xs">{option.rate}</TableCell>
-                                                    <TableCell className="p-1 text-xs">{formatCurrency(option.calculatedAmount)}</TableCell>
-                                                    <TableCell className="p-1 text-xs">{formatCurrency(option.amountRemaining)}</TableCell>
-                                                    <TableCell className="p-1 text-xs"><Button variant="outline" size="sm" className="h-6 p-1 text-xs" onClick={() => selectPaymentAmount(option)}>Select</Button></TableCell>
-                                                </TableRow>
-                                            )) : (
-                                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs h-24">Generated payment combinations will appear here.</TableCell></TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <Separator className="my-3"/>
+                        <PaymentCombinationGenerator
+                           calcTargetAmount={calcTargetAmount}
+                           selectPaymentAmount={selectPaymentAmount}
+                        />
                         <Separator className="my-3"/>
                         <SectionTitle title="Bank Details" onEdit={() => setIsBankSettingsOpen(true)} />
                         <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
@@ -302,5 +250,3 @@ export const PaymentForm = ({
         </div>
     );
 };
-
-    

@@ -38,11 +38,6 @@ type PaymentOption = {
   amountRemaining: number;
 };
 
-type SortConfig = {
-    key: keyof PaymentOption;
-    direction: 'ascending' | 'descending';
-};
-
 export default function SupplierPaymentsClient() {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
@@ -99,13 +94,7 @@ export default function SupplierPaymentsClient() {
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [activeTab, setActiveTab] = useState('processing');
   
-  // Combination Generator State
-  const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [calcTargetAmount, setCalcTargetAmount] = useState(0);
-  const [calcMinRate, setCalcMinRate] = useState(2300);
-  const [calcMaxRate, setCalcMaxRate] = useState(2400);
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-  const [roundFigureToggle, setRoundFigureToggle] = useState(false);
 
   const allExpenses = useMemo(() => [...expenses, ...paymentHistory], [expenses, paymentHistory]);
   const allIncomes = useMemo(() => [...incomes, ...customerPayments], [incomes, customerPayments]);
@@ -446,7 +435,6 @@ export default function SupplierPaymentsClient() {
     setRtgsQuantity(0);
     setRtgsRate(0);
     setRtgsAmount(0);
-    setPaymentOptions([]);
     setPaymentId(getNextPaymentId(paymentMethod as 'Cash' | 'Online' | 'RTGS'));
     setRtgsSrNo(getNextPaymentId('RTGS'));
     if (isOutsider) {
@@ -772,46 +760,7 @@ const processPayment = async () => {
         }
         setIsOutstandingModalOpen(false);
     };
-
-    const handleGeneratePaymentOptions = () => {
-        if (isNaN(calcTargetAmount) || isNaN(calcMinRate) || isNaN(calcMaxRate) || calcMinRate > calcMaxRate) {
-            toast({ title: 'Invalid input for payment calculation.', variant: 'destructive' });
-            return;
-        }
-
-        const rawOptions: PaymentOption[] = [];
-        const step = roundFigureToggle ? 100 : 5;
-
-        // Iterate through potential 'clean' amounts
-        for (let amount = Math.floor(calcTargetAmount / step) * step; amount > 0; amount -= step) {
-            // For each clean amount, find valid quantity/rate combinations
-            for (let currentRate = calcMinRate; currentRate <= calcMaxRate; currentRate += 5) {
-                if (currentRate === 0) continue;
-
-                const quantity = parseFloat((amount / currentRate).toFixed(2));
-                
-                // We can add constraints to quantity if needed, e.g., quantity > 0
-                if (quantity > 0) {
-                    const amountRemaining = parseFloat((calcTargetAmount - amount).toFixed(2));
-                    rawOptions.push({
-                        quantity: quantity,
-                        rate: currentRate,
-                        calculatedAmount: amount,
-                        amountRemaining: amountRemaining
-                    });
-                }
-            }
-        }
-        
-        const sortedOptions = rawOptions.sort((a, b) => a.amountRemaining - b.amountRemaining);
-        const limitedOptions = sortedOptions.slice(0, 200); // Limit to a reasonable number
-
-        setPaymentOptions(limitedOptions);
-        setSortConfig(null);
-        
-        toast({ title: `Generated ${limitedOptions.length} payment options.`, variant: 'success' });
-    };
-
+    
     const selectPaymentAmount = (option: PaymentOption) => {
         setPaymentType('Partial');
         setCdAt('full_amount');
@@ -822,36 +771,10 @@ const processPayment = async () => {
         toast({ title: `Amount ${formatCurrency(option.calculatedAmount)} selected.`, variant: 'success' });
     };
 
-    const requestSort = (key: keyof PaymentOption) => {
-        let direction: 'ascending' | 'descending' = 'ascending';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
-            direction = 'descending';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const sortedPaymentOptions = useMemo(() => {
-        let sortableItems = [...paymentOptions];
-        if (sortConfig !== null) {
-        sortableItems.sort((a, b) => {
-            if (a[sortConfig.key] < b[sortConfig.key]) {
-            return sortConfig.direction === 'ascending' ? -1 : 1;
-            }
-            if (a[sortConfig.key] > b[sortConfig.key]) {
-            return sortConfig.direction === 'ascending' ? 1 : -1;
-            }
-            return 0;
-        });
-        }
-        return sortableItems;
-    }, [paymentOptions, sortConfig]);
-    
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!selectedCustomerKey || !suppliers) return [];
-        const groupedData = customerSummaryMap.get(selectedCustomerKey);
-        if (!groupedData) return [];
-        return groupedData.allTransactions || [];
-    }, [selectedCustomerKey, suppliers, customerSummaryMap]);
+        return suppliers.filter(s => s.customerId === selectedCustomerKey);
+    }, [selectedCustomerKey, suppliers]);
 
 
     if (!isClient || isLoadingInitial) {
@@ -941,31 +864,20 @@ const processPayment = async () => {
                         isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                        handlePaymentIdBlur={handlePaymentIdBlur} editingPayment={editingPayment}
-                        rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType} paymentDate={paymentDate} setPaymentDate={setPaymentDate}
+                        handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
-                        parchiNo={parchiNo} setParchiNo={setParchiNo} checkNo={checkNo}
-                        setCheckNo={setCheckNo}
+                        parchiNo={parchiNo} setParchiNo={setParchiNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
-                        processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        setIsBankSettingsOpen={setIsBankSettingsOpen}
-                        // Combination Generator Props
-                        calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
-                        calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
-                        calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
-                        handleGeneratePaymentOptions={handleGeneratePaymentOptions}
-                        paymentOptions={paymentOptions}
+                        processPayment={processPayment} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
+                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
+                        calcTargetAmount={calcTargetAmount} 
                         selectPaymentAmount={selectPaymentAmount}
-                        requestSort={requestSort}
-                        sortedPaymentOptions={sortedPaymentOptions}
-                        roundFigureToggle={roundFigureToggle}
-                        setRoundFigureToggle={setRoundFigureToggle}
-                        // Bank Account Props
                         bankAccounts={bankAccounts}
                         selectedAccountId={selectedAccountId}
                         setSelectedAccountId={handleSetSelectedAccount}
@@ -994,20 +906,12 @@ const processPayment = async () => {
             isOpen={isOutstandingModalOpen}
             onOpenChange={setIsOutstandingModalOpen}
             customerName={toTitleCase(customerSummaryMap.get(selectedCustomerKey || '')?.name || '')}
-            entries={suppliers.filter(s => {
-                const summary = customerSummaryMap.get(selectedCustomerKey || '');
-                if (!summary || !summary.allTransactions) return false;
-                return summary.allTransactions.some(trans => trans.id === s.id) && parseFloat(String(s.netAmount)) > 0;
-            })}
+            entries={suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
             selectedIds={selectedEntryIds}
             onSelect={handleEntrySelect}
             onSelectAll={(checked: boolean) => {
                 const newSet = new Set<string>();
-                const outstandingEntries = suppliers.filter(s => {
-                    const summary = customerSummaryMap.get(selectedCustomerKey || '');
-                    if (!summary || !summary.allTransactions) return false;
-                    return summary.allTransactions.some(trans => trans.id === s.id) && parseFloat(String(s.netAmount)) > 0;
-                });
+                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
                 if(checked) outstandingEntries.forEach(e => newSet.add(e.id));
                 setSelectedEntryIds(newSet);
             }}
@@ -1045,5 +949,3 @@ const processPayment = async () => {
     </div>
   );
 }
-
-    
