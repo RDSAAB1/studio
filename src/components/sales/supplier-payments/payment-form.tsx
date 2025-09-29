@@ -76,7 +76,7 @@ export const PaymentForm = (props: any) => {
                     )}
                 </div>
                 
-                {rtgsFor === 'Supplier' && paymentMethod !== 'RTGS' && (
+                {rtgsFor === 'Supplier' && (
                 <>
                 <div className="flex items-center justify-between mt-4 mb-2">
                     <h3 className="text-sm font-semibold">Cash Discount (CD)</h3>
