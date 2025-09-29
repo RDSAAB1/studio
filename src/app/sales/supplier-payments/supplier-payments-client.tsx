@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Customer, CustomerSummary, Payment, PaidFor, ReceiptSettings, FundTransaction, Transaction, BankAccount, Income, Expense, CustomerPayment } from "@/lib/definitions";
-import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo, generateReadableId } from "@/lib/utils";
+import { toTitleCase, formatPaymentId, cn, formatCurrency, formatSrNo, generateReadableId, levenshteinDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getSuppliersRealtime, getPaymentsRealtime, addBank, addBankBranch, getBanksRealtime, getBankBranchesRealtime, getReceiptSettings, getFundTransactionsRealtime, getExpensesRealtime, addTransaction, getBankAccountsRealtime, deletePayment as deletePaymentFromDB, getIncomeRealtime, getCustomerPaymentsRealtime, addIncome, updateSupplier, deleteIncome } from "@/lib/firestore";
 import { firestoreDB } from "@/lib/firebase";
@@ -155,34 +155,57 @@ export default function SupplierPaymentsClient() {
  const customerSummaryMap = useMemo(() => {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
     const summary = new Map<string, CustomerSummary>();
+    const LEVENSHTEIN_THRESHOLD = 2;
+    
+    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
-    for (const s of safeSuppliers) {
-        // Ensure customerId exists, create it if not
-        const customerId = s.customerId || `${toTitleCase(s.name)}|${s.contact}`;
-        if (!customerId) continue;
-
-        if (!summary.has(customerId)) {
-            summary.set(customerId, {
-                name: s.name,
-                contact: s.contact,
-                so: s.so,
-                address: s.address,
-                totalOutstanding: 0,
-                paymentHistory: [],
-                totalAmount: 0,
-                totalPaid: 0,
-                outstandingEntryIds: [],
-                acNo: s.acNo,
-                ifscCode: s.ifscCode,
-                bank: s.bank,
-                branch: s.branch
-            } as CustomerSummary);
+    const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
+        if (supplier.forceUnique) {
+            return `${normalizeString(supplier.name)}|${normalizeString(supplier.contact)}|${supplier.id}`;
         }
         
-        const data = summary.get(customerId)!;
-        const netAmount = Math.round(parseFloat(String(s.netAmount)));
+        const supNameNorm = normalizeString(supplier.name);
+        const supSoNorm = normalizeString(supplier.so || '');
+        let bestMatch: string | null = null;
+        let minDistance = Infinity;
+
+        for (const key of existingKeys) {
+            const keyParts = key.split('|');
+            if (keyParts.length > 2) continue; // Skip forceUnique keys
+            
+            const [keyNameNorm, keySoNorm] = keyParts;
+            const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
+            const soDist = levenshteinDistance(supSoNorm, keySoNorm);
+            const totalDist = nameDist + soDist;
+
+            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+                minDistance = totalDist;
+                bestMatch = key;
+            }
+        }
+        return bestMatch;
+    };
+
+    safeSuppliers.forEach(s => {
+        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
+        if (!summary.has(groupingKey)) {
+            summary.set(groupingKey, {
+                name: s.name, contact: s.contact, so: s.so, address: s.address,
+                totalOutstanding: 0, paymentHistory: [], totalAmount: 0,
+                totalPaid: 0, outstandingEntryIds: [], acNo: s.acNo,
+                ifscCode: s.ifscCode, bank: s.bank, branch: s.branch
+            } as CustomerSummary);
+        }
+    });
+
+    safeSuppliers.forEach(supplier => {
+        const groupingKey = findBestMatchKey(supplier, Array.from(summary.keys())) || `${normalizeString(supplier.name)}|${normalizeString(supplier.so || '')}`;
+        if (!summary.has(groupingKey)) return;
+        
+        const data = summary.get(groupingKey)!;
+        const netAmount = Math.round(parseFloat(String(supplier.netAmount)));
         data.totalOutstanding += netAmount;
-    }
+    });
     
     return summary;
 }, [suppliers]);
@@ -480,6 +503,16 @@ export default function SupplierPaymentsClient() {
         let value = paymentId.trim();
         if (!value) return;
 
+        let prefix = '';
+        if (paymentMethod === 'Cash') prefix = 'EX';
+        else if (paymentMethod === 'Online') prefix = 'P';
+        
+        if (value && !isNaN(parseInt(value)) && isFinite(Number(value))) {
+            const padding = paymentMethod === 'Online' ? 6 : 5;
+            value = generateReadableId(prefix, parseInt(value) -1, padding);
+            setPaymentId(value);
+        }
+
         if (paymentMethod === 'Cash') {
             const foundExpense = expenses.find(e => e.transactionId === value);
             if (foundExpense) {
@@ -719,7 +752,6 @@ const processPayment = async () => {
                     }
                 }
                 
-                // Delete the associated expense transaction, if it exists
                 if (paymentToDelete.expenseTransactionId) {
                     const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
                     transaction.delete(expenseDocRef);
@@ -1019,5 +1051,3 @@ const processPayment = async () => {
     
 
 
-
-    

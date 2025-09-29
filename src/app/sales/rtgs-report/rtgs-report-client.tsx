@@ -79,7 +79,6 @@ export default function RtgsReportClient() {
     }, []);
 
     useEffect(() => {
-        // Data is considered loaded when settings are fetched and payments are no longer undefined
         if (settings !== null && payments !== undefined) {
             setLoading(false);
         }
@@ -111,7 +110,11 @@ export default function RtgsReportClient() {
                 parchiNo: p.parchiNo || (p.paidFor?.map((pf: any) => pf.srNo).join(', ') || ''),
             };
         });
-        return newReportRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return newReportRows.sort((a, b) => {
+            const numA = parseInt(a.sixRNo, 10) || 0;
+            const numB = parseInt(b.sixRNo, 10) || 0;
+            return numA - numB;
+        });
     }, [payments, settings]);
 
 
@@ -145,7 +148,11 @@ export default function RtgsReportClient() {
             end.setHours(23, 59, 59, 999);
             filtered = filtered.filter(row => new Date(row.date) <= end);
         }
-        return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return [...filtered].sort((a, b) => {
+            const numA = parseInt(a.sixRNo, 10) || 0;
+            const numB = parseInt(b.sixRNo, 10) || 0;
+            return numA - numB;
+        });
     }, [reportRows, searchSrNo, searchCheckNo, searchName, startDate, endDate]);
     
     const handlePrint = (printRef: React.RefObject<HTMLDivElement>) => {
@@ -483,3 +490,10 @@ export default function RtgsReportClient() {
     );
 }
 
+
+
+
+
+
+
+    
