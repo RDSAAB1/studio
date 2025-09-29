@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -9,13 +8,11 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
 
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getCustomersRealtime, getCustomerPaymentsRealtime } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -84,8 +81,8 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -144,35 +141,6 @@ export default function CustomerEntryClient() {
     }
   }, []);
 
-  useEffect(() => {
-    if (isClient) {
-      const unsub = getCustomersRealtime((data) => {
-        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'customers' })));
-      }, console.error);
-
-      const unsubPayments = getCustomerPaymentsRealtime((data) => {
-        db.mainDataStore.bulkPut(data.map(d => ({ ...d, collection: 'customer_payments' })));
-      }, console.error);
-
-      return () => {
-        unsub();
-        unsubPayments();
-      };
-    }
-  }, [isClient]);
-
-  useEffect(() => {
-    if (customers !== undefined) {
-        setIsLoading(false);
-        if (isInitialLoad.current && customers.length > 0) {
-            handleNew();
-            isInitialLoad.current = false;
-        } else if (isInitialLoad.current && customers.length === 0) {
-            // Still loading from firestore, might need a better loader state
-        }
-    }
-  }, [customers]);
-
   const handleNew = useCallback(() => {
     setIsEditing(false);
     let nextSrNum = 1;
@@ -191,11 +159,23 @@ export default function CustomerEntryClient() {
 }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   useEffect(() => {
-    if (customers !== undefined && isInitialLoad.current) {
+    if (isClient) {
+        const unsubCustomers = getCustomersRealtime(setCustomers, console.error);
+        const unsubPayments = getCustomerPaymentsRealtime(setPaymentHistory, console.error);
+
+        return () => {
+            unsubCustomers();
+            unsubPayments();
+        };
+    }
+  }, [isClient]);
+
+  useEffect(() => {
+    if (customers !== undefined) {
         setIsLoading(false);
-        if (customers.length > 0 || !isInitialLoad.current) {
-             handleNew();
-             isInitialLoad.current = false;
+        if (isInitialLoad.current) {
+            handleNew();
+            isInitialLoad.current = false;
         }
     }
   }, [customers, form, handleNew]);

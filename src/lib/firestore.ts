@@ -22,7 +22,6 @@ import {
 import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
-import { db } from './database';
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const customersCollection = collection(firestoreDB, "customers");
@@ -283,7 +282,6 @@ export async function deleteBankAccount(id: string): Promise<void> {
 export async function addSupplier(supplierData: Customer): Promise<Customer> {
     const docRef = doc(suppliersCollection, supplierData.srNo);
     await setDoc(docRef, supplierData);
-    await db.mainDataStore.put({ ...supplierData, collection: 'suppliers' });
     return supplierData;
 }
 
@@ -294,7 +292,6 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
   }
   const docRef = doc(suppliersCollection, id);
   await updateDoc(docRef, supplierData);
-  await db.mainDataStore.update(id, supplierData);
   return true;
 }
 
@@ -304,7 +301,6 @@ export async function deleteSupplier(id: string): Promise<void> {
     return;
   }
   await deleteDoc(doc(suppliersCollection, id));
-  await db.mainDataStore.delete(id); // Also delete from Dexie
 }
 
 export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
@@ -314,7 +310,6 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
     for (const srNo of srNos) {
         const supplierDocRef = doc(suppliersCollection, srNo);
         batch.delete(supplierDocRef);
-        await db.mainDataStore.delete(srNo);
         const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo }));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         
@@ -341,7 +336,6 @@ export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
 export async function addCustomer(customerData: Customer): Promise<Customer> {
     const docRef = doc(customersCollection, customerData.srNo);
     await setDoc(docRef, customerData);
-    await db.mainDataStore.put({ ...customerData, collection: 'customers' });
     return customerData;
 }
 
@@ -352,7 +346,6 @@ export async function updateCustomer(id: string, customerData: Partial<Omit<Cust
     }
     const docRef = doc(customersCollection, id);
     await updateDoc(docRef, customerData);
-    await db.mainDataStore.update(id, customerData);
     return true;
 }
 
@@ -362,7 +355,6 @@ export async function deleteCustomer(id: string): Promise<void> {
       return;
     }
     await deleteDoc(doc(customersCollection, id));
-    await db.mainDataStore.delete(id);
 }
 
 // --- Inventory Item Functions ---
@@ -388,7 +380,6 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   const batch = writeBatch(firestoreDB);
   snapshot.forEach(doc => {
       batch.delete(doc.ref);
-      db.mainDataStore.delete(doc.id);
   });
   await batch.commit();
 }
@@ -909,7 +900,3 @@ export async function initialDataSync() {
     // it's less critical. It can be useful for warming up the cache on app start.
     console.log("Initial data sync would happen here if it were still implemented.");
 }
-
-
-
-    
