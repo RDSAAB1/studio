@@ -71,7 +71,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
     
     useEffect(() => {
         if (!editingPayment) {
-            setPaymentId(getNextPaymentId(paymentMethod as 'Cash' | 'Online' | 'RTGS'));
+            setPaymentId(getNextPaymentId(paymentMethod as 'Cash'|'Online'|'RTGS'));
             if (paymentMethod === 'RTGS') setRtgsSrNo(getNextPaymentId('RTGS'));
         }
     }, [paymentHistory, expenses, editingPayment, paymentMethod, getNextPaymentId]);
@@ -99,7 +99,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
     const handleSetSelectedAccount = (accountId: string | null) => {
         if(accountId) {
             setSelectedAccountId(accountId);
-            localStorage.setItem('lastSelectedAccountId', accountId);
         }
     };
 

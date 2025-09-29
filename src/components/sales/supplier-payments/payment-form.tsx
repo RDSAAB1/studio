@@ -64,7 +64,7 @@ export const PaymentForm = (props: any) => {
                     </>
                     )}
                     
-                    {paymentMethod !== 'Cash' && (
+                    {paymentMethod === 'Online' && (
                         <div className="space-y-1">
                             <Label className="text-xs">Payment From</Label>
                             <CustomDropdown

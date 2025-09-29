@@ -4,7 +4,7 @@
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit } from 'firebase/firestore';
 import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
-import type { Customer, Payment, PaidFor, Expense, Income } from "@/lib/definitions";
+import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
 import { format } from 'date-fns';
 import { updateSupplierInLocalDB, deletePaymentFromLocalDB } from './database';
 
@@ -12,6 +12,9 @@ const suppliersCollection = collection(firestoreDB, "suppliers");
 const expensesCollection = collection(firestoreDB, "expenses");
 const incomesCollection = collection(firestoreDB, "incomes");
 const paymentsCollection = collection(firestoreDB, "payments");
+const settingsCollection = collection(firestoreDB, "settings");
+const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
+
 
 export const processPaymentLogic = async (context: any): Promise<Payment | null> => {
     const {
@@ -32,7 +35,22 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
     }
 
     const finalPaymentAmount = rtgsAmount || paymentAmount;
-    const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
+    
+    let accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
+    
+    if (paymentMethod === 'RTGS') {
+        const settingsDoc = await getDocs(query(settingsCollection, where("id", "==", "companyDetails")));
+        if (settingsDoc.empty) {
+            throw new Error("Company settings not found.");
+        }
+        const settings = settingsDoc.docs[0].data() as RtgsSettings;
+        if (!settings.defaultBankAccountId) {
+            throw new Error("Default bank account for RTGS is not set in company settings.");
+        }
+        accountIdForPayment = settings.defaultBankAccountId;
+    }
+
+
     const availableBalance = financialState.balances.get(accountIdForPayment) || 0;
 
     if (finalPaymentAmount > availableBalance) {
@@ -88,7 +106,7 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
             paymentMethod: paymentMethod as 'Cash' | 'Online' | 'RTGS' | 'Cheque',
             status: 'Paid', isRecurring: false,
         };
-        if (paymentMethod !== 'Cash') expenseData.bankAccountId = selectedAccountId;
+        if (paymentMethod !== 'Cash') expenseData.bankAccountId = accountIdForPayment;
         transaction.set(expenseTransactionRef, expenseData);
 
         if (cdEnabled && calculatedCdAmount > 0) {
@@ -120,7 +138,7 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
         };
         if (paymentMethod === 'RTGS') paymentDataBase.rtgsSrNo = rtgsSrNo;
         else delete (paymentDataBase as Partial<Payment>).rtgsSrNo;
-        if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = selectedAccountId;
+        if (paymentMethod !== 'Cash') paymentDataBase.bankAccountId = accountIdForPayment;
 
         const newPaymentRef = doc(paymentsCollection);
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
@@ -218,5 +236,3 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
         await deletePaymentFromLocalDB(paymentIdToDelete);
     });
 };
-
-    
