@@ -132,6 +132,7 @@ export const useSupplierPayments = () => {
         handleCustomerSelect,
         handlePaySelectedOutstanding,
         selectPaymentAmount,
-        addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }
+        addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); },
+        bankBranches: data.bankBranches,
     };
 };
