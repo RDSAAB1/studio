@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -85,8 +84,9 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const customers = useLiveQuery(() => db.customers.orderBy('srNo').reverse().toArray(), []);
   const paymentHistory = useLiveQuery(() => db.customerPayments.toArray(), []);
+  
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -114,6 +114,7 @@ export default function CustomerEntryClient() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
+  const safePaymentHistory = useMemo(() => Array.isArray(paymentHistory) ? paymentHistory : [], [paymentHistory]);
   
   const filteredCustomers = useMemo(() => {
     if (!debouncedSearchTerm) {
@@ -139,11 +140,52 @@ export default function CustomerEntryClient() {
     shouldFocusError: false,
   });
 
+  const formValues = form.watch();
+  
+  const calculatedData = useMemo(() => {
+    return calculateCustomerEntry(formValues, safePaymentHistory);
+  }, [formValues, safePaymentHistory]);
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
+      setCurrentCustomer(prev => ({...prev, ...calculatedData}));
+  }, [calculatedData]);
+
+  const resetFormToState = useCallback((customerState: Customer) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let formDate;
+    try {
+        formDate = customerState.date ? new Date(customerState.date) : today;
+        if (isNaN(formDate.getTime())) formDate = today;
+    } catch {
+        formDate = today;
     }
-  }, []);
+    const formValues: FormValues = {
+      srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
+      name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
+      contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
+      grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
+      rate: customerState.rate || 0, 
+      cd: customerState.cdRate || customerState.cd || 0,
+      brokerage: customerState.brokerageRate || customerState.brokerage || 0,
+      kanta: customerState.kanta || 0,
+      paymentType: customerState.paymentType || 'Full',
+      isBrokerageIncluded: customerState.isBrokerageIncluded || false,
+      bagWeightKg: customerState.bagWeightKg || 0,
+      bagRate: customerState.bagRate || 0,
+      shippingName: customerState.shippingName || '',
+      shippingCompanyName: customerState.shippingCompanyName || '',
+      shippingAddress: customerState.shippingAddress || '',
+      shippingContact: customerState.shippingContact || '',
+      shippingGstin: customerState.shippingGstin || '',
+      stateName: customerState.stateName || '',
+      stateCode: customerState.stateCode || '',
+      shippingStateName: customerState.shippingStateName || '',
+      shippingStateCode: customerState.shippingStateCode || '',
+      advanceFreight: customerState.advanceFreight || 0,
+    };
+    form.reset(formValues);
+  }, [form]);
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
@@ -160,8 +202,14 @@ export default function CustomerEntryClient() {
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
-}, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
+  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsClient(true);
+    }
+  }, []);
+  
   useEffect(() => {
     if (customers !== undefined) {
         setIsLoading(false);
@@ -171,6 +219,7 @@ export default function CustomerEntryClient() {
         }
     }
   }, [customers, form, handleNew]);
+
 
   useEffect(() => {
     if (!isClient) return;
@@ -220,58 +269,7 @@ export default function CustomerEntryClient() {
         localStorage.setItem('lastSelectedPaymentType', paymentType);
     }
   }
-
-  const performCalculations = useCallback((data: Partial<FormValues>) => {
-    const calculatedState = calculateCustomerEntry(data, paymentHistory || []);
-    setCurrentCustomer(prev => ({...prev, ...calculatedState}));
-  }, [paymentHistory]);
   
-  useEffect(() => {
-    const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>);
-    });
-    return () => subscription.unsubscribe();
-  }, [form, performCalculations]);
-
-  const resetFormToState = useCallback((customerState: Customer) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let formDate;
-    try {
-        formDate = customerState.date ? new Date(customerState.date) : today;
-        if (isNaN(formDate.getTime())) formDate = today;
-    } catch {
-        formDate = today;
-    }
-    const formValues: FormValues = {
-      srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
-      name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
-      contact: customerState.contact, gstin: customerState.gstin || '', vehicleNo: customerState.vehicleNo, variety: customerState.variety,
-      grossWeight: customerState.grossWeight || 0, teirWeight: customerState.teirWeight || 0,
-      rate: customerState.rate || 0, 
-      cd: customerState.cdRate || customerState.cd || 0,
-      brokerage: customerState.brokerageRate || customerState.brokerage || 0,
-      kanta: customerState.kanta || 0,
-      paymentType: customerState.paymentType || 'Full',
-      isBrokerageIncluded: customerState.isBrokerageIncluded || false,
-      bagWeightKg: customerState.bagWeightKg || 0,
-      bagRate: customerState.bagRate || 0,
-      shippingName: customerState.shippingName || '',
-      shippingCompanyName: customerState.shippingCompanyName || '',
-      shippingAddress: customerState.shippingAddress || '',
-      shippingContact: customerState.shippingContact || '',
-      shippingGstin: customerState.shippingGstin || '',
-      stateName: customerState.stateName || '',
-      stateCode: customerState.stateCode || '',
-      shippingStateName: customerState.shippingStateName || '',
-      shippingStateCode: customerState.shippingStateCode || '',
-      advanceFreight: customerState.advanceFreight || 0,
-    };
-    setCurrentCustomer(customerState);
-    form.reset(formValues);
-    performCalculations(formValues);
-  }, [form, performCalculations]);
-
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);
     if (customerToEdit) {
@@ -409,7 +407,7 @@ export default function CustomerEntryClient() {
 
   const onSubmit = async (callback?: (savedEntry: Customer) => void) => {
     if (isEditing) {
-        const hasPayments = (paymentHistory || []).some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
+        const hasPayments = safePaymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentCustomer.srNo));
         if (hasPayments) {
             setUpdateAction(() => (deletePayments: boolean) => executeSubmit(deletePayments, callback));
             setIsUpdateConfirmOpen(true);
@@ -548,7 +546,7 @@ export default function CustomerEntryClient() {
                         isBrokerageIncluded: item.isBrokerageIncluded === 'TRUE' || item.isBrokerageIncluded === true,
                         paymentType: item.paymentType || 'Full',
                     };
-                    const calculated = calculateCustomerEntry(customerData, paymentHistory || []);
+                    const calculated = calculateCustomerEntry(customerData, safePaymentHistory);
                     await addCustomer({ ...customerData, ...calculated } as Omit<Customer, 'id'>);
                 }
                 toast({title: "Import Successful", description: `${json.length} customer entries have been imported.`});
@@ -648,12 +646,12 @@ export default function CustomerEntryClient() {
         entryType="Customer"
         onPrintRow={(entry: Customer) => handlePrint([entry])}
       />
-
+      
       <CustomerDetailsDialog
         customer={detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
         onPrint={handleOpenPrintPreview}
-        paymentHistory={paymentHistory || []}
+        paymentHistory={safePaymentHistory}
       />
         
       <DocumentPreviewDialog
