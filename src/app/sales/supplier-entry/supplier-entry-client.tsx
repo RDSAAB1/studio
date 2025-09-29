@@ -70,7 +70,6 @@ export default function SupplierEntryClient() {
   const suppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray(), []);
   const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
 
-  const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -126,13 +125,10 @@ export default function SupplierEntryClient() {
 
   const formValues = form.watch();
 
-  const calculatedData = useMemo(() => {
+  const currentSupplier = useMemo(() => {
     return calculateSupplierEntry(formValues, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers);
   }, [formValues, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers]);
 
-  useEffect(() => {
-    setCurrentSupplier(prev => ({...prev, ...calculatedData}));
-  }, [calculatedData]);
 
   const resetFormToState = useCallback((customerState: Customer) => {
     setSuggestedSupplier(null);
@@ -196,7 +192,7 @@ export default function SupplierEntryClient() {
       setIsClient(true);
     }
   }, []);
-
+  
   useEffect(() => {
     if (suppliers !== undefined) {
         setIsLoading(false);
@@ -387,11 +383,11 @@ export default function SupplierEntryClient() {
     const isForcedUnique = values.forceUnique || false;
 
     const completeEntry: Customer = {
-        ...calculatedData,
+        ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
         date: values.date.toISOString().split("T")[0],
-        dueDate: calculatedData.dueDate, // Use the adjusted due date from state
+        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
         so: toTitleCase(values.so),
@@ -758,12 +754,20 @@ export default function SupplierEntryClient() {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-        
+      
+       {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
         customer={detailsSupplier}
-        paymentHistory={safePaymentHistory}
+        paymentHistory={paymentHistory}
       />
       
       <ReceiptPrintDialog

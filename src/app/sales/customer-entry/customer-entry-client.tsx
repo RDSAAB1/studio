@@ -87,7 +87,6 @@ export default function CustomerEntryClient() {
   const customers = useLiveQuery(() => db.customers.orderBy('srNo').reverse().toArray(), []);
   const paymentHistory = useLiveQuery(() => db.customerPayments.toArray(), []);
   
-  const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -142,13 +141,9 @@ export default function CustomerEntryClient() {
 
   const formValues = form.watch();
   
-  const calculatedData = useMemo(() => {
+  const currentCustomer = useMemo(() => {
     return calculateCustomerEntry(formValues, safePaymentHistory);
   }, [formValues, safePaymentHistory]);
-
-  useEffect(() => {
-      setCurrentCustomer(prev => ({...prev, ...calculatedData}));
-  }, [calculatedData]);
 
   const resetFormToState = useCallback((customerState: Customer) => {
     const today = new Date();
@@ -546,7 +541,7 @@ export default function CustomerEntryClient() {
                         isBrokerageIncluded: item.isBrokerageIncluded === 'TRUE' || item.isBrokerageIncluded === true,
                         paymentType: item.paymentType || 'Full',
                     };
-                    const calculated = calculateCustomerEntry(customerData, safePaymentHistory);
+                    const calculated = calculateCustomerEntry(customerData, paymentHistory);
                     await addCustomer({ ...customerData, ...calculated } as Omit<Customer, 'id'>);
                 }
                 toast({title: "Import Successful", description: `${json.length} customer entries have been imported.`});
@@ -646,12 +641,12 @@ export default function CustomerEntryClient() {
         entryType="Customer"
         onPrintRow={(entry: Customer) => handlePrint([entry])}
       />
-      
+
       <CustomerDetailsDialog
         customer={detailsCustomer}
         onOpenChange={() => setDetailsCustomer(null)}
         onPrint={handleOpenPrintPreview}
-        paymentHistory={safePaymentHistory}
+        paymentHistory={paymentHistory}
       />
         
       <DocumentPreviewDialog
