@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -155,15 +156,31 @@ export default function SupplierPaymentsClient() {
     const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
     const summary = new Map<string, CustomerSummary>();
     const LEVENSHTEIN_THRESHOLD = 2;
-    
-    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
-    const getGroupKey = (supplier: Customer): string => {
-        return `${normalizeString(supplier.name)}|${normalizeString(supplier.contact || '')}`;
+    const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+    
+    const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
+        const supNameNorm = normalizeString(supplier.name);
+        const supSoNorm = normalizeString(supplier.so || '');
+        let bestMatch: string | null = null;
+        let minDistance = Infinity;
+
+        for (const key of existingKeys) {
+            const [keyNameNorm, keySoNorm] = key.split('|');
+            const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
+            const soDist = levenshteinDistance(supSoNorm, keySoNorm);
+            const totalDist = nameDist + soDist;
+
+            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
+                minDistance = totalDist;
+                bestMatch = key;
+            }
+        }
+        return bestMatch;
     };
     
     safeSuppliers.forEach(s => {
-        const groupingKey = getGroupKey(s);
+        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.so || '')}`;
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -862,10 +879,8 @@ const processPayment = async () => {
     
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!selectedCustomerKey || !suppliers) return [];
-    
         const groupedData = customerSummaryMap.get(selectedCustomerKey);
         if (!groupedData) return [];
-        
         return groupedData.allTransactions || [];
     }, [selectedCustomerKey, suppliers, customerSummaryMap]);
 
@@ -1061,3 +1076,5 @@ const processPayment = async () => {
     </div>
   );
 }
+
+    
