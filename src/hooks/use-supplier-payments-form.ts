@@ -95,12 +95,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         setSelectedCustomerKey(null);
         resetPaymentForm();
     }, [resetPaymentForm]);
-    
-    const handleSetSelectedAccount = (accountId: string | null) => {
-        if(accountId) {
-            setSelectedAccountId(accountId);
-        }
-    };
 
     return {
         selectedCustomerKey, setSelectedCustomerKey,
@@ -128,6 +122,5 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         calcTargetAmount, setCalcTargetAmount,
         resetPaymentForm,
         handleFullReset,
-        handleSetSelectedAccount,
     };
 };
