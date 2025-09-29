@@ -22,6 +22,8 @@ export const useSupplierPayments = () => {
     const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
     const [isBankSettingsOpen, setIsBankSettingsOpen] = useState(false);
     const [rtgsReceiptData, setRtgsReceiptData] = useState<any | null>(null);
+    const [activeTab, setActiveTab] = useState('processing');
+
 
     const handleCustomerSelect = (key: string | null) => {
         form.setSelectedCustomerKey(key);
@@ -66,6 +68,7 @@ export const useSupplierPayments = () => {
     
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
+            setActiveTab('processing');
             await handleEditPaymentLogic(paymentToEdit, { ...data, ...form });
             toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {
@@ -107,6 +110,13 @@ export const useSupplierPayments = () => {
         setIsOutstandingModalOpen(false);
     };
 
+    const selectPaymentAmount = (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => {
+        form.setRtgsQuantity(option.quantity);
+        form.setRtgsRate(option.rate);
+        form.setRtgsAmount(option.calculatedAmount);
+        toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
+    };
+
     return {
         ...data,
         ...form,
@@ -122,11 +132,13 @@ export const useSupplierPayments = () => {
         setIsBankSettingsOpen,
         rtgsReceiptData,
         setRtgsReceiptData,
+        activeTab, setActiveTab,
         processPayment,
         handleEditPayment,
         handleDeletePayment,
         handleCustomerSelect,
         handlePaySelectedOutstanding,
+        selectPaymentAmount,
         addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); }
     };
 };

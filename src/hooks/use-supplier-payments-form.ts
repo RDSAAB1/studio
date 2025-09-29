@@ -95,6 +95,13 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         setSelectedCustomerKey(null);
         resetPaymentForm();
     }, [resetPaymentForm]);
+    
+    const handleSetSelectedAccount = (accountId: string | null) => {
+        if(accountId) {
+            setSelectedAccountId(accountId);
+            localStorage.setItem('lastSelectedAccountId', accountId);
+        }
+    };
 
     return {
         selectedCustomerKey, setSelectedCustomerKey,
@@ -106,6 +113,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         paymentType, setPaymentType,
         paymentMethod, setPaymentMethod,
         selectedAccountId, setSelectedAccountId,
+        handleSetSelectedAccount,
         supplierDetails, setSupplierDetails,
         bankDetails, setBankDetails,
         isPayeeEditing, setIsPayeeEditing,
