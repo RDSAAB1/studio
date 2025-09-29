@@ -32,7 +32,7 @@ export const RtgsForm = (props: any) => {
     const {
         rtgsFor, supplierDetails, setSupplierDetails,
         isPayeeEditing, setIsPayeeEditing,
-        bankDetails, setBankDetails, banks, bankBranches,
+        bankDetails, setBankDetails, banks,
         rtgsSrNo, setRtgsSrNo, sixRNo, setSixRNo, sixRDate, setSixRDate,
         utrNo, setUtrNo, parchiNo, setParchiNo, checkNo, setCheckNo,
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
@@ -41,6 +41,8 @@ export const RtgsForm = (props: any) => {
         selectPaymentAmount
     } = props;
     
+    const bankBranches = props.bankBranches;
+
     const allBankOptions = React.useMemo(() => {
         const combinedNames = [...new Set([...(banks?.map((b: any) => b.name) || [])])];
         return combinedNames.sort().map(name => ({ value: name, label: name }));
@@ -107,7 +109,7 @@ export const RtgsForm = (props: any) => {
 
             <PaymentCombinationGenerator 
                 calcTargetAmount={calcTargetAmount}
-                setCalcTargetAmount={props.setCalcTargetAmount}
+                setCalcTargetAmount={setCalcTargetAmount}
                 selectPaymentAmount={selectPaymentAmount}
             />
 
