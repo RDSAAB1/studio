@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Info, Pen, Printer, Trash } from "lucide-react";
+import { ScrollArea } from "../ui/scroll-area";
 
 
 export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, onShowDetails, selectedIds, onSelectionChange, onPrintRow, entryType = 'Supplier' }: any) {
@@ -34,7 +35,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
     return (
         <Card>
             <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <ScrollArea className="h-[60vh]">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -106,7 +107,7 @@ export const EntryTable = memo(function EntryTable({ entries, onEdit, onDelete, 
                             ))}
                         </TableBody>
                     </Table>
-                </div>
+                </ScrollArea>
             </CardContent>
         </Card>
     );

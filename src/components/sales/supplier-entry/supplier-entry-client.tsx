@@ -1,23 +1,19 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry } from "@/lib/utils";
+import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
-
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments } from "@/lib/firestore";
-import { format } from "date-fns";
-import { Hourglass } from "lucide-react";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
+import { format, addDays, isSunday } from "date-fns";
+import { Hourglass, Lightbulb } from "lucide-react";
 
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -26,6 +22,9 @@ import { DetailsDialog } from "@/components/sales/details-dialog";
 import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components/sales/print-dialogs";
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 const formSchema = z.object({
     srNo: z.string(),
@@ -46,6 +45,7 @@ const formSchema = z.object({
     labouryRate: z.coerce.number().min(0),
     kanta: z.coerce.number().min(0),
     paymentType: z.string().min(1, "Payment type is required"),
+    forceUnique: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -65,12 +65,19 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function SupplierEntryClient() {
   const { toast } = useToast();
-  const suppliers = useLiveQuery(() => db.mainDataStore.where('collection').equals('suppliers').sortBy('srNo')) || [];
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('payments').sortBy('date')) || [];
+  const [suppliers, setSuppliers] = useState<Customer[]>([]);
+  const [lastVisibleSupplier, setLastVisibleSupplier] = useState<any>(null);
+  const [hasMoreSuppliers, setHasMoreSuppliers] = useState(true);
+
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [lastVisiblePayment, setLastVisiblePayment] = useState<any>(null);
+  const [hasMorePayments, setHasMorePayments] = useState(true);
+
   const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const [detailsSupplier, setDetailsSupplier] = useState<Customer | null>(null);
   const [receiptsToPrint, setReceiptsToPrint] = useState<Customer[]>([]);
@@ -81,7 +88,6 @@ export default function SupplierEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
-  const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
@@ -89,6 +95,11 @@ export default function SupplierEntryClient() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
+
+  const [suggestedSupplier, setSuggestedSupplier] = useState<Customer | null>(null);
 
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
   
@@ -115,24 +126,135 @@ export default function SupplierEntryClient() {
     shouldFocusError: false,
   });
 
+  const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, paymentHistory, holidays, dailyPaymentLimit, suppliers || []);
+      setCurrentSupplier(prev => ({...prev, ...calculatedState}));
+      if (showWarning && warning) {
+        let title = 'Date Warning';
+        let description = warning;
+        if (warning.includes('holiday')) {
+            title = 'Holiday on Due Date';
+            description = `Try Term: ${String(suggestedTerm)} days`;
+        } else if (warning.includes('limit')) {
+            title = 'Daily Limit Reached';
+            description = `Try Term: ${String(suggestedTerm)} days`;
+        }
+        
+        toast({ title, description, variant: 'destructive', duration: 7000 });
+      }
+  }, [paymentHistory, holidays, dailyPaymentLimit, suppliers, toast]);
+
+  const resetFormToState = useCallback((customerState: Customer) => {
+    setSuggestedSupplier(null);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let formDate;
+    try {
+        formDate = customerState.date ? new Date(customerState.date) : today;
+        if (isNaN(formDate.getTime())) formDate = today;
+    } catch {
+        formDate = today;
+    }
+    
+    const formValues: FormValues = {
+        srNo: customerState.srNo,
+        date: formDate,
+        term: Number(customerState.term) || 0,
+        name: customerState.name,
+        so: customerState.so,
+        address: customerState.address,
+        contact: customerState.contact,
+        vehicleNo: customerState.vehicleNo,
+        variety: customerState.variety,
+        grossWeight: customerState.grossWeight || 0,
+        teirWeight: customerState.teirWeight || 0,
+        rate: customerState.rate || 0,
+        kartaPercentage: customerState.kartaPercentage,
+        labouryRate: customerState.labouryRate,
+        kanta: customerState.kanta,
+        paymentType: customerState.paymentType || 'Full',
+        forceUnique: customerState.forceUnique || false,
+    };
+
+    setCurrentSupplier(customerState);
+    form.reset(formValues);
+    performCalculations(formValues, false);
+  }, [form, performCalculations]);
+
+  const handleNew = useCallback(() => {
+      setIsEditing(false);
+      setSuggestedSupplier(null);
+      let nextSrNum = 1;
+      if (safeSuppliers && safeSuppliers.length > 0) {
+          const maxSrNoNum = safeSuppliers.reduce((maxNum, s) => {
+              const currentNum = parseInt(s.srNo.substring(1), 10);
+              return isNaN(currentNum) ? maxNum : Math.max(maxNum, currentNum);
+          }, 0);
+          nextSrNum = maxSrNoNum + 1;
+      }
+      const newState = getInitialFormState(lastVariety, lastPaymentType);
+      newState.srNo = formatSrNo(nextSrNum, 'S');
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      newState.date = today.toISOString().split('T')[0];
+      newState.dueDate = today.toISOString().split('T')[0];
+      resetFormToState(newState);
+      form.setValue('date', new Date()); // Set today's date
+      setTimeout(() => form.setFocus('srNo'), 50);
+  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsClient(true);
     }
   }, []);
 
-  useEffect(() => {
-    if (suppliers !== undefined) {
-        setIsLoading(false);
-        if (isInitialLoad.current && suppliers) {
-            const nextSrNum = suppliers.length > 0 ? Math.max(...suppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'S');
-            form.setValue('srNo', initialSrNo);
-            setCurrentSupplier(prev => ({ ...prev, srNo: initialSrNo }));
-            isInitialLoad.current = false;
-        }
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [suppliersResult, paymentsResult] = await Promise.all([
+        getInitialSuppliers(),
+        getInitialPayments()
+      ]);
+      
+      setSuppliers(suppliersResult.data);
+      setLastVisibleSupplier(suppliersResult.lastVisible);
+      setHasMoreSuppliers(suppliersResult.hasMore);
+
+      setPaymentHistory(paymentsResult.data);
+      setLastVisiblePayment(paymentsResult.lastVisible);
+      setHasMorePayments(paymentsResult.hasMore);
+
+      handleNew();
+
+    } catch (error) {
+      console.error("Error loading initial data:", error);
+      toast({ title: 'Error loading data', variant: 'destructive' });
     }
-  }, [suppliers, form]);
+    setIsLoading(false);
+  }, [handleNew, toast]);
+  
+  useEffect(() => {
+    if(isClient) {
+        loadInitialData();
+    }
+  }, [isClient, loadInitialData]);
+
+  const loadMoreData = useCallback(async () => {
+    if (!hasMoreSuppliers || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+        const result = await getMoreSuppliers(lastVisibleSupplier);
+        setSuppliers(prev => [...prev, ...result.data]);
+        setLastVisibleSupplier(result.lastVisible);
+        setHasMoreSuppliers(result.hasMore);
+    } catch(e) {
+        console.error("Failed to load more suppliers", e);
+        toast({title: 'Error', description: 'Could not load more entries.', variant: 'destructive'});
+    }
+    setIsLoadingMore(false);
+  }, [hasMoreSuppliers, isLoadingMore, lastVisibleSupplier, toast]);
+
 
   useEffect(() => {
     if (!isClient) return;
@@ -142,6 +264,10 @@ export default function SupplierEntryClient() {
         if (settings) {
             setReceiptSettings(settings);
         }
+        const fetchedHolidays = await getHolidays();
+        setHolidays(fetchedHolidays);
+        const limit = await getDailyPaymentLimit();
+        setDailyPaymentLimit(limit);
     };
     fetchSettings();
 
@@ -181,66 +307,13 @@ export default function SupplierEntryClient() {
         localStorage.setItem('lastSelectedPaymentType', paymentType);
     }
   }
-
-  const performCalculations = useCallback((data: Partial<FormValues>) => {
-      const calculatedState = calculateSupplierEntry(data, paymentHistory);
-      setCurrentSupplier(prev => ({...prev, ...calculatedState}));
-  }, [paymentHistory]);
   
   useEffect(() => {
     const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>);
+        performCalculations(value as Partial<FormValues>, false);
     });
     return () => subscription.unsubscribe();
   }, [form, performCalculations]);
-
-  const resetFormToState = useCallback((customerState: Customer) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let formDate;
-    try {
-        formDate = customerState.date ? new Date(customerState.date) : today;
-        if (isNaN(formDate.getTime())) formDate = today;
-    } catch {
-        formDate = today;
-    }
-    
-    const formValues: FormValues = {
-        srNo: customerState.srNo,
-        date: formDate,
-        term: Number(customerState.term) || 0,
-        name: customerState.name,
-        so: customerState.so,
-        address: customerState.address,
-        contact: customerState.contact,
-        vehicleNo: customerState.vehicleNo,
-        variety: customerState.variety,
-        grossWeight: customerState.grossWeight || 0,
-        teirWeight: customerState.teirWeight || 0,
-        rate: customerState.rate || 0,
-        kartaPercentage: customerState.kartaPercentage,
-        labouryRate: customerState.labouryRate,
-        kanta: customerState.kanta,
-        paymentType: customerState.paymentType || 'Full',
-    };
-
-    setCurrentSupplier(customerState);
-    form.reset(formValues);
-    performCalculations(formValues);
-  }, [form, performCalculations]);
-
-  const handleNew = useCallback(() => {
-    setIsEditing(false);
-    const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-    const newState = getInitialFormState(lastVariety, lastPaymentType);
-    newState.srNo = formatSrNo(nextSrNum, 'S');
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    newState.date = today.toISOString().split('T')[0];
-    newState.dueDate = today.toISOString().split('T')[0];
-    resetFormToState(newState);
-    setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeSuppliers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeSuppliers.find(c => c.id === id);
@@ -261,28 +334,87 @@ export default function SupplierEntryClient() {
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
-    } else {
-        if (isEditing) {
-            setIsEditing(false);
-            const currentId = currentSupplier.srNo;
-            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || formatSrNo(nextSrNum, 'S'), id: currentId };
-            resetFormToState(newState);
-        }
+    } else if (isEditing) {
+        // Keep the form data but switch to "new entry" mode for that SR No.
+        setIsEditing(false);
+        const currentData = form.getValues();
+        setCurrentSupplier(prev => ({
+            ...prev,
+            srNo: formattedSrNo,
+            id: formattedSrNo // The new ID will be the SR No
+        }));
+        form.setValue('srNo', formattedSrNo);
     }
   }
 
-  const handleContactBlur = (contactValue: string) => {
+  const onContactChange = (contactValue: string) => {
+    form.setValue('contact', contactValue);
     if (contactValue.length === 10 && suppliers) {
-      const foundCustomer = suppliers.find(c => c.contact === contactValue);
-      if (foundCustomer && foundCustomer.id !== currentSupplier.id) {
-        form.setValue('name', foundCustomer.name);
-        form.setValue('so', foundCustomer.so);
-        form.setValue('address', foundCustomer.address);
-        toast({ title: "Supplier Found: Details auto-filled." });
+      const latestEntryForContact = suppliers
+          .filter(c => c.contact === contactValue)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          
+      if (latestEntryForContact && latestEntryForContact.id !== currentSupplier.id) {
+          form.setValue('name', latestEntryForContact.name);
+          form.setValue('so', latestEntryForContact.so);
+          form.setValue('address', latestEntryForContact.address);
+          toast({ title: "Supplier Found: Details auto-filled from last entry." });
       }
     }
-  }
+  };
+
+  const findAndSuggestSimilarSupplier = () => {
+    if (form.formState.isSubmitting || isEditing) {
+        setSuggestedSupplier(null);
+        return;
+    }
+
+    const { name, so } = form.getValues();
+    if (!name) {
+        setSuggestedSupplier(null);
+        return;
+    }
+
+    const currentNameNorm = name.replace(/\s+/g, '').toLowerCase();
+    const currentSoNorm = (so || '').replace(/\s+/g, '').toLowerCase();
+    
+    if (currentNameNorm.length < 3) {
+      setSuggestedSupplier(null);
+      return;
+    }
+    
+    let bestMatch: Customer | null = null;
+    let minDistance = Infinity;
+
+    const uniqueSuppliers = Array.from(new Map(suppliers.map(s => [s.customerId, s])).values());
+    
+    for (const supplier of uniqueSuppliers) {
+        const supNameNorm = supplier.name.replace(/\s+/g, '').toLowerCase();
+        const supSoNorm = (supplier.so || '').replace(/\s+/g, '').toLowerCase();
+        
+        const nameDist = levenshteinDistance(currentNameNorm, supNameNorm);
+        const soDist = levenshteinDistance(supSoNorm, supSoNorm);
+        const totalDist = nameDist + soDist;
+        
+        if (totalDist > 0 && totalDist < 3 && totalDist < minDistance) {
+            minDistance = totalDist;
+            bestMatch = supplier;
+        }
+    }
+    setSuggestedSupplier(bestMatch);
+  };
+  
+  const applySuggestion = () => {
+    if (suggestedSupplier) {
+        form.setValue('name', toTitleCase(suggestedSupplier.name));
+        form.setValue('so', toTitleCase(suggestedSupplier.so));
+        form.setValue('address', toTitleCase(suggestedSupplier.address));
+        form.setValue('contact', suggestedSupplier.contact);
+        setSuggestedSupplier(null);
+        toast({ title: "Details Updated", description: "Supplier details have been corrected." });
+    }
+  };
+
 
   const handleDelete = async (id: string) => {
     if (!id) {
@@ -292,6 +424,7 @@ export default function SupplierEntryClient() {
     try {
       await deleteSupplier(id);
       await deletePaymentsForSrNo(currentSupplier.srNo);
+      setSuppliers(prev => prev.filter(s => s.id !== id));
       toast({ title: "Entry and payments deleted.", variant: "success" });
       if (currentSupplier.id === id) {
         handleNew();
@@ -303,30 +436,44 @@ export default function SupplierEntryClient() {
   };
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
+    
+    const isForcedUnique = values.forceUnique || false;
+
     const completeEntry: Customer = {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
         date: values.date.toISOString().split("T")[0],
-        dueDate: new Date(new Date(values.date).setDate(new Date(values.date).getDate() + (Number(values.term) || 0))).toISOString().split("T")[0],
+        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
-        name: toTitleCase(values.name), so: toTitleCase(values.so), address: toTitleCase(values.address), vehicleNo: toTitleCase(values.vehicleNo), variety: toTitleCase(values.variety),
-        customerId: `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        name: toTitleCase(values.name),
+        so: toTitleCase(values.so),
+        address: toTitleCase(values.address),
+        vehicleNo: toTitleCase(values.vehicleNo),
+        variety: toTitleCase(values.variety),
+        customerId: isForcedUnique 
+            ? `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}|${Date.now()}` 
+            : `${toTitleCase(values.name).toLowerCase()}|${values.contact.toLowerCase()}`,
+        forceUnique: isForcedUnique,
     };
+
 
     try {
         if (isEditing && currentSupplier.id && currentSupplier.id !== completeEntry.id) {
           await deleteSupplier(currentSupplier.id);
+          setSuppliers(prev => prev.filter(s => s.id !== currentSupplier.id));
         }
 
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
             const savedEntry = await addSupplier(updatedEntry);
+            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
             toast({ title: "Entry updated and payments deleted.", variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
+            setSuppliers(prev => [savedEntry, ...prev.filter(s => s.id !== savedEntry.id)].sort((a,b) => b.srNo.localeCompare(a.srNo)));
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         }
@@ -337,6 +484,9 @@ export default function SupplierEntryClient() {
   };
 
   const onSubmit = async (values: FormValues, callback?: (savedEntry: Customer) => void) => {
+    if (suggestedSupplier && !values.forceUnique) {
+      return; // Do not submit if a suggestion is active and user hasn't chosen an action
+    }
     if (isEditing) {
         const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
         if (hasPayments) {
@@ -419,7 +569,7 @@ export default function SupplierEntryClient() {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -516,6 +666,8 @@ export default function SupplierEntryClient() {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
+            setSuppliers([]);
+            setPaymentHistory([]);
             toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
@@ -601,7 +753,8 @@ export default function SupplierEntryClient() {
             <SupplierForm 
                 form={form}
                 handleSrNoBlur={handleSrNoBlur}
-                handleContactBlur={handleContactBlur}
+                onContactChange={onContactChange}
+                handleNameOrSoBlur={findAndSuggestSimilarSupplier}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
                 setLastVariety={handleSetLastVariety}
@@ -627,6 +780,32 @@ export default function SupplierEntryClient() {
             />
         </form>
       </FormProvider>      
+
+      <AlertDialog open={!!suggestedSupplier} onOpenChange={() => setSuggestedSupplier(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5 text-yellow-500" />
+                    Did you mean this supplier?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                    A supplier with a very similar name already exists. Is this the same person?
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
+                        <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
+                        <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
+                        <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
+                    </div>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => {
+                    form.setValue('forceUnique', true);
+                    setSuggestedSupplier(null);
+                }}>No, Create New</AlertDialogAction>
+                <AlertDialogAction onClick={applySuggestion}>Yes, Use This One</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       <EntryTable 
         entries={filteredSuppliers} 
@@ -637,7 +816,15 @@ export default function SupplierEntryClient() {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-        
+      
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}

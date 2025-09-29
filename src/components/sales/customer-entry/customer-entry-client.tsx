@@ -8,13 +8,11 @@ import { z } from "zod";
 import type { Customer, CustomerPayment, OptionItem, ReceiptSettings, DocumentType, ConsolidatedReceiptData } from "@/lib/definitions";
 import { formatSrNo, toTitleCase, formatCurrency, calculateCustomerEntry } from "@/lib/utils";
 import * as XLSX from 'xlsx';
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from '@/lib/database';
 
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addCustomer, deleteCustomer, getCustomersRealtime, getCustomerPaymentsRealtime, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo } from "@/lib/firestore";
+import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments } from "@/lib/firestore";
 import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
@@ -26,6 +24,7 @@ import { ReceiptPrintDialog, ConsolidatedReceiptPrintDialog } from "@/components
 import { UpdateConfirmDialog } from "@/components/sales/update-confirm-dialog";
 import { ReceiptSettingsDialog } from "@/components/sales/receipt-settings-dialog";
 import { Hourglass } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 
 export const formSchema = z.object({
@@ -83,12 +82,19 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
 
 export default function CustomerEntryClient() {
   const { toast } = useToast();
-  const customers = useLiveQuery(() => db.mainDataStore.where('collection').equals('customers').sortBy('srNo'));
-  const paymentHistory = useLiveQuery(() => db.mainDataStore.where('collection').equals('customer_payments').sortBy('date')) || [];
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [lastVisibleCustomer, setLastVisibleCustomer] = useState<any>(null);
+  const [hasMoreCustomers, setHasMoreCustomers] = useState(true);
+
+  const [paymentHistory, setPaymentHistory] = useState<CustomerPayment[]>([]);
+  const [lastVisiblePayment, setLastVisiblePayment] = useState<any>(null);
+  const [hasMorePayments, setHasMorePayments] = useState(true);
+
   const [currentCustomer, setCurrentCustomer] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [documentPreviewCustomer, setDocumentPreviewCustomer] = useState<Customer | null>(null);
@@ -102,7 +108,6 @@ export default function CustomerEntryClient() {
   const [paymentTypeOptions, setPaymentTypeOptions] = useState<OptionItem[]>([]);
   const [lastVariety, setLastVariety] = useState<string>('');
   const [lastPaymentType, setLastPaymentType] = useState<string>('');
-  const isInitialLoad = useRef(true);
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings | null>(null);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
@@ -143,18 +148,54 @@ export default function CustomerEntryClient() {
     }
   }, []);
 
-  useEffect(() => {
-    if (customers !== undefined) {
-        setIsLoading(false);
-        if (isInitialLoad.current && customers) {
-            const nextSrNum = customers.length > 0 ? Math.max(...customers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const initialSrNo = formatSrNo(nextSrNum, 'C');
-            form.setValue('srNo', initialSrNo);
-            setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
-            isInitialLoad.current = false;
-        }
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+        const [custResult, paymentResult] = await Promise.all([
+            getInitialCustomers(),
+            getInitialCustomerPayments()
+        ]);
+        setCustomers(custResult.data);
+        setLastVisibleCustomer(custResult.lastVisible);
+        setHasMoreCustomers(custResult.hasMore);
+        
+        setPaymentHistory(paymentResult.data);
+        setLastVisiblePayment(paymentResult.lastVisible);
+        setHasMorePayments(paymentResult.hasMore);
+        
+        const nextSrNum = custResult.data.length > 0 ? Math.max(...custResult.data.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+        const initialSrNo = formatSrNo(nextSrNum, 'C');
+        form.setValue('srNo', initialSrNo);
+        setCurrentCustomer(prev => ({ ...prev, srNo: initialSrNo }));
+
+    } catch (error) {
+        console.error("Error loading initial data:", error);
+        toast({ title: 'Error', description: 'Could not load initial data.', variant: 'destructive' });
     }
-  }, [customers, form]);
+    setIsLoading(false);
+  }, [form, toast]);
+
+  useEffect(() => {
+    if (isClient) {
+      loadInitialData();
+    }
+  }, [isClient, loadInitialData]);
+
+  const loadMoreData = useCallback(async () => {
+      if (!hasMoreCustomers || isLoadingMore) return;
+      setIsLoadingMore(true);
+      try {
+          const result = await getMoreCustomers(lastVisibleCustomer);
+          setCustomers(prev => [...prev, ...result.data]);
+          setLastVisibleCustomer(result.lastVisible);
+          setHasMoreCustomers(result.hasMore);
+      } catch (error) {
+          console.error("Error loading more customers:", error);
+          toast({ title: 'Error', description: 'Could not load more entries.', variant: 'destructive' });
+      }
+      setIsLoadingMore(false);
+  }, [lastVisibleCustomer, hasMoreCustomers, isLoadingMore, toast]);
+
 
   useEffect(() => {
     if (!isClient) return;
@@ -258,7 +299,11 @@ export default function CustomerEntryClient() {
 
   const handleNew = useCallback(() => {
     setIsEditing(false);
-    const nextSrNum = safeCustomers.length > 0 ? Math.max(...safeCustomers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+    let nextSrNum = 1;
+    if (safeCustomers.length > 0) {
+        const lastSrNo = safeCustomers.sort((a, b) => a.srNo.localeCompare(b.srNo)).pop()?.srNo || 'C00000';
+        nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
+    }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'C');
     const today = new Date();
@@ -267,7 +312,7 @@ export default function CustomerEntryClient() {
     newState.dueDate = today.toISOString().split('T')[0];
     resetFormToState(newState);
     setTimeout(() => form.setFocus('srNo'), 50);
-  }, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
+}, [safeCustomers, lastVariety, lastPaymentType, resetFormToState, form]);
 
   const handleEdit = (id: string) => {
     const customerToEdit = safeCustomers.find(c => c.id === id);
@@ -325,6 +370,7 @@ export default function CustomerEntryClient() {
     try {
       await deleteCustomer(id);
       await deleteCustomerPaymentsForSrNo(currentCustomer.srNo);
+      setCustomers(prev => prev.filter(c => c.id !== id));
       toast({ title: "Entry and payments deleted.", variant: "success" });
       if (currentCustomer.id === id) {
         handleNew();
@@ -384,19 +430,38 @@ export default function CustomerEntryClient() {
     try {
         if (isEditing && currentCustomer.id && currentCustomer.id !== dataToSave.srNo) {
             await deleteCustomer(currentCustomer.id);
+            setCustomers(prev => prev.filter(c => c.id !== currentCustomer.id));
         }
         
         if (deletePayments) {
             await deleteCustomerPaymentsForSrNo(dataToSave.srNo!);
             const entryWithRestoredAmount = { ...dataToSave, netAmount: dataToSave.originalNetAmount, id: dataToSave.srNo };
-            await addCustomer(entryWithRestoredAmount as Customer);
+            const savedEntry = await addCustomer(entryWithRestoredAmount as Customer);
+            setCustomers(prev => {
+                const existingIndex = prev.findIndex(c => c.id === savedEntry.id);
+                if (existingIndex > -1) {
+                    const newCustomers = [...prev];
+                    newCustomers[existingIndex] = savedEntry;
+                    return newCustomers;
+                }
+                return [savedEntry, ...prev].sort((a,b) => b.srNo.localeCompare(a.srNo));
+            });
             toast({ title: "Entry updated, payments deleted.", variant: "success" });
             if (callback) callback(entryWithRestoredAmount as Customer); else handleNew();
         } else {
             const entryToSave = { ...dataToSave, id: dataToSave.srNo };
-            await addCustomer(entryToSave as Customer);
+            const savedEntry = await addCustomer(entryToSave as Customer);
+            setCustomers(prev => {
+                const existingIndex = prev.findIndex(c => c.id === savedEntry.id);
+                if (existingIndex > -1) {
+                    const newCustomers = [...prev];
+                    newCustomers[existingIndex] = savedEntry;
+                    return newCustomers;
+                }
+                return [savedEntry, ...prev].sort((a,b) => b.srNo.localeCompare(a.srNo));
+            });
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
-            if (callback) callback(entryToSave as Customer); else handleNew();
+            if (callback) callback(savedEntry as Customer); else handleNew();
         }
     } catch (error) {
         console.error("Error saving customer:", error);
@@ -645,6 +710,13 @@ export default function CustomerEntryClient() {
         entryType="Customer"
         onPrintRow={(entry: Customer) => handlePrint([entry])}
       />
+      {hasMoreCustomers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
 
       <CustomerDetailsDialog
         customer={detailsCustomer}
