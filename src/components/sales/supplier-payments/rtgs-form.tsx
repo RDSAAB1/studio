@@ -55,12 +55,15 @@ export const RtgsForm = (props: any) => {
 
     const availableBranchOptions = React.useMemo(() => {
         if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
-        return bankBranches
+        const uniqueBranches = new Map<string, { value: string; label: string }>();
+        bankBranches
             .filter((branch: any) => branch.bankName === bankDetails.bank)
-            .map((branch: any) => ({
-                value: branch.branchName,
-                label: toTitleCase(branch.branchName)
-            }));
+            .forEach((branch: any) => {
+                if (!uniqueBranches.has(branch.branchName)) {
+                    uniqueBranches.set(branch.branchName, { value: branch.branchName, label: toTitleCase(branch.branchName) });
+                }
+            });
+        return Array.from(uniqueBranches.values());
     }, [bankDetails.bank, bankBranches]);
 
     const handleBankSelect = (bankName: string | null) => {
@@ -99,7 +102,8 @@ export const RtgsForm = (props: any) => {
             toast({ title: "Please select a bank first.", variant: 'destructive' });
             return;
         }
-        await addBankBranch({ bankName: bankDetails.bank, branchName: newBranchName, ifscCode: '' });
+        // Don't add to DB immediately. Just set the name.
+        // The user will fill the IFSC and it will be added on form submission if needed.
         handleBranchSelect(newBranchName);
     };
 
