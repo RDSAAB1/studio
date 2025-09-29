@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getIncomeRealtime, getCustomerPaymentsRealtime, getReceiptSettings } from "@/lib/firestore";
+import { getSuppliersRealtime, getPaymentsRealtime, getBanksRealtime, getBankAccountsRealtime, getFundTransactionsRealtime, getExpensesRealtime, getIncomeRealtime, getCustomerPaymentsRealtime, getReceiptSettings, getIncomesRealtime } from "@/lib/firestore";
 import type { Customer, Payment, Bank, BankAccount, FundTransaction, Income, Expense, CustomerPayment, ReceiptSettings } from "@/lib/definitions";
 
 export const useSupplierData = () => {
