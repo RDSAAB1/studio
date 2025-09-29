@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { Separator } from '@/components/ui/separator';
 import { PaymentCombinationGenerator } from './payment-combination-generator';
+import { useSupplierData } from '@/hooks/use-supplier-data';
 
 
 const SectionTitle = ({ title, onEdit, editingPayment }: { title: string, onEdit?: () => void, editingPayment?: boolean }) => (
@@ -37,10 +38,10 @@ export const RtgsForm = (props: any) => {
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
         editingPayment, setIsBankSettingsOpen,
         calcTargetAmount, setCalcTargetAmount,
-        selectPaymentAmount,
-        banks,
-        bankBranches
+        selectPaymentAmount
     } = props;
+    
+    const { banks, bankBranches } = useSupplierData();
     
     const bankOptions = React.useMemo(() => {
         if (!Array.isArray(banks)) return [];
