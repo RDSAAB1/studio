@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
 import { db } from "@/lib/database";
 import { useLiveQuery } from "dexie-react-hooks";
 import { format, addDays, isSunday } from "date-fns";
@@ -208,13 +208,13 @@ export default function SupplierEntryClient() {
 
   useEffect(() => {
     if (suppliers !== undefined) {
-        setIsLoading(false);
-        if (isInitialLoad.current && suppliers) {
-            handleNew();
-            isInitialLoad.current = false;
-        }
+      if (isInitialLoad.current) {
+        handleNew();
+        isInitialLoad.current = false;
+      }
+      setIsLoading(false);
     }
-  }, [suppliers, form, handleNew]);
+  }, [suppliers, handleNew]);
 
 
   useEffect(() => {
