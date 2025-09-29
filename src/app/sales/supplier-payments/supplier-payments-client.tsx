@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -159,35 +158,12 @@ export default function SupplierPaymentsClient() {
     
     const normalizeString = (str: string) => str.replace(/\s+/g, '').toLowerCase();
 
-    const findBestMatchKey = (supplier: Customer, existingKeys: string[]): string | null => {
-        if (supplier.forceUnique) {
-            return `${normalizeString(supplier.name)}|${normalizeString(supplier.contact)}|${supplier.id}`;
-        }
-        
-        const supNameNorm = normalizeString(supplier.name);
-        const supContactNorm = normalizeString(supplier.contact || '');
-        let bestMatch: string | null = null;
-        let minDistance = Infinity;
-
-        for (const key of existingKeys) {
-            const keyParts = key.split('|');
-            if (keyParts.length > 2) continue; // Skip forceUnique keys
-            
-            const [keyNameNorm, keyContactNorm] = keyParts;
-            const nameDist = levenshteinDistance(supNameNorm, keyNameNorm);
-            const contactDist = levenshteinDistance(supContactNorm, keyContactNorm);
-            const totalDist = nameDist + contactDist;
-
-            if (totalDist < minDistance && totalDist <= LEVENSHTEIN_THRESHOLD) {
-                minDistance = totalDist;
-                bestMatch = key;
-            }
-        }
-        return bestMatch;
+    const getGroupKey = (supplier: Customer): string => {
+        return `${normalizeString(supplier.name)}|${normalizeString(supplier.contact || '')}`;
     };
-
+    
     safeSuppliers.forEach(s => {
-        const groupingKey = findBestMatchKey(s, Array.from(summary.keys())) || `${normalizeString(s.name)}|${normalizeString(s.contact || '')}`;
+        const groupingKey = getGroupKey(s);
         if (!summary.has(groupingKey)) {
             summary.set(groupingKey, {
                 name: s.name, contact: s.contact, so: s.so, address: s.address,
@@ -279,7 +255,7 @@ export default function SupplierPaymentsClient() {
         return combinedNames.sort().map(name => ({ value: name, label: toTitleCase(name) }));
     }, [banks]);
     
-  const availableBranches = useMemo(() => {
+    const availableBranches = useMemo(() => {
         if (!bankDetails.bank || !Array.isArray(bankBranches)) return [];
         const branchesForBank = bankBranches.filter((branch: any) => branch.bankName.toLowerCase() === bankDetails.bank.toLowerCase());
         const uniqueBranches = new Map<string, { value: string; label: string }>();
@@ -886,15 +862,11 @@ const processPayment = async () => {
     
     const transactionsForSelectedSupplier = useMemo(() => {
         if (!selectedCustomerKey || !suppliers) return [];
-
+    
         const groupedData = customerSummaryMap.get(selectedCustomerKey);
         if (!groupedData) return [];
-
-        // Get all unique customerIds from the grouped entries
-        const customerIdsInGroup = new Set(groupedData.allTransactions?.map(t => t.customerId));
-
-        // Filter all suppliers to find entries that belong to this group
-        return suppliers.filter(s => customerIdsInGroup.has(s.customerId));
+        
+        return groupedData.allTransactions || [];
     }, [selectedCustomerKey, suppliers, customerSummaryMap]);
 
 
@@ -985,18 +957,20 @@ const processPayment = async () => {
                         isPayeeEditing={isPayeeEditing} setIsPayeeEditing={setIsPayeeEditing}
                         bankDetails={bankDetails} setBankDetails={setBankDetails}
                         banks={banks} bankBranches={bankBranches} paymentId={paymentId} setPaymentId={setPaymentId}
-                        handlePaymentIdBlur={handlePaymentIdBlur} rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType}
+                        handlePaymentIdBlur={handlePaymentIdBlur} editingPayment={editingPayment}
+                        rtgsSrNo={rtgsSrNo} setRtgsSrNo={setRtgsSrNo} paymentType={paymentType} setPaymentType={setPaymentType} paymentDate={paymentDate} setPaymentDate={setPaymentDate}
                         paymentAmount={paymentAmount} setPaymentAmount={setPaymentAmount} cdEnabled={cdEnabled}
                         setCdEnabled={setCdEnabled} cdPercent={cdPercent} setCdPercent={setCdPercent}
                         cdAt={cdAt} setCdAt={setCdAt} calculatedCdAmount={calculatedCdAmount} sixRNo={sixRNo}
                         setSixRNo={setSixRNo} sixRDate={sixRDate} setSixRDate={setSixRDate} utrNo={utrNo}
                         setUtrNo={setUtrNo} 
-                        parchiNo={parchiNo} setParchiNo={setParchiNo}
+                        parchiNo={parchiNo} setParchiNo={setParchiNo} checkNo={checkNo}
+                        setCheckNo={setCheckNo}
                         rtgsQuantity={rtgsQuantity} setRtgsQuantity={setRtgsQuantity} rtgsRate={rtgsRate}
                         setRtgsRate={setRtgsRate} rtgsAmount={rtgsAmount} setRtgsAmount={setRtgsAmount}
                         processPayment={processPayment} isProcessing={isProcessing} resetPaymentForm={() => resetPaymentForm(rtgsFor === 'Outsider')}
-                        editingPayment={editingPayment} setIsBankSettingsOpen={setIsBankSettingsOpen} checkNo={checkNo}
-                        setCheckNo={setCheckNo}
+                        setIsBankSettingsOpen={setIsBankSettingsOpen}
+                        // Combination Generator Props
                         calcTargetAmount={calcTargetAmount} setCalcTargetAmount={setCalcTargetAmount}
                         calcMinRate={calcMinRate} setCalcMinRate={setCalcMinRate}
                         calcMaxRate={calcMaxRate} setCalcMaxRate={setCalcMaxRate}
@@ -1007,6 +981,7 @@ const processPayment = async () => {
                         sortedPaymentOptions={sortedPaymentOptions}
                         roundFigureToggle={roundFigureToggle}
                         setRoundFigureToggle={setRoundFigureToggle}
+                        // Bank Account Props
                         bankAccounts={bankAccounts}
                         selectedAccountId={selectedAccountId}
                         setSelectedAccountId={handleSetSelectedAccount}
@@ -1035,12 +1010,20 @@ const processPayment = async () => {
             isOpen={isOutstandingModalOpen}
             onOpenChange={setIsOutstandingModalOpen}
             customerName={toTitleCase(customerSummaryMap.get(selectedCustomerKey || '')?.name || '')}
-            entries={suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0)}
+            entries={suppliers.filter(s => {
+                const summary = customerSummaryMap.get(selectedCustomerKey || '');
+                if (!summary || !summary.allTransactions) return false;
+                return summary.allTransactions.some(trans => trans.id === s.id) && parseFloat(String(s.netAmount)) > 0;
+            })}
             selectedIds={selectedEntryIds}
             onSelect={handleEntrySelect}
             onSelectAll={(checked: boolean) => {
                 const newSet = new Set<string>();
-                const outstandingEntries = suppliers.filter(s => s.customerId === customerIdKey && parseFloat(String(s.netAmount)) > 0);
+                const outstandingEntries = suppliers.filter(s => {
+                    const summary = customerSummaryMap.get(selectedCustomerKey || '');
+                    if (!summary || !summary.allTransactions) return false;
+                    return summary.allTransactions.some(trans => trans.id === s.id) && parseFloat(String(s.netAmount)) > 0;
+                });
                 if(checked) outstandingEntries.forEach(e => newSet.add(e.id));
                 setSelectedEntryIds(newSet);
             }}
