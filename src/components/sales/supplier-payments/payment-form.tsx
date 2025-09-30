@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -130,7 +129,16 @@ export const PaymentForm = (props: any) => {
                     </div>
                 )}
                 
-                {paymentMethod === 'RTGS' && <RtgsForm {...props} />}
+                {paymentMethod === 'RTGS' && (
+                    <div className="space-y-3 pt-2">
+                        <PaymentCombinationGenerator 
+                            calcTargetAmount={calcTargetAmount}
+                            setCalcTargetAmount={setCalcTargetAmount}
+                            selectPaymentAmount={selectPaymentAmount}
+                        />
+                        <RtgsForm {...props} />
+                    </div>
+                )}
                  
                  <CardFooter className="p-0 pt-3">
                     <Card className="bg-muted/30 w-full p-2">
