@@ -8,11 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Printer, Info, Pen, Trash, Download } from "lucide-react";
+import { Printer, Info, Download } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPrintRtgs, onExport }: any) => {
+export const PaymentHistory = ({ payments, onShowDetails, onPrintRtgs, onExport }: any) => {
     return (
         <Card>
             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
@@ -61,7 +60,7 @@ export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPr
                                 ))}
                                 {payments.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={10} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
+                                        <TableCell colSpan={7} className="text-center text-muted-foreground h-24">No payment history found.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
