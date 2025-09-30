@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -100,6 +99,7 @@ export default function SupplierEntryClient() {
   const [dailyPaymentLimit, setDailyPaymentLimit] = useState(800000);
 
   const [suggestedSupplier, setSuggestedSupplier] = useState<Customer | null>(null);
+  const [isManageOptionsOpen, setIsManageOptionsOpen] = useState(false);
 
   const safeSuppliers = useMemo(() => Array.isArray(suppliers) ? suppliers : [], [suppliers]);
   const safePaymentHistory = useMemo(() => Array.isArray(paymentHistory) ? paymentHistory : [], [paymentHistory]);
@@ -789,14 +789,6 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-      
-      {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
 
       <DetailsDialog
         isOpen={!!detailsSupplier}
