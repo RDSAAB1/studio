@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useCallback, useMemo } from 'react';
@@ -88,13 +87,23 @@ export const useSupplierPayments = () => {
     const handleEditPayment = async (paymentToEdit: any) => {
         try {
             setActiveTab('processing');
+            // This function from payment-logic will undo the payment and set the form state
             await handleEditPaymentLogic(paymentToEdit, { ...data, ...form });
+
+            // **NEW FIX**: After form state is set, also set the selected entry IDs
+            if (paymentToEdit.rtgsFor === 'Supplier' && paymentToEdit.paidFor) {
+                const srNosInPayment = paymentToEdit.paidFor.map((pf: any) => pf.srNo);
+                const entriesToSelect = data.suppliers.filter((s: Customer) => srNosInPayment.includes(s.srNo));
+                form.setSelectedEntryIds(new Set(entriesToSelect.map((s: Customer) => s.id)));
+            }
+
             toast({ title: `Editing Payment ${paymentToEdit.paymentId}`, description: "Details loaded. Make changes and re-save." });
         } catch (error: any) {
             toast({ title: "Cannot Edit", description: error.message, variant: "destructive" });
             form.setEditingPayment(null);
         }
     };
+
 
     const handleDeletePayment = async (paymentIdToDelete: string, isEditing: boolean = false) => {
          try {
