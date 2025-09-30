@@ -55,24 +55,6 @@ export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPr
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onShowDetails(p)}>
                                                     <Info className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
-                                                    <Pen className="h-4 w-4" />
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Trash className="h-4 w-4 text-destructive" /></Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>This will permanently delete payment {p.paymentId} and restore the outstanding amount.</AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => p.id && onDelete(p.id)}>Continue</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
                                             </div>
                                         </TableCell>
                                     </TableRow>

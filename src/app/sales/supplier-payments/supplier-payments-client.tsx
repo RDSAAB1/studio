@@ -126,8 +126,6 @@ export default function SupplierPaymentsClient() {
                      <div className="space-y-3">
                         <PaymentHistory
                             payments={hook.paymentHistory}
-                            onEdit={hook.handleEditPayment}
-                            onDelete={hook.handleDeletePayment}
                             onShowDetails={hook.setSelectedPaymentForDetails}
                             onPrintRtgs={hook.setRtgsReceiptData}
                         />
