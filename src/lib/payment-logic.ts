@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc } from 'firebase/firestore';
@@ -223,15 +222,14 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
             }
         }
         
-        // Instead of deleting, mark as deleted to preserve transaction history but reverse financial impact
         if (paymentToDelete.expenseTransactionId) {
             const expenseDocRef = doc(expensesCollection, paymentToDelete.expenseTransactionId);
-            transaction.update(expenseDocRef, { isDeleted: true });
+            transaction.delete(expenseDocRef);
         }
         
-        // Mark the payment itself as deleted instead of removing it
-        transaction.update(paymentRef, { isDeleted: true });
+        // Hard delete the payment document
+        transaction.delete(paymentRef);
 
-        await deletePaymentFromLocalDB(paymentIdToDelete); // This should be updated to handle soft deletes if needed
+        await deletePaymentFromLocalDB(paymentIdToDelete);
     });
 };
