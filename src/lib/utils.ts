@@ -2,7 +2,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Customer, Payment, Holiday } from './definitions';
-import { isSunday, addDays, differenceInCalendarDays } from 'date-fns';
+import { isSunday, addDays, differenceInCalendarDays, isValid, parseISO } from 'date-fns';
 
 interface SupplierFormValues {
     date: Date;
@@ -76,9 +76,21 @@ export const generateReadableId = (prefix: string, lastNumber: number, padding: 
 };
 
 export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paymentHistory: any[], holidays: Holiday[], dailyPaymentLimit: number, allSuppliers: Customer[]) => {
-    const date = values.date ? new Date(values.date) : new Date();
     const termDays = Number(values.term) || 0;
-    let newDueDate = addDays(date, termDays);
+    
+    let entryDate: Date;
+    if (values.date) {
+        // If it's already a Date object, use it. If it's a string, parse it.
+        entryDate = typeof values.date === 'string' ? parseISO(values.date) : values.date;
+        if (!isValid(entryDate)) {
+            entryDate = new Date(); // Fallback to today if parsing fails
+        }
+    } else {
+        entryDate = new Date();
+    }
+    entryDate.setHours(0, 0, 0, 0);
+
+    let newDueDate = addDays(entryDate, termDays);
 
     let warning = '';
     let suggestedTerm: number | null = null;
@@ -92,7 +104,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
         }
         warning = `Due date was on a holiday/Sunday.`;
         newDueDate = shiftedDate;
-        suggestedTerm = differenceInCalendarDays(newDueDate, date);
+        suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
     }
     
     if (allSuppliers && allSuppliers.length > 0) {
@@ -112,7 +124,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
             }
             warning += ` Daily limit of ${formatCurrency(dailyPaymentLimit)} on ${newDueDate.toLocaleDateString()} reached.`;
             newDueDate = nextAvailableDate;
-            suggestedTerm = differenceInCalendarDays(newDueDate, date);
+            suggestedTerm = differenceInCalendarDays(newDueDate, entryDate);
         }
     }
 
@@ -146,7 +158,7 @@ export const calculateSupplierEntry = (values: Partial<SupplierFormValues>, paym
 
     return {
       ...values,
-      date: date instanceof Date ? date.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      date: entryDate,
       term: String(values.term), dueDate: newDueDate.toISOString().split("T")[0],
       weight: weight,
       kartaWeight: kartaWeight,
@@ -203,12 +215,20 @@ export const calculateCustomerEntry = (values: Partial<CustomerFormValues>, paym
       
     const netAmount = originalNetAmount - totalPaidForThisEntry;
 
-    const currentDate = values.date ? new Date(values.date) : new Date();
+    let entryDate: Date;
+    if (values.date) {
+        entryDate = typeof values.date === 'string' ? parseISO(values.date) : values.date;
+        if (!isValid(entryDate)) entryDate = new Date();
+    } else {
+        entryDate = new Date();
+    }
+    entryDate.setHours(0, 0, 0, 0);
+
 
     return {
         ...values,
-        date: currentDate.toISOString().split("T")[0],
-        dueDate: (values.date ? new Date(values.date) : new Date()).toISOString().split("T")[0],
+        date: entryDate,
+        dueDate: entryDate.toISOString().split("T")[0],
         weight: weight,
         netWeight: netWeight,
         amount: amount,

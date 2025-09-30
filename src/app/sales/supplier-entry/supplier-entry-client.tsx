@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
-import { format } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
 
@@ -148,14 +148,19 @@ export default function SupplierEntryClient() {
     setSuggestedSupplier(null);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
     let formDate;
-    try {
-        formDate = customerState.date ? new Date(customerState.date) : today;
-        if (isNaN(formDate.getTime())) formDate = today;
-    } catch {
+    if (customerState.date && typeof customerState.date === 'string') {
+        formDate = parseISO(customerState.date);
+    } else if (customerState.date instanceof Date) {
+        formDate = customerState.date;
+    } else {
         formDate = today;
     }
-    
+    if (!isValid(formDate)) {
+        formDate = today;
+    }
+
     const formValues: FormValues = {
         srNo: customerState.srNo,
         date: formDate,
@@ -422,7 +427,7 @@ const handleDelete = async (id: string) => {
         ...values,
         id: values.srNo, // Use srNo as ID
         date: format(values.date, 'yyyy-MM-dd'),
-        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
+        dueDate: format(parseISO(currentSupplier.dueDate), 'yyyy-MM-dd'),
         term: String(values.term),
         name: toTitleCase(values.name),
         so: toTitleCase(values.so),
@@ -787,7 +792,7 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-
+        
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
@@ -824,6 +829,3 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
-
-    

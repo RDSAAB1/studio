@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments } from "@/lib/firestore";
-import { format } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -261,13 +261,19 @@ export default function CustomerEntryClient() {
   const resetFormToState = useCallback((customerState: Customer) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     let formDate;
-    try {
-        formDate = customerState.date ? new Date(customerState.date) : today;
-        if (isNaN(formDate.getTime())) formDate = today;
-    } catch {
+    if (customerState.date && typeof customerState.date === 'string') {
+        formDate = parseISO(customerState.date);
+    } else if (customerState.date instanceof Date) {
+        formDate = customerState.date;
+    } else {
         formDate = today;
     }
+    if (!isValid(formDate)) {
+        formDate = today;
+    }
+    
     const formValues: FormValues = {
       srNo: customerState.srNo, date: formDate, bags: customerState.bags || 0,
       name: customerState.name, companyName: customerState.companyName || '', address: customerState.address,
