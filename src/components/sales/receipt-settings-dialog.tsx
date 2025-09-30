@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -14,13 +15,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface ReceiptSettingsDialogProps {
+    isOpen: boolean;
+    setIsOpen: (isOpen: boolean) => void;
     settings: ReceiptSettings | null;
     setSettings: (settings: ReceiptSettings) => void;
 }
 
-export const ReceiptSettingsDialog = ({ settings, setSettings }: ReceiptSettingsDialogProps) => {
+export const ReceiptSettingsDialog = ({ isOpen, setIsOpen, settings, setSettings }: ReceiptSettingsDialogProps) => {
     const { toast } = useToast();
-    const [isOpen, setIsOpen] = useState(false);
     const [tempSettings, setTempSettings] = useState<ReceiptSettings | null>(null);
 
     const handleOpen = () => {
@@ -70,10 +72,10 @@ export const ReceiptSettingsDialog = ({ settings, setSettings }: ReceiptSettings
                         <div className="space-y-4">
                             <h3 className="font-semibold text-lg border-b pb-2">Company Information</h3>
                             <div className="space-y-1"><Label>Company Name</Label><Input value={tempSettings.companyName} onChange={(e) => setTempSettings({...tempSettings, companyName: e.target.value})} /></div>
-                            <div className="space-y-1"><Label>Address 1</Label><Input value={tempSettings.address1} onChange={(e) => setTempSettings({...tempSettings, address1: e.target.value})} /></div>
-                            <div className="space-y-1"><Label>Address 2</Label><Input value={tempSettings.address2} onChange={(e) => setTempSettings({...tempSettings, address2: e.target.value})} /></div>
+                            <div className="space-y-1"><Label>Address 1</Label><Input value={tempSettings.companyAddress1} onChange={(e) => setTempSettings({...tempSettings, companyAddress1: e.target.value})} /></div>
+                            <div className="space-y-1"><Label>Address 2</Label><Input value={tempSettings.companyAddress2} onChange={(e) => setTempSettings({...tempSettings, companyAddress2: e.target.value})} /></div>
                             <div className="space-y-1"><Label>Contact No.</Label><Input value={tempSettings.contactNo} onChange={(e) => setTempSettings({...tempSettings, contactNo: e.target.value})} /></div>
-                            <div className="space-y-1"><Label>Email</Label><Input type="email" value={tempSettings.email} onChange={(e) => setTempSettings({...tempSettings, email: e.target.value})} /></div>
+                            <div className="space-y-1"><Label>Email</Label><Input type="email" value={tempSettings.gmail} onChange={(e) => setTempSettings({...tempSettings, gmail: e.target.value})} /></div>
                         </div>
                         <div className="space-y-4">
                             <h3 className="font-semibold text-lg border-b pb-2">Visible Fields</h3>

@@ -22,7 +22,8 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
-import { firestoreDB, db } from "./firebase"; // Renamed to avoid conflict
+import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
+import { db } from "./database";
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
 
@@ -996,4 +997,3 @@ export function getInventoryItemsRealtime(callback: (data: InventoryItem[]) => v
         callback(items);
     }, onError);
 }
-

@@ -387,13 +387,13 @@ const handleDelete = async (id: string) => {
       return;
     }
 
-    const entryToDelete = safeSuppliers.find(s => s.id === id);
-    if (!entryToDelete) {
-        toast({ title: "Entry not found.", variant: "destructive" });
-        return;
-    }
-
     try {
+        const entryToDelete = safeSuppliers.find(s => s.id === id);
+        if (!entryToDelete) {
+            toast({ title: "Entry not found.", variant: "destructive" });
+            return;
+        }
+
         const associatedPayments = safePaymentHistory.filter(p =>
             p.paidFor?.some(pf => pf.srNo === entryToDelete.srNo)
         );
@@ -790,6 +790,14 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
       
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
@@ -810,6 +818,8 @@ const handleDelete = async (id: string) => {
       />
 
       <ReceiptSettingsDialog
+        isOpen={isManageOptionsOpen}
+        setIsOpen={setIsManageOptionsOpen}
         settings={receiptSettings}
         setSettings={setReceiptSettings}
       />
@@ -826,4 +836,3 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
