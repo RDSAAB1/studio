@@ -78,16 +78,16 @@ export default function SupplierPaymentsClient() {
                                 </button>
                             </div>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => setIsHistoryOpen(true)}>
-                            <History className="mr-2 h-4 w-4" />
-                            View History
+                        <Button variant="outline" size="icon" onClick={() => setIsHistoryOpen(true)}>
+                            <History className="h-4 w-4" />
+                            <span className="sr-only">View History</span>
                         </Button>
                     </div>
                 </CardHeader>
             </Card>
 
-            <div className="space-y-3 mt-0">
-                {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
+            <div className="space-y-3">
+                 {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
                     <Card>
                         <CardContent className="p-3">
                             <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
@@ -133,8 +133,6 @@ export default function SupplierPaymentsClient() {
                     <div className="flex-grow min-h-0">
                         <PaymentHistory
                             payments={hook.paymentHistory}
-                            onEdit={hook.handleEditPayment}
-                            handleDeletePayment={hook.handleDeletePayment}
                             onShowDetails={hook.setSelectedPaymentForDetails}
                             onPrintRtgs={hook.setRtgsReceiptData}
                         />
