@@ -21,7 +21,7 @@ interface OptionsManagerDialogProps {
     options: OptionItem[];
     onAdd: (collectionName: string, optionData: { name: string }) => void;
     onUpdate: (collectionName: string, id: string, optionData: { name: string }) => void;
-    onDelete: (collectionName: string, id: string) => void;
+    onDelete: (collectionName: string, id: string, name: string) => void;
 }
 
 export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, onUpdate, onDelete }: OptionsManagerDialogProps) => {
@@ -99,7 +99,7 @@ export const OptionsManagerDialog = ({ isOpen, setIsOpen, type, options, onAdd, 
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => onDelete(collectionName, option.id)}>Continue</AlertDialogAction>
+                                                    <AlertDialogAction onClick={() => onDelete(collectionName, option.id, option.name)}>Continue</AlertDialogAction>
                                                 </AlertDialogFooter>
                                             </AlertDialogContent>
                                         </AlertDialog>
