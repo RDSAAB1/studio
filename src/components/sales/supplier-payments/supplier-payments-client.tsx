@@ -9,12 +9,12 @@ import { useSupplierPayments } from '@/hooks/use-supplier-payments';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, History } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
@@ -59,16 +59,11 @@ export default function SupplierPaymentsClient() {
              <Card>
                  <CardHeader className="p-3">
                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <Tabs value={hook.paymentMethod} onValueChange={(value) => {
-                            hook.setPaymentMethod(value);
-                            hook.resetPaymentForm(hook.rtgsFor === 'Outsider');
-                        }}>
-                            <TabsList className="grid w-full grid-cols-3 h-9">
-                                <TabsTrigger value="Cash">Cash</TabsTrigger>
-                                <TabsTrigger value="Online">Online</TabsTrigger>
-                                <TabsTrigger value="RTGS">RTGS</TabsTrigger>
-                            </TabsList>
-                        </Tabs>
+                        <div className="flex items-center gap-2">
+                             <Button onClick={() => { hook.setPaymentMethod('Cash'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'Cash' ? 'default' : 'outline'} size="sm">Cash</Button>
+                             <Button onClick={() => { hook.setPaymentMethod('Online'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'Online' ? 'default' : 'outline'} size="sm">Online</Button>
+                             <Button onClick={() => { hook.setPaymentMethod('RTGS'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'RTGS' ? 'default' : 'outline'} size="sm">RTGS</Button>
+                        </div>
 
                         {hook.paymentMethod === 'RTGS' && (
                              <div className="flex items-center space-x-2">
