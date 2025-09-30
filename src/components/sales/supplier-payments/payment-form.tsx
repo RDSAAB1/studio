@@ -44,7 +44,7 @@ export const PaymentForm = (props: any) => {
     return (
         <Card>
             <CardContent className="p-3 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-x-3 gap-y-2 items-end">
+                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-x-3 gap-y-2 items-end">
                     <div className="space-y-1">
                         <Label className="text-xs">Payment Date</Label>
                         <Popover>
@@ -93,10 +93,28 @@ export const PaymentForm = (props: any) => {
                 </div>
                 
                 {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && cdEnabled && (
-                    <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-3 gap-2">
-                        <div className="space-y-1"><Label htmlFor="cd-percent" className="text-xs">CD %</Label><Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>
-                        <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
-                        <div className="space-y-1"><Label className="text-xs">CD Amount</Label><Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" /></div>
+                     <div className="p-2 border rounded-lg bg-background grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="cd-percent" className="text-xs">CD%</Label>
+                            <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs flex-1" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-xs">At</Label>
+                            <Select value={cdAt} onValueChange={setCdAt}>
+                                <SelectTrigger className="h-8 text-xs flex-1">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {cdOptions.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-xs">Amt</Label>
+                            <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary flex-1" />
+                        </div>
                     </div>
                 )}
                 
