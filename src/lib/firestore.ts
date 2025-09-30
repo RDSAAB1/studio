@@ -71,7 +71,7 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
     return onSnapshot(docRef, (doc) => {
         if (doc.exists()) {
             const data = doc.data();
-            const options = data.items.map((name: string, index: number) => ({ id: `${name}-${index}`, name }));
+            const options = Array.isArray(data.items) ? data.items.map((name: string) => ({ id: name, name })) : [];
             callback(options);
         } else {
             callback([]);
@@ -997,3 +997,5 @@ export function getInventoryItemsRealtime(callback: (data: InventoryItem[]) => v
         callback(items);
     }, onError);
 }
+
+    
