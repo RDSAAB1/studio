@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -259,14 +258,6 @@ export default function SupplierEntryClient() {
     };
   }, [isClient, form, toast]);
   
-  useEffect(() => {
-    const subscription = form.watch((value) => {
-        performCalculations(value as Partial<FormValues>, false);
-    });
-    return () => subscription.unsubscribe();
-  }, [form, performCalculations]);
-
-  
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
     if(isClient) {
@@ -280,7 +271,15 @@ export default function SupplierEntryClient() {
         localStorage.setItem('lastSelectedPaymentType', paymentType);
     }
   }
+  
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+        performCalculations(value as Partial<FormValues>, false);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, performCalculations]);
 
+  
   const handleEdit = (id: string) => {
     const customerToEdit = safeSuppliers.find(c => c.id === id);
     if (customerToEdit) {
@@ -381,8 +380,8 @@ export default function SupplierEntryClient() {
 
 const handleDelete = async (id: string) => {
     if (!id) {
-        toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
-        return;
+      toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
+      return;
     }
 
     const entryToDelete = safeSuppliers.find(s => s.id === id);
@@ -787,7 +786,15 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-        
+      
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
@@ -824,3 +831,5 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+    
