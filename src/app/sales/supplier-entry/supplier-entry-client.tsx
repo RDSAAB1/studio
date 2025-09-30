@@ -187,8 +187,10 @@ export default function SupplierEntryClient() {
       setSuggestedSupplier(null);
       let nextSrNum = 1;
       if (safeSuppliers && safeSuppliers.length > 0) {
-          const highestSrNo = safeSuppliers.reduce((max, s) => s.srNo > max ? s.srNo : max, 'S00000');
-          nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
+        const highestSrNo = safeSuppliers.reduce((max, s) => {
+            return s.srNo > max ? s.srNo : max;
+        }, 'S00000');
+        nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
       }
       const newState = getInitialFormState(lastVariety, lastPaymentType);
       newState.srNo = generateReadableId('S', nextSrNum - 1, 5);
@@ -619,7 +621,7 @@ const handleDelete = async (id: string) => {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${''}${toTitleCase(item['NAME']).toLowerCase()}|${''}${String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -727,8 +729,8 @@ const handleDelete = async (id: string) => {
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
-                setLastVariety={setLastVariety}
-                setLastPaymentType={setLastPaymentType}
+                setLastVariety={handleSetLastVariety}
+                setLastPaymentType={handleSetLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -786,15 +788,7 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-      
-      {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
-
+        
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
@@ -831,5 +825,3 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
-    
