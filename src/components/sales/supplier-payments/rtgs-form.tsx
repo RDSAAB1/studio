@@ -189,7 +189,7 @@ export const RtgsForm = (props: any) => {
             <Separator />
             
             <SectionTitle title="RTGS Details" />
-            <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 items-end">
+            <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 items-end">
                 <div className="space-y-1"><Label className="text-xs">RTGS SR No.</Label><Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono"/></div>
                 <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                 <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
@@ -202,7 +202,7 @@ export const RtgsForm = (props: any) => {
                         <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={sixRDate} onSelect={setSixRDate} initialFocus /></PopoverContent>
                     </Popover>
                 </div>
-                <div className="space-y-1 col-span-full"><Label className="text-xs">Parchi No. (SR#)</Label><Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs"/></div>
+                <div className="space-y-1"><Label className="text-xs">Parchi No. (SR#)</Label><Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs"/></div>
             </div>
         </div>
     );
