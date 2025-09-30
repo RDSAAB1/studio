@@ -1,6 +1,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { Customer, Payment, CustomerPayment, Transaction, OptionItem, Bank, BankBranch, BankAccount, RtgsSettings, ReceiptSettings, Project, Loan, FundTransaction, Employee, PayrollEntry, AttendanceEntry, InventoryItem, FormatSettings, Holiday } from './definitions';
+import { getSuppliersRealtime, getPaymentsRealtime } from './firestore';
 
 export class AppDatabase extends Dexie {
     suppliers!: Table<Customer>;
@@ -53,6 +54,32 @@ if (typeof window !== 'undefined') {
 
 // Export the db instance. It will be undefined on the server.
 export { db };
+
+// --- Synchronization Logic ---
+export async function syncAllData() {
+    if (!db) return;
+
+    console.log("Starting full data sync...");
+
+    // Sync Suppliers
+    getSuppliersRealtime(async (suppliers) => {
+        if (suppliers.length > 0) {
+            await db.suppliers.bulkPut(suppliers);
+            console.log(`Synced ${suppliers.length} suppliers.`);
+        }
+    }, (error) => console.error("Sync Error (Suppliers):", error));
+
+    // Sync Payments
+    getPaymentsRealtime(async (payments) => {
+        if (payments.length > 0) {
+            await db.payments.bulkPut(payments);
+            console.log(`Synced ${payments.length} payments.`);
+        }
+    }, (error) => console.error("Sync Error (Payments):", error));
+
+    // Add other sync functions here as needed
+}
+
 
 // --- Local DB Helper Functions ---
 export async function updateSupplierInLocalDB(id: string, data: Partial<Customer>) {

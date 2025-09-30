@@ -11,7 +11,8 @@ import { Loader2 } from 'lucide-react';
 import AppLayoutWrapper from '@/components/layout/app-layout';
 import { getFirebaseAuth, onAuthStateChanged, type User } from '@/lib/firebase';
 import { usePathname, useRouter } from 'next/navigation';
-import { getRtgsSettings } from "@/lib/firestore";
+import { getRtgsSettings, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
+import { db, syncAllData } from '@/lib/database';
 
 
 const inter = Inter({
@@ -46,6 +47,8 @@ const AuthWrapper = ({ children }: { children: ReactNode }) => {
             if (currentUser) {
                 const companySettings = await getRtgsSettings();
                 setIsSetupComplete(!!companySettings?.companyName);
+                // Initial data sync on login
+                syncAllData();
             } else {
                 setIsSetupComplete(undefined);
             }

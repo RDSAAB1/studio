@@ -17,6 +17,7 @@ import { AdvancedCalculator } from "../calculator/advanced-calculator";
 import { useRouter } from "next/navigation";
 import { getDailyPaymentLimit, getHolidays, getLoansRealtime } from '@/lib/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { syncAllData } from "@/lib/database";
 
 const DynamicIslandToaster = dynamic(
   () => import('../ui/dynamic-island-toaster').then(mod => mod.default),
@@ -221,6 +222,19 @@ const DraggableCalculator = () => {
 
 export function Header({ toggleSidebar }: HeaderProps) {
   const router = useRouter();
+  const { toast } = useToast();
+
+  const handleManualSync = async () => {
+    const id = "sync-toast";
+    toast({ id, title: "Syncing data...", description: "Please wait..." });
+    try {
+        await syncAllData();
+        toast({ id, title: "Sync Complete", description: "Your data is up to date.", variant: "success" });
+    } catch (error) {
+        console.error("Manual sync failed:", error);
+        toast({ id, title: "Sync Failed", description: "Could not sync data.", variant: "destructive" });
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-10 items-center gap-4 border-b bg-card px-4 sm:px-6 flex-shrink-0">
@@ -242,6 +256,10 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
         {/* Right Aligned Icons */}
         <div className={cn("flex flex-shrink-0 items-center justify-end gap-2")}>
+          <Button variant="ghost" size="icon" onClick={handleManualSync}>
+             <RefreshCw className="h-5 w-5" />
+             <span className="sr-only">Sync Data</span>
+          </Button>
           <NotificationBell />
           <DraggableCalculator />
           <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
