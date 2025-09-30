@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 import { addCustomer, deleteCustomer, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deleteCustomerPaymentsForSrNo, getInitialCustomers, getMoreCustomers, getInitialCustomerPayments, getMoreCustomerPayments } from "@/lib/firestore";
-import { format, parseISO, isValid } from "date-fns";
+import { format } from "date-fns";
 
 import { CustomerForm } from "@/components/sales/customer-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -262,15 +262,11 @@ export default function CustomerEntryClient() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let formDate;
-    if (customerState.date && typeof customerState.date === 'string') {
-        formDate = parseISO(customerState.date);
-    } else if (customerState.date instanceof Date) {
-        formDate = customerState.date;
-    } else {
-        formDate = today;
-    }
-    if (!isValid(formDate)) {
+    let formDate: Date;
+    try {
+        formDate = customerState.date ? new Date(customerState.date) : today;
+        if (isNaN(formDate.getTime())) formDate = today;
+    } catch {
         formDate = today;
     }
     
@@ -307,11 +303,8 @@ export default function CustomerEntryClient() {
     setIsEditing(false);
     let nextSrNum = 1;
     if (safeCustomers.length > 0) {
-        const maxSrNoNum = safeCustomers.reduce((maxNum, s) => {
-            const currentNum = parseInt(s.srNo.substring(1), 10);
-            return isNaN(currentNum) ? maxNum : Math.max(maxNum, currentNum);
-        }, 0);
-        nextSrNum = maxSrNoNum + 1;
+        const highestSrNo = safeCustomers.reduce((max, s) => s.srNo > max ? s.srNo : max, 'C00000');
+        nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
     }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'C');
@@ -599,7 +592,7 @@ export default function CustomerEntryClient() {
                 for (const item of json) {
                     const customerData: Partial<Customer> = {
                         srNo: item.srNo || formatSrNo(nextSrNum++, 'C'),
-                        date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        date: item.date ? format(new Date(item.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         name: toTitleCase(item.name),
                         companyName: toTitleCase(item.companyName || ''),
                         address: toTitleCase(item.address || ''),
@@ -685,8 +678,8 @@ export default function CustomerEntryClient() {
                 handleContactBlur={handleContactBlur}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
-                setLastVariety={handleSetLastVariety}
-                setLastPaymentType={handleSetLastPaymentType}
+                setLastVariety={setLastVariety}
+                setLastPaymentType={setLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -769,3 +762,5 @@ export default function CustomerEntryClient() {
     </div>
   );
 }
+
+    

@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
-import { format, parseISO, isValid } from "date-fns";
+import { format } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
 
@@ -149,18 +149,14 @@ export default function SupplierEntryClient() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    let formDate;
-    if (customerState.date && typeof customerState.date === 'string') {
-        formDate = parseISO(customerState.date);
-    } else if (customerState.date instanceof Date) {
-        formDate = customerState.date;
-    } else {
+    let formDate: Date;
+    try {
+        formDate = customerState.date ? new Date(customerState.date) : today;
+        if (isNaN(formDate.getTime())) formDate = today;
+    } catch {
         formDate = today;
     }
-    if (!isValid(formDate)) {
-        formDate = today;
-    }
-
+    
     const formValues: FormValues = {
         srNo: customerState.srNo,
         date: formDate,
@@ -191,11 +187,8 @@ export default function SupplierEntryClient() {
       setSuggestedSupplier(null);
       let nextSrNum = 1;
       if (safeSuppliers && safeSuppliers.length > 0) {
-          const maxSrNoNum = safeSuppliers.reduce((maxNum, s) => {
-              const currentNum = parseInt(s.srNo.substring(1), 10);
-              return isNaN(currentNum) ? maxNum : Math.max(maxNum, currentNum);
-          }, 0);
-          nextSrNum = maxSrNoNum + 1;
+          const highestSrNo = safeSuppliers.reduce((max, s) => s.srNo > max ? s.srNo : max, 'S00000');
+          nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
       }
       const newState = getInitialFormState(lastVariety, lastPaymentType);
       newState.srNo = generateReadableId('S', nextSrNum - 1, 5);
@@ -427,7 +420,7 @@ const handleDelete = async (id: string) => {
         ...values,
         id: values.srNo, // Use srNo as ID
         date: format(values.date, 'yyyy-MM-dd'),
-        dueDate: format(parseISO(currentSupplier.dueDate), 'yyyy-MM-dd'),
+        dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
         so: toTitleCase(values.so),
@@ -449,8 +442,9 @@ const handleDelete = async (id: string) => {
         if (deletePayments) {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
-            const savedEntry = await addSupplier(updatedEntry);
-            if (callback) callback(savedEntry); else handleNew();
+            await addSupplier(updatedEntry);
+            toast({ title: "Entry updated and payments deleted.", variant: "success" });
+            if (callback) callback(updatedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
             toast({ title: `Entry ${isEditing ? 'updated' : 'saved'} successfully.`, variant: "success" });
@@ -601,9 +595,9 @@ const handleDelete = async (id: string) => {
                      const supplierData: Customer = {
                         id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
                         srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        date: item['DATE'] ? format(new Date(item['DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         term: String(item['TERM'] || '20'),
-                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        dueDate: item['DUE DATE'] ? format(new Date(item['DUE DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         name: toTitleCase(item['NAME']),
                         so: toTitleCase(item['S/O'] || ''),
                         address: toTitleCase(item['ADDRESS'] || ''),
@@ -625,7 +619,7 @@ const handleDelete = async (id: string) => {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${''}${toTitleCase(item['NAME']).toLowerCase()}|${''}${String(item['CONTACT'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -733,8 +727,8 @@ const handleDelete = async (id: string) => {
                 handleNameOrSoBlur={findAndSuggestSimilarSupplier}
                 varietyOptions={varietyOptions}
                 paymentTypeOptions={paymentTypeOptions}
-                setLastVariety={handleSetLastVariety}
-                setLastPaymentType={handleSetLastPaymentType}
+                setLastVariety={setLastVariety}
+                setLastPaymentType={setLastPaymentType}
                 handleAddOption={addOption}
                 handleUpdateOption={updateOption}
                 handleDeleteOption={deleteOption}
@@ -792,7 +786,15 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-        
+      
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
@@ -829,3 +831,5 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+    
