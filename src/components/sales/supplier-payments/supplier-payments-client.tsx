@@ -87,10 +87,9 @@ export default function SupplierPaymentsClient() {
                 <TabsContent value="processing" className="space-y-3">
                     {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
                         <Card>
-                            <CardContent className="p-3">
-                                <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
-                                    <div className="flex flex-1 items-center gap-2">
-                                        <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
+                             <CardHeader className="p-3">
+                                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                                    <div className="flex-1">
                                         <CustomDropdown
                                             options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
                                             value={hook.selectedCustomerKey}
@@ -99,16 +98,16 @@ export default function SupplierPaymentsClient() {
                                         />
                                     </div>
                                     {hook.selectedCustomerKey && (
-                                        <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
-                                            <div className="flex items-center gap-1 text-xs">
+                                        <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
+                                            <div className="flex items-baseline gap-2 text-sm">
                                                 <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                                <p className="font-bold text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                                                <p className="font-bold text-base text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
                                             </div>
                                             <Button variant="outline" size="sm" onClick={() => hook.setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
                                         </div>
                                     )}
                                 </div>
-                            </CardContent>
+                            </CardHeader>
                         </Card>
                     )}
 
