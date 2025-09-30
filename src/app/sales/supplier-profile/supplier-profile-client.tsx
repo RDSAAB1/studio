@@ -331,8 +331,8 @@ export default function SupplierProfileClient() {
 
         return {
             ...entry,
-            totalPaidForThisEntry,
-            totalCdForThisEntry,
+            totalPaidForEntry,
+            totalCdForEntry,
             netAmount: (entry.originalNetAmount || 0) - totalPaidForEntry - totalCdForEntry,
             paymentHistoryForThisEntry: paymentsForThisEntry,
         };
@@ -369,8 +369,8 @@ export default function SupplierProfileClient() {
 
         data.totalOriginalAmount += detailedEntry.originalNetAmount;
         data.totalAmount += detailedEntry.amount;
-        data.totalPaid += detailedEntry.totalPaidForThisEntry;
-        data.totalCdAmount! += detailedEntry.totalCdForThisEntry;
+        data.totalPaid += detailedEntry.totalPaidForEntry;
+        data.totalCdAmount! += detailedEntry.totalCdForEntry;
         
         data.totalGrossWeight! += detailedEntry.grossWeight;
         data.totalTeirWeight! += detailedEntry.teirWeight;
@@ -392,9 +392,9 @@ export default function SupplierProfileClient() {
     });
 
     // Final calculations for each profile
-    summary.forEach(data => {
-        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
+    summary.forEach((data, key) => {
         data.totalDeductions = data.totalKartaAmount! + data.totalLabouryAmount! + data.totalKanta! + data.totalOtherCharges!;
+        data.totalOutstanding = data.totalOriginalAmount - data.totalPaid - data.totalCdAmount!;
         data.totalOutstandingTransactions = data.allTransactions.filter(t => t.netAmount >= 1).length;
         data.averageRate = data.totalFinalWeight! > 0 ? data.totalAmount / data.totalFinalWeight! : 0;
         data.averageOriginalPrice = data.totalNetWeight! > 0 ? data.totalOriginalAmount / data.totalNetWeight! : 0;
@@ -552,3 +552,5 @@ export default function SupplierProfileClient() {
     </div>
   );
 }
+
+    
