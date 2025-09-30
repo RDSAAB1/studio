@@ -68,6 +68,26 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         const lastNum = Math.max(lastCashNum, lastExpenseNum);
         return generateReadableId('EX', lastNum, 5);
     }, [paymentHistory, expenses]);
+
+    const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        let value = e.target.value.trim();
+        if (!value) return;
+
+        if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
+            const num = parseInt(value, 10);
+            let prefix = 'EX';
+            let padding = 5;
+            if (paymentMethod === 'Online') {
+                prefix = 'P';
+                padding = 6;
+            } else if (paymentMethod === 'RTGS') {
+                prefix = 'RT';
+                padding = 5;
+            }
+             const formattedId = generateReadableId(prefix, num - 1, padding);
+             setPaymentId(formattedId);
+        }
+    };
     
     useEffect(() => {
         if (!editingPayment) {
@@ -99,7 +119,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
     return {
         selectedCustomerKey, setSelectedCustomerKey,
         selectedEntryIds, setSelectedEntryIds,
-        paymentId, setPaymentId,
+        paymentId, setPaymentId, handlePaymentIdBlur,
         rtgsSrNo, setRtgsSrNo,
         paymentDate, setPaymentDate,
         paymentAmount, setPaymentAmount,
