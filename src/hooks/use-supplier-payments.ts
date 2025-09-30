@@ -15,7 +15,16 @@ import type { Customer } from '@/lib/definitions';
 export const useSupplierPayments = () => {
     const { toast } = useToast();
     const data = useSupplierData();
-    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses);
+
+    const handleConflict = (message: string) => {
+        toast({
+            title: "ID Occupied",
+            description: message,
+            variant: "destructive",
+        });
+    };
+
+    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, handleConflict);
     // Pass paymentDate to usePaymentCalculations
     const calculations = usePaymentCalculations(data, { ...form, paymentDate: form.paymentDate });
 
@@ -118,13 +127,6 @@ export const useSupplierPayments = () => {
         toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
     };
     
-    const handleConflict = (message: string) => {
-        toast({
-            title: "ID Occupied",
-            description: message,
-            variant: "destructive",
-        });
-    };
 
     return {
         ...data,

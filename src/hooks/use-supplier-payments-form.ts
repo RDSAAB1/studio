@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateReadableId } from '@/lib/utils';
 import type { Payment, Expense } from '@/lib/definitions';
 
-export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[]) => {
+export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], onConflict: (message: string) => void) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [paymentId, setPaymentId] = useState('');
@@ -42,7 +42,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (method === 'RTGS') {
             const rtgsPayments = paymentHistory.filter(p => p.rtgsSrNo);
             const lastNum = rtgsPayments.reduce((max, p) => {
-                const numMatch = p.rtgsSrNo?.match(/^R(\d+)$/);
+                const numMatch = p.rtgsSrNo?.match(/^RT(\d+)$/);
                 const num = numMatch ? parseInt(numMatch[1], 10) : 0;
                 return num > max ? num : max;
             }, 0);
@@ -87,7 +87,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
                  // For RTGS, blur on this field shouldn't format, as the primary ID is rtgsSrNo
                 return;
             }
-             formattedId = generateReadableId(prefix, num - 1, padding);
+             formattedId = generateReadableId(prefix, num, padding);
              setPaymentId(formattedId);
         }
         
@@ -102,10 +102,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (paymentMethod === 'Cash') {
             const existingExpense = expenses.find(ex => ex.transactionId === formattedId);
             if (existingExpense) {
-                // Here we would ideally call a toast function passed in from the component
                 console.warn(`Payment ID ${formattedId} is already used in expenses.`);
-                if (props.onConflict) {
-                     props.onConflict(`Payment ID ${formattedId} is already used for an expense: ${existingExpense.description}`);
+                if (onConflict) {
+                     onConflict(`Payment ID ${formattedId} is already used for an expense: ${existingExpense.description}`);
                 }
             }
         }
@@ -117,7 +116,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
         let formattedId = value.toUpperCase();
         if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
-            formattedId = generateReadableId('RT', parseInt(value, 10) - 1, 5);
+            formattedId = generateReadableId('RT', parseInt(value, 10), 5);
             setRtgsSrNo(formattedId);
         }
 
