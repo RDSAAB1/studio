@@ -286,7 +286,7 @@ export async function addSupplier(supplierData: Customer): Promise<Customer> {
     const docRef = doc(suppliersCollection, supplierData.id);
     await setDoc(docRef, supplierData);
     if (db) {
-        await db.suppliers.put(supplierData);
+        await db.suppliers.put(supplierData); // WRITE-THROUGH
     }
     return supplierData;
 }
@@ -299,7 +299,7 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
   const docRef = doc(suppliersCollection, id);
   await updateDoc(docRef, supplierData);
   if (db) {
-      await db.suppliers.update(id, supplierData);
+      await db.suppliers.update(id, supplierData); // WRITE-THROUGH
   }
   return true;
 }
@@ -311,13 +311,17 @@ export async function deleteSupplier(id: string): Promise<void> {
   }
   await deleteDoc(doc(suppliersCollection, id));
   if (db) {
-      await db.suppliers.delete(id);
+      await db.suppliers.delete(id); // WRITE-THROUGH
   }
 }
 
 export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
     const batch = writeBatch(firestoreDB);
     const paymentsBatch = writeBatch(firestoreDB);
+
+    if (db) {
+        await db.suppliers.where('srNo').anyOf(srNos).delete();
+    }
 
     for (const srNo of srNos) {
         const supplierDocRef = doc(suppliersCollection, srNo);
@@ -390,10 +394,18 @@ export async function deletePaymentsForSrNo(srNo: string): Promise<void> {
   const paymentsQuery = query(supplierPaymentsCollection, where("paidFor", "array-contains", { srNo: srNo }));
   const snapshot = await getDocs(paymentsQuery);
   const batch = writeBatch(firestoreDB);
+  
+  const paymentIdsToDelete: string[] = [];
   snapshot.forEach(doc => {
       batch.delete(doc.ref);
+      paymentIdsToDelete.push(doc.id);
   });
+  
   await batch.commit();
+
+  if (db) {
+    await db.payments.bulkDelete(paymentIdsToDelete);
+  }
 }
 
 export async function deleteAllPayments(): Promise<void> {
@@ -403,6 +415,9 @@ export async function deleteAllPayments(): Promise<void> {
         batch.delete(doc.ref);
     });
     await batch.commit();
+    if (db) {
+        await db.payments.clear();
+    }
 }
 
 export async function deleteCustomerPaymentsForSrNo(srNo: string): Promise<void> {
@@ -448,6 +463,9 @@ export async function deletePayment(id: string, isEditing: boolean = false): Pro
 
         transaction.delete(paymentDocRef);
     });
+    if (db) {
+        await db.payments.delete(id); // WRITE-THROUGH
+    }
 }
 
 
@@ -703,6 +721,9 @@ export async function deleteAllSuppliers(): Promise<void> {
   const batch = writeBatch(firestoreDB);
   allDocs.forEach(doc => batch.delete(doc.ref));
   await batch.commit();
+  if (db) {
+    await db.suppliers.clear();
+  }
 }
 
 
@@ -975,3 +996,4 @@ export function getInventoryItemsRealtime(callback: (data: InventoryItem[]) => v
         callback(items);
     }, onError);
 }
+
