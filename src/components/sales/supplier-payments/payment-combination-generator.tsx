@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from '@/components/ui/switch';
 import { Bot, ArrowUpDown, Replace } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { usePaymentCombination } from '@/hooks/use-payment-combination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -51,10 +51,17 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
     }
 
     return (
-        <div className="p-2 border rounded-lg bg-background flex flex-wrap items-end gap-2">
-            <div className="flex items-center gap-2">
-                <Switch id="round-figure-toggle" checked={roundFigureToggle} onCheckedChange={setRoundFigureToggle} />
-                <Label htmlFor="round-figure-toggle" className="text-xs whitespace-nowrap">Round Figure</Label>
+        <div className="p-2 border rounded-lg bg-background flex flex-wrap items-end gap-3">
+            <div className="flex items-center space-x-2 pt-2">
+                 <button type="button" onClick={() => setRoundFigureToggle(!roundFigureToggle)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", roundFigureToggle ? 'bg-primary/20' : 'bg-secondary/20' )} >
+                    <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", roundFigureToggle ? 'text-primary' : 'text-muted-foreground')}>On</span>
+                    <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !roundFigureToggle ? 'text-primary' : 'text-muted-foreground')}>Off</span>
+                    <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", roundFigureToggle ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
+                        <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", roundFigureToggle ? 'bg-primary' : 'bg-secondary' )}>
+                            <span className="text-xs font-bold text-primary-foreground">Round Figure</span>
+                        </div>
+                    </div>
+                </button>
             </div>
             <div className="space-y-1 flex-1 min-w-[120px]">
                 <Label className="text-xs">Target Amount</Label>
