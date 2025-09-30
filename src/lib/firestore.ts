@@ -22,7 +22,7 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
-import { firestoreDB } from "./firebase"; // Renamed to avoid conflict
+import { firestoreDB, db } from "./firebase"; // Renamed to avoid conflict
 import type { Customer, FundTransaction, Payment, Transaction, PaidFor, Bank, BankBranch, RtgsSettings, OptionItem, ReceiptSettings, ReceiptFieldSettings, IncomeCategory, ExpenseCategory, AttendanceEntry, Project, Loan, BankAccount, CustomerPayment, FormatSettings, Income, Expense, Holiday } from "@/lib/definitions";
 import { toTitleCase, generateReadableId } from "./utils";
 
@@ -283,8 +283,11 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
 // --- Supplier Functions ---
 export async function addSupplier(supplierData: Customer): Promise<Customer> {
-    const docRef = doc(suppliersCollection, supplierData.srNo);
+    const docRef = doc(suppliersCollection, supplierData.id);
     await setDoc(docRef, supplierData);
+    if (db) {
+        await db.suppliers.put(supplierData);
+    }
     return supplierData;
 }
 
@@ -295,6 +298,9 @@ export async function updateSupplier(id: string, supplierData: Partial<Omit<Cust
   }
   const docRef = doc(suppliersCollection, id);
   await updateDoc(docRef, supplierData);
+  if (db) {
+      await db.suppliers.update(id, supplierData);
+  }
   return true;
 }
 
@@ -304,6 +310,9 @@ export async function deleteSupplier(id: string): Promise<void> {
     return;
   }
   await deleteDoc(doc(suppliersCollection, id));
+  if (db) {
+      await db.suppliers.delete(id);
+  }
 }
 
 export async function deleteMultipleSuppliers(srNos: string[]): Promise<void> {
