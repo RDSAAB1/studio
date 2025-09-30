@@ -44,8 +44,8 @@ export const PaymentForm = (props: any) => {
     return (
         <Card>
             <CardContent className="p-3 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-2 items-end">
-                    <div className="space-y-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-x-3 gap-y-2 items-end">
+                    <div className="space-y-1 lg:col-span-2">
                         <Label className="text-xs">Payment Date</Label>
                         <Popover>
                             <PopoverTrigger asChild>
@@ -65,7 +65,7 @@ export const PaymentForm = (props: any) => {
                         <div className="space-y-1"><Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label><Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" /></div>
                         
                         {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
-                            <div className="space-y-1 col-span-full sm:col-span-1 md:col-span-2 lg:col-span-1">
+                            <div className="space-y-1 col-span-full sm:col-span-1 md:col-span-2 lg:col-span-2">
                                 <Label className="text-xs">Parchi No. (SR#)</Label>
                                 <Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs bg-muted" readOnly />
                             </div>
@@ -89,8 +89,7 @@ export const PaymentForm = (props: any) => {
                 
                 {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
                 <>
-                <div className="flex items-center justify-between mt-4 mb-2">
-                    <h3 className="text-sm font-semibold">Cash Discount (CD)</h3>
+                <div className="flex items-center justify-end mt-4 mb-2">
                     <div className="flex items-center space-x-2">
                         <button type="button" onClick={() => setCdEnabled(!cdEnabled)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
                             <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
