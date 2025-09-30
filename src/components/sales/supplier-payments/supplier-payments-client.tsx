@@ -113,7 +113,7 @@ export default function SupplierPaymentsClient() {
                     )}
 
                     {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
-                        <PaymentForm {...hook} handleSetSelectedAccount={hook.handleSetSelectedAccount} bankBranches={hook.bankBranches} />
+                        <PaymentForm {...hook} bankBranches={hook.bankBranches} />
                     )}
                      {hook.selectedCustomerKey && (
                          <TransactionTable
@@ -127,7 +127,7 @@ export default function SupplierPaymentsClient() {
                         <PaymentHistory
                             payments={hook.paymentHistory}
                             onEdit={hook.handleEditPayment}
-                            onDelete={hook.handleDeletePayment}
+                            handleDeletePayment={hook.handleDeletePayment}
                             onShowDetails={hook.setSelectedPaymentForDetails}
                             onPrintRtgs={hook.setRtgsReceiptData}
                         />

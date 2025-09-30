@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Printer, Info, Pen, Trash, Download } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPrintRtgs, onExport }: any) => {
+export const PaymentHistory = ({ payments, onEdit, handleDeletePayment, onShowDetails, onPrintRtgs, onExport }: any) => {
     return (
         <Card>
             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
@@ -69,7 +69,7 @@ export const PaymentHistory = ({ payments, onEdit, onDelete, onShowDetails, onPr
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
                                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => p.id && onDelete(p.id)}>Continue</AlertDialogAction>
+                                                        <AlertDialogAction onClick={() => p.id && handleDeletePayment(p.id)}>Continue</AlertDialogAction>
                                                     </AlertDialogFooter>
                                                     </AlertDialogContent>
                                                 </AlertDialog>
