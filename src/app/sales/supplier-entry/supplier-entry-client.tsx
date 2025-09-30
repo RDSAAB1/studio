@@ -11,9 +11,11 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getSuppliersRealtime, getPaymentsRealtime } from "@/lib/firestore";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
 import { format, addDays, isSunday } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
+import { handleDeletePaymentLogic } from "@/lib/payment-logic";
+
 
 import { SupplierForm } from "@/components/sales/supplier-form";
 import { CalculatedSummary } from "@/components/sales/calculated-summary";
@@ -70,6 +72,7 @@ export default function SupplierEntryClient() {
   const suppliers = useLiveQuery(() => db.suppliers.orderBy('srNo').reverse().toArray(), []);
   const paymentHistory = useLiveQuery(() => db.payments.toArray(), []);
 
+  const [currentSupplier, setCurrentSupplier] = useState<Customer>(() => getInitialFormState());
   const [isEditing, setIsEditing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,12 +126,23 @@ export default function SupplierEntryClient() {
     shouldFocusError: false,
   });
 
-  const formValues = form.watch();
-
-  const currentSupplier = useMemo(() => {
-    return calculateSupplierEntry(formValues, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers);
-  }, [formValues, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers]);
-
+  const performCalculations = useCallback((data: Partial<FormValues>, showWarning: boolean = false) => {
+      const { warning, suggestedTerm, ...calculatedState } = calculateSupplierEntry(data, safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers || []);
+      setCurrentSupplier(prev => ({...prev, ...calculatedState}));
+      if (showWarning && warning) {
+        let title = 'Date Warning';
+        let description = warning;
+        if (warning.includes('holiday')) {
+            title = 'Holiday on Due Date';
+            description = `Try Term: ${String(suggestedTerm)} days`;
+        } else if (warning.includes('limit')) {
+            title = 'Daily Limit Reached';
+            description = `Try Term: ${String(suggestedTerm)} days`;
+        }
+        
+        toast({ title, description, variant: 'destructive', duration: 7000 });
+      }
+  }, [safePaymentHistory, holidays, dailyPaymentLimit, safeSuppliers, toast]);
 
   const resetFormToState = useCallback((customerState: Customer) => {
     setSuggestedSupplier(null);
@@ -162,8 +176,10 @@ export default function SupplierEntryClient() {
         forceUnique: customerState.forceUnique || false,
     };
     
+    setCurrentSupplier(customerState);
     form.reset(formValues);
-  }, [form]);
+    performCalculations(formValues, false);
+  }, [form, performCalculations]);
 
   const handleNew = useCallback(() => {
       setIsEditing(false);
@@ -207,12 +223,6 @@ export default function SupplierEntryClient() {
   useEffect(() => {
     if (!isClient) return;
     
-    setIsLoading(true);
-    // Background sync listeners
-    const unsubSuppliers = getSuppliersRealtime(async (data) => { if (db) await db.suppliers.bulkPut(data); }, console.error);
-    const unsubPayments = getPaymentsRealtime(async (data) => { if (db) await db.payments.bulkPut(data); }, console.error);
-
-    // Fetch one-off settings
     const fetchSettings = async () => {
         const settings = await getReceiptSettings();
         if (settings) {
@@ -225,7 +235,6 @@ export default function SupplierEntryClient() {
     };
     fetchSettings();
 
-    // Fetch options
     const unsubVarieties = getOptionsRealtime('varieties', setVarietyOptions, (err) => console.error("Error fetching varieties:", err));
     const unsubPaymentTypes = getOptionsRealtime('paymentTypes', setPaymentTypeOptions, (err) => console.error("Error fetching payment types:", err));
 
@@ -242,15 +251,20 @@ export default function SupplierEntryClient() {
     }
 
     form.setValue('date', new Date());
-    setIsLoading(false);
 
     return () => {
-      unsubSuppliers();
-      unsubPayments();
       unsubVarieties();
       unsubPaymentTypes();
     };
   }, [isClient, form, toast]);
+  
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+        performCalculations(value as Partial<FormValues>, false);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, performCalculations]);
+
   
   const handleSetLastVariety = (variety: string) => {
     setLastVariety(variety);
@@ -361,24 +375,43 @@ export default function SupplierEntryClient() {
     }
   };
 
-
-  const handleDelete = async (id: string) => {
+const handleDelete = async (id: string) => {
     if (!id) {
-      toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
-      return;
+        toast({ title: "Cannot delete: invalid ID.", variant: "destructive" });
+        return;
     }
+
+    const entryToDelete = safeSuppliers.find(s => s.id === id);
+    if (!entryToDelete) {
+        toast({ title: "Entry not found.", variant: "destructive" });
+        return;
+    }
+
     try {
-      await deleteSupplier(id);
-      await deletePaymentsForSrNo(currentSupplier.srNo);
-      toast({ title: "Entry and payments deleted.", variant: "success" });
-      if (currentSupplier.id === id) {
-        handleNew();
-      }
+        const associatedPayments = safePaymentHistory.filter(p =>
+            p.paidFor?.some(pf => pf.srNo === entryToDelete.srNo)
+        );
+
+        for (const payment of associatedPayments) {
+            await handleDeletePaymentLogic(payment.id, safePaymentHistory);
+        }
+
+        await deleteSupplier(id);
+
+        // Optimistically update UI
+        if (db.suppliers) {
+            await db.suppliers.delete(id);
+        }
+
+        toast({ title: "Entry and associated payments deleted.", variant: "success" });
+        if (currentSupplier.id === id) {
+            handleNew();
+        }
     } catch (error) {
-      console.error("Error deleting supplier and payments: ", error);
-      toast({ title: "Failed to delete entry.", variant: "destructive" });
+        console.error("Error deleting supplier and payments: ", error);
+        toast({ title: "Failed to delete entry.", variant: "destructive" });
     }
-  };
+};
 
   const executeSubmit = async (values: FormValues, deletePayments: boolean = false, callback?: (savedEntry: Customer) => void) => {
     
@@ -664,7 +697,7 @@ export default function SupplierEntryClient() {
                   break;
           }
       }
-  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
+  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier, handleDelete]);
 
   useEffect(() => {
       document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -756,7 +789,7 @@ export default function SupplierEntryClient() {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-
+        
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}

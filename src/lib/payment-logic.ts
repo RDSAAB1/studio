@@ -6,7 +6,7 @@ import { firestoreDB } from "@/lib/firebase";
 import { toTitleCase, formatCurrency } from "@/lib/utils";
 import type { Customer, Payment, PaidFor, Expense, Income, RtgsSettings, BankAccount } from "@/lib/definitions";
 import { format } from 'date-fns';
-import { updateSupplierInLocalDB, deletePaymentFromLocalDB } from './database';
+import { updateSupplierInLocalDB, deletePaymentFromLocalDB, db } from './database';
 
 const suppliersCollection = collection(firestoreDB, "suppliers");
 const expensesCollection = collection(firestoreDB, "expenses");
@@ -217,7 +217,7 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
                     const amountToRestore = detail.amount + (paymentToDelete.cdApplied && paymentToDelete.cdAmount ? paymentToDelete.cdAmount / paymentToDelete.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                    await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
+                    if(db) await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                 }
             }
         }
@@ -230,6 +230,6 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
         // Hard delete the payment document
         transaction.delete(paymentRef);
 
-        await deletePaymentFromLocalDB(paymentIdToDelete);
+        if(db) await deletePaymentFromLocalDB(paymentIdToDelete);
     });
 };
