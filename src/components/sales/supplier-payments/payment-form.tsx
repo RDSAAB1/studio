@@ -63,18 +63,10 @@ export const PaymentForm = (props: any) => {
                         <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" /></div>
                         <div className="space-y-1"><Label className="text-xs">Payment Type</Label><Select value={paymentType} onValueChange={setPaymentType}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full">Full</SelectItem><SelectItem value="Partial">Partial</SelectItem></SelectContent></Select></div>
                         <div className="space-y-1"><Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label><Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" /></div>
-                        
-                        {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
-                            <div className="space-y-1 col-span-full sm:col-span-1 md:col-span-2 lg:col-span-2">
-                                <Label className="text-xs">Parchi No. (SR#)</Label>
-                                <Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs bg-muted" readOnly />
-                            </div>
-                        )}
-
                     </>
                     )}
                     
-                    {(paymentMethod === 'Online' || paymentMethod === 'RTGS') && (
+                    {(paymentMethod === 'Online' || paymentMethod === 'RTGS' || paymentMethod === 'Cash') && (
                          <div className="space-y-1 lg:col-span-2">
                             <Label className="text-xs">Payment From</Label>
                             <CustomDropdown
@@ -85,31 +77,27 @@ export const PaymentForm = (props: any) => {
                             />
                         </div>
                     )}
+                     {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
+                        <div className="flex items-center justify-center pt-2">
+                            <button type="button" onClick={() => setCdEnabled(!cdEnabled)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
+                                <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
+                                <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !cdEnabled ? 'text-primary' : 'text-muted-foreground')}>Off</span>
+                                <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", cdEnabled ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
+                                    <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", cdEnabled ? 'bg-primary' : 'bg-secondary' )}>
+                                        <span className="text-xs font-bold text-primary-foreground">CD</span>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    )}
                 </div>
                 
-                {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && (
-                <>
-                <div className="flex items-center justify-end">
-                    <div className="flex items-center space-x-2">
-                        <button type="button" onClick={() => setCdEnabled(!cdEnabled)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
-                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
-                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !cdEnabled ? 'text-primary' : 'text-muted-foreground')}>Off</span>
-                            <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", cdEnabled ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
-                                <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", cdEnabled ? 'bg-primary' : 'bg-secondary' )}>
-                                    <span className="text-xs font-bold text-primary-foreground">CD</span>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-                {cdEnabled && (
+                {(paymentMethod !== 'RTGS' || rtgsFor === 'Supplier') && cdEnabled && (
                     <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-3 gap-2">
                         <div className="space-y-1"><Label htmlFor="cd-percent" className="text-xs">CD %</Label><Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>
                         <div className="space-y-1"><Label className="text-xs">CD At</Label><Select value={cdAt} onValueChange={setCdAt}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{cdOptions.map(opt => (<SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>))}</SelectContent></Select></div>
                         <div className="space-y-1"><Label className="text-xs">CD Amount</Label><Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" /></div>
                     </div>
-                )}
-                </>
                 )}
                 
                 {paymentMethod === 'RTGS' && <RtgsForm {...props} />}
