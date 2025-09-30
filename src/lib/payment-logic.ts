@@ -97,7 +97,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         const expenseTransactionRef = doc(expensesCollection);
         const expenseData: Partial<Expense> = {
-            id: expenseTransactionRef.id, date: new Date().toISOString().split('T')[0],
+            id: expenseTransactionRef.id, 
+            date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             transactionType: 'Expense', category: 'Supplier Payments',
             subCategory: rtgsFor === 'Supplier' ? 'Supplier Payment' : 'Outsider Payment',
             amount: finalPaymentAmount, payee: supplierDetails.name,
@@ -111,7 +112,8 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
         if (cdEnabled && calculatedCdAmount > 0) {
             const incomeTransactionRef = doc(incomesCollection);
             const incomeData: Partial<Income> = {
-                id: incomeTransactionRef.id, date: new Date().toISOString().split('T')[0],
+                id: incomeTransactionRef.id, 
+                date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                 transactionType: 'Income', category: 'Cash Discount Received',
                 subCategory: 'Supplier CD', amount: calculatedCdAmount, payee: supplierDetails.name,
                 description: `CD received on payment ${paymentId}`,

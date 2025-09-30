@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useCallback, useMemo } from 'react';
@@ -9,7 +10,7 @@ import { useSupplierPaymentsForm } from './use-supplier-payments-form';
 import { processPaymentLogic, handleEditPaymentLogic, handleDeletePaymentLogic } from '@/lib/payment-logic';
 import { toTitleCase } from '@/lib/utils';
 import { addBank } from '@/lib/firestore';
-import type { Customer } from '@/lib/definitions';
+import type { Customer, Payment } from '@/lib/definitions';
 
 
 export const useSupplierPayments = () => {
@@ -25,8 +26,7 @@ export const useSupplierPayments = () => {
     };
 
     const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, handleConflict);
-    // Pass paymentDate to usePaymentCalculations
-    const calculations = usePaymentCalculations(data, { ...form, paymentDate: form.paymentDate });
+    const calculations = usePaymentCalculations(data, form);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [detailsSupplierEntry, setDetailsSupplierEntry] = useState<any | null>(null);
@@ -68,6 +68,7 @@ export const useSupplierPayments = () => {
 
             if (!result.success) {
                 toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
+                setIsProcessing(false);
                 return;
             }
 
