@@ -585,7 +585,7 @@ export async function addIncome(incomeData: Omit<Income, 'id'>): Promise<Income>
     const formatSettings = await getFormatSettings();
     const newTransactionId = incomeData.transactionId || (await (async () => {
         const incomesSnapshot = await getDocs(query(incomesCollection, orderBy('transactionId', 'desc'), limit(1)));
-        const lastNum = incomesSnapshot.empty ? 0 : parseInt(incomesSnapshot.docs[0].data().transactionId.replace(formatSettings.income?.prefix || 'IN', ''));
+        const lastNum = incomesSnapshot.empty ? 0 : parseInt(incomesSnapshot.docs[0].data().transactionId.replace(formatSettings.income?.prefix || 'IN', '')) || 0;
         return generateReadableId(formatSettings.income?.prefix || 'IN', lastNum, formatSettings.income?.padding || 5);
     })());
 

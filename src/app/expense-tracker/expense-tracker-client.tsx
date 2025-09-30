@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Transaction, IncomeCategory, ExpenseCategory, Project, FundTransaction, Loan, BankAccount, Income, Expense, Payment } from "@/lib/definitions";
-import { toTitleCase, cn, formatCurrency, formatTransactionId, generateReadableId } from "@/lib/utils";
+import { toTitleCase, cn, formatCurrency, generateReadableId } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -169,7 +169,8 @@ export default function IncomeExpenseClient() {
   }, [income, expenses])
 
   const allTransactions: DisplayTransaction[] = useMemo(() => {
-      const combined = [...(income || []), ...(expenses || [])];
+      if (!income || !expenses) return [];
+      const combined = [...income, ...expenses];
       return combined.sort((a, b) => (b.transactionId || '').localeCompare(a.transactionId || ''));
   }, [income, expenses]);
 
@@ -179,35 +180,17 @@ export default function IncomeExpenseClient() {
   }, [allTransactions]);
 
   const getNextTransactionId = useCallback((type: 'Income' | 'Expense') => {
-    if (type === 'Income') {
-        const relevantTransactions = allTransactions.filter(t => t.transactionType === 'Income');
-        const lastNum = relevantTransactions.reduce((max, t) => {
-            const numMatch = t.transactionId?.match(/^IN(\d+)$/);
-            if (numMatch && numMatch[1]) {
-                const num = parseInt(numMatch[1], 10);
-                return num > max ? num : max;
-            }
-            return max;
-        }, 0);
-        return generateReadableId('IN', lastNum, 5);
-    } else { // Expense
-        const cashPayments = payments.filter(p => p.receiptType === 'Cash');
-        const lastCashNum = cashPayments.reduce((max, p) => {
-            const numMatch = p.paymentId.match(/^EX(\d+)$/);
-            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-            return num > max ? num : max;
-        }, 0);
-        
-        const lastExpenseNum = expenses.reduce((max, e) => {
-            const numMatch = e.transactionId?.match(/^EX(\d+)$/);
-            const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-            return num > max ? num : max;
-        }, 0);
-
-        const lastNum = Math.max(lastCashNum, lastExpenseNum);
-        return generateReadableId('EX', lastNum, 5);
-    }
-  }, [allTransactions, payments, expenses]);
+      const relevantTransactions = allTransactions.filter(t => t.transactionId?.startsWith(type === 'Income' ? 'IN' : 'EX'));
+      const lastNum = relevantTransactions.reduce((max, t) => {
+          const numMatch = t.transactionId?.match(/^(IN|EX)(\d+)$/);
+          if (numMatch && numMatch[2]) {
+              const num = parseInt(numMatch[2], 10);
+              return num > max ? num : max;
+          }
+          return max;
+      }, 0);
+      return generateReadableId(type === 'Income' ? 'IN' : 'EX', lastNum, 5);
+  }, [allTransactions]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -591,6 +574,7 @@ export default function IncomeExpenseClient() {
   };
 
   const sortedTransactions = useMemo(() => {
+    if (!allTransactions) return [];
     let sortableItems = [...allTransactions];
     if (sortConfig !== null) {
         sortableItems.sort((a, b) => {
@@ -1074,3 +1058,4 @@ export default function IncomeExpenseClient() {
 
 
     
+

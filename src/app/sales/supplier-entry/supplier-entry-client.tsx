@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -6,7 +7,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance, generateReadableId } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
@@ -193,7 +194,7 @@ export default function SupplierEntryClient() {
           nextSrNum = maxSrNoNum + 1;
       }
       const newState = getInitialFormState(lastVariety, lastPaymentType);
-      newState.srNo = formatSrNo(nextSrNum, 'S');
+      newState.srNo = generateReadableId('S', nextSrNum - 1, 5);
       const today = new Date();
       today.setHours(0,0,0,0);
       newState.date = format(today, 'yyyy-MM-dd');
@@ -292,18 +293,21 @@ export default function SupplierEntryClient() {
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
     if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
-        formattedSrNo = formatSrNo(parseInt(formattedSrNo), 'S');
+        formattedSrNo = generateReadableId('S', parseInt(formattedSrNo, 10) - 1, 5);
         form.setValue('srNo', formattedSrNo);
     }
     const foundCustomer = safeSuppliers.find(c => c.srNo === formattedSrNo);
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
-    } else if (isEditing) {
-        // Keep the form data but switch to "new entry" mode for that SR No.
-        setIsEditing(false);
-        const currentData = form.getValues();
-        form.setValue('srNo', formattedSrNo);
+    } else {
+        if (isEditing) {
+            setIsEditing(false);
+            const currentId = currentSupplier.srNo;
+            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
+            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || generateReadableId('S', nextSrNum - 1, 5), id: currentId };
+            resetFormToState(newState);
+        }
     }
   }
 
