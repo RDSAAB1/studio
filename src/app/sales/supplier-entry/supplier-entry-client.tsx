@@ -619,14 +619,14 @@ const handleDelete = async (id: string) => {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${''toTitleCase(item['NAME']).toLowerCase()}|${''String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
 
                     await addSupplier(supplierData);
                 }
-                toast({title: "Import Successful", description: `${''json.length} supplier entries have been imported.`});
+                toast({title: "Import Successful", description: `${json.length} supplier entries have been imported.`});
             } catch (error) {
                 console.error("Import failed:", error);
                 toast({title: "Import Failed", description: "Please check the file format and content.", variant: "destructive"});
@@ -787,6 +787,14 @@ const handleDelete = async (id: string) => {
         onPrintRow={handleSinglePrint}
       />
       
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
+
       <DetailsDialog
         isOpen={!!detailsSupplier}
         onOpenChange={() => setDetailsSupplier(null)}
@@ -823,7 +831,3 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
-    
-
-    
