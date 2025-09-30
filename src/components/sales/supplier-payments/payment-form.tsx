@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -75,7 +75,7 @@ export const PaymentForm = (props: any) => {
                     )}
                     
                     {(paymentMethod === 'Online' || paymentMethod === 'RTGS') && (
-                         <div className="space-y-1">
+                         <div className="space-y-1 lg:col-span-2">
                             <Label className="text-xs">Payment From</Label>
                             <CustomDropdown
                                 options={[{ value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` }, ...bankAccounts.map((acc: any) => ({ value: acc.id, label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (${formatCurrency(financialState.balances.get(acc.id) || 0)})` }))]}
