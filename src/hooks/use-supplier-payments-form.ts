@@ -39,6 +39,20 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     // This is a new function to trigger auto-fill, which will be passed to the blur handler
     const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
 
+    useEffect(() => {
+        const savedAccountId = localStorage.getItem('defaultPaymentAccountId');
+        if (savedAccountId) {
+            setSelectedAccountId(savedAccountId);
+        }
+    }, []);
+
+    const handleSetSelectedAccountId = (accountId: string | null) => {
+        if (accountId) {
+            setSelectedAccountId(accountId);
+            localStorage.setItem('defaultPaymentAccountId', accountId);
+        }
+    };
+
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
         if (!paymentHistory || !expenses) return '';
         if (method === 'RTGS') {
@@ -163,7 +177,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         paymentAmount, setPaymentAmount,
         paymentType, setPaymentType,
         paymentMethod, setPaymentMethod,
-        selectedAccountId, setSelectedAccountId,
+        selectedAccountId, setSelectedAccountId: handleSetSelectedAccountId,
         supplierDetails, setSupplierDetails,
         bankDetails, setBankDetails,
         isPayeeEditing, setIsPayeeEditing,
