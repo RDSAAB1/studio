@@ -17,7 +17,7 @@ export const PaymentHistory = ({ payments, onEdit, handleDeletePayment, onShowDe
         <Card>
             <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Payment History</CardTitle>
-                <Button onClick={onExport} size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>
+                {onExport && <Button onClick={onExport} size="sm" variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>}
             </CardHeader>
             <CardContent className="p-0">
                 <ScrollArea className="h-96">
