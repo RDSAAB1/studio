@@ -299,14 +299,16 @@ export default function SupplierEntryClient() {
     if (foundCustomer) {
         setIsEditing(true);
         resetFormToState(foundCustomer);
-    } else {
-        if (isEditing) {
-            setIsEditing(false);
-            const currentId = currentSupplier.srNo;
-            const nextSrNum = safeSuppliers.length > 0 ? Math.max(...safeSuppliers.map(c => parseInt(c.srNo.substring(1)) || 0)) + 1 : 1;
-            const newState = {...getInitialFormState(lastVariety, lastPaymentType), srNo: formattedSrNo || generateReadableId('S', nextSrNum - 1, 5), id: currentId };
-            resetFormToState(newState);
-        }
+    } else if (isEditing) {
+        // Keep the form data but switch to "new entry" mode for that SR No.
+        setIsEditing(false);
+        const currentData = form.getValues();
+        setCurrentSupplier(prev => ({
+            ...prev,
+            srNo: formattedSrNo,
+            id: formattedSrNo // The new ID will be the SR No
+        }));
+        form.setValue('srNo', formattedSrNo);
     }
   }
 
@@ -595,9 +597,9 @@ const handleDelete = async (id: string) => {
                      const supplierData: Customer = {
                         id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
                         srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        date: item['DATE'] ? format(new Date(item['DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         term: String(item['TERM'] || '20'),
-                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        dueDate: item['DUE DATE'] ? format(new Date(item['DUE DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
                         name: toTitleCase(item['NAME']),
                         so: toTitleCase(item['S/O'] || ''),
                         address: toTitleCase(item['ADDRESS'] || ''),
@@ -786,14 +788,6 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-      
-      {hasMoreSuppliers && (
-        <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-        </div>
-       )}
 
       <DetailsDialog
         isOpen={!!detailsSupplier}
