@@ -54,63 +54,68 @@ export default function SupplierPaymentsClient() {
   
     return (
         <div className="space-y-3">
-            <Tabs value={hook.paymentMethod} onValueChange={(value) => {
-                hook.setPaymentMethod(value);
-                hook.resetPaymentForm(hook.rtgsFor === 'Outsider');
-            }}>
-                <TabsList className="grid w-full grid-cols-3 h-9">
-                    <TabsTrigger value="Cash">Cash</TabsTrigger>
-                    <TabsTrigger value="Online">Online</TabsTrigger>
-                    <TabsTrigger value="RTGS">RTGS</TabsTrigger>
-                </TabsList>
-            </Tabs>
+             <Card>
+                <CardHeader className="p-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 gap-2">
+                        <Tabs value={hook.paymentMethod} onValueChange={(value) => {
+                            hook.setPaymentMethod(value);
+                            hook.resetPaymentForm(hook.rtgsFor === 'Outsider');
+                        }}>
+                            <TabsList className="grid w-full grid-cols-3 h-9">
+                                <TabsTrigger value="Cash">Cash</TabsTrigger>
+                                <TabsTrigger value="Online">Online</TabsTrigger>
+                                <TabsTrigger value="RTGS">RTGS</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
 
-            {hook.paymentMethod === 'RTGS' && (
-                 <div className="flex items-center space-x-2 p-2">
-                    <button type="button" onClick={() => { const newType = hook.rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier'; hook.setRtgsFor(newType); hook.resetPaymentForm(newType === 'Outsider'); }} className={`relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${hook.rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'}`} >
-                        <span className={`absolute right-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground'}`}>Outsider</span>
-                        <span className={`absolute left-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground'}`}>Supplier</span>
-                        <div className={`absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform ${hook.rtgsFor === 'Supplier' ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'}`} >
-                            <div className={`h-full w-full rounded-full flex items-center justify-center transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'bg-secondary' : 'bg-primary'}`}>
-                                <span className="text-sm font-bold text-primary-foreground">For</span>
+                        {hook.paymentMethod === 'RTGS' && (
+                            <div className="flex items-center space-x-2">
+                                <button type="button" onClick={() => { const newType = hook.rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier'; hook.setRtgsFor(newType); hook.resetPaymentForm(newType === 'Outsider'); }} className={`relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${hook.rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'}`} >
+                                    <span className={`absolute right-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground'}`}>Outsider</span>
+                                    <span className={`absolute left-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground'}`}>Supplier</span>
+                                    <div className={`absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform ${hook.rtgsFor === 'Supplier' ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'}`} >
+                                        <div className={`h-full w-full rounded-full flex items-center justify-center transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'bg-secondary' : 'bg-primary'}`}>
+                                            <span className="text-sm font-bold text-primary-foreground">For</span>
+                                        </div>
+                                    </div>
+                                </button>
                             </div>
+                        )}
+                        <Tabs value={activeTab} onValueChange={setActiveTab}>
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="processing">Payment Processing</TabsTrigger>
+                                <TabsTrigger value="history">Full History</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
+                </CardHeader>
+                 {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
+                    <CardContent className="p-3 border-t">
+                        <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                            <div className="flex-1">
+                                <CustomDropdown
+                                    options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                                    value={hook.selectedCustomerKey}
+                                    onChange={hook.handleCustomerSelect}
+                                    placeholder="Search and select supplier..."
+                                />
+                            </div>
+                            {hook.selectedCustomerKey && (
+                                <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
+                                    <div className="flex items-baseline gap-2 text-sm">
+                                        <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
+                                        <p className="font-bold text-base text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                                    </div>
+                                    <Button variant="outline" size="sm" onClick={() => hook.setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
+                                </div>
+                            )}
                         </div>
-                    </button>
-                </div>
-            )}
+                    </CardContent>
+                 )}
+            </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                    <TabsTrigger value="history">Full History</TabsTrigger>
-                </TabsList>
-                <TabsContent value="processing" className="space-y-3">
-                    {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
-                        <Card>
-                             <CardHeader className="p-3">
-                                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                                    <div className="flex-1">
-                                        <CustomDropdown
-                                            options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
-                                            value={hook.selectedCustomerKey}
-                                            onChange={hook.handleCustomerSelect}
-                                            placeholder="Search and select supplier..."
-                                        />
-                                    </div>
-                                    {hook.selectedCustomerKey && (
-                                        <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
-                                            <div className="flex items-baseline gap-2 text-sm">
-                                                <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                                <p className="font-bold text-base text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
-                                            </div>
-                                            <Button variant="outline" size="sm" onClick={() => hook.setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardHeader>
-                        </Card>
-                    )}
-
+                <TabsContent value="processing" className="space-y-3 mt-0">
                     {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
                         <PaymentForm {...hook} bankBranches={hook.bankBranches} />
                     )}
@@ -121,7 +126,7 @@ export default function SupplierPaymentsClient() {
                          />
                      )}
                 </TabsContent>
-                <TabsContent value="history">
+                <TabsContent value="history" className="mt-0">
                      <div className="space-y-3">
                         <PaymentHistory
                             payments={hook.paymentHistory}
