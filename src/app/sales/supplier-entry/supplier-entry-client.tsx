@@ -789,6 +789,14 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
+      
+      {hasMoreSuppliers && (
+        <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+        </div>
+       )}
 
       <DetailsDialog
         isOpen={!!detailsSupplier}
