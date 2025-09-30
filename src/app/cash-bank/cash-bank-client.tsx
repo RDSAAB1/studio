@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -50,7 +51,7 @@ const initialLoanFormState: Partial<Loan> = {
     emiAmount: 0,
     tenureMonths: 0,
     interestRate: 0,
-    startDate: format(new Date(), 'yyyy-MM-dd'),
+    startDate: new Date().toISOString().split('T')[0],
     depositTo: "CashInHand",
     bankLoanType: "Fixed",
 };
@@ -290,6 +291,7 @@ export default function CashBankClient() {
             ...currentLoan,
             loanName: loanNameToSave,
             remainingAmount: (currentLoan.totalAmount || 0) - (currentLoan.amountPaid || 0),
+            startDate: currentLoan.startDate ? format(new Date(currentLoan.startDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             nextEmiDueDate: currentLoan.startDate ? format(addMonths(new Date(currentLoan.startDate), 1), 'yyyy-MM-dd') : undefined,
         };
     

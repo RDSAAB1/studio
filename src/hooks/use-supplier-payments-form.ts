@@ -1,9 +1,11 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateReadableId } from '@/lib/utils';
 import type { Payment, Expense } from '@/lib/definitions';
+import { format } from 'date-fns';
 
 export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], onConflict: (message: string) => void) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
                  // For RTGS, blur on this field shouldn't format, as the primary ID is rtgsSrNo
                 return;
             }
-             formattedId = generateReadableId(prefix, num, padding);
+             formattedId = generateReadableId(prefix, num-1, padding);
              setPaymentId(formattedId);
         }
         
@@ -102,7 +104,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (paymentMethod === 'Cash') {
             const existingExpense = expenses.find(ex => ex.transactionId === formattedId);
             if (existingExpense) {
-                console.warn(`Payment ID ${formattedId} is already used in expenses.`);
                 if (onConflict) {
                      onConflict(`Payment ID ${formattedId} is already used for an expense: ${existingExpense.description}`);
                 }
@@ -116,7 +117,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
         let formattedId = value.toUpperCase();
         if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
-            formattedId = generateReadableId('RT', parseInt(value, 10), 5);
+            formattedId = generateReadableId('RT', parseInt(value, 10)-1, 5);
             setRtgsSrNo(formattedId);
         }
 

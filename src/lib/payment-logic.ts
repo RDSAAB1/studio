@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { collection, doc, getDocs, query, runTransaction, where, addDoc, deleteDoc, limit, updateDoc } from 'firebase/firestore';
@@ -121,7 +122,7 @@ export const processPaymentLogic = async (context: any): Promise<ProcessPaymentR
 
         const paymentDataBase: Omit<Payment, 'id'> = {
             paymentId, customerId: rtgsFor === 'Supplier' ? selectedCustomerKey || '' : 'OUTSIDER',
-            date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : new Date().toISOString().split("T")[0],
+            date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
             amount: Math.round(finalPaymentAmount), cdAmount: Math.round(calculatedCdAmount),
             cdApplied: cdEnabled, type: paymentType, receiptType: paymentMethod,
             notes: `UTR: ${utrNo || ''}, Check: ${checkNo || ''}`,

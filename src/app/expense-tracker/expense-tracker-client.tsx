@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -70,11 +71,8 @@ type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 type DisplayTransaction = (Income | Expense) & { id: string };
 
 const getInitialFormState = (nextTxId: string): TransactionFormValues => {
-  const staticDate = new Date();
-  staticDate.setHours(0, 0, 0, 0);
-
   return {
-    date: staticDate,
+    date: new Date(),
     transactionType: 'Expense',
     category: '',
     subCategory: '',
