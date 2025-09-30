@@ -51,8 +51,8 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
     }
 
     return (
-        <div className="p-2 border rounded-lg bg-background flex flex-wrap items-end gap-3">
-            <div className="flex items-center space-x-2 pt-2">
+        <div className="p-2 border rounded-lg bg-background flex flex-wrap items-center gap-3">
+            <div className="flex items-center space-x-2">
                  <button type="button" onClick={() => setRoundFigureToggle(!roundFigureToggle)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", roundFigureToggle ? 'bg-primary/20' : 'bg-secondary/20' )} >
                     <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", roundFigureToggle ? 'text-primary' : 'text-muted-foreground')}>On</span>
                     <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !roundFigureToggle ? 'text-primary' : 'text-muted-foreground')}>Off</span>
@@ -63,16 +63,16 @@ export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorPr
                     </div>
                 </button>
             </div>
-            <div className="space-y-1 flex-1 min-w-[120px]">
-                <Label className="text-xs">Target Amount</Label>
+            <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+                <Label className="text-xs whitespace-nowrap">Target Amt</Label>
                 <Input type="number" value={calcTargetAmount} onChange={(e) => setCalcTargetAmount(Number(e.target.value))} className="h-8 text-xs" />
             </div>
-            <div className="space-y-1 flex-1 min-w-[100px]">
-                <Label className="text-xs">Min Rate</Label>
+            <div className="flex items-center gap-2 flex-1 min-w-[120px]">
+                <Label className="text-xs whitespace-nowrap">Min Rate</Label>
                 <Input type="number" value={minRate} onChange={(e) => setMinRate(Number(e.target.value))} className="h-8 text-xs" />
             </div>
-            <div className="space-y-1 flex-1 min-w-[100px]">
-                <Label className="text-xs">Max Rate</Label>
+            <div className="flex items-center gap-2 flex-1 min-w-[120px]">
+                <Label className="text-xs whitespace-nowrap">Max Rate</Label>
                 <Input type="number" value={maxRate} onChange={(e) => setMaxRate(Number(e.target.value))} className="h-8 text-xs" />
             </div>
              <div className="flex gap-2">
