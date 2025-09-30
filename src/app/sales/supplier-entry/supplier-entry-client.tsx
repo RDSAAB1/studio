@@ -11,8 +11,8 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
-import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit } from "@/lib/firestore";
-import { format, addDays, isSunday } from "date-fns";
+import { addSupplier, deleteSupplier, updateSupplier, getOptionsRealtime, addOption, updateOption, deleteOption, getReceiptSettings, updateReceiptSettings, deletePaymentsForSrNo, deleteAllSuppliers, deleteAllPayments, getHolidays, getDailyPaymentLimit, getInitialSuppliers, getMoreSuppliers, getInitialPayments, getMorePayments } from "@/lib/firestore";
+import { format } from "date-fns";
 import { Hourglass, Lightbulb } from "lucide-react";
 import { handleDeletePaymentLogic } from "@/lib/payment-logic";
 
@@ -59,7 +59,7 @@ const getInitialFormState = (lastVariety?: string, lastPaymentType?: string): Cu
   today.setHours(0, 0, 0, 0);
 
   return {
-    id: "", srNo: 'S----', date: today.toISOString().split('T')[0], term: '20', dueDate: today.toISOString().split('T')[0], 
+    id: "", srNo: 'S----', date: format(today, 'yyyy-MM-dd'), term: '20', dueDate: format(today, 'yyyy-MM-dd'), 
     name: '', so: '', address: '', contact: '', vehicleNo: '', variety: lastVariety || '', grossWeight: 0, teirWeight: 0,
     weight: 0, kartaPercentage: 1, kartaWeight: 0, kartaAmount: 0, netWeight: 0, rate: 0,
     labouryRate: 2, labouryAmount: 0, kanta: 50, amount: 0, netAmount: 0, originalNetAmount: 0, barcode: '',
@@ -196,8 +196,8 @@ export default function SupplierEntryClient() {
       newState.srNo = formatSrNo(nextSrNum, 'S');
       const today = new Date();
       today.setHours(0,0,0,0);
-      newState.date = today.toISOString().split('T')[0];
-      newState.dueDate = today.toISOString().split('T')[0];
+      newState.date = format(today, 'yyyy-MM-dd');
+      newState.dueDate = format(today, 'yyyy-MM-dd');
       resetFormToState(newState);
       form.setValue('date', new Date()); // Set today's date
       setTimeout(() => form.setFocus('srNo'), 50);
@@ -416,7 +416,7 @@ const handleDelete = async (id: string) => {
         ...currentSupplier,
         ...values,
         id: values.srNo, // Use srNo as ID
-        date: values.date.toISOString().split("T")[0],
+        date: format(values.date, 'yyyy-MM-dd'),
         dueDate: currentSupplier.dueDate, // Use the adjusted due date from state
         term: String(values.term),
         name: toTitleCase(values.name),
@@ -458,7 +458,7 @@ const handleDelete = async (id: string) => {
       return; // Do not submit if a suggestion is active and user hasn't chosen an action
     }
     if (isEditing) {
-        const hasPayments = safePaymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
+        const hasPayments = paymentHistory.some(p => p.paidFor?.some(pf => pf.srNo === currentSupplier.srNo));
         if (hasPayments) {
             setUpdateAction(() => (deletePayments: boolean) => executeSubmit(values, deletePayments, callback));
             setIsUpdateConfirmOpen(true);
@@ -539,7 +539,7 @@ const handleDelete = async (id: string) => {
     const handleExport = () => {
         if (!suppliers) return;
         const dataToExport = suppliers.map(c => {
-            const calculated = calculateSupplierEntry(c as FormValues, safePaymentHistory, [], 800000, []);
+            const calculated = calculateSupplierEntry(c as FormValues, paymentHistory, [], 800000, []);
             return {
                 'SR NO.': c.srNo,
                 'DATE': c.date,
@@ -691,7 +691,7 @@ const handleDelete = async (id: string) => {
                   break;
           }
       }
-  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier, handleDelete]);
+  }, [form, onSubmit, handleSaveAndPrint, handleNew, isEditing, currentSupplier]);
 
   useEffect(() => {
       document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -820,5 +820,3 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
-
-    
