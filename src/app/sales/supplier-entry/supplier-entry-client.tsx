@@ -6,7 +6,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Customer, Payment, OptionItem, ReceiptSettings, ConsolidatedReceiptData, Holiday } from "@/lib/definitions";
-import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance, generateReadableId } from "@/lib/utils";
+import { formatSrNo, toTitleCase, formatCurrency, calculateSupplierEntry, levenshteinDistance } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
 import { useToast } from "@/hooks/use-toast";
@@ -194,7 +194,7 @@ export default function SupplierEntryClient() {
         nextSrNum = parseInt(highestSrNo.substring(1)) + 1;
       }
       const newState = getInitialFormState(lastVariety, lastPaymentType);
-      newState.srNo = generateReadableId('S', nextSrNum - 1, 5);
+      newState.srNo = formatSrNo(nextSrNum, 'S');
       const today = new Date();
       today.setHours(0,0,0,0);
       newState.date = format(today, 'yyyy-MM-dd');
@@ -293,7 +293,7 @@ export default function SupplierEntryClient() {
   const handleSrNoBlur = (srNoValue: string) => {
     let formattedSrNo = srNoValue.trim();
     if (formattedSrNo && !isNaN(parseInt(formattedSrNo)) && isFinite(Number(formattedSrNo))) {
-        formattedSrNo = generateReadableId('S', parseInt(formattedSrNo, 10) - 1, 5);
+        formattedSrNo = formatSrNo(parseInt(formattedSrNo), 'S');
         form.setValue('srNo', formattedSrNo);
     }
     const foundCustomer = safeSuppliers.find(c => c.srNo === formattedSrNo);
@@ -642,6 +642,7 @@ const handleDelete = async (id: string) => {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
+            toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
             console.error("Error deleting all entries:", error);
@@ -763,12 +764,12 @@ const handleDelete = async (id: string) => {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                     A supplier with a very similar name already exists. Is this the same person?
-                    <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
-                        <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
-                        <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
-                        <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
-                    </div>
                 </AlertDialogDescription>
+                <div className="mt-4 p-4 bg-muted rounded-lg text-sm text-foreground">
+                    <span className="block"><strong>Name:</strong> {toTitleCase(suggestedSupplier?.name || '')}</span>
+                    <span className="block"><strong>S/O:</strong> {toTitleCase(suggestedSupplier?.so || '')}</span>
+                    <span className="block"><strong>Address:</strong> {toTitleCase(suggestedSupplier?.address || '')}</span>
+                </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogAction onClick={() => {
@@ -810,6 +811,8 @@ const handleDelete = async (id: string) => {
       />
 
       <ReceiptSettingsDialog
+        isOpen={false}
+        setIsOpen={() => {}}
         settings={receiptSettings}
         setSettings={setReceiptSettings}
       />
@@ -826,3 +829,7 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+    
+
+    
