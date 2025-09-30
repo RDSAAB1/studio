@@ -307,8 +307,11 @@ export default function CustomerEntryClient() {
     setIsEditing(false);
     let nextSrNum = 1;
     if (safeCustomers.length > 0) {
-        const lastSrNo = safeCustomers.sort((a, b) => a.srNo.localeCompare(b.srNo)).pop()?.srNo || 'C00000';
-        nextSrNum = parseInt(lastSrNo.substring(1)) + 1;
+        const maxSrNoNum = safeCustomers.reduce((maxNum, s) => {
+            const currentNum = parseInt(s.srNo.substring(1), 10);
+            return isNaN(currentNum) ? maxNum : Math.max(maxNum, currentNum);
+        }, 0);
+        nextSrNum = maxSrNoNum + 1;
     }
     const newState = getInitialFormState(lastVariety, lastPaymentType);
     newState.srNo = formatSrNo(nextSrNum, 'C');
