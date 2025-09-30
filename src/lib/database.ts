@@ -24,7 +24,7 @@ export class AppDatabase extends Dexie {
     
     constructor() {
         super('bizsuiteDB');
-        this.version(2).stores({
+        this.version(3).stores({
             suppliers: '&id, &srNo, name, contact, date, customerId',
             customers: '++id, &srNo, name, contact, date, customerId',
             payments: '++id, paymentId, customerId, date',
