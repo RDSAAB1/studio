@@ -82,7 +82,7 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
                     const newNetAmount = outstanding - paymentForThisEntry;
                     transaction.update(supplierRef, { netAmount: newNetAmount });
                     // Queue update for local DB
-                    await updateSupplierInLocalDB(entryData.id, { netAmount: newNetAmount });
+                    if (db) await updateSupplierInLocalDB(entryData.id, { netAmount: newNetAmount });
                     amountToDistribute -= paymentForThisEntry;
                 }
             }
@@ -217,7 +217,6 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
                     const amountToRestore = detail.amount + (paymentToDelete.cdApplied && paymentToDelete.cdAmount ? paymentToDelete.cdAmount / paymentToDelete.paidFor.length : 0);
                     const newNetAmount = (currentSupplier.netAmount as number) + amountToRestore;
                     transaction.update(customerDoc.ref, { netAmount: Math.round(newNetAmount) });
-                    if(db) await updateSupplierInLocalDB(customerDoc.id, { netAmount: Math.round(newNetAmount) });
                 }
             }
         }
@@ -229,7 +228,7 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
         
         // Hard delete the payment document
         transaction.delete(paymentRef);
-
-        if(db) await deletePaymentFromLocalDB(paymentIdToDelete);
     });
 };
+
+    

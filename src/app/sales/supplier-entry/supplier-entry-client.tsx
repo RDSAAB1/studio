@@ -398,11 +398,6 @@ const handleDelete = async (id: string) => {
 
         await deleteSupplier(id);
 
-        // Optimistically update UI
-        if (db.suppliers) {
-            await db.suppliers.delete(id);
-        }
-
         toast({ title: "Entry and associated payments deleted.", variant: "success" });
         if (currentSupplier.id === id) {
             handleNew();
@@ -641,7 +636,6 @@ const handleDelete = async (id: string) => {
         try {
             await deleteAllSuppliers();
             await deleteAllPayments();
-            toast({ title: "All entries deleted successfully", variant: "success" });
             handleNew();
         } catch (error) {
             console.error("Error deleting all entries:", error);
@@ -826,3 +820,5 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+    
