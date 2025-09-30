@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateReadableId } from '@/lib/utils';
-import type { Payment } from '@/lib/definitions';
+import type { Payment, Expense } from '@/lib/definitions';
 
-export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any[]) => {
+export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[]) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [paymentId, setPaymentId] = useState('');
@@ -33,6 +33,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
 
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [calcTargetAmount, setCalcTargetAmount] = useState(0);
+    
+    // This is a new function to trigger auto-fill, which will be passed to the blur handler
+    const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
 
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
         if (!paymentHistory || !expenses) return '';
@@ -69,23 +72,58 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         return generateReadableId('EX', lastNum, 5);
     }, [paymentHistory, expenses]);
 
-    const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
         let value = e.target.value.trim();
         if (!value) return;
 
+        let formattedId = value;
         if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
             const num = parseInt(value, 10);
             let prefix = 'EX';
             let padding = 5;
             if (paymentMethod === 'Online') {
-                prefix = 'P';
-                padding = 6;
+                prefix = 'P'; padding = 6;
             } else if (paymentMethod === 'RTGS') {
-                prefix = 'RT';
-                padding = 5;
+                 // For RTGS, blur on this field shouldn't format, as the primary ID is rtgsSrNo
+                return;
             }
-             const formattedId = generateReadableId(prefix, num - 1, padding);
+             formattedId = generateReadableId(prefix, num - 1, padding);
              setPaymentId(formattedId);
+        }
+        
+        // Check for existing payment to auto-fill (edit)
+        const existingPayment = paymentHistory.find(p => p.paymentId === formattedId);
+        if (existingPayment) {
+            onEditCallback(existingPayment);
+            return;
+        }
+
+        // Check for conflict with expenses if payment method is Cash
+        if (paymentMethod === 'Cash') {
+            const existingExpense = expenses.find(ex => ex.transactionId === formattedId);
+            if (existingExpense) {
+                // Here we would ideally call a toast function passed in from the component
+                console.warn(`Payment ID ${formattedId} is already used in expenses.`);
+                if (props.onConflict) {
+                     props.onConflict(`Payment ID ${formattedId} is already used for an expense: ${existingExpense.description}`);
+                }
+            }
+        }
+    };
+    
+    const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
+        let value = e.target.value.trim();
+        if (!value) return;
+
+        let formattedId = value.toUpperCase();
+        if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
+            formattedId = generateReadableId('RT', parseInt(value, 10) - 1, 5);
+            setRtgsSrNo(formattedId);
+        }
+
+        const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
+        if (existingPayment) {
+            onEditCallback(existingPayment);
         }
     };
     
@@ -120,7 +158,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         selectedCustomerKey, setSelectedCustomerKey,
         selectedEntryIds, setSelectedEntryIds,
         paymentId, setPaymentId, handlePaymentIdBlur,
-        rtgsSrNo, setRtgsSrNo,
+        rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
         paymentDate, setPaymentDate,
         paymentAmount, setPaymentAmount,
         paymentType, setPaymentType,
@@ -142,5 +180,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: any
         calcTargetAmount, setCalcTargetAmount,
         resetPaymentForm,
         handleFullReset,
+        onEdit, setOnEdit, // Pass setter for the callback
     };
 };

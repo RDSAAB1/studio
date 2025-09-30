@@ -35,12 +35,14 @@ export const RtgsForm = (props: any) => {
         rtgsFor, supplierDetails, setSupplierDetails,
         isPayeeEditing, setIsPayeeEditing,
         bankDetails, setBankDetails,
-        rtgsSrNo, setRtgsSrNo, sixRNo, setSixRNo, sixRDate, setSixRDate,
+        rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
+        sixRNo, setSixRNo, sixRDate, setSixRDate,
         utrNo, setUtrNo, parchiNo, setParchiNo, checkNo, setCheckNo,
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
         editingPayment, setIsBankSettingsOpen,
         calcTargetAmount, setCalcTargetAmount,
         selectPaymentAmount,
+        handleEditPayment, // Receive the edit handler
     } = props;
     
     const { banks, bankBranches } = useSupplierData();
@@ -188,7 +190,7 @@ export const RtgsForm = (props: any) => {
             
             <SectionTitle title="RTGS Details" />
             <div className="p-2 border rounded-lg bg-background grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 items-end">
-                <div className="space-y-1"><Label className="text-xs">RTGS SR No.</Label><Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} className="h-8 text-xs font-mono"/></div>
+                <div className="space-y-1"><Label className="text-xs">RTGS SR No.</Label><Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono"/></div>
                 <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
                 <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
                 <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>

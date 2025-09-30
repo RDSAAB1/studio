@@ -117,6 +117,14 @@ export const useSupplierPayments = () => {
         form.setRtgsAmount(option.calculatedAmount);
         toast({ title: `Selected: ${option.quantity} Qtl @ ${option.rate}`});
     };
+    
+    const handleConflict = (message: string) => {
+        toast({
+            title: "ID Occupied",
+            description: message,
+            variant: "destructive",
+        });
+    };
 
     return {
         ...data,
@@ -141,5 +149,6 @@ export const useSupplierPayments = () => {
         handlePaySelectedOutstanding,
         selectPaymentAmount,
         addBank: async (name: string) => { await addBank(name); toast({title: 'Bank Added', variant: 'success'}); },
+        onConflict: handleConflict,
     };
 };
