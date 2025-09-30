@@ -597,9 +597,9 @@ const handleDelete = async (id: string) => {
                      const supplierData: Customer = {
                         id: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
                         srNo: item['SR NO.'] || formatSrNo(nextSrNum++, 'S'),
-                        date: item['DATE'] ? format(new Date(item['DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                        date: item['DATE'] ? new Date(item['DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         term: String(item['TERM'] || '20'),
-                        dueDate: item['DUE DATE'] ? format(new Date(item['DUE DATE']), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+                        dueDate: item['DUE DATE'] ? new Date(item['DUE DATE']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                         name: toTitleCase(item['NAME']),
                         so: toTitleCase(item['S/O'] || ''),
                         address: toTitleCase(item['ADDRESS'] || ''),
@@ -621,7 +621,7 @@ const handleDelete = async (id: string) => {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${''toTitleCase(item['NAME']).toLowerCase()}|${''String(item['CONTACT'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -788,6 +788,12 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
+      
+      <div className="text-center">
+            <Button onClick={loadMoreData} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
+      </div>
 
       <DetailsDialog
         isOpen={!!detailsSupplier}
