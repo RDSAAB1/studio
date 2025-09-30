@@ -23,8 +23,8 @@ export class AppDatabase extends Dexie {
     inventoryItems!: Table<InventoryItem>;
     
     constructor() {
-        super('bizsuiteDB');
-        this.version(3).stores({
+        super('bizsuiteDB_v2');
+        this.version(1).stores({
             suppliers: '&id, &srNo, name, contact, date, customerId',
             customers: '++id, &srNo, name, contact, date, customerId',
             payments: '++id, paymentId, customerId, date',
