@@ -29,6 +29,7 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('processing');
 
     const hook = useSupplierPayments();
 
@@ -57,14 +58,13 @@ export default function SupplierPaymentsClient() {
     return (
         <div className="space-y-3">
              <Card>
-                 <CardHeader className="p-3">
-                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
+                 <CardHeader className="p-0">
+                    <div className="flex items-center justify-between p-3 border-b">
+                         <div className="flex items-center gap-2">
                              <Button onClick={() => { hook.setPaymentMethod('Cash'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'Cash' ? 'default' : 'outline'} size="sm">Cash</Button>
                              <Button onClick={() => { hook.setPaymentMethod('Online'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'Online' ? 'default' : 'outline'} size="sm">Online</Button>
                              <Button onClick={() => { hook.setPaymentMethod('RTGS'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'RTGS' ? 'default' : 'outline'} size="sm">RTGS</Button>
                         </div>
-
                         {hook.paymentMethod === 'RTGS' && (
                              <div className="flex items-center space-x-2">
                                 <button type="button" onClick={() => { const newType = hook.rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier'; hook.setRtgsFor(newType); hook.resetPaymentForm(newType === 'Outsider'); }} className={`relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${hook.rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'}`} >
@@ -84,12 +84,9 @@ export default function SupplierPaymentsClient() {
                         </Button>
                     </div>
                 </CardHeader>
-            </Card>
-
-            <div className="space-y-3">
-                 {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
-                    <Card>
-                        <CardContent className="p-3">
+                <CardContent className="p-3">
+                     {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
+                        <div className="mb-4">
                             <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                                 <div className="flex-1">
                                     <CustomDropdown
@@ -109,20 +106,19 @@ export default function SupplierPaymentsClient() {
                                     </div>
                                 )}
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
-                    <PaymentForm {...hook} bankBranches={hook.bankBranches} />
-                )}
-                 {hook.selectedCustomerKey && (
-                     <TransactionTable
-                        suppliers={transactionsForSelectedSupplier}
-                        onShowDetails={hook.setDetailsSupplierEntry}
-                     />
-                 )}
-            </div>
+                        </div>
+                    )}
+                     {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
+                        <PaymentForm {...hook} bankBranches={hook.bankBranches} />
+                    )}
+                     {hook.selectedCustomerKey && (
+                         <TransactionTable
+                            suppliers={transactionsForSelectedSupplier}
+                            onShowDetails={hook.setDetailsSupplierEntry}
+                         />
+                     )}
+                </CardContent>
+            </Card>
 
             <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
                 <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
