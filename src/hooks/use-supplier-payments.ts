@@ -64,15 +64,21 @@ export const useSupplierPayments = () => {
     const processPayment = async () => {
         setIsProcessing(true);
         try {
-            const finalPaymentData = await processPaymentLogic({ ...data, ...form, ...calculations });
+            const result = await processPaymentLogic({ ...data, ...form, ...calculations });
+
+            if (!result.success) {
+                toast({ title: "Transaction Failed", description: result.message, variant: "destructive" });
+                return;
+            }
+
             toast({ title: `Payment processed successfully.`, variant: 'success' });
-            if (form.paymentMethod === 'RTGS' && finalPaymentData) {
-                setRtgsReceiptData(finalPaymentData);
+            if (form.paymentMethod === 'RTGS' && result.payment) {
+                setRtgsReceiptData(result.payment);
             }
             form.resetPaymentForm(form.rtgsFor === 'Outsider');
         } catch (error: any) {
             console.error("Error processing payment:", error);
-            toast({ title: "Transaction Failed", description: error.message, variant: "destructive" });
+            toast({ title: "Transaction Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
         } finally {
             setIsProcessing(false);
         }

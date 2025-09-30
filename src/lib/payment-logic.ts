@@ -16,7 +16,13 @@ const settingsCollection = collection(firestoreDB, "settings");
 const bankAccountsCollection = collection(firestoreDB, "bankAccounts");
 
 
-export const processPaymentLogic = async (context: any): Promise<Payment | null> => {
+interface ProcessPaymentResult {
+    success: boolean;
+    message?: string;
+    payment?: Payment;
+}
+
+export const processPaymentLogic = async (context: any): Promise<ProcessPaymentResult> => {
     const {
         rtgsFor, selectedCustomerKey, selectedEntryIds, editingPayment,
         rtgsAmount, paymentAmount, paymentMethod, selectedAccountId,
@@ -28,10 +34,10 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
     } = context;
 
     if (rtgsFor === 'Supplier' && !selectedCustomerKey) {
-        throw new Error("No supplier selected");
+        return { success: false, message: "No supplier selected" };
     }
     if (rtgsFor === 'Supplier' && selectedEntryIds.size === 0 && !editingPayment) {
-        throw new Error("Please select entries to pay");
+        return { success: false, message: "Please select entries to pay" };
     }
 
     const finalPaymentAmount = rtgsAmount || paymentAmount;
@@ -39,7 +45,7 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
     const accountIdForPayment = paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId;
     
     if (paymentMethod === 'RTGS' && !accountIdForPayment) {
-        throw new Error("Please select an account to pay from for RTGS.");
+        return { success: false, message: "Please select an account to pay from for RTGS." };
     }
 
 
@@ -47,15 +53,15 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
 
     if (finalPaymentAmount > availableBalance) {
         const accountName = bankAccounts.find((acc: any) => acc.id === accountIdForPayment)?.accountHolderName || 'Cash in Hand';
-        throw new Error(`Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.`);
+        return { success: false, message: `Payment of ${formatCurrency(finalPaymentAmount)} exceeds available balance of ${formatCurrency(availableBalance)} in ${accountName}.` };
     }
 
     const totalPaidAmount = finalPaymentAmount + calculatedCdAmount;
     if (totalPaidAmount <= 0) {
-        throw new Error("Payment amount must be positive");
+        return { success: false, message: "Payment amount must be positive" };
     }
     if (rtgsFor === 'Supplier' && paymentType === 'Partial' && !editingPayment && totalPaidAmount > totalOutstandingForSelected) {
-        throw new Error("Partial payment cannot exceed outstanding");
+        return { success: false, message: "Partial payment cannot exceed outstanding" };
     }
 
     let finalPaymentData: Payment | null = null;
@@ -136,7 +142,7 @@ export const processPaymentLogic = async (context: any): Promise<Payment | null>
         transaction.set(newPaymentRef, { ...paymentDataBase, id: newPaymentRef.id });
         finalPaymentData = { id: newPaymentRef.id, ...paymentDataBase } as Payment;
     });
-    return finalPaymentData;
+    return { success: true, payment: finalPaymentData };
 };
 
 export const handleEditPaymentLogic = async (paymentToEdit: Payment, context: any) => {
@@ -230,5 +236,3 @@ export const handleDeletePaymentLogic = async (paymentIdToDelete: string, paymen
         transaction.delete(paymentRef);
     });
 };
-
-    
