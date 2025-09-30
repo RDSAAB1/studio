@@ -445,7 +445,6 @@ const handleDelete = async (id: string) => {
             await deletePaymentsForSrNo(completeEntry.srNo);
             const updatedEntry = { ...completeEntry, netAmount: completeEntry.originalNetAmount };
             const savedEntry = await addSupplier(updatedEntry);
-            toast({ title: "Entry updated and payments deleted.", variant: "success" });
             if (callback) callback(savedEntry); else handleNew();
         } else {
             const savedEntry = await addSupplier(completeEntry);
@@ -621,7 +620,7 @@ const handleDelete = async (id: string) => {
                         originalNetAmount: parseFloat(item['NET AMOUNT']) || 0,
                         netAmount: parseFloat(item['NET AMOUNT']) || 0,
                         paymentType: item['PAYMENT TYPE'] || 'Full',
-                        customerId: `${''toTitleCase(item['NAME']).toLowerCase()}|${''String(item['CONTACT'] || '').toLowerCase()}`,
+                        customerId: `${toTitleCase(item['NAME']).toLowerCase()}|${String(item['CONTACT'] || '').toLowerCase()}`,
                         barcode: '',
                         receiptType: 'Cash',
                     };
@@ -788,12 +787,6 @@ const handleDelete = async (id: string) => {
         onSelectionChange={setSelectedSupplierIds}
         onPrintRow={handleSinglePrint}
       />
-      
-      <div className="text-center">
-            <Button onClick={loadMoreData} disabled={isLoadingMore}>
-                {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
-      </div>
 
       <DetailsDialog
         isOpen={!!detailsSupplier}
@@ -831,3 +824,6 @@ const handleDelete = async (id: string) => {
     </div>
   );
 }
+
+
+    
