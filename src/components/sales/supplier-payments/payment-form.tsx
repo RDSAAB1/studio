@@ -37,6 +37,7 @@ export const PaymentForm = (props: any) => {
         calcTargetAmount, setCalcTargetAmount,
         selectPaymentAmount,
         handleEditPayment, // Receive the edit handler
+        parchiNo, setParchiNo, // Receive parchiNo and its setter
     } = props;
 
 
@@ -62,6 +63,14 @@ export const PaymentForm = (props: any) => {
                         <div className="space-y-1"><Label className="text-xs">Payment ID</Label><Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" /></div>
                         <div className="space-y-1"><Label className="text-xs">Payment Type</Label><Select value={paymentType} onValueChange={setPaymentType}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full">Full</SelectItem><SelectItem value="Partial">Partial</SelectItem></SelectContent></Select></div>
                         <div className="space-y-1"><Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label><Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" /></div>
+                        
+                        {(paymentMethod === 'Cash' || paymentMethod === 'Online') && (
+                            <div className="space-y-1 col-span-full sm:col-span-1 md:col-span-2 lg:col-span-1">
+                                <Label className="text-xs">Parchi No. (SR#)</Label>
+                                <Input value={parchiNo} onChange={(e) => setParchiNo(e.target.value)} className="h-8 text-xs bg-muted" readOnly />
+                            </div>
+                        )}
+
                     </>
                     )}
                     
