@@ -356,7 +356,7 @@ export const CustomerForm = ({ form, handleSrNoBlur, handleContactBlur, varietyO
             options={optionsToManage}
             onAdd={handleAddOption}
             onUpdate={handleUpdateOption}
-            onDelete={handleDeleteOption}
+            onDelete={(collectionName: string, id: string, name: string) => handleDeleteOption(collectionName, id, name)}
         />
         </>
     );

@@ -189,13 +189,13 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Payment Type<Button variant="ghost" size="icon" onClick={() => openManagementDialog('paymentType')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <Controller name="paymentType" control={form.control} render={({ field }) => (
-                                    <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} onAdd={(newVal) => handleAddOption('paymentTypes', {name: newVal})} placeholder="Select type..." />
+                                    <CustomDropdown options={paymentTypeOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => {form.setValue("paymentType", val); setLastPaymentType(val);}} placeholder="Select type..." />
                                 )} />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-2">Variety <Button variant="ghost" size="icon" onClick={() => openManagementDialog('variety')} className="h-5 w-5 shrink-0"><Settings className="h-3 w-3"/></Button></Label>
                                 <Controller name="variety" control={form.control} render={({ field }) => (
-                                    <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} onAdd={(newVal) => handleAddOption('varieties', {name: newVal})} placeholder="Select variety..." />
+                                    <CustomDropdown options={varietyOptions.map((v: OptionItem) => ({value: v.name, label: toTitleCase(v.name)}))} value={field.value} onChange={(val) => { form.setValue("variety", val); setLastVariety(val); }} placeholder="Select variety..." />
                                 )} />
                             </div>
                             <Controller name="date" control={form.control} render={({ field }) => (
@@ -251,7 +251,7 @@ export const SupplierForm = ({ form, handleSrNoBlur, onContactChange, handleName
             options={optionsToManage}
             onAdd={handleAddOption}
             onUpdate={handleUpdateOption}
-            onDelete={handleDeleteOption}
+            onDelete={(collectionName: string, id: string, name: string) => handleDeleteOption(collectionName, id, name)}
         />
         </>
     );
