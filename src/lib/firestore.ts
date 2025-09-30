@@ -71,7 +71,7 @@ export function getOptionsRealtime(collectionName: string, callback: (options: O
     return onSnapshot(docRef, (doc) => {
         if (doc.exists()) {
             const data = doc.data();
-            const options = Array.isArray(data.items) ? data.items.map((name: string) => ({ id: name, name })) : [];
+            const options = Array.isArray(data.items) ? data.items.map((name: string) => ({ id: name.toLowerCase(), name: toTitleCase(name) })) : [];
             callback(options);
         } else {
             callback([]);
