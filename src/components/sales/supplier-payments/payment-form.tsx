@@ -35,10 +35,25 @@ export const PaymentForm = (props: any) => {
         bankAccounts, selectedAccountId, setSelectedAccountId,
         financialState,
         calcTargetAmount, setCalcTargetAmount,
+        minRate, setMinRate,
+        maxRate, setMaxRate,
         selectPaymentAmount,
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
     } = props;
+
+    const paymentFromOptions = useMemo(() => {
+        const cashOption = { value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` };
+        const bankOptions = bankAccounts.map((acc: any) => ({ 
+            value: acc.id, 
+            label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (${formatCurrency(financialState.balances.get(acc.id) || 0)})` 
+        }));
+        
+        if (paymentMethod === 'Cash') {
+            return [cashOption];
+        }
+        return bankOptions;
+    }, [paymentMethod, financialState.balances, bankAccounts]);
 
 
     return (
@@ -83,7 +98,7 @@ export const PaymentForm = (props: any) => {
                     <div className="space-y-1 lg:col-span-2">
                         <Label className="text-xs">Payment From</Label>
                         <CustomDropdown
-                            options={[{ value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` }, ...bankAccounts.map((acc: any) => ({ value: acc.id, label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (${formatCurrency(financialState.balances.get(acc.id) || 0)})` }))]}
+                            options={paymentFromOptions}
                             value={selectedAccountId}
                             onChange={(value) => setSelectedAccountId(value)}
                             placeholder="Select Account"
@@ -134,6 +149,10 @@ export const PaymentForm = (props: any) => {
                         <PaymentCombinationGenerator 
                             calcTargetAmount={calcTargetAmount}
                             setCalcTargetAmount={setCalcTargetAmount}
+                            minRate={minRate}
+                            setMinRate={setMinRate}
+                            maxRate={maxRate}
+                            setMaxRate={setMaxRate}
                             selectPaymentAmount={selectPaymentAmount}
                         />
                         <RtgsForm {...props} />

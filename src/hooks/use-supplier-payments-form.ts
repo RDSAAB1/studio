@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -100,21 +99,18 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             if (paymentMethod === 'Online') {
                 prefix = 'P'; padding = 6;
             } else if (paymentMethod === 'RTGS') {
-                 // For RTGS, blur on this field shouldn't format, as the primary ID is rtgsSrNo
                 return;
             }
              formattedId = generateReadableId(prefix, num-1, padding);
              setPaymentId(formattedId);
         }
         
-        // Check for existing payment to auto-fill (edit)
         const existingPayment = paymentHistory.find(p => p.paymentId === formattedId);
         if (existingPayment) {
             onEditCallback(existingPayment);
             return;
         }
 
-        // Check for conflict with expenses if payment method is Cash
         if (paymentMethod === 'Cash') {
             const existingExpense = expenses.find(ex => ex.transactionId === formattedId);
             if (existingExpense) {

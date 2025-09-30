@@ -19,13 +19,13 @@ type SortConfig = {
 
 interface UsePaymentCombinationProps {
     calcTargetAmount: number;
+    minRate: number;
+    maxRate: number;
 }
 
-export const usePaymentCombination = ({ calcTargetAmount }: UsePaymentCombinationProps) => {
+export const usePaymentCombination = ({ calcTargetAmount, minRate, maxRate }: UsePaymentCombinationProps) => {
     const { toast } = useToast();
     const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
-    const [minRate, setMinRate] = useState(2300);
-    const [maxRate, setMaxRate] = useState(2400);
     const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
     const [roundFigureToggle, setRoundFigureToggle] = useState(false);
 
@@ -96,10 +96,6 @@ export const usePaymentCombination = ({ calcTargetAmount }: UsePaymentCombinatio
 
     return {
         paymentOptions,
-        minRate,
-        setMinRate,
-        maxRate,
-        setMaxRate,
         roundFigureToggle,
         setRoundFigureToggle,
         handleGeneratePaymentOptions,
