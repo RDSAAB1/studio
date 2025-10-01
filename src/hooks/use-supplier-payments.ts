@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useCallback, useMemo } from 'react';
@@ -25,7 +24,7 @@ export const useSupplierPayments = () => {
         });
     };
 
-    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, handleConflict);
+    const form = useSupplierPaymentsForm(data.paymentHistory, data.expenses, data.bankAccounts, handleConflict);
     const calculations = usePaymentCalculations(data, form);
 
     const [isProcessing, setIsProcessing] = useState(false);

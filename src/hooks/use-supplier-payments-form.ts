@@ -38,16 +38,18 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     // This is a new function to trigger auto-fill, which will be passed to the blur handler
     const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
 
+    const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
+
     useEffect(() => {
         const savedAccountId = localStorage.getItem('defaultPaymentAccountId');
         if (savedAccountId && savedAccountId !== 'CashInHand') {
             setSelectedAccountId(savedAccountId);
-            setPaymentMethod(bankAccounts.some(ba => ba.id === savedAccountId) ? 'Online' : 'Cash');
+            setPaymentMethod(safeBankAccounts.some(ba => ba.id === savedAccountId) ? 'Online' : 'Cash');
         } else {
              setSelectedAccountId('CashInHand');
              setPaymentMethod('Cash');
         }
-    }, [bankAccounts]);
+    }, [safeBankAccounts]);
 
     const handleSetSelectedAccountId = (accountId: string | null) => {
         if (accountId) {
@@ -66,7 +68,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             setSelectedAccountId('CashInHand');
         } else {
             const defaultBankId = localStorage.getItem('defaultPaymentAccountId');
-            const firstBankId = bankAccounts.find(ba => ba.id !== 'CashInHand')?.id;
+            const firstBankId = safeBankAccounts.find(ba => ba.id !== 'CashInHand')?.id;
             
             if (selectedAccountId === 'CashInHand') {
                 if (defaultBankId && defaultBankId !== 'CashInHand') {
@@ -74,7 +76,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
                 } else if (firstBankId) {
                     setSelectedAccountId(firstBankId);
                 } else {
-                    // Fallback if no bank accounts exist, though UI should prevent this state
                     setSelectedAccountId('CashInHand');
                     setPaymentMethod('Cash');
                 }
