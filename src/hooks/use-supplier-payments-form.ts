@@ -35,9 +35,21 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [calcTargetAmount, setCalcTargetAmount] = useState(0);
     
-    // State for payment combination generator
-    const [minRate, setMinRate] = useState(0);
-    const [maxRate, setMaxRate] = useState(0);
+    // State for payment combination generator with localStorage persistence
+    const [minRate, setMinRate] = useState<number>(() => {
+        if (typeof window !== 'undefined') {
+            const savedMinRate = localStorage.getItem('paymentMinRate');
+            return savedMinRate ? Number(savedMinRate) : 0;
+        }
+        return 0;
+    });
+    const [maxRate, setMaxRate] = useState<number>(() => {
+        if (typeof window !== 'undefined') {
+            const savedMaxRate = localStorage.getItem('paymentMaxRate');
+            return savedMaxRate ? Number(savedMaxRate) : 0;
+        }
+        return 0;
+    });
     
     // This is a new function to trigger auto-fill, which will be passed to the blur handler
     const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
@@ -45,33 +57,15 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
 
     useEffect(() => {
-        const savedMinRate = localStorage.getItem('paymentMinRate');
-        const savedMaxRate = localStorage.getItem('paymentMaxRate');
-        if (savedMinRate) setMinRate(Number(savedMinRate));
-        if (savedMaxRate) setMaxRate(Number(savedMaxRate));
-
-        const savedAccountId = localStorage.getItem('defaultPaymentAccountId');
-        if (savedAccountId && savedAccountId !== 'CashInHand') {
-            const accountExists = safeBankAccounts.some(ba => ba.id === savedAccountId);
-            if (accountExists) {
-                setSelectedAccountId(savedAccountId);
-                setPaymentMethod('Online');
-            } else {
-                setSelectedAccountId('CashInHand');
-                setPaymentMethod('Cash');
-            }
-        } else {
-             setSelectedAccountId('CashInHand');
-             setPaymentMethod('Cash');
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('paymentMinRate', String(minRate));
         }
-    }, [safeBankAccounts]);
-
-    useEffect(() => {
-        localStorage.setItem('paymentMinRate', String(minRate));
     }, [minRate]);
 
     useEffect(() => {
-        localStorage.setItem('paymentMaxRate', String(maxRate));
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('paymentMaxRate', String(maxRate));
+        }
     }, [maxRate]);
 
     const handleSetSelectedAccountId = (accountId: string | null) => {
