@@ -96,12 +96,7 @@ export const PaymentForm = (props: any) => {
                                 </Popover>
                             </div>
                             
-                            {paymentMethod === 'RTGS' ? (
-                                <div className="space-y-1 flex-1 min-w-[120px]">
-                                    <Label className="text-xs">RTGS SR No.</Label>
-                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono"/>
-                                </div>
-                            ) : (
+                            {paymentMethod !== 'RTGS' && (
                                 <div className="space-y-1 flex-1 min-w-[120px]">
                                     <Label className="text-xs">Payment ID</Label>
                                     <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
@@ -212,15 +207,16 @@ export const PaymentForm = (props: any) => {
                          <CardTitle className="text-base">RTGS Details & Generation</CardTitle>
                      </CardHeader>
                      <CardContent className="p-3 space-y-3">
+                         <RtgsForm {...props} />
                          <PaymentCombinationGenerator
                              calcTargetAmount={calcTargetAmount}
                              setCalcTargetAmount={setCalcTargetAmount}
                              minRate={minRate}
                              setMinRate={setMinRate}
                              maxRate={maxRate}
+                             setMaxRate={setMaxRate}
                              selectPaymentAmount={selectPaymentAmount}
                          />
-                         <RtgsForm {...props} />
                      </CardContent>
                  </Card>
             )}
