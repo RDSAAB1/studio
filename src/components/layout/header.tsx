@@ -102,10 +102,10 @@ const NotificationBell = () => {
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="relative h-8 w-8">
+                    <Bell className="h-4 w-4" />
                     {pendingNotifications.length > 0 && (
-                        <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-destructive" />
+                        <span className="absolute top-1.5 right-1.5 block h-1.5 w-1.5 rounded-full bg-destructive" />
                     )}
                     <span className="sr-only">Notifications</span>
                 </Button>
@@ -185,8 +185,8 @@ const DraggableCalculator = () => {
     return (
         <Dialog modal={false}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                    <Calculator className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Calculator className="h-4 w-4" />
                     <span className="sr-only">Calculator</span>
                 </Button>
             </DialogTrigger>
@@ -255,21 +255,21 @@ export function Header({ toggleSidebar }: HeaderProps) {
         </div>
 
         {/* Right Aligned Icons */}
-        <div className={cn("flex flex-shrink-0 items-center justify-end gap-1")}>
-          <Button variant="ghost" size="icon" onClick={handleManualSync}>
-             <RefreshCw className="h-5 w-5" />
+        <div className={cn("flex flex-shrink-0 items-center justify-end")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleManualSync}>
+             <RefreshCw className="h-4 w-4" />
              <span className="sr-only">Sync Data</span>
           </Button>
           <NotificationBell />
           <DraggableCalculator />
-          <Button variant="ghost" size="icon" onClick={() => router.push('/settings')}>
-            <Settings className="h-5 w-5" />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/settings')}>
+            <Settings className="h-4 w-4" />
             <span className="sr-only">Settings</span>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <UserCircle className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <UserCircle className="h-4 w-4" />
                 <span className="sr-only">Profile</span>
               </Button>
             </DropdownMenuTrigger>
