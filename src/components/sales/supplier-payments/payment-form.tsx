@@ -35,6 +35,7 @@ export const PaymentForm = (props: any) => {
         bankAccounts, selectedAccountId, setSelectedAccountId,
         financialState,
         calcTargetAmount, setCalcTargetAmount,
+        minRate, setMinRate, maxRate, setMaxRate,
         selectPaymentAmount,
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
@@ -42,10 +43,10 @@ export const PaymentForm = (props: any) => {
 
     const paymentFromOptions = useMemo(() => {
         const cashOption = { value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` };
-        const bankOptions = bankAccounts.map((acc: any) => ({ 
+        const bankOptions = Array.isArray(bankAccounts) ? bankAccounts.map((acc: any) => ({ 
             value: acc.id, 
             label: `${acc.accountHolderName} (...${acc.accountNumber.slice(-4)}) (${formatCurrency(financialState.balances.get(acc.id) || 0)})` 
-        }));
+        })) : [];
         
         if (paymentMethod === 'Cash') {
             return [cashOption];
@@ -149,23 +150,23 @@ export const PaymentForm = (props: any) => {
             </Card>
 
             {paymentMethod === 'RTGS' && (
-                <Card className="mt-3">
+                 <Card className="mt-3">
                      <CardHeader>
-                        <CardTitle className="text-base">RTGS Details & Generation</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 space-y-3">
-                        <PaymentCombinationGenerator
-                            calcTargetAmount={calcTargetAmount}
-                            setCalcTargetAmount={setCalcTargetAmount}
-                            minRate={props.minRate}
-                            setMinRate={props.setMinRate}
-                            maxRate={props.maxRate}
-                            setMaxRate={props.setMaxRate}
-                            selectPaymentAmount={selectPaymentAmount}
-                        />
-                        <RtgsForm {...props} />
-                    </CardContent>
-                </Card>
+                         <CardTitle className="text-base">RTGS Details & Generation</CardTitle>
+                     </CardHeader>
+                     <CardContent className="p-3 space-y-3">
+                         <PaymentCombinationGenerator
+                             calcTargetAmount={calcTargetAmount}
+                             setCalcTargetAmount={setCalcTargetAmount}
+                             minRate={minRate}
+                             setMinRate={setMinRate}
+                             maxRate={maxRate}
+                             setMaxRate={setMaxRate}
+                             selectPaymentAmount={selectPaymentAmount}
+                         />
+                         <RtgsForm {...props} />
+                     </CardContent>
+                 </Card>
             )}
              
             <CardFooter className="p-0 pt-3">

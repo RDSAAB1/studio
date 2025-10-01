@@ -35,6 +35,10 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [calcTargetAmount, setCalcTargetAmount] = useState(0);
     
+    // State for payment combination generator
+    const [minRate, setMinRate] = useState(0);
+    const [maxRate, setMaxRate] = useState(0);
+    
     // This is a new function to trigger auto-fill, which will be passed to the blur handler
     const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
 
@@ -43,8 +47,14 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     useEffect(() => {
         const savedAccountId = localStorage.getItem('defaultPaymentAccountId');
         if (savedAccountId && savedAccountId !== 'CashInHand') {
-            setSelectedAccountId(savedAccountId);
-            setPaymentMethod(safeBankAccounts.some(ba => ba.id === savedAccountId) ? 'Online' : 'Cash');
+            const accountExists = safeBankAccounts.some(ba => ba.id === savedAccountId);
+            if (accountExists) {
+                setSelectedAccountId(savedAccountId);
+                setPaymentMethod('Online');
+            } else {
+                setSelectedAccountId('CashInHand');
+                setPaymentMethod('Cash');
+            }
         } else {
              setSelectedAccountId('CashInHand');
              setPaymentMethod('Cash');
@@ -68,20 +78,23 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             setSelectedAccountId('CashInHand');
         } else {
             const defaultBankId = localStorage.getItem('defaultPaymentAccountId');
+            const accountExists = safeBankAccounts.some(ba => ba.id === defaultBankId);
             const firstBankId = safeBankAccounts.find(ba => ba.id !== 'CashInHand')?.id;
             
-            if (selectedAccountId === 'CashInHand') {
-                if (defaultBankId && defaultBankId !== 'CashInHand') {
+            if (selectedAccountId === 'CashInHand' || method !== paymentMethod) { // Change only if switching or coming from cash
+                if (defaultBankId && defaultBankId !== 'CashInHand' && accountExists) {
                     setSelectedAccountId(defaultBankId);
                 } else if (firstBankId) {
                     setSelectedAccountId(firstBankId);
                 } else {
+                    // Fallback to cash if no bank accounts are available
                     setSelectedAccountId('CashInHand');
                     setPaymentMethod('Cash');
                 }
             }
         }
     };
+
 
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
         if (!paymentHistory || !expenses) return '';
@@ -226,6 +239,8 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         rtgsFor, setRtgsFor,
         editingPayment, setEditingPayment,
         calcTargetAmount, setCalcTargetAmount,
+        minRate, setMinRate,
+        maxRate, setMaxRate,
         resetPaymentForm,
         handleFullReset,
         onEdit, setOnEdit, // Pass setter for the callback
