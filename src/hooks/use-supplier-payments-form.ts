@@ -122,20 +122,24 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
     
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
-        let value = e.target.value.trim();
+        let value = e.target.value.trim().toUpperCase();
         if (!value) return;
     
-        let formattedId = value.toUpperCase();
-        if (!/^RT/i.test(value) && !isNaN(parseInt(value)) && isFinite(Number(value))) {
-            const num = parseInt(value, 10);
-            // Correctly format the number with padding without incrementing it
-            formattedId = 'RT' + String(num).padStart(5, '0');
-            setRtgsSrNo(formattedId);
-        }
+        // Strip "RT" prefix if present and get the numeric part
+        const numericPart = value.startsWith('RT') ? value.substring(2) : value;
     
-        const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
-        if (existingPayment) {
-            onEditCallback(existingPayment);
+        if (!isNaN(parseInt(numericPart)) && isFinite(Number(numericPart))) {
+            const num = parseInt(numericPart, 10);
+            const formattedId = 'RT' + String(num).padStart(5, '0');
+            setRtgsSrNo(formattedId);
+    
+            const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
+            if (existingPayment) {
+                onEditCallback(existingPayment);
+            }
+        } else {
+            // If it's not a parsable number, just set what was typed
+            setRtgsSrNo(value);
         }
     };
     
