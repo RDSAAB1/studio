@@ -9,7 +9,6 @@ import { format } from 'date-fns';
 export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
-    const [paymentId, setPaymentId] = useState('');
     const [rtgsSrNo, setRtgsSrNo] = useState('');
     const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
     const [paymentAmount, setPaymentAmount] = useState(0);
@@ -109,15 +108,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             }, 0);
             return generateReadableId('RT', lastNum, 5);
         }
-        if (method === 'Online') {
-            const onlinePayments = paymentHistory.filter(p => p.receiptType === 'Online');
-            const lastNum = onlinePayments.reduce((max, p) => {
-                const numMatch = p.paymentId.match(/^P(\d+)$/);
-                const num = numMatch ? parseInt(numMatch[1], 10) : 0;
-                return num > max ? num : max;
-            }, 0);
-            return generateReadableId('P', lastNum, 6);
-        }
+         // For Cash and Online, we don't have a separate ID in the form anymore, but the logic can stay for other uses.
         const cashPayments = paymentHistory.filter(p => p.receiptType === 'Cash');
         const lastCashNum = cashPayments.reduce((max, p) => {
             const numMatch = p.paymentId.match(/^EX(\d+)$/);
@@ -132,38 +123,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         const lastNum = Math.max(lastCashNum, lastExpenseNum);
         return generateReadableId('EX', lastNum, 5);
     }, [paymentHistory, expenses]);
-
-    const handlePaymentIdBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
-        let value = e.target.value.trim();
-        if (!value) return;
-
-        let formattedId = value;
-        if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
-            const num = parseInt(value, 10);
-            let prefix = 'EX';
-            let padding = 5;
-            if (paymentMethod === 'Online') {
-                prefix = 'P'; padding = 6;
-            }
-             formattedId = generateReadableId(prefix, num-1, padding);
-             setPaymentId(formattedId);
-        }
-        
-        const existingPayment = paymentHistory.find(p => p.paymentId === formattedId);
-        if (existingPayment) {
-            onEditCallback(existingPayment);
-            return;
-        }
-
-        if (paymentMethod === 'Cash') {
-            const existingExpense = expenses.find(ex => ex.transactionId === formattedId);
-            if (existingExpense) {
-                if (onConflict) {
-                     onConflict(`Payment ID ${formattedId} is already used for an expense: ${existingExpense.description}`);
-                }
-            }
-        }
-    };
     
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
         const value = e.target.value.trim().toUpperCase();
@@ -184,12 +143,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     
     useEffect(() => {
         if (!editingPayment) {
-            setPaymentId(getNextPaymentId(paymentMethod as 'Cash'|'Online'|'RTGS'));
-            if (paymentMethod === 'RTGS') {
-                setRtgsSrNo(getNextPaymentId('RTGS'));
-            } else {
-                setRtgsSrNo(''); // Clear RTGS SR No. if not in RTGS mode
-            }
+            setRtgsSrNo(getNextPaymentId('RTGS'));
         }
     }, [paymentHistory, expenses, editingPayment, paymentMethod, getNextPaymentId]);
 
@@ -199,7 +153,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         setEditingPayment(null);
         setUtrNo(''); setCheckNo(''); setSixRNo(''); setParchiNo('');
         setRtgsQuantity(0); setRtgsRate(0); setRtgsAmount(0);
-        setPaymentId(getNextPaymentId(paymentMethod as 'Cash'|'Online'|'RTGS'));
         setRtgsSrNo(getNextPaymentId('RTGS'));
         if (isOutsider) {
             setSupplierDetails({ name: '', fatherName: '', address: '', contact: '' });
@@ -216,7 +169,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     return {
         selectedCustomerKey, setSelectedCustomerKey,
         selectedEntryIds, setSelectedEntryIds,
-        paymentId, setPaymentId, handlePaymentIdBlur,
         rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur,
         paymentDate, setPaymentDate,
         paymentAmount, setPaymentAmount,

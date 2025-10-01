@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, RefreshCw, Loader2, Pen, User } from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw, Loader2, Pen, User, Hash } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { RtgsForm } from './rtgs-form';
@@ -55,6 +55,7 @@ export const PaymentForm = (props: any) => {
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
         supplierDetails, setSupplierDetails, isPayeeEditing, setIsPayeeEditing,
+        rtgsSrNo, setRtgsSrNo, handleRtgsSrNoBlur
     } = props;
 
     const paymentFromOptions = useMemo(() => {
@@ -94,12 +95,17 @@ export const PaymentForm = (props: any) => {
                                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={paymentDate} onSelect={setPaymentDate} initialFocus /></PopoverContent>
                                 </Popover>
                             </div>
-
-                            {paymentMethod !== 'RTGS' && (
-                             <div className="space-y-1 flex-1 min-w-[120px]">
-                                <Label className="text-xs">Payment ID</Label>
-                                <Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
-                            </div>
+                            
+                            {paymentMethod === 'RTGS' ? (
+                                <div className="space-y-1 flex-1 min-w-[120px]">
+                                    <Label className="text-xs">RTGS SR No.</Label>
+                                    <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono"/>
+                                </div>
+                            ) : (
+                                <div className="space-y-1 flex-1 min-w-[120px]">
+                                    <Label className="text-xs">Payment ID</Label>
+                                    <Input value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
+                                </div>
                             )}
 
                             <div className="space-y-1 flex-1 min-w-[120px]">
@@ -212,7 +218,6 @@ export const PaymentForm = (props: any) => {
                              minRate={minRate}
                              setMinRate={setMinRate}
                              maxRate={maxRate}
-                             setMaxRate={setMaxRate}
                              selectPaymentAmount={selectPaymentAmount}
                          />
                          <RtgsForm {...props} />

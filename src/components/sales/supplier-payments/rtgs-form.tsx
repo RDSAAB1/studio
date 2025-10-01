@@ -11,7 +11,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon, Settings, ClipboardList, Hash } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { PaymentCombinationGenerator } from './payment-combination-generator';
 import { useSupplierData } from '@/hooks/use-supplier-data';
 import { addBank } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -26,9 +25,6 @@ export const RtgsForm = (props: any) => {
         utrNo, setUtrNo, parchiNo, setParchiNo, checkNo, setCheckNo,
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
         editingPayment, setIsBankSettingsOpen,
-        calcTargetAmount, setCalcTargetAmount,
-        minRate, setMinRate, maxRate, setMaxRate,
-        selectPaymentAmount,
         handleEditPayment,
     } = props;
     
@@ -120,10 +116,6 @@ export const RtgsForm = (props: any) => {
                         </Button>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                         <div className="space-y-1">
-                            <Label className="text-xs">RTGS SR No.</Label>
-                            <Input value={rtgsSrNo} onChange={e => setRtgsSrNo(e.target.value)} onBlur={(e) => handleRtgsSrNoBlur(e, handleEditPayment)} className="h-8 text-xs font-mono"/>
-                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                              <div className="space-y-1">
                                 <Label className="text-xs">Bank</Label>
@@ -156,20 +148,10 @@ export const RtgsForm = (props: any) => {
                      <CardHeader>
                          <CardTitle className="text-base">Payment Calculation</CardTitle>
                      </CardHeader>
-                     <CardContent className="p-3 space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
-                            <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
-                            <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
-                        </div>
-                         <PaymentCombinationGenerator
-                             calcTargetAmount={calcTargetAmount}
-                             setCalcTargetAmount={setCalcTargetAmount}
-                             minRate={minRate}
-                             setMinRate={setMinRate}
-                             maxRate={maxRate}
-                             selectPaymentAmount={selectPaymentAmount}
-                         />
+                     <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1"><Label className="text-xs">Quantity</Label><Input type="number" value={rtgsQuantity} onChange={e => setRtgsQuantity(Number(e.target.value))} className="h-8 text-xs"/></div>
+                        <div className="space-y-1"><Label className="text-xs">Rate</Label><Input type="number" value={rtgsRate} onChange={e => setRtgsRate(Number(e.target.value))} className="h-8 text-xs"/></div>
+                        <div className="space-y-1"><Label className="text-xs">Amount</Label><Input type="number" value={rtgsAmount} onChange={e => setRtgsAmount(Number(e.target.value))} className="h-8 text-xs" /></div>
                      </CardContent>
                 </Card>
                  <Card>
