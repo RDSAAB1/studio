@@ -2,21 +2,20 @@
 "use client";
 
 import React from 'react';
-import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
+import { cn, toTitleCase } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, Settings, Pen, Landmark, Package, ClipboardList, Hash } from "lucide-react";
+import { Calendar as CalendarIcon, Settings, ClipboardList, Hash } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
-import { Separator } from '@/components/ui/separator';
 import { PaymentCombinationGenerator } from './payment-combination-generator';
 import { useSupplierData } from '@/hooks/use-supplier-data';
-import { addBank, addBankBranch } from '@/lib/firestore';
+import { addBank } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const RtgsForm = (props: any) => {
     const { toast } = useToast();
@@ -169,7 +168,6 @@ export const RtgsForm = (props: any) => {
                              minRate={minRate}
                              setMinRate={setMinRate}
                              maxRate={maxRate}
-                             setMaxRate={setMaxRate}
                              selectPaymentAmount={selectPaymentAmount}
                          />
                      </CardContent>

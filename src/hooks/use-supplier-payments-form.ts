@@ -35,26 +35,22 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
     const [calcTargetAmount, setCalcTargetAmount] = useState(0);
     
-    // State for payment combination generator with localStorage persistence
-    const [minRate, setMinRate] = useState<number>(() => {
-        if (typeof window !== 'undefined') {
-            const savedMinRate = localStorage.getItem('paymentMinRate');
-            return savedMinRate ? Number(savedMinRate) : 0;
-        }
-        return 0;
-    });
-    const [maxRate, setMaxRate] = useState<number>(() => {
-        if (typeof window !== 'undefined') {
-            const savedMaxRate = localStorage.getItem('paymentMaxRate');
-            return savedMaxRate ? Number(savedMaxRate) : 0;
-        }
-        return 0;
-    });
+    const [minRate, setMinRate] = useState<number>(0);
+    const [maxRate, setMaxRate] = useState<number>(0);
     
     // This is a new function to trigger auto-fill, which will be passed to the blur handler
     const [onEdit, setOnEdit] = useState<((payment: Payment) => void) | null>(null);
 
     const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const savedMinRate = localStorage.getItem('paymentMinRate');
+            const savedMaxRate = localStorage.getItem('paymentMaxRate');
+            setMinRate(savedMinRate ? Number(savedMinRate) : 0);
+            setMaxRate(savedMaxRate ? Number(savedMaxRate) : 0);
+        }
+    }, []);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -149,7 +145,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             if (paymentMethod === 'Online') {
                 prefix = 'P'; padding = 6;
             } else if (paymentMethod === 'RTGS') {
-                // For RTGS, we use rtgsSrNo, so this blur handler is for other payment types.
                 return;
             }
              formattedId = generateReadableId(prefix, num-1, padding);
@@ -244,6 +239,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         maxRate, setMaxRate,
         resetPaymentForm,
         handleFullReset,
-        onEdit, setOnEdit, // Pass setter for the callback
+        onEdit, setOnEdit,
     };
 };
