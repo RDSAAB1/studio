@@ -62,9 +62,9 @@ export const PaymentForm = (props: any) => {
                     <CardTitle className="text-base">Payment & CD Details</CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 space-y-3">
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-2 items-end">
+                     <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
                         {/* Payment Details */}
-                        <div className="space-y-1">
+                        <div className="space-y-1 flex-1 min-w-[150px]">
                             <Label className="text-xs">Payment Date</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
@@ -77,12 +77,12 @@ export const PaymentForm = (props: any) => {
                             </Popover>
                         </div>
 
-                         <div className="space-y-1">
+                         <div className="space-y-1 flex-1 min-w-[120px]">
                             <Label className="text-xs">Payment ID</Label>
                             <Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="space-y-1 flex-1 min-w-[120px]">
                             <Label className="text-xs">Payment Type</Label>
                             <Select value={paymentType} onValueChange={setPaymentType}>
                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -93,12 +93,12 @@ export const PaymentForm = (props: any) => {
                             </Select>
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="space-y-1 flex-1 min-w-[150px]">
                             <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
                             <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
                         </div>
                         
-                        <div className="space-y-1 lg:col-span-2">
+                        <div className="space-y-1 flex-grow min-w-[200px]">
                             <Label className="text-xs">Payment From</Label>
                             <CustomDropdown
                                 options={paymentFromOptions}
