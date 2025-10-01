@@ -23,7 +23,11 @@ interface UsePaymentCombinationProps {
     maxRate: number;
 }
 
-export const usePaymentCombination = ({ calcTargetAmount, minRate, maxRate }: UsePaymentCombinationProps) => {
+export const usePaymentCombination = ({ 
+    calcTargetAmount,
+    minRate,
+    maxRate,
+}: UsePaymentCombinationProps) => {
     const { toast } = useToast();
     const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
     const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);

@@ -1,42 +1,45 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from '@/components/ui/switch';
 import { Bot, ArrowUpDown, Replace } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { usePaymentCombination } from '@/hooks/use-payment-combination';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PaymentCombinationGeneratorProps {
     calcTargetAmount: number;
     setCalcTargetAmount: (value: number) => void;
+    minRate: number;
+    setMinRate: (value: number) => void;
+    maxRate: number;
+    setMaxRate: (value: number) => void;
     selectPaymentAmount: (option: { quantity: number; rate: number; calculatedAmount: number; amountRemaining: number; }) => void;
 }
 
 export const PaymentCombinationGenerator: React.FC<PaymentCombinationGeneratorProps> = ({
     calcTargetAmount,
     setCalcTargetAmount,
+    minRate,
+    setMinRate,
+    maxRate,
+    setMaxRate,
     selectPaymentAmount,
 }) => {
     const {
         paymentOptions,
-        minRate,
-        setMinRate,
-        maxRate,
-        setMaxRate,
         roundFigureToggle,
         setRoundFigureToggle,
         handleGeneratePaymentOptions,
         requestSort,
         sortedPaymentOptions
-    } = usePaymentCombination({ calcTargetAmount });
+    } = usePaymentCombination({ calcTargetAmount, minRate, maxRate });
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 

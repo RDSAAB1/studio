@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn, formatCurrency, toTitleCase } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -35,12 +35,32 @@ export const PaymentForm = (props: any) => {
         bankAccounts, selectedAccountId, setSelectedAccountId,
         financialState,
         calcTargetAmount, setCalcTargetAmount,
-        minRate, setMinRate,
-        maxRate, setMaxRate,
         selectPaymentAmount,
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
     } = props;
+
+    const [minRate, setMinRate] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return Number(localStorage.getItem('paymentCombinationMinRate')) || 4000;
+        }
+        return 4000;
+    });
+    const [maxRate, setMaxRate] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return Number(localStorage.getItem('paymentCombinationMaxRate')) || 4500;
+        }
+        return 4500;
+    });
+
+    // Persist min/max rate to localStorage
+    React.useEffect(() => {
+        localStorage.setItem('paymentCombinationMinRate', String(minRate));
+    }, [minRate]);
+
+    React.useEffect(() => {
+        localStorage.setItem('paymentCombinationMaxRate', String(maxRate));
+    }, [maxRate]);
 
     const paymentFromOptions = useMemo(() => {
         const cashOption = { value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` };
