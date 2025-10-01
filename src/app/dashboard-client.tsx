@@ -388,9 +388,9 @@ export default function DashboardClient() {
                     <CardTitle className="flex items-center gap-2">Dashboard</CardTitle>
                     <CardDescription>Filter and view your business overview.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col sm:flex-row gap-2">
+                <CardContent className="flex flex-col sm:flex-row items-center gap-4">
                     <DateRangePicker date={date} onDateChange={setDate} />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Button variant="outline" size="sm" onClick={() => setDate({ from: new Date(), to: new Date() })}>Today</Button>
                         <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
                         <Button variant="outline" size="sm" onClick={() => setDate({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
