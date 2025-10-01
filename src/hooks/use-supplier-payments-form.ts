@@ -45,6 +45,11 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
 
     useEffect(() => {
+        const savedMinRate = localStorage.getItem('paymentMinRate');
+        const savedMaxRate = localStorage.getItem('paymentMaxRate');
+        if (savedMinRate) setMinRate(Number(savedMinRate));
+        if (savedMaxRate) setMaxRate(Number(savedMaxRate));
+
         const savedAccountId = localStorage.getItem('defaultPaymentAccountId');
         if (savedAccountId && savedAccountId !== 'CashInHand') {
             const accountExists = safeBankAccounts.some(ba => ba.id === savedAccountId);
@@ -61,6 +66,14 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         }
     }, [safeBankAccounts]);
 
+    useEffect(() => {
+        localStorage.setItem('paymentMinRate', String(minRate));
+    }, [minRate]);
+
+    useEffect(() => {
+        localStorage.setItem('paymentMaxRate', String(maxRate));
+    }, [maxRate]);
+
     const handleSetSelectedAccountId = (accountId: string | null) => {
         if (accountId) {
             setSelectedAccountId(accountId);
@@ -75,7 +88,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'RTGS') => {
         setPaymentMethod(method);
         if (method === 'Cash') {
-            setSelectedAccountId('CashInHand');
+            handleSetSelectedAccountId('CashInHand');
         } else {
             const defaultBankId = localStorage.getItem('defaultPaymentAccountId');
             const accountExists = safeBankAccounts.some(ba => ba.id === defaultBankId);
@@ -83,12 +96,11 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             
             if (selectedAccountId === 'CashInHand' || method !== paymentMethod) { // Change only if switching or coming from cash
                 if (defaultBankId && defaultBankId !== 'CashInHand' && accountExists) {
-                    setSelectedAccountId(defaultBankId);
+                    handleSetSelectedAccountId(defaultBankId);
                 } else if (firstBankId) {
-                    setSelectedAccountId(firstBankId);
+                    handleSetSelectedAccountId(firstBankId);
                 } else {
-                    // Fallback to cash if no bank accounts are available
-                    setSelectedAccountId('CashInHand');
+                    handleSetSelectedAccountId('CashInHand');
                     setPaymentMethod('Cash');
                 }
             }
@@ -168,23 +180,17 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
         const value = e.target.value.trim().toUpperCase();
         if (!value) return;
-    
-        const numericPart = value.replace(/\D/g, '');
-    
-        if (numericPart) {
-            const num = parseInt(numericPart, 10);
-            const formattedId = 'RT' + String(num).padStart(5, '0');
-            setRtgsSrNo(formattedId);
-    
-            const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
-            if (existingPayment) {
-                onEditCallback(existingPayment);
-            }
-        } else if (value.startsWith('RT')) {
-            const existingPayment = paymentHistory.find(p => p.rtgsSrNo === value);
-            if (existingPayment) {
-                onEditCallback(existingPayment);
-            }
+
+        const numericPartStr = value.replace(/\D/g, '');
+        if (!numericPartStr) return;
+
+        const num = parseInt(numericPartStr, 10);
+        const formattedId = 'RT' + String(num).padStart(5, '0');
+        setRtgsSrNo(formattedId);
+
+        const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
+        if (existingPayment) {
+            onEditCallback(existingPayment);
         }
     };
     
