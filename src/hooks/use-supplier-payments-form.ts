@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateReadableId } from '@/lib/utils';
-import type { Payment, Expense } from '@/lib/definitions';
+import type { Payment, Expense, BankAccount } from '@/lib/definitions';
 import { format } from 'date-fns';
 
-export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], onConflict: (message: string) => void) => {
+export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Expense[], bankAccounts: BankAccount[], onConflict: (message: string) => void) => {
     const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [paymentId, setPaymentId] = useState('');
@@ -40,15 +40,23 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
     useEffect(() => {
         const savedAccountId = localStorage.getItem('defaultPaymentAccountId');
-        if (savedAccountId) {
+        if (savedAccountId && savedAccountId !== 'CashInHand') {
             setSelectedAccountId(savedAccountId);
+            setPaymentMethod(bankAccounts.some(ba => ba.id === savedAccountId) ? 'Online' : 'Cash');
+        } else {
+             setSelectedAccountId('CashInHand');
+             setPaymentMethod('Cash');
         }
-    }, []);
+    }, [bankAccounts]);
 
     const handleSetSelectedAccountId = (accountId: string | null) => {
         if (accountId) {
             setSelectedAccountId(accountId);
-            localStorage.setItem('defaultPaymentAccountId', accountId);
+            if (accountId !== 'CashInHand') {
+                localStorage.setItem('defaultPaymentAccountId', accountId);
+            } else {
+                localStorage.removeItem('defaultPaymentAccountId');
+            }
         }
     };
     
@@ -57,10 +65,19 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         if (method === 'Cash') {
             setSelectedAccountId('CashInHand');
         } else {
-            // Attempt to set a default bank account, or the first available one if cash was selected
-            const defaultBank = localStorage.getItem('defaultPaymentAccountId');
-            if (selectedAccountId === 'CashInHand' && defaultBank && defaultBank !== 'CashInHand') {
-                setSelectedAccountId(defaultBank);
+            const defaultBankId = localStorage.getItem('defaultPaymentAccountId');
+            const firstBankId = bankAccounts.find(ba => ba.id !== 'CashInHand')?.id;
+            
+            if (selectedAccountId === 'CashInHand') {
+                if (defaultBankId && defaultBankId !== 'CashInHand') {
+                    setSelectedAccountId(defaultBankId);
+                } else if (firstBankId) {
+                    setSelectedAccountId(firstBankId);
+                } else {
+                    // Fallback if no bank accounts exist, though UI should prevent this state
+                    setSelectedAccountId('CashInHand');
+                    setPaymentMethod('Cash');
+                }
             }
         }
     };

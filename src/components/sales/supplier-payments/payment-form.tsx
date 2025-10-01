@@ -40,28 +40,6 @@ export const PaymentForm = (props: any) => {
         parchiNo, setParchiNo, // Receive parchiNo and its setter
     } = props;
 
-    const [minRate, setMinRate] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return Number(localStorage.getItem('paymentCombinationMinRate')) || 4000;
-        }
-        return 4000;
-    });
-    const [maxRate, setMaxRate] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return Number(localStorage.getItem('paymentCombinationMaxRate')) || 4500;
-        }
-        return 4500;
-    });
-
-    // Persist min/max rate to localStorage
-    React.useEffect(() => {
-        localStorage.setItem('paymentCombinationMinRate', String(minRate));
-    }, [minRate]);
-
-    React.useEffect(() => {
-        localStorage.setItem('paymentCombinationMaxRate', String(maxRate));
-    }, [maxRate]);
-
     const paymentFromOptions = useMemo(() => {
         const cashOption = { value: 'CashInHand', label: `Cash In Hand (${formatCurrency(financialState.balances.get('CashInHand') || 0)})` };
         const bankOptions = bankAccounts.map((acc: any) => ({ 
@@ -79,8 +57,11 @@ export const PaymentForm = (props: any) => {
     return (
         <>
             <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Payment & CD Details</CardTitle>
+                </CardHeader>
                 <CardContent className="p-3 space-y-3">
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-x-3 gap-y-2 items-end">
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-2 items-end">
                         {/* Payment Details */}
                         <div className="space-y-1">
                             <Label className="text-xs">Payment Date</Label>
@@ -120,7 +101,7 @@ export const PaymentForm = (props: any) => {
                             <Label className="text-xs">Payment From</Label>
                             <CustomDropdown
                                 options={paymentFromOptions}
-                                value={paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId}
+                                value={selectedAccountId}
                                 onChange={(value) => setSelectedAccountId(value)}
                                 placeholder="Select Account"
                             />
@@ -169,14 +150,17 @@ export const PaymentForm = (props: any) => {
 
             {paymentMethod === 'RTGS' && (
                 <Card className="mt-3">
+                     <CardHeader>
+                        <CardTitle className="text-base">RTGS Details & Generation</CardTitle>
+                    </CardHeader>
                     <CardContent className="p-3 space-y-3">
-                        <PaymentCombinationGenerator 
+                        <PaymentCombinationGenerator
                             calcTargetAmount={calcTargetAmount}
                             setCalcTargetAmount={setCalcTargetAmount}
-                            minRate={minRate}
-                            setMinRate={setMinRate}
-                            maxRate={maxRate}
-                            setMaxRate={setMaxRate}
+                            minRate={props.minRate}
+                            setMinRate={props.setMinRate}
+                            maxRate={props.maxRate}
+                            setMaxRate={props.setMaxRate}
                             selectPaymentAmount={selectPaymentAmount}
                         />
                         <RtgsForm {...props} />
