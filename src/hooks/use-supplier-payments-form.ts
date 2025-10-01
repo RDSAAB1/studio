@@ -127,7 +127,9 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     
         let formattedId = value.toUpperCase();
         if (!/^RT/i.test(value) && !isNaN(parseInt(value)) && isFinite(Number(value))) {
-            formattedId = 'RT' + String(value).padStart(5, '0');
+            const num = parseInt(value, 10);
+            // Correctly format the number with padding without incrementing it
+            formattedId = 'RT' + String(num).padStart(5, '0');
             setRtgsSrNo(formattedId);
         }
     
