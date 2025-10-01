@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState } from 'react';
@@ -10,18 +9,30 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, RefreshCw, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw, Loader2, Pen, User } from "lucide-react";
 import { format } from 'date-fns';
 import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import { RtgsForm } from './rtgs-form';
 import { PaymentCombinationGenerator } from './payment-combination-generator';
-
 
 const cdOptions = [
     { value: 'partial_on_paid', label: 'Partial CD on Paid Amount' },
     { value: 'on_unpaid_amount', label: 'CD on Unpaid Amount' },
     { value: 'on_full_amount', label: 'Full CD (Paid + Unpaid)' },
 ];
+
+const SectionTitle = ({ title, onEdit, editingPayment, icon, description }: { title: string, onEdit?: () => void, editingPayment?: boolean, icon?: React.ReactNode, description?: string }) => (
+    <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+             {icon}
+            <div>
+                <h3 className="text-sm font-semibold">{title}</h3>
+                {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            </div>
+        </div>
+        {onEdit && !editingPayment && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Pen className="h-4 w-4"/></Button>}
+    </div>
+);
 
 
 export const PaymentForm = (props: any) => {
@@ -39,6 +50,7 @@ export const PaymentForm = (props: any) => {
         selectPaymentAmount,
         handleEditPayment, // Receive the edit handler
         parchiNo, setParchiNo, // Receive parchiNo and its setter
+        supplierDetails, setSupplierDetails, isPayeeEditing, setIsPayeeEditing,
     } = props;
 
     const paymentFromOptions = useMemo(() => {
@@ -148,6 +160,34 @@ export const PaymentForm = (props: any) => {
                     )}
                 </CardContent>
             </Card>
+
+             {(paymentMethod === 'RTGS' || (paymentMethod !== 'RTGS' && props.selectedCustomerKey)) && (
+                <Card className="mt-3">
+                    <CardHeader>
+                         <SectionTitle title="Payee Details" icon={<User size={18}/>} onEdit={() => setIsPayeeEditing(true)} editingPayment={editingPayment} />
+                    </CardHeader>
+                    <CardContent className="space-y-3 p-3">
+                         {isPayeeEditing ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-lg bg-background">
+                                <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
+                                <div className="space-y-1"><Label className="text-xs">{rtgsFor === 'Outsider' ? 'Company' : "Father's Name"}</Label><Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} className="h-8 text-xs" /></div>
+                                <div className="space-y-1"><Label className="text-xs">Contact</Label><Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" /></div>
+                                <div className="space-y-1"><Label className="text-xs">Address</Label><Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} className="h-8 text-xs" /></div>
+                                <div className="col-span-full flex justify-end">
+                                    <Button size="sm" onClick={() => setIsPayeeEditing(false)} className="h-7 text-xs">Done</Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-xs grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground p-2 rounded-lg bg-background/50">
+                                <p><span className="font-semibold">Name:</span> {supplierDetails.name}</p>
+                                <p><span className="font-semibold">{rtgsFor === 'Outsider' ? 'Company:' : "Father's Name:"}</span> {supplierDetails.fatherName}</p>
+                                <p><span className="font-semibold">Contact:</span> {supplierDetails.contact}</p>
+                                <p className="col-span-full"><span className="font-semibold">Address:</span> {supplierDetails.address}</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {paymentMethod === 'RTGS' && (
                  <Card className="mt-3">
