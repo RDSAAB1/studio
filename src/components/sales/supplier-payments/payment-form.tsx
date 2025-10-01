@@ -77,95 +77,99 @@ export const PaymentForm = (props: any) => {
 
 
     return (
-        <Card>
-            <CardContent className="p-3 space-y-3">
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-x-3 gap-y-2 items-end">
-                    {/* Payment Details */}
-                    <div className="space-y-1">
-                        <Label className="text-xs">Payment Date</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-8 text-xs", !paymentDate && "text-muted-foreground")}>
-                                    <CalendarIcon className="mr-2 h-3 w-3" />
-                                    {paymentDate ? format(paymentDate, "dd-MMM-yy") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={paymentDate} onSelect={setPaymentDate} initialFocus /></PopoverContent>
-                        </Popover>
-                    </div>
-
-                     <div className="space-y-1">
-                        <Label className="text-xs">Payment ID</Label>
-                        <Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
-                    </div>
-
-                    <div className="space-y-1">
-                        <Label className="text-xs">Payment Type</Label>
-                        <Select value={paymentType} onValueChange={setPaymentType}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Full">Full</SelectItem>
-                                <SelectItem value="Partial">Partial</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                        <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
-                        <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
-                    </div>
-                    
-                    <div className="space-y-1 lg:col-span-2">
-                        <Label className="text-xs">Payment From</Label>
-                        <CustomDropdown
-                            options={paymentFromOptions}
-                            value={selectedAccountId}
-                            onChange={(value) => setSelectedAccountId(value)}
-                            placeholder="Select Account"
-                        />
-                    </div>
-                    
-                     <div className="flex items-center justify-center pt-2">
-                        <button type="button" onClick={() => setCdEnabled(!cdEnabled)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
-                            <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
-                            <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !cdEnabled ? 'text-primary' : 'text-muted-foreground')}>Off</span>
-                            <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", cdEnabled ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
-                                <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", cdEnabled ? 'bg-primary' : 'bg-secondary' )}>
-                                    <span className="text-xs font-bold text-primary-foreground">CD</span>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-                
-                {cdEnabled && (
-                     <div className="p-2 border rounded-lg bg-background flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-                            <Label htmlFor="cd-percent" className="text-xs">CD%</Label>
-                            <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+        <>
+            <Card>
+                <CardContent className="p-3 space-y-3">
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-x-3 gap-y-2 items-end">
+                        {/* Payment Details */}
+                        <div className="space-y-1">
+                            <Label className="text-xs">Payment Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-8 text-xs", !paymentDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-3 w-3" />
+                                        {paymentDate ? format(paymentDate, "dd-MMM-yy") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={paymentDate} onSelect={setPaymentDate} initialFocus /></PopoverContent>
+                            </Popover>
                         </div>
-                        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                            <Label className="text-xs">At</Label>
-                            <Select value={cdAt} onValueChange={setCdAt}>
-                                <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue />
-                                </SelectTrigger>
+
+                         <div className="space-y-1">
+                            <Label className="text-xs">Payment ID</Label>
+                            <Input id="payment-id" value={paymentId} onChange={e => setPaymentId(e.target.value)} onBlur={(e) => handlePaymentIdBlur(e, handleEditPayment)} className="h-8 text-xs font-mono" />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label className="text-xs">Payment Type</Label>
+                            <Select value={paymentType} onValueChange={setPaymentType}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    {cdOptions.map(opt => (
-                                        <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
-                                    ))}
+                                    <SelectItem value="Full">Full</SelectItem>
+                                    <SelectItem value="Partial">Partial</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-                            <Label className="text-xs">Amt</Label>
-                            <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
+
+                        <div className="space-y-1">
+                            <Label htmlFor="payment-amount" className="text-xs">Pay Amount</Label>
+                            <Input id="payment-amount" type="number" value={paymentAmount} onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)} readOnly={paymentType === 'Full'} className="h-8 text-xs" />
+                        </div>
+                        
+                        <div className="space-y-1 lg:col-span-2">
+                            <Label className="text-xs">Payment From</Label>
+                            <CustomDropdown
+                                options={paymentFromOptions}
+                                value={paymentMethod === 'Cash' ? 'CashInHand' : selectedAccountId}
+                                onChange={(value) => setSelectedAccountId(value)}
+                                placeholder="Select Account"
+                            />
+                        </div>
+                        
+                         <div className="flex items-center justify-center pt-2">
+                            <button type="button" onClick={() => setCdEnabled(!cdEnabled)} className={cn( "relative w-40 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", cdEnabled ? 'bg-primary/20' : 'bg-secondary/20' )} >
+                                <span className={cn("absolute right-4 text-xs font-semibold transition-colors duration-300", cdEnabled ? 'text-primary' : 'text-muted-foreground')}>On</span>
+                                <span className={cn("absolute left-4 text-xs font-semibold transition-colors duration-300", !cdEnabled ? 'text-primary' : 'text-muted-foreground')}>Off</span>
+                                <div className={cn( "absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform", cdEnabled ? 'translate-x-[calc(100%-28px)]' : 'translate-x-[-4px]' )}>
+                                    <div className={cn( "h-full w-full rounded-full flex items-center justify-center transition-colors duration-300", cdEnabled ? 'bg-primary' : 'bg-secondary' )}>
+                                        <span className="text-xs font-bold text-primary-foreground">CD</span>
+                                    </div>
+                                </div>
+                            </button>
                         </div>
                     </div>
-                )}
-                
-                {paymentMethod === 'RTGS' && (
-                    <div className="space-y-3 pt-2">
+                    
+                    {cdEnabled && (
+                         <div className="p-2 border rounded-lg bg-background flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+                                <Label htmlFor="cd-percent" className="text-xs">CD%</Label>
+                                <Input id="cd-percent" type="number" value={cdPercent} onChange={e => setCdPercent(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                            </div>
+                            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                                <Label className="text-xs">At</Label>
+                                <Select value={cdAt} onValueChange={setCdAt}>
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {cdOptions.map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+                                <Label className="text-xs">Amt</Label>
+                                <Input value={formatCurrency(calculatedCdAmount)} readOnly className="h-8 text-xs font-bold text-primary" />
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {paymentMethod === 'RTGS' && (
+                <Card className="mt-3">
+                    <CardContent className="p-3 space-y-3">
                         <PaymentCombinationGenerator 
                             calcTargetAmount={calcTargetAmount}
                             setCalcTargetAmount={setCalcTargetAmount}
@@ -176,25 +180,25 @@ export const PaymentForm = (props: any) => {
                             selectPaymentAmount={selectPaymentAmount}
                         />
                         <RtgsForm {...props} />
-                    </div>
-                )}
-                 
-                 <CardFooter className="p-0 pt-3">
-                    <Card className="bg-muted/30 w-full p-2">
-                        <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                            <div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">To Pay:</span><span className="text-sm font-semibold">{formatCurrency(props.rtgsAmount || paymentAmount)}</span></div>
-                            {cdEnabled && (<div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">CD:</span><span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span></div>)}
-                            <div className="flex items-center gap-2 border-l pl-2 ml-2"><span className="text-sm font-medium text-muted-foreground">Total Reduction:</span><span className="text-base font-bold text-primary">{formatCurrency((props.rtgsAmount || paymentAmount) + calculatedCdAmount)}</span></div>
-                            <div className="flex-grow"></div>
-                            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
-                            <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
-                                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                                {editingPayment ? 'Update Payment' : 'Finalize Payment'}
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </CardFooter>
-            </CardContent>
-        </Card>
+                    </CardContent>
+                </Card>
+            )}
+             
+            <CardFooter className="p-0 pt-3">
+                <Card className="bg-muted/30 w-full p-2">
+                    <CardContent className="p-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        <div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">To Pay:</span><span className="text-sm font-semibold">{formatCurrency(props.rtgsAmount || paymentAmount)}</span></div>
+                        {cdEnabled && (<div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">CD:</span><span className="text-sm font-semibold">{formatCurrency(calculatedCdAmount)}</span></div>)}
+                        <div className="flex items-center gap-2 border-l pl-2 ml-2"><span className="text-sm font-medium text-muted-foreground">Total Reduction:</span><span className="text-base font-bold text-primary">{formatCurrency((props.rtgsAmount || paymentAmount) + calculatedCdAmount)}</span></div>
+                        <div className="flex-grow"></div>
+                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetPaymentForm(rtgsFor === 'Outsider')}><RefreshCw className="mr-2 h-3 w-3" />Clear Form</Button>
+                        <Button onClick={processPayment} size="sm" className="h-8 text-xs" disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            {editingPayment ? 'Update Payment' : 'Finalize Payment'}
+                        </Button>
+                    </CardContent>
+                </Card>
+            </CardFooter>
+        </>
     );
 };

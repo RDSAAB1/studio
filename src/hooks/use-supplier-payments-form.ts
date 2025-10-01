@@ -51,6 +51,19 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             localStorage.setItem('defaultPaymentAccountId', accountId);
         }
     };
+    
+    const handleSetPaymentMethod = (method: 'Cash' | 'Online' | 'RTGS') => {
+        setPaymentMethod(method);
+        if (method === 'Cash') {
+            setSelectedAccountId('CashInHand');
+        } else {
+            // Attempt to set a default bank account, or the first available one if cash was selected
+            const defaultBank = localStorage.getItem('defaultPaymentAccountId');
+            if (selectedAccountId === 'CashInHand' && defaultBank && defaultBank !== 'CashInHand') {
+                setSelectedAccountId(defaultBank);
+            }
+        }
+    };
 
     const getNextPaymentId = useCallback((method: 'Cash' | 'Online' | 'RTGS') => {
         if (!paymentHistory || !expenses) return '';
@@ -125,7 +138,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         const value = e.target.value.trim().toUpperCase();
         if (!value) return;
     
-        // Extract only the numeric part of the input
         const numericPart = value.replace(/\D/g, '');
     
         if (numericPart) {
@@ -134,6 +146,11 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             setRtgsSrNo(formattedId);
     
             const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
+            if (existingPayment) {
+                onEditCallback(existingPayment);
+            }
+        } else if (value.startsWith('RT')) {
+            const existingPayment = paymentHistory.find(p => p.rtgsSrNo === value);
             if (existingPayment) {
                 onEditCallback(existingPayment);
             }
@@ -175,7 +192,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
         paymentDate, setPaymentDate,
         paymentAmount, setPaymentAmount,
         paymentType, setPaymentType,
-        paymentMethod, setPaymentMethod,
+        paymentMethod, setPaymentMethod: handleSetPaymentMethod,
         selectedAccountId, setSelectedAccountId: handleSetSelectedAccountId,
         supplierDetails, setSupplierDetails,
         bankDetails, setBankDetails,
