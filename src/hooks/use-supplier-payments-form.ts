@@ -127,7 +127,7 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
 
         let formattedId = value.toUpperCase();
         if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
-            formattedId = generateReadableId('RT', parseInt(value, 10)-1, 5);
+            formattedId = generateReadableId('RT', parseInt(value, 10) -1, 5);
             setRtgsSrNo(formattedId);
         }
 
