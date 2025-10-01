@@ -43,6 +43,7 @@ export const RtgsForm = (props: any) => {
         rtgsQuantity, setRtgsQuantity, rtgsRate, setRtgsRate, rtgsAmount, setRtgsAmount,
         editingPayment, setIsBankSettingsOpen,
         calcTargetAmount, setCalcTargetAmount,
+        minRate, setMinRate, maxRate, setMaxRate,
         selectPaymentAmount,
         handleEditPayment, // Receive the edit handler
     } = props;
@@ -171,8 +172,8 @@ export const RtgsForm = (props: any) => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-lg bg-background">
                                 <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={supplierDetails.name} onChange={e => setSupplierDetails({...supplierDetails, name: e.target.value})} className="h-8 text-xs" /></div>
                                 <div className="space-y-1"><Label className="text-xs">{rtgsFor === 'Outsider' ? 'Company' : "Father's Name"}</Label><Input value={supplierDetails.fatherName} onChange={e => setSupplierDetails({...supplierDetails, fatherName: e.target.value})} className="h-8 text-xs" /></div>
-                                <div className="col-span-full space-y-1"><Label className="text-xs">Address</Label><Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} className="h-8 text-xs" /></div>
-                                <div className="space-y-1"><Label className="text-xs">Contact</Label><Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" disabled={rtgsFor === 'Supplier'}/></div>
+                                <div className="space-y-1"><Label className="text-xs">Contact</Label><Input value={supplierDetails.contact} onChange={e => setSupplierDetails({...supplierDetails, contact: e.target.value})} className="h-8 text-xs" /></div>
+                                <div className="space-y-1 sm:col-span-2"><Label className="text-xs">Address</Label><Input value={supplierDetails.address} onChange={e => setSupplierDetails({...supplierDetails, address: e.target.value})} className="h-8 text-xs" /></div>
                                 <div className="col-span-full flex justify-end">
                                     <Button size="sm" onClick={() => setIsPayeeEditing(false)} className="h-7 text-xs">Done</Button>
                                 </div>
@@ -181,6 +182,7 @@ export const RtgsForm = (props: any) => {
                             <div className="text-xs grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground p-2 rounded-lg bg-background/50">
                                 <p><span className="font-semibold">Name:</span> {supplierDetails.name}</p>
                                 <p><span className="font-semibold">{rtgsFor === 'Outsider' ? 'Company:' : "Father's Name:"}</span> {supplierDetails.fatherName}</p>
+                                <p><span className="font-semibold">Contact:</span> {supplierDetails.contact}</p>
                                 <p className="col-span-full"><span className="font-semibold">Address:</span> {supplierDetails.address}</p>
                             </div>
                         )}
