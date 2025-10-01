@@ -7,12 +7,15 @@ import { toTitleCase, formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useSupplierPayments } from '@/hooks/use-supplier-payments';
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Loader2, History } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 import { PaymentForm } from '@/components/sales/supplier-payments/payment-form';
 import { PaymentHistory } from '@/components/sales/supplier-payments/payment-history';
@@ -26,6 +29,7 @@ import { RTGSReceiptDialog } from '@/components/sales/supplier-payments/rtgs-rec
 
 export default function SupplierPaymentsClient() {
     const { toast } = useToast();
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('processing');
 
     const hook = useSupplierPayments();
@@ -54,84 +58,84 @@ export default function SupplierPaymentsClient() {
   
     return (
         <div className="space-y-3">
-            <Tabs value={hook.paymentMethod} onValueChange={(value) => {
-                hook.setPaymentMethod(value);
-                hook.resetPaymentForm(hook.rtgsFor === 'Outsider');
-            }}>
-                <TabsList className="grid w-full grid-cols-3 h-9">
-                    <TabsTrigger value="Cash">Cash</TabsTrigger>
-                    <TabsTrigger value="Online">Online</TabsTrigger>
-                    <TabsTrigger value="RTGS">RTGS</TabsTrigger>
-                </TabsList>
-            </Tabs>
-
-            {hook.paymentMethod === 'RTGS' && (
-                 <div className="flex items-center space-x-2 p-2">
-                    <button type="button" onClick={() => { const newType = hook.rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier'; hook.setRtgsFor(newType); hook.resetPaymentForm(newType === 'Outsider'); }} className={`relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${hook.rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'}`} >
-                        <span className={`absolute right-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground'}`}>Outsider</span>
-                        <span className={`absolute left-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground'}`}>Supplier</span>
-                        <div className={`absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform ${hook.rtgsFor === 'Supplier' ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'}`} >
-                            <div className={`h-full w-full rounded-full flex items-center justify-center transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'bg-secondary' : 'bg-primary'}`}>
-                                <span className="text-sm font-bold text-primary-foreground">For</span>
+             <Card>
+                <CardHeader className="p-0">
+                    <div className="flex items-center justify-between p-3 border-b">
+                        <div className="flex items-center gap-2">
+                            <Button onClick={() => { hook.setPaymentMethod('Cash'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'Cash' ? 'default' : 'outline'} size="sm">Cash</Button>
+                            <Button onClick={() => { hook.setPaymentMethod('Online'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'Online' ? 'default' : 'outline'} size="sm">Online</Button>
+                            <Button onClick={() => { hook.setPaymentMethod('RTGS'); hook.resetPaymentForm(hook.rtgsFor === 'Outsider'); }} variant={hook.paymentMethod === 'RTGS' ? 'default' : 'outline'} size="sm">RTGS</Button>
+                        </div>
+                        {hook.paymentMethod === 'RTGS' && (
+                            <div className="flex items-center space-x-2">
+                                <button type="button" onClick={() => { const newType = hook.rtgsFor === 'Supplier' ? 'Outsider' : 'Supplier'; hook.setRtgsFor(newType); hook.resetPaymentForm(newType === 'Outsider'); }} className={`relative w-48 h-7 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${hook.rtgsFor === 'Outsider' ? 'bg-primary/20' : 'bg-secondary/20'}`} >
+                                    <span className={`absolute right-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Outsider' ? 'text-primary' : 'text-muted-foreground'}`}>Outsider</span>
+                                    <span className={`absolute left-4 text-xs font-semibold transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'text-primary' : 'text-muted-foreground'}`}>Supplier</span>
+                                    <div className={`absolute w-[calc(50%+12px)] h-full top-0 rounded-full shadow-lg flex items-center justify-center transition-transform duration-300 ease-in-out bg-card transform ${hook.rtgsFor === 'Supplier' ? 'translate-x-[-4px]' : 'translate-x-[calc(100%-28px)]'}`} >
+                                        <div className={`h-full w-full rounded-full flex items-center justify-center transition-colors duration-300 ${hook.rtgsFor === 'Supplier' ? 'bg-secondary' : 'bg-primary'}`}>
+                                            <span className="text-sm font-bold text-primary-foreground">For</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        )}
+                        <Button variant="outline" size="icon" onClick={() => setIsHistoryOpen(true)}>
+                            <History className="h-4 w-4" />
+                            <span className="sr-only">View History</span>
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-3">
+                    {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
+                        <div className="mb-4">
+                            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                                <div className="flex-1">
+                                    <CustomDropdown
+                                        options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
+                                        value={hook.selectedCustomerKey}
+                                        onChange={hook.handleCustomerSelect}
+                                        placeholder="Search and select supplier..."
+                                    />
+                                </div>
+                                {hook.selectedCustomerKey && (
+                                    <div className="flex items-center gap-4 md:border-l md:pl-4 w-full md:w-auto mt-2 md:mt-0">
+                                        <div className="flex items-baseline gap-2 text-sm">
+                                            <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
+                                            <p className="font-bold text-base text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
+                                        </div>
+                                        <Button variant="outline" size="sm" onClick={() => hook.setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </button>
-                </div>
-            )}
-
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="processing">Payment Processing</TabsTrigger>
-                    <TabsTrigger value="history">Full History</TabsTrigger>
-                </TabsList>
-                <TabsContent value="processing" className="space-y-3">
-                    {(hook.paymentMethod !== 'RTGS' || hook.rtgsFor === 'Supplier') && (
-                        <Card>
-                            <CardContent className="p-3">
-                                <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
-                                    <div className="flex flex-1 items-center gap-2">
-                                        <Label htmlFor="supplier-select" className="text-sm font-semibold whitespace-nowrap">Select Supplier:</Label>
-                                        <CustomDropdown
-                                            options={Array.from(hook.customerSummaryMap.entries()).map(([key, data]) => ({ value: key, label: `${toTitleCase(data.name)} (${data.contact})` }))}
-                                            value={hook.selectedCustomerKey}
-                                            onChange={hook.handleCustomerSelect}
-                                            placeholder="Search and select supplier..."
-                                        />
-                                    </div>
-                                    {hook.selectedCustomerKey && (
-                                        <div className="flex items-center gap-2 md:border-l md:pl-2 w-full md:w-auto mt-2 md:mt-0">
-                                            <div className="flex items-center gap-1 text-xs">
-                                                <Label className="font-medium text-muted-foreground">Total Outstanding:</Label>
-                                                <p className="font-bold text-destructive">{formatCurrency(hook.customerSummaryMap.get(hook.selectedCustomerKey)?.totalOutstanding || 0)}</p>
-                                            </div>
-                                            <Button variant="outline" size="sm" onClick={() => hook.setIsOutstandingModalOpen(true)} className="h-7 text-xs">Change Selection</Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
                     )}
-
                     {(hook.selectedCustomerKey || hook.rtgsFor === 'Outsider') && (
                         <PaymentForm {...hook} bankBranches={hook.bankBranches} />
                     )}
-                     {hook.selectedCustomerKey && (
-                         <TransactionTable
+                    {hook.selectedCustomerKey && (
+                        <TransactionTable
                             suppliers={transactionsForSelectedSupplier}
                             onShowDetails={hook.setDetailsSupplierEntry}
-                         />
-                     )}
-                </TabsContent>
-                <TabsContent value="history">
-                     <div className="space-y-3">
+                        />
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+                <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Full Payment History</DialogTitle>
+                        <DialogDescription>A complete log of all payments recorded.</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-grow min-h-0">
                         <PaymentHistory
                             payments={hook.paymentHistory}
                             onShowDetails={hook.setSelectedPaymentForDetails}
                             onPrintRtgs={hook.setRtgsReceiptData}
                         />
-                     </div>
-                </TabsContent>
-            </Tabs>
+                    </div>
+                </DialogContent>
+            </Dialog>
           
             <OutstandingEntriesDialog
                 isOpen={hook.isOutstandingModalOpen}
