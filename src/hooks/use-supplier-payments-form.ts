@@ -124,13 +124,13 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
         let value = e.target.value.trim();
         if (!value) return;
-
+    
         let formattedId = value.toUpperCase();
-        if (!isNaN(parseInt(value)) && isFinite(Number(value))) {
-            formattedId = generateReadableId('RT', parseInt(value, 10) -1, 5);
+        if (!/^RT/i.test(value) && !isNaN(parseInt(value)) && isFinite(Number(value))) {
+            formattedId = 'RT' + String(value).padStart(5, '0');
             setRtgsSrNo(formattedId);
         }
-
+    
         const existingPayment = paymentHistory.find(p => p.rtgsSrNo === formattedId);
         if (existingPayment) {
             onEditCallback(existingPayment);
