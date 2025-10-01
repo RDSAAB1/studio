@@ -122,13 +122,13 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
     };
     
     const handleRtgsSrNoBlur = (e: React.FocusEvent<HTMLInputElement>, onEditCallback: (payment: Payment) => void) => {
-        let value = e.target.value.trim().toUpperCase();
+        const value = e.target.value.trim().toUpperCase();
         if (!value) return;
     
-        // Strip "RT" prefix if present and get the numeric part
-        const numericPart = value.startsWith('RT') ? value.substring(2) : value;
+        // Extract only the numeric part of the input
+        const numericPart = value.replace(/\D/g, '');
     
-        if (!isNaN(parseInt(numericPart)) && isFinite(Number(numericPart))) {
+        if (numericPart) {
             const num = parseInt(numericPart, 10);
             const formattedId = 'RT' + String(num).padStart(5, '0');
             setRtgsSrNo(formattedId);
@@ -137,9 +137,6 @@ export const useSupplierPaymentsForm = (paymentHistory: Payment[], expenses: Exp
             if (existingPayment) {
                 onEditCallback(existingPayment);
             }
-        } else {
-            // If it's not a parsable number, just set what was typed
-            setRtgsSrNo(value);
         }
     };
     
